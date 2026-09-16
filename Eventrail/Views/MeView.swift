@@ -19,7 +19,6 @@ struct MeView: View {
                     profileCard
                     statistics
                     refreshCard
-                    accountCard
                     favoritesCard
                     settingsCard(store: $store)
                     footnote
@@ -107,57 +106,128 @@ struct MeView: View {
         }
     }
 
-    /// Re-imports every event in the library from its public page. Only imported
-    /// fields are replaced; notes, interest, tickets and attendance are not.
-    private var refreshCard: some View {
-        HStack(spacing: 13) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Last refreshed")
-                    .font(.system(size: 14, weight: .semibold))
-                refreshDetail
-                    .font(.system(size: 12))
-                    .foregroundStyle(store.refreshFailure == nil ? .secondary : Color.favorite)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    // MARK: - Keeping the library current
 
-            Button {
-                Task { await store.refresh() }
-            } label: {
-                Text(store.isRefreshing ? "Refreshing" : "Refresh")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.brandTint)
-                    .padding(.horizontal, 15)
-                    .padding(.vertical, 9)
+    /// The one thing this screen asks Eventernote for.
+    ///
+    /// Refreshing and importing an account were two buttons until it became
+    /// clear they are one intention: bring the library up to date from
+    /// Eventernote. With an account linked, Refresh reads its history too;
+    /// without one there is nothing to import, so nothing extra is offered.
+    /// The account itself is a row underneath rather than a second button.
+    private var refreshCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 13) {
+                VStack(alignment: .leading, spacing: 4) {
+                    refreshTitle
+                        .font(.system(size: 14, weight: .semibold))
+                    refreshDetail
+                        .font(.system(size: 12))
+                        .foregroundStyle(store.refreshFailure == nil ? .secondary : Color.favorite)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    Task { await store.refresh() }
+                } label: {
+                    Text(store.isRefreshing ? "Refreshing" : "Refresh")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.brandTint)
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 9)
+                }
+                .buttonStyle(.plain)
+                .glassCapsule(interactive: true)
+                .disabled(store.isRefreshing || nothingToRefresh)
             }
-            .buttonStyle(.plain)
-            .glassCapsule(interactive: true)
-            .disabled(store.isRefreshing || store.library.isEmpty)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
+
+            if let fraction = refreshFraction {
+                ProgressView(value: fraction)
+                    .tint(Color.trackTicket)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
+
+            if store.eventernoteHandle == nil {
+                accountRow("Link Eventernote Account") { isLinking = true }
+            } else {
+                accountRow("Change Account") { isLinking = true }
+                accountRow("Unlink Account") { isConfirmingUnlink = true }
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 15)
         .glassPanel()
+    }
+
+    /// An empty library with no account named has nothing to ask about.
+    private var nothingToRefresh: Bool {
+        store.library.isEmpty && store.eventernoteHandle == nil
+    }
+
+    private var refreshTitle: Text {
+        if let handle = store.eventernoteHandle {
+            Text(verbatim: "@\(handle)")
+        } else {
+            Text("Last refreshed")
+        }
     }
 
     /// The honest wording: the app reports when it last *succeeded*, never that
     /// the data is current.
     private var refreshDetail: Text {
         if store.isRefreshing {
-            Text("Re-importing ^[\(store.library.count) event](inflect: true)…")
-        } else if let failure = store.refreshFailure {
-            Text(verbatim: failure)
-        } else if let lastRefreshed = store.lastRefreshed {
-            Text("Events re-imported \(lastRefreshed, format: .relative(presentation: .named))")
-        } else if store.library.isEmpty {
-            Text("Add events from Search to fill your library")
-        } else {
-            Text("Never re-imported")
+            return workingDetail
+        }
+        // Counts and a short fall belong on the same line: "it worked" and "it
+        // only got this far" are both true of a partial import.
+        if let summary = store.importSummary {
+            let counts = Text("Imported ^[\(summary.read) event](inflect: true) — \(summary.added) added, \(summary.filled) updated")
+            guard let failure = store.refreshFailure else { return counts }
+            return counts + Text(verbatim: " ") + Text(verbatim: failure)
+        }
+        if let failure = store.refreshFailure {
+            return Text(verbatim: failure)
+        }
+        if let lastRefreshed = store.lastRefreshed {
+            return Text("Refreshed \(lastRefreshed, format: .relative(presentation: .named))")
+        }
+        if nothingToRefresh {
+            return Text("Add events from Search, or link your Eventernote account")
+        }
+        return Text("Never refreshed")
+    }
+
+    /// Which of the two passes is running. They take very different amounts of
+    /// time, so saying only "Refreshing" would leave the longer one looking
+    /// stuck.
+    private var workingDetail: Text {
+        switch store.refreshStage {
+        case .readingHistory(_, 0), .none:
+            Text("Reading your Eventernote history…")
+        case .readingHistory(let read, let total):
+            Text("Reading your history — \(read) of ^[\(total) event](inflect: true)")
+        case .reimporting(let read, let total):
+            Text("Re-importing — \(read) of ^[\(total) event](inflect: true)")
+        }
+    }
+
+    /// How far along the running pass is. Both passes know their own length, so
+    /// neither has to spin without saying how much is left.
+    private var refreshFraction: Double? {
+        switch store.refreshStage {
+        case .readingHistory(let read, let total) where total > 0,
+             .reimporting(let read, let total) where total > 0:
+            Double(read) / Double(total)
+        default:
+            nil
         }
     }
 
     /// The settings this screen keeps out of the way. Destructive work lives
     /// here rather than in the cards, where it would be one stray tap from the
-    /// Refresh and Import buttons beside it.
+    /// Refresh button beside it.
     private var settingsMenu: some View {
         Menu {
             Button("Delete All Events", systemImage: "trash", role: .destructive) {
@@ -190,108 +260,6 @@ struct MeView: View {
         }
     }
 
-    // MARK: - The linked Eventernote account
-
-    /// Names an Eventernote account and pulls its attended events in.
-    ///
-    /// Eventernote publishes every member's history on a page anyone can load,
-    /// so this needs a handle and nothing else — no password, no session, no
-    /// writing back. Importing adds what is missing and fills in tracking the
-    /// reader has left blank; it never overrules an answer they gave.
-    private var accountCard: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 13) {
-                VStack(alignment: .leading, spacing: 4) {
-                    accountTitle
-                        .font(.system(size: 14, weight: .semibold))
-                    accountDetail
-                        .font(.system(size: 12))
-                        .foregroundStyle(store.importFailure == nil ? .secondary : Color.favorite)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button {
-                    if store.eventernoteHandle == nil {
-                        isLinking = true
-                    } else {
-                        Task { await store.importAccountHistory() }
-                    }
-                } label: {
-                    accountAction
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.brandTint)
-                        .padding(.horizontal, 15)
-                        .padding(.vertical, 9)
-                }
-                .buttonStyle(.plain)
-                .glassCapsule(interactive: true)
-                .disabled(store.isImporting)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 15)
-
-            if store.isImporting, let progress = store.importProgress, progress.total > 0 {
-                ProgressView(value: Double(progress.read), total: Double(progress.total))
-                    .tint(Color.trackTicket)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-            }
-
-            if store.eventernoteHandle != nil {
-                accountRow("Change account") { isLinking = true }
-                accountRow("Unlink account") { isConfirmingUnlink = true }
-            }
-        }
-        .glassPanel()
-    }
-
-    private var accountTitle: Text {
-        if let handle = store.eventernoteHandle {
-            Text(verbatim: "@\(handle)")
-        } else {
-            Text("Eventernote Account")
-        }
-    }
-
-    private var accountAction: Text {
-        if store.eventernoteHandle == nil {
-            Text("Link")
-        } else if store.isImporting {
-            Text("Importing")
-        } else {
-            Text("Import")
-        }
-    }
-
-    /// Reports what the last import actually did, and says plainly when it
-    /// stopped short rather than implying the whole history arrived.
-    private var accountDetail: Text {
-        guard store.eventernoteHandle != nil else {
-            return Text("Import the events you have attended from your Eventernote profile")
-        }
-        if store.isImporting {
-            if let progress = store.importProgress {
-                return Text("Read \(progress.read) of ^[\(progress.total) event](inflect: true)…")
-            }
-            return Text("Reading your Eventernote history…")
-        }
-        // Counts and a short fall belong on the same line: "it worked" and "it
-        // only got this far" are both true of a partial import.
-        if let summary = store.importSummary {
-            let counts = Text("Imported ^[\(summary.read) event](inflect: true) — \(summary.added) added, \(summary.filled) updated")
-            guard let failure = store.importFailure else { return counts }
-            return counts + Text(verbatim: " ") + Text(verbatim: failure)
-        }
-        if let failure = store.importFailure {
-            return Text(verbatim: failure)
-        }
-        if let lastImported = store.lastImported {
-            return Text("History imported \(lastImported, format: .relative(presentation: .named))")
-        }
-        return Text("Not imported yet")
-    }
-
     private func accountRow(_ label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
@@ -307,7 +275,7 @@ struct MeView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .disabled(store.isImporting)
+        .disabled(store.isRefreshing)
         .overlay(alignment: .top) {
             Divider().padding(.leading, 16)
         }

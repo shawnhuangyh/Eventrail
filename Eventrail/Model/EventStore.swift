@@ -82,25 +82,26 @@ final class EventStore {
     private(set) var syncStatus: CloudSync.Outcome?
     private(set) var lastSynced: Date?
 
-    private(set) var isImporting = false
-    /// How far through the linked account's history the import has read, so a
-    /// nine-page import says so rather than appearing to hang.
-    private(set) var importProgress: ImportProgress?
-    /// What the last import did, kept only for as long as the screen shows it.
+    /// What a refresh is doing at this moment. Reading a nine-page history and
+    /// re-reading nine hundred event pages take very different amounts of time,
+    /// so the screen says which one it is waiting on rather than just spinning.
+    private(set) var refreshStage: RefreshStage?
+    /// What the last refresh imported from the linked account, kept only for as
+    /// long as the screen shows it.
     private(set) var importSummary: ImportSummary?
-    private(set) var importFailure: String?
 
-    /// How many of the account's events have been read so far.
-    struct ImportProgress: Hashable {
-        var read: Int
-        var total: Int
+    enum RefreshStage: Hashable {
+        /// Paging the linked account's own list. `total` is 0 until the site
+        /// has said how long the list is.
+        case readingHistory(read: Int, total: Int)
+        case reimporting(read: Int, total: Int)
     }
 
     /// What one import changed. `added` and `filled` are counted separately
     /// because they are different promises: one grew the library, the other only
     /// wrote a tracking field the reader had left alone.
     ///
-    /// A summary and an ``importFailure`` can both be set: an import that read
+    /// A summary and a ``refreshFailure`` can both be set: a history that read
     /// six pages of nine still adopted those six.
     struct ImportSummary: Hashable {
         var read: Int
@@ -188,8 +189,6 @@ final class EventStore {
 
     /// The Eventernote account the reader imports from, if they have named one.
     var eventernoteHandle: String? { archive.eventernoteAccount?.value }
-
-    var lastImported: Date? { archive.lastImported }
 
     func tracking(for event: Event) -> Tracking {
         archive.tracking[event.id]?.value ?? Tracking()
@@ -330,7 +329,13 @@ final class EventStore {
         return imported
     }
 
-    /// Re-imports every event in the library from its public page.
+    /// Brings the library up to date — the one thing this screen asks for.
+    ///
+    /// With an account linked that is two passes, in this order: the account's
+    /// own list first, so whatever it adds is in the library, and then each
+    /// event's own page for the times, billing and head count a listing row
+    /// never carries. Without an account it is only the second pass, because
+    /// there is nothing to import from.
     ///
     /// Only imported fields are replaced. On failure the previous snapshot and
     /// its timestamp are kept: the app reports when it last *succeeded*, never
@@ -339,35 +344,54 @@ final class EventStore {
         guard !isRefreshing else { return }
         isRefreshing = true
         refreshFailure = nil
-        defer { isRefreshing = false }
-
-        let events = library
-        guard !events.isEmpty else {
-            archive.lastRefreshed = .now
-            persist()
-            return
+        importSummary = nil
+        defer {
+            isRefreshing = false
+            refreshStage = nil
         }
 
-        let imported = await Self.reimport(events, using: client)
-        guard !imported.isEmpty else {
-            refreshFailure = String(localized: "Could not reach Eventernote. Showing the last import.")
-            return
+        // A history that failed still leaves events worth re-reading, so the
+        // second pass runs either way and the first failure is the one reported.
+        var landed = false
+        if eventernoteHandle != nil {
+            landed = await importHistory()
         }
-        for event in imported { apply(event) }
+        if await reimportDetails() { landed = true }
+
+        // The timestamp moves only when something actually arrived, so a run
+        // that reached nothing cannot pass itself off as a successful refresh.
+        guard landed else { return }
         archive.lastRefreshed = .now
         persist()
     }
 
-    /// Fetches event pages a few at a time. Whatever comes back is used; an
-    /// event whose page failed keeps the copy already held.
-    private nonisolated static func reimport(
-        _ events: [Event], using client: EventernoteClient
-    ) async -> [Event] {
-        let inFlight = 4
-        return await withTaskGroup(of: Event?.self) { group in
-            var imported: [Event] = []
-            var next = events.startIndex
+    /// The events whose own page is worth asking for.
+    ///
+    /// An upcoming event can still change — Eventernote announces times and
+    /// venues late — so those are always re-read. A past event that has already
+    /// been read is settled, and re-reading nine hundred of them on every
+    /// refresh would be a great many requests for facts that cannot move.
+    /// One never read is fetched whenever it falls, which is what fills in a
+    /// freshly imported history; a page that fails stays undetailed and is
+    /// picked up again by the next refresh.
+    private var needsReading: [Event] {
+        library.filter { $0.isUpcoming || !$0.isDetailed }
+    }
 
+    /// Reads those pages a few at a time, reporting whether the pass got
+    /// through at all. An event whose page failed keeps the copy already held.
+    private func reimportDetails() async -> Bool {
+        let events = needsReading
+        guard !events.isEmpty else { return true }
+        refreshStage = .reimporting(read: 0, total: events.count)
+
+        let client = client
+        let inFlight = 4
+        var read = 0
+        var landed = 0
+
+        await withTaskGroup(of: Event?.self) { group in
+            var next = events.startIndex
             func addTask() {
                 guard next < events.endIndex else { return }
                 let event = events[next]
@@ -377,11 +401,23 @@ final class EventStore {
 
             for _ in 0 ..< min(inFlight, events.count) { addTask() }
             for await result in group {
-                if let result { imported.append(result) }
+                read += 1
+                if let result {
+                    apply(result)
+                    landed += 1
+                }
+                refreshStage = .reimporting(read: read, total: events.count)
                 addTask()
             }
-            return imported
         }
+
+        guard landed > 0 else {
+            if refreshFailure == nil {
+                refreshFailure = String(localized: "Could not reach Eventernote. Showing the last import.")
+            }
+            return false
+        }
+        return true
     }
 
     // MARK: - The linked Eventernote account
@@ -403,7 +439,7 @@ final class EventStore {
         archive.eventernoteAccount = Stamped(profile.handle)
         archive.lastImported = nil
         importSummary = nil
-        importFailure = nil
+        refreshFailure = nil
         persist()
     }
 
@@ -417,7 +453,7 @@ final class EventStore {
         archive.eventernoteAccount = Stamped(nil)
         archive.lastImported = nil
         importSummary = nil
-        importFailure = nil
+        refreshFailure = nil
         persist()
     }
 
@@ -436,18 +472,15 @@ final class EventStore {
     ///   adopts what it read and says it stopped short.
     ///
     /// Notes and ticket status are never written by an import at all.
-    func importAccountHistory() async {
-        guard !isImporting, let handle = eventernoteHandle else { return }
-        isImporting = true
-        importFailure = nil
-        importSummary = nil
+    ///
+    /// Reports whether anything was adopted, so ``refresh()`` knows whether the
+    /// pass is worth stamping.
+    private func importHistory() async -> Bool {
+        guard let handle = eventernoteHandle else { return false }
         // Read before the import stamps itself, so the catch-up run knows it is
         // the catch-up run.
         let isCatchingUp = archive.lastImported == nil
-        defer {
-            isImporting = false
-            importProgress = nil
-        }
+        refreshStage = .readingHistory(read: 0, total: 0)
 
         var imported: [Event] = []
         var page = 1
@@ -457,20 +490,20 @@ final class EventStore {
             do {
                 read = try await client.events(forUser: handle, page: page)
             } catch {
-                importFailure = page == 1
+                refreshFailure = page == 1
                     ? String(localized: "Could not reach Eventernote. Nothing was imported.")
                     : String(localized: "Eventernote stopped answering partway through. What did arrive was imported.")
                 break
             }
             imported += read.items
-            importProgress = ImportProgress(read: imported.count, total: max(read.total, imported.count))
+            refreshStage = .readingHistory(read: imported.count, total: max(read.total, imported.count))
             // An empty page ends the run even if the site's own count disagrees,
             // so a miscounted total cannot spin this forever.
             guard read.hasMore, !read.items.isEmpty else { break }
             page += 1
         }
 
-        guard !imported.isEmpty else { return }
+        guard !imported.isEmpty else { return false }
         // The site lists the odd event twice, on two adjacent rows of the same
         // page. Adopting it twice is harmless, but counting it twice would
         // overstate what arrived.
@@ -481,7 +514,7 @@ final class EventStore {
         archive.lastImported = .now
         importSummary = ImportSummary(read: distinct.count, added: counts.added,
                                       filled: counts.filled)
-        persist()
+        return true
     }
 
     /// Folds an imported history into the archive under the rules above.
