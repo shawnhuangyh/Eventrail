@@ -1,3 +1,8 @@
 {
-    "sweetpad.build.xcodeWorkspacePath": "Eventrail.xcodeproj/project.xcworkspace"
+    "sweetpad.build.xcodeWorkspacePath": "Eventrail.xcodeproj/project.xcworkspace",
+    "sweetpad.build.destination": {
+        "id": "iossimulator-C2FA974F-F572-4028-82BE-351553E78778",
+        "type": "iOSSimulator"
+    },
+    "sweetpad.build.scheme": "Eventrail"
 }
