@@ -63,9 +63,26 @@ iOS background execution is opportunistic, so the app makes no promise of exact 
 
 iOS, macOS, and visionOS from a single SwiftUI target (deployment target 26.0), built with Xcode. Persistence is planned on SwiftData or Core Data with CloudKit, to be chosen after validating schema constraints, conflict behavior, and migration requirements.
 
+## Languages
+
+The interface is localized into four languages:
+
+| Language | Locale code |
+| --- | --- |
+| English | `en` |
+| Japanese | `ja` |
+| Simplified Chinese | `zh-Hans` |
+| Traditional Chinese | `zh-Hant` |
+
+The app follows your system language and region settings, and falls back to English for any language not on this list. You can override it per-app in iOS Settings or macOS System Settings without changing your system language.
+
+All user-facing text — screen labels, the interest/ticket/attendance values, refresh status, and error messages — is defined as localizable strings in a String Catalog rather than hard-coded, so dates, times, and numbers are formatted for your locale too.
+
+Event content itself is not translated. Event titles, venue names, and performer names come from Eventernote as published (predominantly Japanese) and are displayed verbatim in every language, so they always match the official page. Your own notes are likewise stored and shown exactly as you typed them, in whatever language you use.
+
 ## Scope of the first release
 
-Native browsing, search, and event detail; the four local tracking fields; offline access; iCloud sync; one optional public username import; manual and on-activation refresh; website links for account actions; and honest refresh status and error handling.
+Native browsing, search, and event detail; the four local tracking fields; offline access; iCloud sync; one optional public username import; manual and on-activation refresh; website links for account actions; honest refresh status and error handling; and a fully localized interface in English, Japanese, Simplified Chinese, and Traditional Chinese.
 
 Deliberately deferred: exact-time scheduling, an app-operated backend, writing to Eventernote from the app, importing private Eventernote notes, and managing multiple profiles.
 
