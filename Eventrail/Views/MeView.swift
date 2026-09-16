@@ -250,6 +250,8 @@ struct MeView: View {
             return Text("This device only — nothing leaves it")
         }
         switch store.syncStatus {
+        case .notConfigured:
+            return Text("This build cannot use iCloud yet — it needs the iCloud capability enabled for the app")
         case .signedOut:
             return Text("Sign in to iCloud in Settings to sync this library")
         case .tooLarge(let bytes):

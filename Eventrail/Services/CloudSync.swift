@@ -27,6 +27,10 @@ nonisolated struct CloudSync: Sendable {
     /// What a push to iCloud did, in terms the Me screen can state plainly.
     enum Outcome: Sendable, Equatable {
         case synced
+        /// The build carries no `ubiquity-kvstore` entitlement, so the store
+        /// accepts writes and drops them. Without this case the screen would
+        /// report a sync that never happened.
+        case notConfigured
         /// No iCloud account on this device, so there is nowhere to sync to.
         case signedOut
         /// The library outgrew the key-value store's quota.
@@ -39,9 +43,21 @@ nonisolated struct CloudSync: Sendable {
         FileManager.default.ubiquityIdentityToken != nil
     }
 
+    /// Whether this build may use the key-value store at all.
+    ///
+    /// `synchronize()` is the only signal the framework offers: it returns false
+    /// when the entitlement is missing. Without the check a build signed without
+    /// iCloud would look like it was syncing, because `set(_:forKey:)` neither
+    /// fails nor throws — it just goes nowhere.
+    var isConfigured: Bool {
+        NSUbiquitousKeyValueStore.default.synchronize()
+    }
+
     /// Whatever iCloud currently holds, or nil if it holds nothing readable.
     func load() -> LibraryArchive? {
-        guard let data = NSUbiquitousKeyValueStore.default.data(forKey: Self.key) else { return nil }
+        guard isConfigured,
+              let data = NSUbiquitousKeyValueStore.default.data(forKey: Self.key)
+        else { return nil }
         do {
             return try Self.unpack(data)
         } catch {
@@ -52,6 +68,7 @@ nonisolated struct CloudSync: Sendable {
 
     @discardableResult
     func save(_ archive: LibraryArchive) -> Outcome {
+        guard isConfigured else { return .notConfigured }
         guard isAvailable else { return .signedOut }
         do {
             let packed = try Self.pack(archive)
@@ -61,7 +78,7 @@ nonisolated struct CloudSync: Sendable {
             }
             let store = NSUbiquitousKeyValueStore.default
             store.set(packed, forKey: Self.key)
-            store.synchronize()
+            guard store.synchronize() else { return .notConfigured }
             return .synced
         } catch {
             Self.log.error("iCloud copy could not be written: \(error.localizedDescription)")

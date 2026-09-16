@@ -233,8 +233,11 @@ final class EventStore {
     /// which is what makes it worth saving and syncing.
     private func keep(_ event: Event) {
         let known = archive.events[event.id]
-        archive.events[event.id] = known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event
-        seen[event.id] = nil
+        let kept = known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event
+        archive.events[event.id] = kept
+        // Also left in `seen`, so a sheet still open keeps resolving if the
+        // reader un-favorites it and pruning drops it from the archive.
+        seen[event.id] = kept
     }
 
     /// Folds a freshly imported copy of an event back in, wherever it is held.
@@ -319,6 +322,10 @@ final class EventStore {
     /// copies agree in both directions rather than one overwriting the other.
     func syncNow() async {
         guard iCloudSyncEnabled, let cloud else { return }
+        guard cloud.isConfigured else {
+            syncStatus = .notConfigured
+            return
+        }
         guard cloud.isAvailable else {
             syncStatus = .signedOut
             return
@@ -326,6 +333,7 @@ final class EventStore {
         if let remote = cloud.load() {
             archive = archive.merging(remote)
         }
+        archive = archive.pruned()
         let outcome = cloud.save(archive)
         syncStatus = outcome
         if outcome == .synced { lastSynced = .now }
@@ -340,8 +348,9 @@ final class EventStore {
     func saveNow() {
         pendingSave?.cancel()
         pendingSave = nil
+        archive = archive.pruned()
         file?.save(archive)
-        guard iCloudSyncEnabled, let cloud, cloud.isAvailable else { return }
+        guard iCloudSyncEnabled, let cloud, cloud.isConfigured, cloud.isAvailable else { return }
         let outcome = cloud.save(archive)
         syncStatus = outcome
         if outcome == .synced { lastSynced = .now }
@@ -375,6 +384,9 @@ final class EventStore {
     /// should not touch the disk, or iCloud, on every keystroke.
     private func persist() {
         pendingSave?.cancel()
+        // Pruning here, not only on merge: an event the reader removed must stop
+        // being uploaded, not linger in iCloud until some other device syncs.
+        archive = archive.pruned()
         let archive = archive
         let file = file
         let cloud = iCloudSyncEnabled ? cloud : nil
