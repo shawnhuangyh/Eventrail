@@ -206,6 +206,20 @@ final class EventStore {
         }
     }
 
+    // MARK: - Favorites
+
+    /// Everything the reader has hearted, upcoming first and then most recent
+    /// past — the same ordering the library uses.
+    ///
+    /// A favorite can point at an event found in search and never added to the
+    /// library, so this resolves through ``event(id:)`` rather than ``library``.
+    var favoriteEvents: [Event] {
+        let events = favorites.compactMap { event(id: $0) }
+        let upcoming = events.filter(\.isUpcoming).sorted { $0.startsAt < $1.startsAt }
+        let past = events.filter { !$0.isUpcoming }.sorted { $0.startsAt > $1.startsAt }
+        return upcoming + past
+    }
+
     // MARK: - Profile statistics
 
     private var attendedEvents: [Event] {

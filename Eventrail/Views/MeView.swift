@@ -5,6 +5,8 @@ import SwiftUI
 struct MeView: View {
     @Environment(EventStore.self) private var store
 
+    @State private var openEvent: Event?
+
     var body: some View {
         @Bindable var store = store
 
@@ -14,6 +16,7 @@ struct MeView: View {
                     profileCard
                     statistics
                     refreshCard
+                    favoritesCard
                     settingsCard(store: $store)
                     footnote
                 }
@@ -22,6 +25,9 @@ struct MeView: View {
             }
             .washBackground()
             .navigationTitle("Me")
+            .sheet(item: $openEvent) { event in
+                EventDetailView(event: event)
+            }
         }
     }
 
@@ -114,6 +120,85 @@ struct MeView: View {
             Text("Public profile imported \(lastRefreshed, format: .relative(presentation: .named))")
         } else {
             Text("Never imported")
+        }
+    }
+
+    /// Events hearted from the detail sheet. Favoriting is separate from the
+    /// three tracking fields: it says "keep this in front of me", not "I have a
+    /// ticket".
+    private var favoritesCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Favorite Events")
+                    .font(.system(size: 17, weight: .bold))
+                if !store.favoriteEvents.isEmpty {
+                    Text(store.favoriteEvents.count.formatted())
+                        .font(.system(size: 12, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, store.favoriteEvents.isEmpty ? 6 : 12)
+
+            if store.favoriteEvents.isEmpty {
+                Text("Tap the heart on any event to keep it here.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(store.favoriteEvents.enumerated()), id: \.element.id) { index, event in
+                        favoriteRow(event, isFirst: index == 0)
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+        }
+        .glassPanel()
+    }
+
+    private func favoriteRow(_ event: Event, isFirst: Bool) -> some View {
+        Button {
+            openEvent = event
+        } label: {
+            HStack(spacing: 12) {
+                FlyerThumbnail(width: 38, cornerRadius: 10)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(event.title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                    Text("\(event.dayLine) · \(event.venue)")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    withAnimation(.snappy) { store.toggleFavorite(event) }
+                } label: {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.favorite)
+                        .frame(width: 32, height: 32)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove from favorites")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            if !isFirst { Divider().padding(.leading, 66) }
         }
     }
 

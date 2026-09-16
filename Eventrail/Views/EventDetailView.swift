@@ -124,7 +124,7 @@ struct EventDetailView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(store.isFavorite(event) ? "Remove favourite" : "Mark as favourite")
+                .accessibilityLabel(store.isFavorite(event) ? "Remove from favorites" : "Add to favorites")
             }
 
             circularAction {
