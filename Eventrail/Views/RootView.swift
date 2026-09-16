@@ -35,9 +35,14 @@ struct RootView: View {
         .environment(store)
         .tint(.brandTint)
         // Edits are written after a short pause; leaving the app cuts that
-        // short, so the last one is flushed here rather than lost.
+        // short, so the last one is flushed here rather than lost. Coming back
+        // is the moment to pick up whatever another device wrote meanwhile.
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { store.saveNow() }
+            if phase == .active {
+                Task { await store.syncNow() }
+            } else {
+                store.saveNow()
+            }
         }
     }
 }

@@ -80,6 +80,6 @@ enum PreviewData {
 extension EventStore {
     /// A store holding the preview fixtures, with no file behind it.
     @MainActor static var preview: EventStore {
-        EventStore(file: nil, library: PreviewData.events, tracking: PreviewData.tracking)
+        EventStore(file: nil, cloud: nil, library: PreviewData.events, tracking: PreviewData.tracking)
     }
 }

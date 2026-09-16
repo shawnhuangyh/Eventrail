@@ -8,6 +8,8 @@ struct MeView: View {
     @State private var openEvent: Event?
 
     var body: some View {
+        @Bindable var store = store
+
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
@@ -15,7 +17,7 @@ struct MeView: View {
                     statistics
                     refreshCard
                     favoritesCard
-                    settingsCard
+                    settingsCard(store: $store)
                     footnote
                 }
                 .padding(.horizontal, 16)
@@ -208,26 +210,72 @@ struct MeView: View {
         }
     }
 
-    private var settingsCard: some View {
+    private func settingsCard(store: Bindable<EventStore>) -> some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Storage")
-                    .font(.system(size: 14, weight: .semibold))
-                // Sync is not built yet, so the card does not claim it.
-                Text("Your library, notes and tracking are kept on this device only.")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            Toggle(isOn: store.iCloudSyncEnabled) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("iCloud Sync")
+                        .font(.system(size: 14, weight: .semibold))
+                    syncDetail
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(syncNeedsAttention ? Color.favorite : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
+
+            if self.store.iCloudSyncEnabled, self.store.cloudUsage > 0.8 {
+                quotaMeter
+            }
 
             settingsRow("Export library", value: "CSV · JSON")
             settingsRow("Language", value: "System")
             settingsRow("About Eventrail", value: nil)
         }
         .glassPanel()
+    }
+
+    /// Anything the reader has to act on is said in the colour used for
+    /// attention, not buried in the same grey as the ordinary case.
+    private var syncNeedsAttention: Bool {
+        guard store.iCloudSyncEnabled, let status = store.syncStatus else { return false }
+        return status != .synced
+    }
+
+    /// What syncing is actually doing right now — never a claim that it worked
+    /// when it did not.
+    private var syncDetail: Text {
+        guard store.iCloudSyncEnabled else {
+            return Text("This device only — nothing leaves it")
+        }
+        switch store.syncStatus {
+        case .signedOut:
+            return Text("Sign in to iCloud in Settings to sync this library")
+        case .tooLarge(let bytes):
+            return Text("Library is too large to sync (\(bytes.formatted(.byteCount(style: .file))))")
+        case .failed(let reason):
+            return Text(verbatim: reason)
+        case .synced, .none:
+            if let lastSynced = store.lastSynced {
+                return Text("Events, notes and tracking synced \(lastSynced, format: .relative(presentation: .named))")
+            }
+            return Text("Your events, notes and tracking sync privately")
+        }
+    }
+
+    /// iCloud's key-value storage has a fixed ceiling, and a library that grows
+    /// past it stops syncing silently. The reader gets the warning before that.
+    private var quotaMeter: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ProgressView(value: min(store.cloudUsage, 1))
+                .tint(store.cloudUsage >= 1 ? Color.favorite : Color.trackTicket)
+            Text("\(Int(store.cloudUsage * 100))% of the space iCloud allows for this library")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
     }
 
     private func settingsRow(_ label: LocalizedStringKey, value: LocalizedStringKey?) -> some View {
@@ -258,7 +306,7 @@ struct MeView: View {
     }
 
     private var footnote: some View {
-        Text("Your notes, interest, ticket status and attendance stay on this device. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
+        Text("Your notes, interest, ticket status and attendance belong to you. They stay on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)

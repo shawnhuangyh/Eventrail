@@ -64,104 +64,152 @@ struct EventGroup: Identifiable {
 /// The reader's library, and every write to it.
 ///
 /// Imported facts and the reader's own records are kept strictly apart: an
-/// import replaces ``library`` entries and never reads or writes ``tracking``
-/// or ``favorites``. The whole thing is mirrored to ``LibraryFile`` after each
-/// change so what the reader adds survives the app being closed.
+/// import replaces ``LibraryArchive/events`` and never reads or writes tracking,
+/// membership or favorites. Every change is mirrored to ``LibraryFile`` so it
+/// survives the app closing, and — when the reader has it switched on — pushed
+/// to ``CloudSync`` so their other devices see it.
 @Observable
 final class EventStore {
-    private(set) var library: [Event]
-    private(set) var tracking: [Event.ID: Tracking]
-    private(set) var favorites: Set<Event.ID>
-    private(set) var recentSearches: [String]
+    /// Everything the reader owns. Kept as one value so a merge from another
+    /// device is a single, reviewable operation rather than a dozen assignments.
+    private var archive: LibraryArchive
 
     private(set) var isRefreshing = false
-    private(set) var lastRefreshed: Date?
     /// Why the last import stopped short, if it did. A failed import keeps the
     /// previous snapshot and the timestamp that goes with it.
     private(set) var refreshFailure: String?
 
-    /// Events met in search but never added. A favourite, or a sheet still open,
-    /// has to keep resolving after the search that found it is gone.
+    private(set) var syncStatus: CloudSync.Outcome?
+    private(set) var lastSynced: Date?
+
+    /// Whether this device mirrors the library to iCloud. A per-device choice,
+    /// so it deliberately does not sync: turning sync off on a phone should not
+    /// turn it off on the iPad.
+    var iCloudSyncEnabled: Bool {
+        didSet {
+            guard iCloudSyncEnabled != oldValue else { return }
+            UserDefaults.standard.set(iCloudSyncEnabled, forKey: Self.syncPreferenceKey)
+            if iCloudSyncEnabled {
+                Task { await syncNow() }
+            } else {
+                syncStatus = nil
+            }
+        }
+    }
+
+    private static let syncPreferenceKey = "iCloudSyncEnabled"
+
+    /// Events met in search but never added. Transient: they are not the
+    /// reader's, so they are neither saved nor synced until one is kept.
     private var seen: [Event.ID: Event] = [:]
 
     private let file: LibraryFile?
+    private let cloud: CloudSync?
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
+    private var cloudChanges: Task<Void, Never>?
 
-    /// The default store reads the reader's own library from disk. Previews and
-    /// the playground pass events in and leave `file` nil, so nothing they do
-    /// is written anywhere.
+    /// The default store reads the reader's own library from disk and, if they
+    /// have sync on, merges whatever iCloud holds. Previews and the playground
+    /// pass events in and leave `file` and `cloud` nil, so nothing they do is
+    /// written or synced anywhere.
     init(
         file: LibraryFile? = .shared,
+        cloud: CloudSync? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
         tracking: [Event.ID: Tracking] = [:]
     ) {
         self.file = file
+        self.cloud = cloud
         self.client = client
 
-        let archive = file?.load() ?? LibraryArchive()
-        self.library = archive.events.isEmpty ? library : archive.events
-        self.tracking = archive.events.isEmpty ? tracking : archive.tracking
-        favorites = archive.favorites
-        recentSearches = archive.recentSearches
-        lastRefreshed = archive.lastRefreshed
+        // On by default: a reader with more than one device expects their own
+        // records to follow them. A preview has no file and never syncs.
+        iCloudSyncEnabled = file != nil
+            && (UserDefaults.standard.object(forKey: Self.syncPreferenceKey) as? Bool ?? true)
+
+        var loaded = file?.load() ?? LibraryArchive()
+        if loaded.membership.isEmpty, !library.isEmpty {
+            loaded.events = Dictionary(library.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            loaded.membership = library.reduce(into: [:]) { $0[$1.id] = Stamped(true) }
+            loaded.tracking = tracking.mapValues { Stamped($0) }
+        }
+        archive = loaded
+
+        guard iCloudSyncEnabled, let cloud else { return }
+        // Whatever another device wrote while this one was closed is merged
+        // before the first screen reads anything.
+        if let remote = cloud.load() {
+            archive = archive.merging(remote)
+        }
+        observeCloudChanges()
+        cloud.pull()
+    }
+
+    deinit {
+        cloudChanges?.cancel()
+        pendingSave?.cancel()
     }
 
     // MARK: - Reading
 
+    var library: [Event] { archive.libraryEvents }
+
+    var recentSearches: [String] { archive.recentSearches.value }
+
+    var lastRefreshed: Date? { archive.lastRefreshed }
+
     func tracking(for event: Event) -> Tracking {
-        tracking[event.id] ?? Tracking()
+        archive.tracking[event.id]?.value ?? Tracking()
     }
 
     func status(for event: Event) -> TrackingStatus {
         TrackingStatus(tracking(for: event))
     }
 
-    func isInLibrary(_ event: Event) -> Bool {
-        library.contains { $0.id == event.id }
-    }
+    func isInLibrary(_ event: Event) -> Bool { archive.isInLibrary(event.id) }
 
-    func isFavorite(_ event: Event) -> Bool {
-        favorites.contains(event.id)
-    }
+    func isFavorite(_ event: Event) -> Bool { archive.isFavorite(event.id) }
 
     /// The freshest copy of an event this app holds, wherever it came from.
     func event(id: Event.ID) -> Event? {
-        library.first { $0.id == id } ?? seen[id]
+        archive.events[id] ?? seen[id]
     }
 
     // MARK: - Writing
 
     func setTracking(_ tracking: Tracking, for event: Event) {
-        self.tracking[event.id] = tracking.isEmpty ? nil : tracking
-        scheduleSave()
+        archive.tracking[event.id] = Stamped(tracking)
+        keep(event)
+        persist()
     }
 
     func toggleFavorite(_ event: Event) {
-        if favorites.contains(event.id) { favorites.remove(event.id) } else { favorites.insert(event.id) }
-        // A favourite outside the library still has to resolve to an event.
-        seen[event.id] = event
-        scheduleSave()
+        archive.favorites[event.id] = Stamped(!isFavorite(event))
+        keep(event)
+        persist()
     }
 
     /// Copying an event found in search into the library is always explicit — an
     /// import never does it silently, and never undoes it.
     func toggleLibraryMembership(_ event: Event) {
-        if let index = library.firstIndex(where: { $0.id == event.id }) {
-            seen[event.id] = library[index]
-            library.remove(at: index)
-            if tracking[event.id]?.isEmpty ?? true { tracking[event.id] = nil }
+        let wasIn = isInLibrary(event)
+        archive.membership[event.id] = Stamped(!wasIn)
+        if wasIn {
+            if archive.tracking[event.id]?.value.isEmpty ?? true { archive.tracking[event.id] = nil }
         } else {
-            library.append(event)
-            if tracking[event.id] == nil { tracking[event.id] = Tracking(interest: .interested) }
+            keep(event)
+            if archive.tracking[event.id] == nil {
+                archive.tracking[event.id] = Stamped(Tracking(interest: .interested))
+            }
         }
-        scheduleSave()
+        persist()
     }
 
     /// Holds on to what a search turned up, without adding any of it.
     func remember(_ events: [Event]) {
-        for event in events where library.contains(where: { $0.id == event.id }) == false {
+        for event in events where archive.events[event.id] == nil {
             seen[event.id] = event
         }
     }
@@ -169,23 +217,31 @@ final class EventStore {
     func remember(search term: String) {
         let term = term.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !term.isEmpty else { return }
-        recentSearches.removeAll { $0.caseInsensitiveCompare(term) == .orderedSame }
-        recentSearches.insert(term, at: 0)
-        recentSearches = Array(recentSearches.prefix(8))
-        scheduleSave()
+        var recents = archive.recentSearches.value
+        recents.removeAll { $0.caseInsensitiveCompare(term) == .orderedSame }
+        recents.insert(term, at: 0)
+        archive.recentSearches = Stamped(Array(recents.prefix(8)))
+        persist()
     }
 
     func clearRecentSearches() {
-        recentSearches = []
-        scheduleSave()
+        archive.recentSearches = Stamped([])
+        persist()
+    }
+
+    /// Moves an event out of the transient search results and into the archive,
+    /// which is what makes it worth saving and syncing.
+    private func keep(_ event: Event) {
+        let known = archive.events[event.id]
+        archive.events[event.id] = known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event
+        seen[event.id] = nil
     }
 
     /// Folds a freshly imported copy of an event back in, wherever it is held.
     private func apply(_ imported: Event) {
-        if let index = library.firstIndex(where: { $0.id == imported.id }) {
-            library[index] = imported
-        }
-        if seen[imported.id] != nil || !isInLibrary(imported) {
+        if archive.events[imported.id] != nil {
+            archive.events[imported.id] = imported
+        } else {
             seen[imported.id] = imported
         }
     }
@@ -199,7 +255,7 @@ final class EventStore {
     func loadDetail(for event: Event) async -> Event {
         guard let imported = try? await client.detail(for: event) else { return event }
         apply(imported)
-        scheduleSave()
+        persist()
         return imported
     }
 
@@ -216,8 +272,8 @@ final class EventStore {
 
         let events = library
         guard !events.isEmpty else {
-            lastRefreshed = .now
-            scheduleSave()
+            archive.lastRefreshed = .now
+            persist()
             return
         }
 
@@ -227,8 +283,8 @@ final class EventStore {
             return
         }
         for event in imported { apply(event) }
-        lastRefreshed = .now
-        scheduleSave()
+        archive.lastRefreshed = .now
+        persist()
     }
 
     /// Fetches event pages a few at a time. Whatever comes back is used; an
@@ -257,33 +313,83 @@ final class EventStore {
         }
     }
 
-    // MARK: - Persisting
+    // MARK: - Syncing
 
-    /// Writes now, rather than after the usual pause. Called when the app is
-    /// about to go to the background, where the pending write would be lost.
+    /// Merges whatever iCloud holds and pushes the result back, so the two
+    /// copies agree in both directions rather than one overwriting the other.
+    func syncNow() async {
+        guard iCloudSyncEnabled, let cloud else { return }
+        guard cloud.isAvailable else {
+            syncStatus = .signedOut
+            return
+        }
+        if let remote = cloud.load() {
+            archive = archive.merging(remote)
+        }
+        let outcome = cloud.save(archive)
+        syncStatus = outcome
+        if outcome == .synced { lastSynced = .now }
+        file?.save(archive)
+        if cloudChanges == nil { observeCloudChanges() }
+    }
+
+    /// Flushes a pending write immediately.
+    ///
+    /// Edits are written after a short pause; the app leaving the foreground
+    /// cuts that pause short, so the last one is committed here rather than lost.
     func saveNow() {
         pendingSave?.cancel()
         pendingSave = nil
         file?.save(archive)
+        guard iCloudSyncEnabled, let cloud, cloud.isAvailable else { return }
+        let outcome = cloud.save(archive)
+        syncStatus = outcome
+        if outcome == .synced { lastSynced = .now }
     }
 
-    private var archive: LibraryArchive {
-        LibraryArchive(
-            events: library, tracking: tracking, favorites: favorites,
-            recentSearches: recentSearches, lastRefreshed: lastRefreshed
-        )
+    /// How much of iCloud's quota the library takes up, 0...1.
+    var cloudUsage: Double {
+        cloud?.usage(of: archive) ?? 0
     }
+
+    /// Another device wrote. Merge rather than adopt: this device may have
+    /// edits of its own that have not been pushed yet.
+    private func observeCloudChanges() {
+        cloudChanges = Task { [weak self] in
+            let changes = NotificationCenter.default.notifications(
+                named: NSUbiquitousKeyValueStore.didChangeExternallyNotification
+            )
+            for await _ in changes {
+                guard let self, self.iCloudSyncEnabled, let remote = self.cloud?.load() else { continue }
+                self.archive = self.archive.merging(remote)
+                self.lastSynced = .now
+                self.syncStatus = .synced
+                self.file?.save(self.archive)
+            }
+        }
+    }
+
+    // MARK: - Persisting
 
     /// Coalesces the writes a burst of edits produces — typing in a note field
-    /// should not touch the disk on every keystroke.
-    private func scheduleSave() {
+    /// should not touch the disk, or iCloud, on every keystroke.
+    private func persist() {
         pendingSave?.cancel()
-        guard let file else { return }
         let archive = archive
-        pendingSave = Task {
+        let file = file
+        let cloud = iCloudSyncEnabled ? cloud : nil
+        guard file != nil || cloud != nil else { return }
+
+        pendingSave = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            await Task.detached(priority: .utility) { file.save(archive) }.value
+            let outcome = await Task.detached(priority: .utility) { () -> CloudSync.Outcome? in
+                file?.save(archive)
+                return cloud?.save(archive)
+            }.value
+            guard !Task.isCancelled, let self, let outcome else { return }
+            self.syncStatus = outcome
+            if outcome == .synced { self.lastSynced = .now }
         }
     }
 
@@ -331,7 +437,7 @@ final class EventStore {
     /// A favorite can point at an event found in search and never added to the
     /// library, so this resolves through ``event(id:)`` rather than ``library``.
     var favoriteEvents: [Event] {
-        let events = favorites.compactMap { event(id: $0) }
+        let events = archive.favorites.compactMap { $0.value.value ? event(id: $0.key) : nil }
         let upcoming = events.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
         let past = events.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
         return upcoming + past

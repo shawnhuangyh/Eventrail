@@ -23,7 +23,20 @@ Eventernote publishes no API, so [EventernoteClient.swift](Eventrail/Services/Ev
 - The count beside a name in performer search is the site's *fan* count, not an event count.
 - Every accessor is failable by design: a changed template yields a missing field or a dropped row, never wrong data.
 
-Persistence is a plain JSON file ([LibraryArchive.swift](Eventrail/Model/LibraryArchive.swift)) in Application Support, deliberately *not* SwiftData — that schema is still unsettled, and this keeps what the reader adds across launches without committing to a store. Imported fields and the reader's `Tracking` are written separately: an import replaces events and never reads or writes tracking or favorites.
+## Persistence and sync
+
+`LibraryArchive` is the single value holding everything the reader owns. It is written to a plain JSON file in Application Support, deliberately *not* SwiftData — that schema is still unsettled, and this keeps what the reader adds across launches without committing to a store. `EventStore` holds one `archive` and derives `library` from it, so a merge from another device is one reviewable operation.
+
+iCloud sync goes through [CloudSync.swift](Eventrail/Services/CloudSync.swift) on `NSUbiquitousKeyValueStore`. Things that matter:
+
+- **Every record the reader owns is a `Stamped<Value>`** — the value plus when it changed. Merges are last-writer-wins *per record*, never per file, because a whole-blob overwrite would silently erase a note typed on the other device. `LibraryArchive.merging(_:)` is where this lives; the merge is symmetric.
+- **Removals are tombstones** (`membership[id] = Stamped(false)`), not deletions. Dropping the key instead would let the next merge resurrect the event. Tombstones are pruned after 180 days.
+- Event facts are not the reader's, so they need no timestamp: the more complete import (`isDetailed`) wins.
+- The payload is zlib-compressed before it goes to iCloud. Measured on real data: ~646 bytes/event of JSON compresses to ~134, so the 900 KB guard under Apple's 1 MB quota fits roughly 6,700 events. `CloudSync.save` refuses to write past the guard rather than letting the store drop it silently, and the Me screen shows a meter past 80%.
+- `iCloudSyncEnabled` is a **per-device** preference in `UserDefaults` and deliberately does not sync — turning it off on a phone must not turn it off on the iPad.
+- `LibraryFile.load()` falls back to `LegacyArchive` for files written before records carried timestamps. Don't remove that until you're sure no device holds a pre-sync file.
+
+**Capability:** sync needs `com.apple.developer.ubiquity-kvstore-identifier`, which lives in [Eventrail.entitlements](Eventrail.entitlements) at the repo root (outside the synchronized group, so it is not bundled as a resource) and is wired via `CODE_SIGN_ENTITLEMENTS` in both configurations. Simulator builds sign locally and work as-is; a **device build needs iCloud enabled on the App ID in the developer portal**, otherwise signing fails.
 
 The UI comes from the Claude Design canvas "Eventernote Mobile App Design" (`Eventrail.dc.html`), which specifies a Liquid Glass treatment in light and dark. All glass goes through `glassBackground(in:interactive:)` in [WashBackground.swift](Eventrail/Views/Components/WashBackground.swift) — that one helper also holds a `#if os(visionOS)` material fallback, kept from when the target still built for visionOS. Palette colours are colorsets in `Assets.xcassets` generated from the design's oklch values, with light and dark variants.
 

@@ -2,7 +2,7 @@
 
 A native SwiftUI companion app for browsing [Eventernote](https://www.eventernote.com/) events and keeping your own record of what you're interested in, what you have tickets for, and what you actually attended — stored on your device and synchronized through your private iCloud account.
 
-> **Status: early development.** Most of the behavior described here comes from the project's design proposal. What is actually built today: searching Eventernote's public event and performer pages, adding events to your own library, the four tracking fields, and re-importing a saved event from its public page. Your library is kept in a local JSON file — iCloud sync, offline caching policy, public-profile import and background refresh are not built yet, and persistence has not been moved to SwiftData/CloudKit. Not affiliated with or endorsed by Eventernote.
+> **Status: early development.** Most of the behavior described here comes from the project's design proposal. What is actually built today: searching Eventernote's public event and performer pages, adding events to your own library, the four tracking fields, re-importing a saved event from its public page, and iCloud sync of everything you've tagged. Your library is kept in a local JSON file mirrored to your private iCloud key-value storage — offline caching policy, public-profile import and background refresh are not built yet, and persistence has not been moved to SwiftData/CloudKit. Not affiliated with or endorsed by Eventernote.
 
 ## What it does
 
@@ -37,7 +37,7 @@ The design is built around one rule: **imports serve your records; they never ov
 - Records are never deleted just because they're missing from one response. A failed request, incomplete pagination, or a changed page layout looks the same as a genuine cancellation — only a successful, complete refresh of the relevant scope can establish that a participation is no longer listed, and even then the event and your annotations are preserved.
 - On network or parsing failure, the last successful snapshot is retained and the app shows you when it last refreshed successfully.
 - Repeated imports are idempotent: events and participation relationships are keyed by stable Eventernote event IDs, not by titles or dates, so re-importing produces no duplicates.
-- iCloud conflict handling merges independent fields, preserves both versions of conflicting note text rather than discarding one, and prevents an older import snapshot from replacing a newer one.
+- iCloud conflict handling merges record by record rather than file by file: an edit made on one device never erases an unrelated edit made on another, and removing an event travels to your other devices instead of being undone by the next merge.
 
 ## Refreshing
 
