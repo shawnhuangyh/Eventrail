@@ -112,9 +112,9 @@ struct MeView: View {
     ///
     /// Refreshing and importing an account were two buttons until it became
     /// clear they are one intention: bring the library up to date from
-    /// Eventernote. With an account linked, Refresh reads its history too;
-    /// without one there is nothing to import, so nothing extra is offered.
-    /// The account itself is a row underneath rather than a second button.
+    /// Eventernote. Refresh is the whole of it now, and it needs an account to
+    /// refresh from — until one is named it stays put, with the row that names
+    /// one directly beneath it.
     private var refreshCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 13) {
@@ -139,7 +139,7 @@ struct MeView: View {
                 }
                 .buttonStyle(.plain)
                 .glassCapsule(interactive: true)
-                .disabled(store.isRefreshing || nothingToRefresh)
+                .disabled(store.isRefreshing || !store.isLinked)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
@@ -161,22 +161,22 @@ struct MeView: View {
         .glassPanel()
     }
 
-    /// An empty library with no account named has nothing to ask about.
-    private var nothingToRefresh: Bool {
-        store.library.isEmpty && store.eventernoteHandle == nil
-    }
-
     private var refreshTitle: Text {
         if let handle = store.eventernoteHandle {
             Text(verbatim: "@\(handle)")
         } else {
-            Text("Last refreshed")
+            Text("Eventernote")
         }
     }
 
     /// The honest wording: the app reports when it last *succeeded*, never that
     /// the data is current.
     private var refreshDetail: Text {
+        // Said before anything else: with no account there is nothing to
+        // refresh from, and a stale timestamp would only be confusing.
+        guard store.isLinked else {
+            return Text("Link your account to bring your library up to date")
+        }
         if store.isRefreshing {
             return workingDetail
         }
@@ -192,9 +192,6 @@ struct MeView: View {
         }
         if let lastRefreshed = store.lastRefreshed {
             return Text("Refreshed \(lastRefreshed, format: .relative(presentation: .named))")
-        }
-        if nothingToRefresh {
-            return Text("Add events from Search, or link your Eventernote account")
         }
         return Text("Never refreshed")
     }

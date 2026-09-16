@@ -190,6 +190,10 @@ final class EventStore {
     /// The Eventernote account the reader imports from, if they have named one.
     var eventernoteHandle: String? { archive.eventernoteAccount?.value }
 
+    /// Whether an account has been named. ``refresh()`` needs one — it is the
+    /// list being refreshed from.
+    var isLinked: Bool { eventernoteHandle != nil }
+
     func tracking(for event: Event) -> Tracking {
         archive.tracking[event.id]?.value ?? Tracking()
     }
@@ -331,17 +335,20 @@ final class EventStore {
 
     /// Brings the library up to date — the one thing this screen asks for.
     ///
-    /// With an account linked that is two passes, in this order: the account's
-    /// own list first, so whatever it adds is in the library, and then each
-    /// event's own page for the times, billing and head count a listing row
-    /// never carries. Without an account it is only the second pass, because
-    /// there is nothing to import from.
+    /// It takes two passes, in this order: the linked account's own list first,
+    /// so whatever it adds is in the library, and then each event's own page for
+    /// the times, billing and head count a listing row never carries.
+    ///
+    /// A linked account is required. Without one there is no list to read, and
+    /// the second pass alone is not what the reader is asking for when they tap
+    /// Refresh; an event they added from Search still fills its own page in when
+    /// they open it, through ``loadDetail(for:)``.
     ///
     /// Only imported fields are replaced. On failure the previous snapshot and
     /// its timestamp are kept: the app reports when it last *succeeded*, never
     /// that what it holds is current.
     func refresh() async {
-        guard !isRefreshing else { return }
+        guard !isRefreshing, eventernoteHandle != nil else { return }
         isRefreshing = true
         refreshFailure = nil
         importSummary = nil
@@ -352,10 +359,7 @@ final class EventStore {
 
         // A history that failed still leaves events worth re-reading, so the
         // second pass runs either way and the first failure is the one reported.
-        var landed = false
-        if eventernoteHandle != nil {
-            landed = await importHistory()
-        }
+        var landed = await importHistory()
         if await reimportDetails() { landed = true }
 
         // The timestamp moves only when something actually arrived, so a run
