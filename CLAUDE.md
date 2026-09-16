@@ -4,23 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Eventrail is a multiplatform SwiftUI app (single target `Eventrail`, bundle id `com.shawnhuang.Eventrail`). [MyApp.swift](Eventrail/MyApp.swift) declares the `@main` `App` and shows [RootView.swift](Eventrail/Views/RootView.swift), a three-tab `TabView` (My Events / Me / Search, the last with `role: .search`). There is no test target, no package manifest, and no dependencies.
+Eventrail is an iPhone/iPad SwiftUI app (single target `Eventrail`, bundle id `com.shawnhuang.Eventrail`). [MyApp.swift](Eventrail/MyApp.swift) declares the `@main` `App` and shows [RootView.swift](Eventrail/Views/RootView.swift), a three-tab `TabView` (My Events / Me / Search, the last with `role: .search`). There is no test target, no package manifest, and no dependencies.
 
 Source is grouped as:
 
 - [Eventrail/Model/](Eventrail/Model/) — `Event`, the reader's private `Tracking` record, and `EventStore`, an `@Observable` in-memory store passed down through `.environment`. Persistence is deliberately absent until the SwiftData/CloudKit schema is settled; [SampleData.swift](Eventrail/Model/SampleData.swift) stands in for the Eventernote import adapter.
 - [Eventrail/Views/](Eventrail/Views/) — one file per screen, plus [Components/](Eventrail/Views/Components/) for the shared glass panel, wash background, and small repeated parts.
 
-The UI comes from the Claude Design canvas "Eventernote Mobile App Design" (`Eventrail.dc.html`), which specifies a Liquid Glass treatment in light and dark. All glass goes through `glassBackground(in:interactive:)` in [WashBackground.swift](Eventrail/Views/Components/WashBackground.swift) — `glassEffect` is unavailable on visionOS, so that one helper holds the fallback. Palette colours are colorsets in `Assets.xcassets` generated from the design's oklch values, with light and dark variants.
+The UI comes from the Claude Design canvas "Eventernote Mobile App Design" (`Eventrail.dc.html`), which specifies a Liquid Glass treatment in light and dark. All glass goes through `glassBackground(in:interactive:)` in [WashBackground.swift](Eventrail/Views/Components/WashBackground.swift) — that one helper also holds a `#if os(visionOS)` material fallback, kept from when the target still built for visionOS. Palette colours are colorsets in `Assets.xcassets` generated from the design's oklch values, with light and dark variants.
 
 ## Build and run
 
 ```bash
 # Build for the simulator
 xcodebuild -scheme Eventrail -destination 'platform=iOS Simulator,name=iPhone 17' build
-
-# Build for macOS (the target also supports macOS and visionOS)
-xcodebuild -scheme Eventrail -destination 'platform=macOS' build
 
 # Clean build folder when the project file or build settings change
 xcodebuild -scheme Eventrail clean
@@ -55,8 +52,9 @@ chore: update development dependencies
 
 ## Platform and language constraints
 
-- `SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx xros xrsimulator` with `SDKROOT = auto`. Any API used must exist on iOS, macOS, and visionOS, or be guarded with `#if os(...)` / `if #available`. `TARGETED_DEVICE_FAMILY = 1,2,7` (iPhone, iPad, Vision).
-- Deployment targets are iOS/macOS/visionOS **26.0** at both the project and target level, so recent SwiftUI APIs are available without availability checks. Availability still varies *by platform*, though — check visionOS before using a new API (`glassEffect`, `tabViewSearchActivation` and `searchTabSelection` are all unavailable there).
+- `SUPPORTED_PLATFORMS = iphoneos iphonesimulator` with `SDKROOT = auto`, `SUPPORTS_MACCATALYST = NO`, and `TARGETED_DEVICE_FAMILY = 1,2` (iPhone, iPad). macOS and visionOS were dropped deliberately; `platform=macOS` and visionOS destinations will not resolve.
+- Deployment target is iOS **26.0** at both the project and target level, so recent SwiftUI APIs are available without availability checks.
+- Some `#if os(visionOS)` branches survive from when the target built for visionOS (`glassBackground` in [WashBackground.swift](Eventrail/Views/Components/WashBackground.swift), `tabViewSearchActivation` in [RootView.swift](Eventrail/Views/RootView.swift)). They are unreachable now but make re-adding the platform cheap — remove them only on purpose.
 - `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` — types are `@MainActor` by default. Mark work that must leave the main actor explicitly (`nonisolated`, `@concurrent`, actors). `SWIFT_APPROACHABLE_CONCURRENCY = YES`, Swift language mode 5.
 - `LOCALIZATION_PREFERS_STRING_CATALOGS` / `SWIFT_EMIT_LOC_STRINGS` are on and known regions are en, ja, zh-Hans, zh-Hant — user-facing strings should be localizable `LocalizedStringKey`s, not raw `String`s.
 
