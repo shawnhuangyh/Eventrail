@@ -8,6 +8,7 @@ struct MeView: View {
     @State private var openEvent: Event?
     @State private var isLinking = false
     @State private var isConfirmingUnlink = false
+    @State private var isConfirmingDeleteAll = false
 
     var body: some View {
         @Bindable var store = store
@@ -28,6 +29,9 @@ struct MeView: View {
             }
             .washBackground()
             .navigationTitle("Me")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) { settingsMenu }
+            }
             .sheet(item: $openEvent) { event in
                 EventDetailView(event: event)
             }
@@ -40,6 +44,13 @@ struct MeView: View {
                 Button("Keep it", role: .cancel) {}
             } message: {
                 Text("The events already imported stay in your library.")
+            }
+            .confirmationDialog("Delete every event?", isPresented: $isConfirmingDeleteAll,
+                                titleVisibility: .visible) {
+                Button("Delete All Events", role: .destructive) { store.removeAllEvents() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                deleteAllDetail
             }
         }
     }
@@ -142,6 +153,31 @@ struct MeView: View {
         } else {
             Text("Never re-imported")
         }
+    }
+
+    /// The settings this screen keeps out of the way. Destructive work lives
+    /// here rather than in the cards, where it would be one stray tap from the
+    /// Refresh and Import buttons beside it.
+    private var settingsMenu: some View {
+        Menu {
+            Button("Delete All Events", systemImage: "trash", role: .destructive) {
+                isConfirmingDeleteAll = true
+            }
+            .disabled(store.library.isEmpty && store.favoriteEvents.isEmpty)
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .accessibilityLabel("Settings")
+    }
+
+    /// Says what actually goes, including the favorites the reader would
+    /// otherwise be left staring at.
+    private var deleteAllDetail: Text {
+        let events = Text("^[\(store.library.count) event](inflect: true)")
+        guard !store.favoriteEvents.isEmpty else {
+            return events + Text(" will be removed from this device and from your other devices. You can add them again from Search.")
+        }
+        return events + Text(" and ^[\(store.favoriteEvents.count) favorite](inflect: true) will be removed from this device and from your other devices. You can add them again from Search.")
     }
 
     /// The badge says what the app is reading, and never more than that: even

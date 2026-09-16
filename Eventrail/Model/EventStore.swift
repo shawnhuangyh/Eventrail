@@ -238,6 +238,43 @@ final class EventStore {
         persist()
     }
 
+    /// Takes events out of the library in one go.
+    ///
+    /// Each one is tombstoned rather than dropped, exactly as a single removal
+    /// is: the other device has to be told a removal happened, or the next merge
+    /// would hand all of them straight back.
+    ///
+    /// Favorites are left alone. Hearting an event says "keep this in front of
+    /// me", which is a separate answer from whether it is in the library.
+    func remove(_ events: some Sequence<Event>) {
+        let now = Date.now
+        for event in events { tombstone(event.id, at: now) }
+        persist()
+    }
+
+    /// Empties the library, and the favorites with it.
+    ///
+    /// Favorites go too here, unlike a removal of some events: a reader who
+    /// asked for every event to go should not be left looking at a Favorites
+    /// card that still lists a few.
+    func removeAllEvents() {
+        let now = Date.now
+        for event in library { tombstone(event.id, at: now) }
+        for id in archive.favorites.filter(\.value.value).keys {
+            archive.favorites[id] = Stamped(false, at: now)
+        }
+        persist()
+    }
+
+    /// Marks one event as removed. A note the reader typed outlives its event,
+    /// so that re-adding it later brings the note back; an empty record does not.
+    private func tombstone(_ id: Event.ID, at now: Date) {
+        archive.membership[id] = Stamped(false, at: now)
+        if archive.tracking[id]?.value.isEmpty ?? true {
+            archive.tracking[id] = nil
+        }
+    }
+
     /// Holds on to what a search turned up, without adding any of it.
     func remember(_ events: [Event]) {
         for event in events where archive.events[event.id] == nil {
