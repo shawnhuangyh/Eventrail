@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug on Simulator",
+            "type": "lldb",
+            "request": "attach",
+            "preLaunchTask": "Build and Install (wait for debugger)",
+            "program": "${workspaceFolder}/.vscode/.build/Eventrail.app/Eventrail",
+            "stopOnEntry": false,
+            "presentation": {
+                "group": "Eventrail"
+            }
+        }
+    ]
+}

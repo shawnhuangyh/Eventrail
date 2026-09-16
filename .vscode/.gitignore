@@ -1,0 +1,2 @@
+# Stable symlink to the current build, republished by run-simulator.sh.
+.build/
