@@ -26,7 +26,8 @@ struct EventsView: View {
                 }
             }
             .washBackground()
-            .navigationTitle(Text("^[\(eventCount) Event](inflect: true)"))
+            .navigationTitle("My Events")
+            .navigationSubtitle(Text("^[\(eventCount) event](inflect: true)"))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) { showMenu }
             }
