@@ -10,7 +10,7 @@ struct EventRowContent<Trailing: View>: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 13) {
-            FlyerThumbnail()
+            FlyerThumbnail(url: event.imageURL)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(event.title)
@@ -50,9 +50,15 @@ struct LibraryRow: View {
     let event: Event
     let open: () -> Void
 
+    /// Eventernote often announces an event months before it publishes a
+    /// start time, so the row says so rather than inventing one.
+    private var detail: Text {
+        event.timeLine.map { Text(verbatim: $0) } ?? Text("Time to be announced")
+    }
+
     var body: some View {
         Button(action: open) {
-            EventRowContent(event: event, detail: Text(event.timeLine)) {
+            EventRowContent(event: event, detail: detail) {
                 VStack(alignment: .trailing) {
                     StatusBadge(status: store.status(for: event))
                     Spacer(minLength: 8)
@@ -71,7 +77,7 @@ struct LibraryRow: View {
 
 #Preview {
     List {
-        LibraryRow(event: SampleData.library[0], open: {})
+        LibraryRow(event: PreviewData.events[0], open: {})
             .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
@@ -79,5 +85,5 @@ struct LibraryRow: View {
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
     .washBackground()
-    .environment(EventStore())
+    .environment(EventStore.preview)
 }

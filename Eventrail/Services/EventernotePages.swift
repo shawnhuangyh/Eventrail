@@ -1,0 +1,261 @@
+import Foundation
+
+/// A voice actor or artist, as Eventernote's performer search lists them.
+nonisolated struct PerformerProfile: Identifiable, Hashable, Codable, Sendable {
+    /// Eventernote's actor id.
+    let id: Int
+    let name: String
+    /// The kana reading the site prints beside the name.
+    let reading: String?
+    /// How many Eventernote users list the performer as a favourite. The site
+    /// prints this beside the name in search results; it is not a count of
+    /// their events.
+    let fanCount: Int?
+    /// The already-escaped path segment the site uses for them. Names contain
+    /// "!", "(" and spaces, so it is carried verbatim rather than re-encoded.
+    let slug: String
+}
+
+/// One page of a paged Eventernote listing.
+nonisolated struct EventernotePage<Item: Sendable>: Sendable {
+    let items: [Item]
+    /// How many rows the site says match in total, across every page.
+    let total: Int
+    let page: Int
+    let pageSize: Int
+
+    var hasMore: Bool { page * pageSize < total }
+}
+
+/// Turns Eventernote's smartphone templates into models.
+///
+/// Every field is read through ``HTMLCursor``, so a template change degrades to
+/// a missing field or a dropped row rather than to wrong data.
+nonisolated enum EventernotePages {
+    // MARK: - Listings
+
+    /// The `gb_listevent` block shared by the event search, the calendar and a
+    /// performer's own event list.
+    static func events(in html: String, page: Int, pageSize: Int) -> EventernotePage<Event> {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="gb_listevent">"#),
+              let list = cursor.take(upTo: "</ul>")
+        else {
+            return EventernotePage(items: [], total: totalCount(in: html) ?? 0,
+                                   page: page, pageSize: pageSize)
+        }
+
+        let rows = HTMLCursor(list).slices(startingAt: #"<li class="#)
+        return EventernotePage(
+            items: rows.compactMap(event(inRow:)),
+            total: totalCount(in: html) ?? rows.count,
+            page: page,
+            pageSize: pageSize
+        )
+    }
+
+    /// The performer search results.
+    static func performers(in html: String, page: Int, pageSize: Int) -> EventernotePage<PerformerProfile> {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="gb_listview">"#),
+              let list = cursor.take(upTo: "</ul>")
+        else {
+            return EventernotePage(items: [], total: totalCount(in: html) ?? 0,
+                                   page: page, pageSize: pageSize)
+        }
+
+        var rows = HTMLCursor(list)
+        var profiles: [PerformerProfile] = []
+        while rows.advance(past: #"<a href="/actors/"#) {
+            guard let path = rows.take(upTo: "\""), let id = Int(path.split(separator: "/").last ?? "")
+            else { break }
+            guard rows.advance(past: ">") else { break }
+            let billed = (rows.take(upTo: "<span") ?? "").htmlText
+            let count = rows.text(after: ">", upTo: "</span>").flatMap(number(in:))
+            let (name, reading) = splitReading(billed)
+            guard !name.isEmpty else { continue }
+            profiles.append(PerformerProfile(id: id, name: name, reading: reading,
+                                             fanCount: count,
+                                             slug: String(path.split(separator: "/").dropLast().joined(separator: "/"))))
+        }
+
+        return EventernotePage(items: profiles, total: totalCount(in: html) ?? profiles.count,
+                               page: page, pageSize: pageSize)
+    }
+
+    /// "689件見つかりました。" — the site's own count for the whole result set.
+    ///
+    /// The count follows its element immediately, so anything longer than a
+    /// number means the two markers matched different parts of the page.
+    private static func totalCount(in html: String) -> Int? {
+        var cursor = HTMLCursor(html)
+        guard let found = cursor.text(after: #"class="t2">"#, upTo: "件見つかりました"),
+              found.count <= 20
+        else { return nil }
+        return number(in: found)
+    }
+
+    private static func event(inRow row: Substring) -> Event? {
+        var cursor = HTMLCursor(row)
+        guard let id = cursor.text(after: #"<a href="/events/"#, upTo: "\""), !id.isEmpty else { return nil }
+
+        cursor.advance(past: #"<div class="image">"#)
+        let image = cursor.text(after: #"<img src=""#, upTo: "\"").flatMap(URL.init(string:))
+
+        guard let title = cursor.text(after: #"<div class="event"><p>"#, upTo: "</p>"),
+              let printedDay = cursor.text(after: #"<div class="date"><p>"#, upTo: "</p>"),
+              let day = day(in: printedDay)
+        else { return nil }
+
+        let performers = (cursor.text(after: #"<div class="actor">"#, upTo: "</div>") ?? "")
+            .split(whereSeparator: \.isNewline)
+            .map { Performer(name: $0.trimmingCharacters(in: .whitespaces)) }
+            .filter { !$0.name.isEmpty }
+
+        // Only a performer's own event list prints times in the row; the search
+        // results leave the block out entirely.
+        let times = cursor.text(after: #"<div class="time">"#, upTo: "</div>")
+        let venue = cursor.text(after: #"<div class="place">"#, upTo: "</div>") ?? ""
+
+        return event(id: id, title: title, day: day, venue: venue, venueDetail: nil,
+                     placeID: nil, times: times, performers: performers,
+                     listedAttendees: nil, imageURL: image, isDetailed: false)
+    }
+
+    // MARK: - An event's own page
+
+    static func event(in html: String, id: String) -> Event? {
+        var cursor = HTMLCursor(html)
+        cursor.advance(past: #"<div class="gb_title_cover""#)
+        let image = cursor.text(after: "background-image:url(", upTo: ")").flatMap(URL.init(string:))
+        guard let title = cursor.text(after: #"<h1 class="gb_subtitle gb_curl_effect">"#, upTo: "</h1>"),
+              let printedDay = section("開催日時", in: html)?.htmlText,
+              let day = day(in: printedDay)
+        else { return nil }
+
+        var venue = ""
+        var placeID: Int?
+        if let place = section("開催場所", in: html) {
+            var places = HTMLCursor(place)
+            if let path = places.text(after: #"<a href="/places/"#, upTo: "\"") {
+                placeID = Int(path)
+                venue = places.text(after: ">", upTo: "</a>") ?? ""
+            } else {
+                venue = place.htmlText
+            }
+        }
+
+        var performers: [Performer] = []
+        if let billing = section("出演者", in: html) {
+            var names = HTMLCursor(billing)
+            while names.advance(past: #"<a href="/actors/"#) {
+                guard let path = names.take(upTo: "\""),
+                      let name = names.text(after: ">", upTo: "</a>")
+                else { break }
+                performers.append(Performer(name: name, actorID: Int(path.split(separator: "/").last ?? "")))
+            }
+        }
+
+        var attendees = HTMLCursor(html)
+        let listed = attendees.text(after: "このイベントに参加のイベンター(", upTo: ")").flatMap(number(in:))
+
+        return event(id: id, title: title, day: day, venue: venue, venueDetail: nil,
+                     placeID: placeID, times: section("開場/開演/終演時間", in: html)?.htmlText,
+                     performers: performers, listedAttendees: listed,
+                     imageURL: image, isDetailed: true)
+    }
+
+    /// Address and capacity from a venue's page, in the form the detail sheet
+    /// prints under the venue name.
+    static func venueDetail(in html: String) -> String? {
+        let address = section("所在地", in: html)?.htmlText
+            // The postal code adds a line's worth of digits and no information
+            // the address below it does not already carry.
+            .drop { $0 == "〒" || $0.isNumber || $0 == "-" }
+            .trimmingCharacters(in: .whitespaces)
+        let capacity = section("収容人数", in: html)?.htmlText
+
+        let parts = [address, capacity].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// The markup between one `gb_subtitle` heading and the next.
+    private static func section(_ heading: String, in html: String) -> Substring? {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<h2 class="gb_subtitle">"# + heading + "</h2>") else { return nil }
+        return cursor.take(upTo: "<h2") ?? cursor.rest
+    }
+
+    // MARK: - Shared field parsing
+
+    private static func event(
+        id: String, title: String, day: DateComponents, venue: String, venueDetail: String?,
+        placeID: Int?, times: String?, performers: [Performer], listedAttendees: Int?,
+        imageURL: URL?, isDetailed: Bool
+    ) -> Event? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = Event.publishedZone
+        guard let date = calendar.date(from: day) else { return nil }
+
+        return Event(
+            id: id,
+            title: title,
+            artist: performers.first?.name ?? title,
+            venue: venue,
+            venueDetail: venueDetail,
+            placeID: placeID,
+            date: date,
+            doorsOpen: time(labelled: "開場", in: times, on: day, calendar: calendar),
+            startsAt: time(labelled: "開演", in: times, on: day, calendar: calendar),
+            endsAt: time(labelled: "終演", in: times, on: day, calendar: calendar),
+            timeZone: Event.publishedZone,
+            listedAttendees: listedAttendees,
+            performers: performers,
+            imageURL: imageURL,
+            sourceURL: EventernoteClient.site.appending(path: "events/\(id)"),
+            isDetailed: isDetailed
+        )
+    }
+
+    /// "2027-05-09(日)" and "2027-04-25 (日)" both yield the day.
+    private static func day(in printed: String) -> DateComponents? {
+        let parts = printed.prefix(10).split(separator: "-")
+        guard parts.count == 3,
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2])
+        else { return nil }
+        return DateComponents(year: year, month: month, day: day)
+    }
+
+    /// Reads one time out of "開場 14:30 開演 15:30 終演 18:50". The site prints
+    /// "-" for a time it has not been told, which stays nil here.
+    private static func time(
+        labelled label: String, in line: String?, on day: DateComponents, calendar: Calendar
+    ) -> Date? {
+        guard let line else { return nil }
+        var cursor = HTMLCursor(line)
+        guard cursor.advance(past: label) else { return nil }
+
+        let value = cursor.rest.drop(while: { $0 == " " || $0 == "\u{00A0}" || $0.isNewline })
+        let clock = value.prefix { $0.isNumber || $0 == ":" }.split(separator: ":")
+        guard clock.count == 2, let hour = Int(clock[0]), let minute = Int(clock[1]) else { return nil }
+
+        var components = day
+        components.hour = hour
+        components.minute = minute
+        return calendar.date(from: components)
+    }
+
+    /// The first run of digits, with the site's thousands separators dropped.
+    private static func number(in text: String) -> Int? {
+        Int(text.filter(\.isNumber))
+    }
+
+    /// "水瀬いのり (みなせいのり)" — the reading is appended in parentheses.
+    private static func splitReading(_ billed: String) -> (name: String, reading: String?) {
+        guard billed.hasSuffix(")"), let open = billed.range(of: " (", options: .backwards) else {
+            return (billed, nil)
+        }
+        let reading = billed[open.upperBound ..< billed.index(before: billed.endIndex)]
+        return (String(billed[..<open.lowerBound]), reading.isEmpty ? nil : String(reading))
+    }
+}

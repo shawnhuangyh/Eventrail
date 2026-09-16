@@ -7,22 +7,27 @@ struct SearchView: View {
 
     @State private var query = ""
     @State private var scope: SearchScope = .events
+    @State private var events = Feed<Event>()
+    @State private var performers = Feed<PerformerProfile>()
     @State private var openEvent: Event?
 
-    private var results: [Event] {
-        store.searchResults(query: query, scope: scope)
+    /// The query and the scope together: either one changing starts a new search.
+    private struct Request: Hashable {
+        let term: String
+        let scope: SearchScope
+    }
+
+    private var term: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if term.isEmpty {
                     startingPoints
-                } else if results.isEmpty {
-                    ContentUnavailableView.search(text: query)
-                        .padding(.top, 48)
                 } else {
-                    resultList
+                    results
                 }
             }
             .washBackground()
@@ -33,46 +38,150 @@ struct SearchView: View {
                     Text(option.label).tag(option)
                 }
             }
+            .onSubmit(of: .search) { store.remember(search: term) }
+            .navigationDestination(for: PerformerProfile.self) { performer in
+                PerformerEventsView(performer: performer)
+            }
             .sheet(item: $openEvent) { event in
                 EventDetailView(event: event)
             }
+            .task(id: Request(term: term, scope: scope)) { await search() }
         }
     }
 
-    private var resultList: some View {
-        LazyVStack(alignment: .leading, spacing: 9) {
-            Text("^[\(results.count) result](inflect: true) on Eventernote")
-                .font(.system(size: 11.5, weight: .semibold))
-                .kerning(0.35)
-                .textCase(.uppercase)
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 6)
+    /// Runs the search the field currently describes.
+    ///
+    /// `task(id:)` cancels this when the reader types again, so the pause at the
+    /// top is what keeps a request from going out per keystroke.
+    private func search() async {
+        let term = term
+        guard !term.isEmpty else {
+            events.clear()
+            performers.clear()
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(350))
+        guard !Task.isCancelled else { return }
 
-            ForEach(results) { event in
-                SearchResultRow(event: event) { openEvent = event }
+        switch scope {
+        case .events:
+            await events.load { page in
+                try await EventernoteClient.shared.searchEvents(keyword: term, page: page)
+            }
+            store.remember(events.items)
+        case .performers:
+            await performers.load { page in
+                try await EventernoteClient.shared.searchPerformers(keyword: term, page: page)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
     }
+
+    // MARK: - Results
+
+    @ViewBuilder
+    private var results: some View {
+        switch scope {
+        case .events: eventResults
+        case .performers: performerResults
+        }
+    }
+
+    @ViewBuilder
+    private var eventResults: some View {
+        if events.isLoading {
+            SearchProgress()
+        } else if let failure = events.failure {
+            SearchFailure(message: failure) { await search() }
+        } else if events.isEmptyResult {
+            ContentUnavailableView.search(text: term)
+                .padding(.top, 48)
+        } else {
+            LazyVStack(alignment: .leading, spacing: 9) {
+                resultCount("^[\(events.total) result](inflect: true) on Eventernote")
+
+                ForEach(events.items) { event in
+                    SearchResultRow(event: event) { openEvent = event }
+                        .task { await loadMoreEvents(after: event) }
+                }
+
+                if events.isLoadingMore { SearchProgress(compact: true) }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func loadMoreEvents(after event: Event) async {
+        guard events.isNearEnd(event) else { return }
+        await events.loadMore()
+        store.remember(events.items)
+    }
+
+    @ViewBuilder
+    private var performerResults: some View {
+        if performers.isLoading {
+            SearchProgress()
+        } else if let failure = performers.failure {
+            SearchFailure(message: failure) { await search() }
+        } else if performers.isEmptyResult {
+            ContentUnavailableView.search(text: term)
+                .padding(.top, 48)
+        } else {
+            LazyVStack(alignment: .leading, spacing: 9) {
+                resultCount("^[\(performers.total) performer](inflect: true) on Eventernote")
+
+                ForEach(performers.items) { performer in
+                    PerformerRow(performer: performer)
+                        .task {
+                            guard performers.isNearEnd(performer) else { return }
+                            await performers.loadMore()
+                        }
+                }
+
+                if performers.isLoadingMore { SearchProgress(compact: true) }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func resultCount(_ label: LocalizedStringKey) -> some View {
+        Text(label)
+            .font(.system(size: 11.5, weight: .semibold))
+            .kerning(0.35)
+            .textCase(.uppercase)
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 6)
+    }
+
+    // MARK: - Before a search
 
     private var startingPoints: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recent")
-                .font(.system(size: 11.5, weight: .semibold))
-                .kerning(0.35)
-                .textCase(.uppercase)
-                .foregroundStyle(.tertiary)
+            if !store.recentSearches.isEmpty {
+                HStack {
+                    Text("Recent")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .kerning(0.35)
+                        .textCase(.uppercase)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Button("Clear") { store.clearRecentSearches() }
+                        .font(.system(size: 12, weight: .medium))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.brandTint)
+                }
                 .padding(.horizontal, 4)
 
-            FlowLayout(spacing: 8) {
-                ForEach(SampleData.recentSearches, id: \.self) { term in
-                    Button(term) { query = term }
-                        .font(.system(size: 13, weight: .medium))
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 9)
-                        .glassCapsule(interactive: true)
+                FlowLayout(spacing: 8) {
+                    ForEach(store.recentSearches, id: \.self) { recent in
+                        Button(recent) { query = recent }
+                            .font(.system(size: 13, weight: .medium))
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .glassCapsule(interactive: true)
+                    }
                 }
             }
 
@@ -96,7 +205,7 @@ struct SearchView: View {
 
 /// A search result. The circular control adds the event to the library, or
 /// removes it again — always an explicit choice.
-private struct SearchResultRow: View {
+struct SearchResultRow: View {
     @Environment(EventStore.self) private var store
 
     let event: Event
@@ -104,11 +213,19 @@ private struct SearchResultRow: View {
 
     private var isSaved: Bool { store.isInLibrary(event) }
 
+    /// A search row carries no head count, so it shows what the row does know.
+    private var detail: Text {
+        if let listed = event.listedAttendees {
+            Text("\(listed.formatted()) going")
+        } else if let time = event.timeLine {
+            Text(verbatim: time)
+        } else {
+            Text("Time to be announced")
+        }
+    }
+
     var body: some View {
-        EventRowContent(
-            event: event,
-            detail: Text("\(event.listedAttendees.formatted()) going")
-        ) {
+        EventRowContent(event: event, detail: detail) {
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 Button {
@@ -132,7 +249,84 @@ private struct SearchResultRow: View {
     }
 }
 
+/// A performer search result. Opening one lists everything they are billed on.
+private struct PerformerRow: View {
+    let performer: PerformerProfile
+
+    var body: some View {
+        NavigationLink(value: performer) {
+            HStack(spacing: 13) {
+                Circle()
+                    .fill(.quaternary)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(performer.name)
+                        .font(.system(size: 14.5, weight: .semibold))
+                        .lineLimit(1)
+                    if let reading = performer.reading {
+                        Text(reading)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let fans = performer.fanCount {
+                    Text("^[\(fans) fan](inflect: true)")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(13)
+        }
+        .buttonStyle(.plain)
+        .glassPanel(interactive: true)
+    }
+}
+
+/// The wait while Eventernote answers.
+struct SearchProgress: View {
+    var compact = false
+
+    var body: some View {
+        ProgressView()
+            .controlSize(.regular)
+            .frame(maxWidth: .infinity)
+            .padding(.top, compact ? 12 : 60)
+            .padding(.bottom, compact ? 12 : 0)
+    }
+}
+
+/// Eventernote could not be reached. The reader is told which, and can retry.
+struct SearchFailure: View {
+    let message: String
+    let retry: () async -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Search Unavailable", systemImage: "wifi.exclamationmark")
+        } description: {
+            Text(verbatim: message)
+        } actions: {
+            Button("Try Again") { Task { await retry() } }
+                .buttonStyle(.glass)
+        }
+        .padding(.top, 40)
+    }
+}
+
 #Preview {
     SearchView()
-        .environment(EventStore())
+        .environment(EventStore.preview)
 }

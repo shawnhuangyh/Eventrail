@@ -2,11 +2,25 @@ import SwiftUI
 
 /// One event: what Eventernote publishes about it, and what the reader records
 /// about it. The two are kept visually distinct throughout.
+///
+/// A sheet opened from a search row starts with only what the row printed, and
+/// imports the event's own page for the rest.
 struct EventDetailView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    let event: Event
+    private let source: Event
+    @State private var isImporting = false
+
+    init(event: Event) {
+        source = event
+    }
+
+    /// The fullest copy the app holds. An import lands in the store, so reading
+    /// it back keeps this sheet and the lists behind it showing the same event.
+    private var event: Event {
+        store.event(id: source.id) ?? source
+    }
 
     private var tracking: Binding<Tracking> {
         Binding(
@@ -28,7 +42,7 @@ struct EventDetailView: View {
                     actions
                     statistics
                     trackingCard
-                    performersCard
+                    if !event.performers.isEmpty { performersCard }
                     venueCard
                     openInEventernote
                     footnote
@@ -43,6 +57,16 @@ struct EventDetailView: View {
         }
         .washBackground()
         .presentationDragIndicator(.visible)
+        .task { await importPage() }
+    }
+
+    /// Imports the event's own page for the times, billing and head count a
+    /// search row does not carry. A row already imported is left alone.
+    private func importPage() async {
+        guard !event.isDetailed else { return }
+        isImporting = true
+        defer { isImporting = false }
+        await store.loadDetail(for: event)
     }
 
     // MARK: - Header
@@ -52,10 +76,15 @@ struct EventDetailView: View {
             Rectangle()
                 .fill(.quaternary)
                 .overlay {
-                    Image(systemName: "music.microphone")
-                        .font(.system(size: 72, weight: .ultraLight))
-                        .foregroundStyle(.tertiary)
+                    AsyncImage(url: event.imageURL) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Image(systemName: "music.microphone")
+                            .font(.system(size: 72, weight: .ultraLight))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+                .clipped()
                 .overlay {
                     // Fades the flyer into the wash so the title stays readable.
                     LinearGradient(
@@ -75,7 +104,7 @@ struct EventDetailView: View {
                     .font(.system(size: 22, weight: .bold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("\(event.longDateLine) · Doors \(event.doorsLine) · Start \(event.timeLine)")
+                timingLine
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -83,6 +112,23 @@ struct EventDetailView: View {
             .padding(.horizontal, 22)
             .padding(.bottom, 14)
         }
+    }
+
+    /// The day, then whichever of the two times Eventernote has published. An
+    /// event announced without them says so rather than showing a made-up hour.
+    private var timingLine: Text {
+        var parts = [event.longDateLine]
+        if let doors = event.doorsLine { parts.append(String(localized: "Doors \(doors)")) }
+        if let start = event.timeLine {
+            parts.append(String(localized: "Start \(start)"))
+        } else if event.doorsLine == nil {
+            parts.append(isImporting
+                         ? String(localized: "Importing times…")
+                         : String(localized: "Times to be announced"))
+        }
+        // Already-localized fragments around imported times, so assembled as a
+        // string rather than as a localizable key.
+        return Text(verbatim: parts.joined(separator: " · "))
     }
 
     private var doneButton: some View {
@@ -108,10 +154,16 @@ struct EventDetailView: View {
             }
 
             circularAction {
-                ShareLink(item: event.sourceURL) {
-                    actionIcon("square.and.arrow.up", tint: .primary)
+                Button {
+                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                } label: {
+                    actionIcon(
+                        store.isInLibrary(event) ? "checkmark" : "plus",
+                        tint: store.isInLibrary(event) ? .trackAttended : .brandTint
+                    )
                 }
-                .accessibilityLabel("Share event")
+                .buttonStyle(.plain)
+                .accessibilityLabel(store.isInLibrary(event) ? "Remove from my events" : "Add to my events")
             }
 
             circularAction {
@@ -153,16 +205,19 @@ struct EventDetailView: View {
             .foregroundStyle(tint)
             .frame(width: 56, height: 56)
             .contentShape(.rect)
+            .contentTransition(.symbolEffect(.replace))
     }
 
     // MARK: - Imported facts
 
+    /// An em dash stands in for a field the public page does not carry — the
+    /// app never fills one in itself.
     private var statistics: some View {
         HStack(spacing: 11) {
-            StatTile(tint: .trackInterest, value: event.listedAttendees.formatted(),
+            StatTile(tint: .trackInterest, value: event.listedAttendees?.formatted() ?? "—",
                      label: "Listed on Eventernote")
-            StatTile(tint: .trackTicket, value: event.doorsLine, label: "Doors open")
-            StatTile(tint: .trackAttended, value: event.timeLine, label: "Performance")
+            StatTile(tint: .trackTicket, value: event.doorsLine ?? "—", label: "Doors open")
+            StatTile(tint: .trackAttended, value: event.timeLine ?? "—", label: "Performance")
         }
         .padding(.horizontal, 18)
     }
@@ -245,6 +300,8 @@ struct EventDetailView: View {
 
     // MARK: - Performers
 
+    /// Eventernote bills performers by name and nothing else — no instrument,
+    /// no role — so the row shows the name and the billing order it was given in.
     private var performersCard: some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -268,17 +325,12 @@ struct EventDetailView: View {
                             }
                             .frame(width: 38, height: 38)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(performer.name)
-                                .font(.system(size: 14, weight: .semibold))
-                            Text(performer.role)
-                                .font(.system(size: 11.5))
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(performer.name)
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                         if performer.name == event.artist {
-                            Text("Headliner")
+                            Text("Top billed")
                                 .font(.system(size: 10, weight: .semibold))
                                 .textCase(.uppercase)
                                 .foregroundStyle(Color.brandTint)
@@ -314,15 +366,17 @@ struct EventDetailView: View {
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(event.venue)
+                    Text(event.venue.isEmpty ? String(localized: "Venue to be announced") : event.venue)
                         .font(.system(size: 14.5, weight: .semibold))
-                    Text(event.venueDetail)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    if let venueDetail = event.venueDetail {
+                        Text(venueDetail)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                if let directionsURL {
+                if let directionsURL, !event.venue.isEmpty {
                     Link(destination: directionsURL) {
                         Text("Directions")
                             .font(.system(size: 12.5, weight: .semibold))
@@ -363,8 +417,8 @@ struct EventDetailView: View {
 
     private var footnote: some View {
         Group {
-            if let lastRefreshed = store.lastRefreshed {
-                Text("Event data imported from the public Eventernote page. Last successful import \(lastRefreshed, format: .relative(presentation: .named)).")
+            if isImporting {
+                Text("Importing this event from its public Eventernote page…")
             } else {
                 Text("Event data imported from the public Eventernote page.")
             }
@@ -379,6 +433,6 @@ struct EventDetailView: View {
 }
 
 #Preview {
-    EventDetailView(event: SampleData.library[0])
-        .environment(EventStore())
+    EventDetailView(event: PreviewData.events[0])
+        .environment(EventStore.preview)
 }

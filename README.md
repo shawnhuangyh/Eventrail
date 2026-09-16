@@ -2,7 +2,7 @@
 
 A native SwiftUI companion app for browsing [Eventernote](https://www.eventernote.com/) events and keeping your own record of what you're interested in, what you have tickets for, and what you actually attended — stored on your device and synchronized through your private iCloud account.
 
-> **Status: early development.** The architecture and behavior described here come from the project's design proposal; the repository currently contains the app skeleton. The Eventernote import layer still requires a feasibility prototype before the full feature set can be committed to. This is not a completed or tested integration, and it is not affiliated with or endorsed by Eventernote.
+> **Status: early development.** Most of the behavior described here comes from the project's design proposal. What is actually built today: searching Eventernote's public event and performer pages, adding events to your own library, the four tracking fields, and re-importing a saved event from its public page. Your library is kept in a local JSON file — iCloud sync, offline caching policy, public-profile import and background refresh are not built yet, and persistence has not been moved to SwiftData/CloudKit. Not affiliated with or endorsed by Eventernote.
 
 ## What it does
 

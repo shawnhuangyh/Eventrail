@@ -8,6 +8,8 @@ enum AppTab: Hashable {
 /// The three home tabs. On iOS 26 the tab bar is Liquid Glass over the wash,
 /// and the search tab gets the system's dedicated search treatment.
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var store = EventStore()
     @State private var selection: AppTab = .events
 
@@ -32,6 +34,11 @@ struct RootView: View {
         #endif
         .environment(store)
         .tint(.brandTint)
+        // Edits are written after a short pause; leaving the app cuts that
+        // short, so the last one is flushed here rather than lost.
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { store.saveNow() }
+        }
     }
 }
 
@@ -40,6 +47,6 @@ struct RootView: View {
 }
 
 #Playground {
-    let store = EventStore()
+    let store = EventStore.preview
     _ = store.groups(filter: .upcoming, grouping: .month).map(\.label)
 }

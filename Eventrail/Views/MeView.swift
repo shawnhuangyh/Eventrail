@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// The associated public profile, library statistics, and the controls over
-/// where the reader's own records live.
+/// The reader's own library at a glance: what it holds, when it was last
+/// imported, and where it is kept.
 struct MeView: View {
     @Environment(EventStore.self) private var store
 
     @State private var openEvent: Event?
 
     var body: some View {
-        @Bindable var store = store
-
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
@@ -17,7 +15,7 @@ struct MeView: View {
                     statistics
                     refreshCard
                     favoritesCard
-                    settingsCard(store: $store)
+                    settingsCard
                     footnote
                 }
                 .padding(.horizontal, 16)
@@ -31,6 +29,9 @@ struct MeView: View {
         }
     }
 
+    /// Eventrail reads Eventernote's public pages and nothing else. There is no
+    /// account behind this screen, and the card has to say so rather than imply
+    /// a profile the app has not got.
     private var profileCard: some View {
         HStack(spacing: 14) {
             Circle()
@@ -43,20 +44,18 @@ struct MeView: View {
                 .frame(width: 58, height: 58)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(store.profileHandle)
+                Text("My library")
                     .font(.system(size: 16, weight: .semibold))
-                Text("Public profile imported · ^[\(store.listedParticipations) participation](inflect: true)")
+                Text("^[\(store.library.count) event](inflect: true) · ^[\(store.favoriteEvents.count) favorite](inflect: true)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                // A username is not a login: the import proves nothing about
-                // who owns the account, and the interface has to say so.
                 HStack(spacing: 5) {
                     Circle()
                         .fill(Color.trackTicket)
                         .frame(width: 6, height: 6)
-                    Text("Unverified — read only")
+                    Text("No Eventernote account — read only")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Color.trackTicket)
                 }
@@ -82,6 +81,8 @@ struct MeView: View {
         }
     }
 
+    /// Re-imports every event in the library from its public page. Only imported
+    /// fields are replaced; notes, interest, tickets and attendance are not.
     private var refreshCard: some View {
         HStack(spacing: 13) {
             VStack(alignment: .leading, spacing: 4) {
@@ -89,7 +90,8 @@ struct MeView: View {
                     .font(.system(size: 14, weight: .semibold))
                 refreshDetail
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(store.refreshFailure == nil ? .secondary : Color.favorite)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -104,7 +106,7 @@ struct MeView: View {
             }
             .buttonStyle(.plain)
             .glassCapsule(interactive: true)
-            .disabled(store.isRefreshing)
+            .disabled(store.isRefreshing || store.library.isEmpty)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 15)
@@ -115,11 +117,15 @@ struct MeView: View {
     /// the data is current.
     private var refreshDetail: Text {
         if store.isRefreshing {
-            Text("Importing public profile…")
+            Text("Re-importing ^[\(store.library.count) event](inflect: true)…")
+        } else if let failure = store.refreshFailure {
+            Text(verbatim: failure)
         } else if let lastRefreshed = store.lastRefreshed {
-            Text("Public profile imported \(lastRefreshed, format: .relative(presentation: .named))")
+            Text("Events re-imported \(lastRefreshed, format: .relative(presentation: .named))")
+        } else if store.library.isEmpty {
+            Text("Add events from Search to fill your library")
         } else {
-            Text("Never imported")
+            Text("Never re-imported")
         }
     }
 
@@ -167,13 +173,13 @@ struct MeView: View {
             openEvent = event
         } label: {
             HStack(spacing: 12) {
-                FlyerThumbnail(width: 38, cornerRadius: 10)
+                FlyerThumbnail(url: event.imageURL, width: 38, cornerRadius: 10)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(event.title)
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
-                    Text("\(event.dayLine) · \(event.venue)")
+                    Text(verbatim: "\(event.dayLine) · \(event.venue)")
                         .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -202,24 +208,21 @@ struct MeView: View {
         }
     }
 
-    private func settingsCard(store: Bindable<EventStore>) -> some View {
+    private var settingsCard: some View {
         VStack(spacing: 0) {
-            Toggle(isOn: store.iCloudSyncEnabled) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("iCloud Sync")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(store.wrappedValue.iCloudSyncEnabled
-                         ? "Notes, tracking and settings sync privately"
-                         : "This device only — nothing leaves it")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Storage")
+                    .font(.system(size: 14, weight: .semibold))
+                // Sync is not built yet, so the card does not claim it.
+                Text("Your library, notes and tracking are kept on this device only.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
 
-            settingsRow("Backup & Restore", value: "Last backup 3 days ago")
             settingsRow("Export library", value: "CSV · JSON")
             settingsRow("Language", value: "System")
             settingsRow("About Eventrail", value: nil)
@@ -255,7 +258,7 @@ struct MeView: View {
     }
 
     private var footnote: some View {
-        Text("Your notes, interest, ticket status and attendance live on this device and in your private iCloud. Eventrail is not affiliated with Eventernote.")
+        Text("Your notes, interest, ticket status and attendance stay on this device. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)
@@ -267,5 +270,5 @@ struct MeView: View {
 
 #Preview {
     MeView()
-        .environment(EventStore())
+        .environment(EventStore.preview)
 }

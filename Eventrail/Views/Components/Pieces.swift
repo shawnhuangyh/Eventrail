@@ -1,23 +1,34 @@
 import SwiftUI
 
-/// Stand-in for the event flyer until imported artwork is available.
+/// The event flyer Eventernote hosts, with the placeholder the design uses
+/// until it loads — or for the events the site has no artwork for.
 struct FlyerThumbnail: View {
+    var url: URL?
     var width: CGFloat = 58
     var cornerRadius: CGFloat = 15
 
-    var body: some View {
+    private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        shape
             .fill(.quaternary)
             .overlay {
-                Image(systemName: "music.microphone")
-                    .font(.system(size: width * 0.34, weight: .light))
-                    .foregroundStyle(.tertiary)
+                // Flyers are listed as squares and printed 5:7, so the artwork
+                // fills the frame and is cropped rather than letterboxed.
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "music.microphone")
+                        .font(.system(size: width * 0.34, weight: .light))
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .clipShape(shape)
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
+                shape.strokeBorder(.white.opacity(0.35), lineWidth: 0.5)
             }
-            // Event flyers are printed 5:7.
             .frame(width: width, height: width * 7 / 5)
             .accessibilityLabel("Event flyer")
     }

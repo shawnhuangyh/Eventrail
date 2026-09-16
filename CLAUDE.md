@@ -8,8 +8,22 @@ Eventrail is an iPhone/iPad SwiftUI app (single target `Eventrail`, bundle id `c
 
 Source is grouped as:
 
-- [Eventrail/Model/](Eventrail/Model/) — `Event`, the reader's private `Tracking` record, and `EventStore`, an `@Observable` in-memory store passed down through `.environment`. Persistence is deliberately absent until the SwiftData/CloudKit schema is settled; [SampleData.swift](Eventrail/Model/SampleData.swift) stands in for the Eventernote import adapter.
+- [Eventrail/Model/](Eventrail/Model/) — `Event`, the reader's private `Tracking` record, `Feed` (one page of an Eventernote listing at a time), and `EventStore`, an `@Observable` store passed down through `.environment`. [PreviewData.swift](Eventrail/Model/PreviewData.swift) is fixtures for `#Preview` and the playground only; the running app starts with an empty library.
+- [Eventrail/Services/](Eventrail/Services/) — the Eventernote import adapter. See below.
 - [Eventrail/Views/](Eventrail/Views/) — one file per screen, plus [Components/](Eventrail/Views/Components/) for the shared glass panel, wash background, and small repeated parts.
+
+## The Eventernote import
+
+Eventernote publishes no API, so [EventernoteClient.swift](Eventrail/Services/EventernoteClient.swift) GETs the site's public pages and [EventernotePages.swift](Eventrail/Services/EventernotePages.swift) reads them with [HTMLCursor.swift](Eventrail/Services/HTMLCursor.swift), a marker-based scanner (no HTML parser, no dependency). Things worth knowing before changing any of it:
+
+- **The User-Agent must contain `iPhone`.** The site serves a desktop template otherwise, and every selector here is from the smartphone template. This is the single most breakable assumption in the adapter.
+- Pages read: `/events/search`, `/actors/search`, `/actors/{slug}/{id}/events`, `/events/{id}`, `/places/{id}`. `robots.txt` disallows only `/users/notice` and `/users/timeline`. Everything is a GET — nothing is ever written back to Eventernote, and no account is involved.
+- Performer slugs come back already percent-encoded and are passed through `percentEncodedPath`; re-encoding them breaks names containing `!`, `(` or spaces.
+- Search rows carry only day, title, venue, billing and a thumbnail. Times, head count and the venue address come from the event's own page, so `Event` marks that with `isDetailed` and its time fields are optional. **Do not make them non-optional** — Eventernote routinely announces an event months before it publishes a start time.
+- The count beside a name in performer search is the site's *fan* count, not an event count.
+- Every accessor is failable by design: a changed template yields a missing field or a dropped row, never wrong data.
+
+Persistence is a plain JSON file ([LibraryArchive.swift](Eventrail/Model/LibraryArchive.swift)) in Application Support, deliberately *not* SwiftData — that schema is still unsettled, and this keeps what the reader adds across launches without committing to a store. Imported fields and the reader's `Tracking` are written separately: an import replaces events and never reads or writes tracking or favorites.
 
 The UI comes from the Claude Design canvas "Eventernote Mobile App Design" (`Eventrail.dc.html`), which specifies a Liquid Glass treatment in light and dark. All glass goes through `glassBackground(in:interactive:)` in [WashBackground.swift](Eventrail/Views/Components/WashBackground.swift) — that one helper also holds a `#if os(visionOS)` material fallback, kept from when the target still built for visionOS. Palette colours are colorsets in `Assets.xcassets` generated from the design's oklch values, with light and dark variants.
 

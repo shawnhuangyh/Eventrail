@@ -107,5 +107,5 @@ struct EventsView: View {
 
 #Preview {
     EventsView()
-        .environment(EventStore())
+        .environment(EventStore.preview)
 }

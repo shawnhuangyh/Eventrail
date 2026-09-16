@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// How interested the reader is. Distinct from anything Eventernote knows.
-enum Interest: String, CaseIterable, Identifiable, Hashable {
+nonisolated enum Interest: String, CaseIterable, Identifiable, Hashable, Codable {
     case none, interested, planning
 
     var id: Self { self }
@@ -15,7 +15,7 @@ enum Interest: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum TicketStatus: String, CaseIterable, Identifiable, Hashable {
+nonisolated enum TicketStatus: String, CaseIterable, Identifiable, Hashable, Codable {
     case none, purchased
 
     var id: Self { self }
@@ -28,7 +28,7 @@ enum TicketStatus: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum Attendance: String, CaseIterable, Identifiable, Hashable {
+nonisolated enum Attendance: String, CaseIterable, Identifiable, Hashable, Codable {
     case unrecorded, attended
 
     var id: Self { self }
@@ -45,7 +45,7 @@ enum Attendance: String, CaseIterable, Identifiable, Hashable {
 ///
 /// These four fields belong to the reader and to this app. A refresh of the
 /// public page never touches them.
-struct Tracking: Hashable {
+nonisolated struct Tracking: Hashable, Codable {
     var interest: Interest = .none
     var ticket: TicketStatus = .none
     var attendance: Attendance = .unrecorded
