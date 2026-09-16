@@ -1,0 +1,48 @@
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+
+# Xcode build output and local state
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager generated files
+.build/
+.swiftpm/
+# Keep Package.resolved tracked for reproducible app dependency versions.
+
+# Archives, distribution artifacts, and test results
+*.xcarchive
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcresult
+*.profraw
+*.profdata
+
+# Local signing credentials
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+
+# Editor temporary files
+*.swp
+*.swo
+*~
+
+# Optional Fastlane generated output
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+docs/dev
