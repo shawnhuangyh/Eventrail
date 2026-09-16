@@ -6,6 +6,8 @@ struct MeView: View {
     @Environment(EventStore.self) private var store
 
     @State private var openEvent: Event?
+    @State private var isLinking = false
+    @State private var isConfirmingUnlink = false
 
     var body: some View {
         @Bindable var store = store
@@ -16,6 +18,7 @@ struct MeView: View {
                     profileCard
                     statistics
                     refreshCard
+                    accountCard
                     favoritesCard
                     settingsCard(store: $store)
                     footnote
@@ -27,6 +30,16 @@ struct MeView: View {
             .navigationTitle("Me")
             .sheet(item: $openEvent) { event in
                 EventDetailView(event: event)
+            }
+            .sheet(isPresented: $isLinking) {
+                EventernoteAccountSheet()
+            }
+            .confirmationDialog("Unlink this Eventernote account?",
+                                isPresented: $isConfirmingUnlink, titleVisibility: .visible) {
+                Button("Unlink", role: .destructive) { store.unlinkAccount() }
+                Button("Keep it", role: .cancel) {}
+            } message: {
+                Text("The events already imported stay in your library.")
             }
         }
     }
@@ -57,7 +70,7 @@ struct MeView: View {
                     Circle()
                         .fill(Color.trackTicket)
                         .frame(width: 6, height: 6)
-                    Text("No Eventernote account — read only")
+                    accountBadge
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(Color.trackTicket)
                 }
@@ -128,6 +141,139 @@ struct MeView: View {
             Text("Add events from Search to fill your library")
         } else {
             Text("Never re-imported")
+        }
+    }
+
+    /// The badge says what the app is reading, and never more than that: even
+    /// with an account named, this is one public page being read, not a login.
+    private var accountBadge: Text {
+        if let handle = store.eventernoteHandle {
+            Text("Reading @\(handle) — read only")
+        } else {
+            Text("No Eventernote account — read only")
+        }
+    }
+
+    // MARK: - The linked Eventernote account
+
+    /// Names an Eventernote account and pulls its attended events in.
+    ///
+    /// Eventernote publishes every member's history on a page anyone can load,
+    /// so this needs a handle and nothing else — no password, no session, no
+    /// writing back. Importing adds what is missing and fills in tracking the
+    /// reader has left blank; it never overrules an answer they gave.
+    private var accountCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 13) {
+                VStack(alignment: .leading, spacing: 4) {
+                    accountTitle
+                        .font(.system(size: 14, weight: .semibold))
+                    accountDetail
+                        .font(.system(size: 12))
+                        .foregroundStyle(store.importFailure == nil ? .secondary : Color.favorite)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    if store.eventernoteHandle == nil {
+                        isLinking = true
+                    } else {
+                        Task { await store.importAccountHistory() }
+                    }
+                } label: {
+                    accountAction
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.brandTint)
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 9)
+                }
+                .buttonStyle(.plain)
+                .glassCapsule(interactive: true)
+                .disabled(store.isImporting)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
+
+            if store.isImporting, let progress = store.importProgress, progress.total > 0 {
+                ProgressView(value: Double(progress.read), total: Double(progress.total))
+                    .tint(Color.trackTicket)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
+
+            if store.eventernoteHandle != nil {
+                accountRow("Change account") { isLinking = true }
+                accountRow("Unlink account") { isConfirmingUnlink = true }
+            }
+        }
+        .glassPanel()
+    }
+
+    private var accountTitle: Text {
+        if let handle = store.eventernoteHandle {
+            Text(verbatim: "@\(handle)")
+        } else {
+            Text("Eventernote Account")
+        }
+    }
+
+    private var accountAction: Text {
+        if store.eventernoteHandle == nil {
+            Text("Link")
+        } else if store.isImporting {
+            Text("Importing")
+        } else {
+            Text("Import")
+        }
+    }
+
+    /// Reports what the last import actually did, and says plainly when it
+    /// stopped short rather than implying the whole history arrived.
+    private var accountDetail: Text {
+        guard store.eventernoteHandle != nil else {
+            return Text("Import the events you have attended from your Eventernote profile")
+        }
+        if store.isImporting {
+            if let progress = store.importProgress {
+                return Text("Read \(progress.read) of ^[\(progress.total) event](inflect: true)…")
+            }
+            return Text("Reading your Eventernote history…")
+        }
+        // Counts and a short fall belong on the same line: "it worked" and "it
+        // only got this far" are both true of a partial import.
+        if let summary = store.importSummary {
+            let counts = Text("Imported ^[\(summary.read) event](inflect: true) — \(summary.added) added, \(summary.filled) updated")
+            guard let failure = store.importFailure else { return counts }
+            return counts + Text(verbatim: " ") + Text(verbatim: failure)
+        }
+        if let failure = store.importFailure {
+            return Text(verbatim: failure)
+        }
+        if let lastImported = store.lastImported {
+            return Text("History imported \(lastImported, format: .relative(presentation: .named))")
+        }
+        return Text("Not imported yet")
+    }
+
+    private func accountRow(_ label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(label)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isImporting)
+        .overlay(alignment: .top) {
+            Divider().padding(.leading, 16)
         }
     }
 

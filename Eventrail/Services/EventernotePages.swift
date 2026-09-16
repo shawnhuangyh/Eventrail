@@ -16,6 +16,24 @@ nonisolated struct PerformerProfile: Identifiable, Hashable, Codable, Sendable {
     let slug: String
 }
 
+/// An Eventernote member's public page.
+///
+/// Anyone can load this logged out — it is how the app imports a reader's own
+/// history without ever holding their password or a session of theirs.
+nonisolated struct EventernoteProfile: Hashable, Sendable {
+    /// The account name in the site's URLs, without the "@".
+    let handle: String
+    /// The display name printed above the handle, which need not match it.
+    let name: String
+    let bio: String?
+    /// How many events the site says the account has attended, if it printed it.
+    let eventCount: Int?
+    /// The performers the account lists as favourites. Imported for the count
+    /// shown before a link is confirmed; the app keeps no follow list of its own.
+    let favoritePerformers: [PerformerProfile]
+    let avatarURL: URL?
+}
+
 /// One page of a paged Eventernote listing.
 nonisolated struct EventernotePage<Item: Sendable>: Sendable {
     let items: [Item]
@@ -83,13 +101,28 @@ nonisolated enum EventernotePages {
                                page: page, pageSize: pageSize)
     }
 
-    /// "689件見つかりました。" — the site's own count for the whole result set.
+    /// The size of the whole result set, however the page in hand states it.
+    private static func totalCount(in html: String) -> Int? {
+        searchTotal(in: html) ?? attendedTotal(in: html)
+    }
+
+    /// "689件見つかりました。" — the count a search page prints.
     ///
     /// The count follows its element immediately, so anything longer than a
     /// number means the two markers matched different parts of the page.
-    private static func totalCount(in html: String) -> Int? {
+    private static func searchTotal(in html: String) -> Int? {
         var cursor = HTMLCursor(html)
         guard let found = cursor.text(after: #"class="t2">"#, upTo: "件見つかりました"),
+              found.count <= 20
+        else { return nil }
+        return number(in: found)
+    }
+
+    /// "参加イベント一覧(879)" — the heading a member's own event list carries
+    /// in place of a search count.
+    private static func attendedTotal(in html: String) -> Int? {
+        var cursor = HTMLCursor(html)
+        guard let found = cursor.text(after: #"<h2 class="gb_subtitle">参加イベント一覧("#, upTo: ")"),
               found.count <= 20
         else { return nil }
         return number(in: found)
@@ -120,6 +153,65 @@ nonisolated enum EventernotePages {
         return event(id: id, title: title, day: day, venue: venue, venueDetail: nil,
                      placeID: nil, times: times, performers: performers,
                      listedAttendees: nil, imageURL: image, isDetailed: false)
+    }
+
+    // MARK: - A member's own page
+
+    /// Reads `/users/{handle}`.
+    ///
+    /// The handle is passed in rather than read back out of the page: it is what
+    /// the reader typed and what every later request is built from, and a page
+    /// that fails to print it should not silently change which account is linked.
+    static func profile(in html: String, handle: String) -> EventernoteProfile? {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="profile_box"#),
+              let name = cursor.text(after: #"<h1 class="top">"#, upTo: "</h1>")
+        else { return nil }
+
+        // Everything past the name is optional: an account with no bio, no
+        // avatar and no favourites is still an account worth linking.
+        let bio = cursor.text(after: #"<p class="text">"#, upTo: "</p>")
+
+        var counts = HTMLCursor(html)
+        counts.advance(past: #"<div class="gb_score_table">"#)
+        let eventCount = counts.text(after: #"/events">"#, upTo: "</a>").flatMap(number(in:))
+
+        return EventernoteProfile(
+            handle: handle, name: name, bio: bio, eventCount: eventCount,
+            favoritePerformers: favoritePerformers(in: html),
+            avatarURL: avatarImage(in: html)
+        )
+    }
+
+    /// The "お気に入りの声優" block, which carries each performer's id and the
+    /// already-escaped slug their event list is addressed by.
+    private static func favoritePerformers(in html: String) -> [PerformerProfile] {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="favorite_actor">"#),
+              cursor.advance(past: "<ul>"),
+              let list = cursor.take(upTo: "</ul>")
+        else { return [] }
+
+        var rows = HTMLCursor(list)
+        var performers: [PerformerProfile] = []
+        while rows.advance(past: #"<a href="/actors/"#) {
+            guard let path = rows.take(upTo: "\""),
+                  let id = Int(path.split(separator: "/").last ?? ""),
+                  let name = rows.text(after: ">", upTo: "</a>")
+            else { break }
+            let slug = path.split(separator: "/").dropLast().joined(separator: "/")
+            // The block prints no reading, and the number beside a name here is
+            // the site's fan count, which this page does not carry at all.
+            performers.append(PerformerProfile(id: id, name: name, reading: nil,
+                                               fanCount: nil, slug: slug))
+        }
+        return performers
+    }
+
+    private static func avatarImage(in html: String) -> URL? {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="thumb">"#) else { return nil }
+        return cursor.text(after: #"src=""#, upTo: "\"").flatMap(URL.init(string:))
     }
 
     // MARK: - An event's own page

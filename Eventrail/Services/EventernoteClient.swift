@@ -14,6 +14,11 @@ nonisolated struct EventernoteClient: Sendable {
     /// Rows per page, passed to the site's own paging.
     static let pageSize = 30
 
+    /// Rows per page when importing a whole account. The site honours this up to
+    /// at least 100, which turns a nine-hundred-event history into nine requests
+    /// rather than thirty.
+    static let importPageSize = 100
+
     /// The site serves a desktop template unless the request looks like a phone,
     /// and it is the phone template this importer reads. The product name is
     /// kept in front of it so the traffic is attributable.
@@ -62,6 +67,45 @@ nonisolated struct EventernoteClient: Sendable {
         let html = try await html(at: path, query: ["limit": "\(Self.pageSize)", "page": "\(page)"],
                                   isPreEncoded: true)
         return EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
+    }
+
+    // MARK: - A member's own history
+
+    enum Account {
+        /// The handles the site addresses accounts by. Anything else is a typo,
+        /// and asking for it would send a malformed path to Eventernote.
+        static func normalized(_ typed: String) -> String? {
+            let handle = typed
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .drop { $0 == "@" }
+            guard !handle.isEmpty, handle.count <= 64,
+                  handle.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" || $0 == "." })
+            else { return nil }
+            return String(handle)
+        }
+    }
+
+    /// Reads one member's public page, which is what confirms a handle exists
+    /// before the app records it.
+    func profile(forUser handle: String) async throws -> EventernoteProfile {
+        let html = try await html(at: "/users/\(handle)", query: [:])
+        guard let profile = EventernotePages.profile(in: html, handle: handle) else {
+            throw Failure.unreadable
+        }
+        return profile
+    }
+
+    /// One page of the events a member has marked themselves as attending.
+    ///
+    /// The listing is the same `gb_listevent` block the search results use, so
+    /// the rows carry the same fields and the same `isDetailed == false`. It
+    /// runs newest first and mixes dates still to come in with the past.
+    func events(forUser handle: String, page: Int = 1) async throws -> EventernotePage<Event> {
+        let html = try await html(
+            at: "/users/\(handle)/events",
+            query: ["limit": "\(Self.importPageSize)", "page": "\(page)"]
+        )
+        return EventernotePages.events(in: html, page: page, pageSize: Self.importPageSize)
     }
 
     // MARK: - One event

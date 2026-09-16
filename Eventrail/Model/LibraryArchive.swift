@@ -43,6 +43,21 @@ struct LibraryArchive: Codable, Sendable {
     var favorites: [Event.ID: Stamped<Bool>] = [:]
     var recentSearches: Stamped<[String]> = Stamped([], at: .distantPast)
     var lastRefreshed: Date?
+    /// The Eventernote account the reader imports their history from.
+    ///
+    /// The reader's own setting, so it is stamped and merges like the rest: a
+    /// handle named on the phone should reach the iPad. Unlinking writes a
+    /// `nil` *inside* the stamp rather than dropping the record, for the same
+    /// reason a removal is a tombstone — losing the record would let the next
+    /// merge re-link the account.
+    ///
+    /// Optional on the outside only so that an archive written before this
+    /// existed still decodes. Swift's synthesized decoder does not fall back to
+    /// a property's default value, so a new non-optional key here would read as
+    /// a corrupt file and empty every library in the field.
+    var eventernoteAccount: Stamped<String?>?
+    /// When the linked account's history was last imported.
+    var lastImported: Date?
 
     /// The library itself, in no particular order — every screen sorts it.
     var libraryEvents: [Event] {
@@ -74,9 +89,20 @@ struct LibraryArchive: Codable, Sendable {
         merged.tracking = Self.merge(tracking, other.tracking)
         merged.favorites = Self.merge(favorites, other.favorites)
         merged.recentSearches = recentSearches.newer(other.recentSearches)
+        merged.eventernoteAccount = Self.newer(eventernoteAccount, other.eventernoteAccount)
         merged.lastRefreshed = [lastRefreshed, other.lastRefreshed].compactMap { $0 }.max()
+        merged.lastImported = [lastImported, other.lastImported].compactMap { $0 }.max()
 
         return merged.pruned()
+    }
+
+    /// The newer of two records either device may not have at all.
+    private static func newer<Value>(
+        _ mine: Stamped<Value>?, _ theirs: Stamped<Value>?
+    ) -> Stamped<Value>? {
+        guard let mine else { return theirs }
+        guard let theirs else { return mine }
+        return mine.newer(theirs)
     }
 
     private static func merge<Value>(

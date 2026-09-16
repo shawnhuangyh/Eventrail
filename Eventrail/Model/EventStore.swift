@@ -82,6 +82,32 @@ final class EventStore {
     private(set) var syncStatus: CloudSync.Outcome?
     private(set) var lastSynced: Date?
 
+    private(set) var isImporting = false
+    /// How far through the linked account's history the import has read, so a
+    /// nine-page import says so rather than appearing to hang.
+    private(set) var importProgress: ImportProgress?
+    /// What the last import did, kept only for as long as the screen shows it.
+    private(set) var importSummary: ImportSummary?
+    private(set) var importFailure: String?
+
+    /// How many of the account's events have been read so far.
+    struct ImportProgress: Hashable {
+        var read: Int
+        var total: Int
+    }
+
+    /// What one import changed. `added` and `filled` are counted separately
+    /// because they are different promises: one grew the library, the other only
+    /// wrote a tracking field the reader had left alone.
+    ///
+    /// A summary and an ``importFailure`` can both be set: an import that read
+    /// six pages of nine still adopted those six.
+    struct ImportSummary: Hashable {
+        var read: Int
+        var added: Int
+        var filled: Int
+    }
+
     /// Whether this device mirrors the library to iCloud. A per-device choice,
     /// so it deliberately does not sync: turning sync off on a phone should not
     /// turn it off on the iPad.
@@ -159,6 +185,11 @@ final class EventStore {
     var recentSearches: [String] { archive.recentSearches.value }
 
     var lastRefreshed: Date? { archive.lastRefreshed }
+
+    /// The Eventernote account the reader imports from, if they have named one.
+    var eventernoteHandle: String? { archive.eventernoteAccount?.value }
+
+    var lastImported: Date? { archive.lastImported }
 
     func tracking(for event: Event) -> Tracking {
         archive.tracking[event.id]?.value ?? Tracking()
@@ -314,6 +345,153 @@ final class EventStore {
             }
             return imported
         }
+    }
+
+    // MARK: - The linked Eventernote account
+
+    /// Confirms a handle names a real account, without recording anything.
+    ///
+    /// The reader sees who they are about to link before the app commits to it —
+    /// handles are short and easy to mistype, and a wrong one would otherwise
+    /// import a stranger's history into their library.
+    func lookUpAccount(_ typed: String) async throws -> EventernoteProfile {
+        guard let handle = EventernoteClient.Account.normalized(typed) else {
+            throw EventernoteClient.Failure.unreadable
+        }
+        return try await client.profile(forUser: handle)
+    }
+
+    func link(_ profile: EventernoteProfile) {
+        guard profile.handle != eventernoteHandle else { return }
+        archive.eventernoteAccount = Stamped(profile.handle)
+        archive.lastImported = nil
+        importSummary = nil
+        importFailure = nil
+        persist()
+    }
+
+    /// Forgets the account. What it already imported stays: those events are in
+    /// the library now, and unlinking is about where the app looks next, not
+    /// about undoing what the reader has collected.
+    func unlinkAccount() {
+        guard eventernoteHandle != nil else { return }
+        // A nil inside the stamp rather than a dropped record, so the unlink
+        // reaches the other device instead of being merged away.
+        archive.eventernoteAccount = Stamped(nil)
+        archive.lastImported = nil
+        importSummary = nil
+        importFailure = nil
+        persist()
+    }
+
+    /// Imports every event the linked account is listed as attending.
+    ///
+    /// Three rules keep this from talking over the reader:
+    ///
+    /// - An event they removed stays removed. Its tombstone is honoured, or the
+    ///   next import would hand back exactly what they took out.
+    /// - The first import after linking fills in the tracking they have left
+    ///   blank; every import after that only fills in events it has just added.
+    ///   `Attendance.unrecorded` cannot be told apart from an answer the reader
+    ///   gave, so a later import that re-asserted it would quietly undo them
+    ///   marking a registered event as one they did not go to.
+    /// - A page that fails does not discard the pages that worked. The import
+    ///   adopts what it read and says it stopped short.
+    ///
+    /// Notes and ticket status are never written by an import at all.
+    func importAccountHistory() async {
+        guard !isImporting, let handle = eventernoteHandle else { return }
+        isImporting = true
+        importFailure = nil
+        importSummary = nil
+        // Read before the import stamps itself, so the catch-up run knows it is
+        // the catch-up run.
+        let isCatchingUp = archive.lastImported == nil
+        defer {
+            isImporting = false
+            importProgress = nil
+        }
+
+        var imported: [Event] = []
+        var page = 1
+
+        while true {
+            let read: EventernotePage<Event>
+            do {
+                read = try await client.events(forUser: handle, page: page)
+            } catch {
+                importFailure = page == 1
+                    ? String(localized: "Could not reach Eventernote. Nothing was imported.")
+                    : String(localized: "Eventernote stopped answering partway through. What did arrive was imported.")
+                break
+            }
+            imported += read.items
+            importProgress = ImportProgress(read: imported.count, total: max(read.total, imported.count))
+            // An empty page ends the run even if the site's own count disagrees,
+            // so a miscounted total cannot spin this forever.
+            guard read.hasMore, !read.items.isEmpty else { break }
+            page += 1
+        }
+
+        guard !imported.isEmpty else { return }
+        // The site lists the odd event twice, on two adjacent rows of the same
+        // page. Adopting it twice is harmless, but counting it twice would
+        // overstate what arrived.
+        var seen: Set<Event.ID> = []
+        let distinct = imported.filter { seen.insert($0.id).inserted }
+
+        let counts = adopt(distinct, fillingBlanks: isCatchingUp)
+        archive.lastImported = .now
+        importSummary = ImportSummary(read: distinct.count, added: counts.added,
+                                      filled: counts.filled)
+        persist()
+    }
+
+    /// Folds an imported history into the archive under the rules above.
+    ///
+    /// `fillingBlanks` reaches events already in the library — the ones saved
+    /// from Search before the account was linked. Without it only the events
+    /// this import adds are ruled on, and everything the reader has already
+    /// answered, or deliberately left blank, stays as they left it.
+    private func adopt(_ imported: [Event], fillingBlanks: Bool) -> (added: Int, filled: Int) {
+        let now = Date.now
+        var added = 0
+        var filled = 0
+
+        for event in imported {
+            // The reader took this one out. An import is not a reason to undo that.
+            if let membership = archive.membership[event.id], !membership.value { continue }
+
+            let isNew = !archive.isInLibrary(event.id)
+            if isNew {
+                archive.membership[event.id] = Stamped(true, at: now)
+                added += 1
+            }
+            keep(event)
+
+            guard isNew || fillingBlanks else { continue }
+            let recorded = archive.tracking[event.id]?.value ?? Tracking()
+            let completed = completing(recorded, for: event)
+            // Only a real change is stamped: rewriting an unchanged record would
+            // make this device win a merge it has nothing new to say in.
+            if completed != recorded {
+                archive.tracking[event.id] = Stamped(completed, at: now)
+                filled += 1
+            }
+        }
+        return (added, filled)
+    }
+
+    /// Fills the one field the account listing actually evidences, and only when
+    /// the reader has not answered it themselves.
+    private func completing(_ tracking: Tracking, for event: Event) -> Tracking {
+        var completed = tracking
+        if event.isUpcoming {
+            if completed.interest == .none { completed.interest = .planning }
+        } else if completed.attendance == .unrecorded {
+            completed.attendance = .attended
+        }
+        return completed
     }
 
     // MARK: - Syncing
