@@ -6,7 +6,7 @@ A native SwiftUI companion app for browsing [Eventernote](https://www.eventernot
 
 ## What it does
 
-**Browse events natively.** Event lists, search, and detail screens rendered as a real iOS/macOS/visionOS app rather than a wrapped web page, populated from publicly accessible Eventernote information. Every event links back to its original page.
+**Browse events natively.** Event lists, search, and detail screens rendered as a real iOS app rather than a wrapped web page, populated from publicly accessible Eventernote information. Every event links back to its original page.
 
 **Track events on your own terms.** For any event you can independently record:
 
@@ -21,7 +21,7 @@ These fields belong to you and to this app. They live in the local database, syn
 
 **Work offline.** Saved events and annotations are cached locally and remain fully usable with no network and no active iCloud connection. Syncing resumes when connectivity returns.
 
-**Sync across your devices.** Personal annotations, profile settings, and suitable event snapshots move between your iPhone, iPad, Mac, and Vision Pro through your own private iCloud storage. There is no app-operated backend and no account to create.
+**Sync across your devices.** Personal annotations, profile settings, and suitable event snapshots move between your iPhone and iPad through your own private iCloud storage. There is no app-operated backend and no account to create.
 
 **Import a public Eventernote profile — optionally.** Enter an Eventernote username and the app imports that profile's public upcoming and historical participation records. This is a one-way, read-only import of public data: no password is collected, no session cookie is extracted, and entering a username does **not** authenticate you or prove you own the account. The interface presents this as importing a public profile, not as signing in.
 
@@ -61,7 +61,7 @@ iOS background execution is opportunistic, so the app makes no promise of exact 
 
 ## Platforms
 
-iOS, macOS, and visionOS from a single SwiftUI target (deployment target 26.0), built with Xcode. Persistence is planned on SwiftData or Core Data with CloudKit, to be chosen after validating schema constraints, conflict behavior, and migration requirements.
+iPhone and iPad from a single SwiftUI target (deployment target 26.0), built with Xcode. macOS and visionOS were dropped deliberately. Persistence is planned on SwiftData or Core Data with CloudKit, to be chosen after validating schema constraints, conflict behavior, and migration requirements.
 
 ## Languages
 
@@ -74,7 +74,7 @@ The interface is localized into four languages:
 | Simplified Chinese | `zh-Hans` |
 | Traditional Chinese | `zh-Hant` |
 
-The app follows your system language and region settings, and falls back to English for any language not on this list. You can override it per-app in iOS Settings or macOS System Settings without changing your system language.
+The app follows your system language and region settings, and falls back to English for any language not on this list. You can override it per-app in iOS Settings without changing your system language.
 
 All user-facing text — screen labels, the interest/ticket/attendance values, refresh status, and error messages — is defined as localizable strings in a String Catalog rather than hard-coded, so dates, times, and numbers are formatted for your locale too.
 
