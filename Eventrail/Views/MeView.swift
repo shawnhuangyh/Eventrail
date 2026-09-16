@@ -229,9 +229,7 @@ struct MeView: View {
                 quotaMeter
             }
 
-            settingsRow("Export library", value: "CSV · JSON")
-            settingsRow("Language", value: "System")
-            settingsRow("About Eventrail", value: nil)
+            settingsRow("About Eventrail")
         }
         .glassPanel()
     }
@@ -280,19 +278,14 @@ struct MeView: View {
         .padding(.bottom, 12)
     }
 
-    private func settingsRow(_ label: LocalizedStringKey, value: LocalizedStringKey?) -> some View {
+    private func settingsRow(_ label: LocalizedStringKey) -> some View {
         Button {
-            // Destinations for these land with the persistence layer.
+            // The destination lands with the About screen.
         } label: {
             HStack(spacing: 12) {
                 Text(label)
                     .font(.system(size: 14, weight: .medium))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if let value {
-                    Text(value)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(.tertiary)
-                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
