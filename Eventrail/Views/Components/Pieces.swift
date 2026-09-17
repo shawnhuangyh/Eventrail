@@ -239,7 +239,9 @@ struct FlowLayout: Layout {
 ///
 /// The heart is a sibling of the row's own button rather than a button inside
 /// its label. Nested, the row's tap target covers it and a tap on the heart
-/// opens the event instead of un-favoriting it.
+/// opens the event instead of un-favoriting it. It is the same circular glass
+/// control the Following tab's rows carry, so the one gesture that takes a row
+/// out of a list looks the same wherever the list is.
 struct FavoriteEventRow: View {
     @Environment(EventStore.self) private var store
 
@@ -285,12 +287,12 @@ struct FavoriteEventRow: View {
                     withAnimation(.snappy) { store.toggleFavorite(event) }
                 } label: {
                     Image(systemName: "heart.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 15))
                         .foregroundStyle(Color.favorite)
-                        .frame(width: 32, height: 32)
-                        .contentShape(.rect)
+                        .frame(width: 38, height: 38)
                 }
                 .buttonStyle(.plain)
+                .glassCircle(interactive: true)
                 .accessibilityLabel("Remove from favorites")
             }
         }
@@ -306,8 +308,8 @@ struct FavoriteEventRow: View {
 /// that stops following them.
 ///
 /// Shared by the Me card and the full list behind its See All. The unfollow
-/// button sits beside the link rather than inside it, for the reason
-/// ``FavoriteEventRow`` gives.
+/// button sits beside the link rather than inside it, and wears the same
+/// circular glass, for the reasons ``FavoriteEventRow`` gives.
 struct FollowedPerformerRow: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
@@ -342,12 +344,12 @@ struct FollowedPerformerRow: View {
                     withAnimation(.snappy) { store.unfollow(performer) }
                 } label: {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.trackAttended)
-                        .frame(width: 32, height: 32)
-                        .contentShape(.rect)
+                        .frame(width: 38, height: 38)
                 }
                 .buttonStyle(.plain)
+                .glassCircle(interactive: true)
                 .accessibilityLabel("Stop following")
             }
         }
