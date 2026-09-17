@@ -226,22 +226,18 @@ struct SearchResultRow: View {
 
     var body: some View {
         EventRowContent(event: event, detail: detail) {
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                Button {
-                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-                } label: {
-                    Image(systemName: isSaved ? "checkmark" : "plus")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(isSaved ? Color.trackAttended : Color.brandTint)
-                        .frame(width: 38, height: 38)
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.plain)
-                .glassCircle(interactive: true)
-                .accessibilityLabel(isSaved ? "Remove from my events" : "Add to my events")
-                Spacer(minLength: 0)
+            Button {
+                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+            } label: {
+                Image(systemName: isSaved ? "checkmark" : "plus")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(isSaved ? Color.trackAttended : Color.brandTint)
+                    .frame(width: 38, height: 38)
+                    .contentTransition(.symbolEffect(.replace))
             }
+            .buttonStyle(.plain)
+            .glassCircle(interactive: true)
+            .accessibilityLabel(isSaved ? "Remove from my events" : "Add to my events")
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)

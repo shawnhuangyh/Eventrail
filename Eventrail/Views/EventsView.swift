@@ -148,7 +148,10 @@ struct EventsView: View {
     /// reads better with the filter alone standing in it.
     private var showMenu: some View {
         Menu {
-            Button("Select Events", systemImage: "checkmark.circle") {
+            // No icon on purpose: the two pickers below put a checkmark in the
+            // menu's leading gutter, and an image of a different width here
+            // pushed this one title out of that shared column.
+            Button("Select Events") {
                 isSelecting = true
             }
             .disabled(eventCount == 0)

@@ -9,7 +9,10 @@ struct EventRowContent<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(alignment: .top, spacing: 13) {
+        // Centred, not top-aligned: the flyer is a fixed 5:7 block and the text
+        // beside it is one line shorter whenever the title fits on one line, so
+        // pinning both to the top left the row ragged along the bottom.
+        HStack(alignment: .center, spacing: 13) {
             FlyerThumbnail(url: event.imageURL)
 
             VStack(alignment: .leading, spacing: 5) {
@@ -59,14 +62,12 @@ struct LibraryRow: View {
     var body: some View {
         Button(action: open) {
             EventRowContent(event: event, detail: detail) {
-                VStack(alignment: .trailing) {
+                VStack(alignment: .trailing, spacing: 7) {
                     StatusBadge(status: store.status(for: event))
-                    Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.vertical, 2)
             }
         }
         .buttonStyle(.plain)
