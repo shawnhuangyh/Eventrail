@@ -53,6 +53,17 @@ struct LibraryArchive: Codable, Sendable {
     var membership: [Event.ID: Stamped<Bool>] = [:]
     var tracking: [Event.ID: Stamped<Tracking>] = [:]
     var favorites: [Event.ID: Stamped<Bool>] = [:]
+    /// The performers the reader follows, keyed by Eventernote's actor id.
+    ///
+    /// The reader's own record rather than the site's — following here never
+    /// touches the favourite list their Eventernote account keeps. So it is
+    /// stamped and merged like the rest, and unfollowing writes a `false`
+    /// instead of dropping the key, for the same reason a removal is a
+    /// tombstone: a dropped key would be handed straight back by the next merge.
+    ///
+    /// Optional on the outside only so that an archive written before this
+    /// existed still decodes, exactly as ``eventernoteAccount`` is.
+    var follows: [String: Stamped<Bool>]?
     var recentSearches: Stamped<[String]> = Stamped([], at: .distantPast)
     var lastRefreshed: Date?
     /// The Eventernote account the reader imports their history from.
@@ -85,6 +96,7 @@ struct LibraryArchive: Codable, Sendable {
 
     func isInLibrary(_ id: Event.ID) -> Bool { membership[id]?.value == true }
     func isFavorite(_ id: Event.ID) -> Bool { favorites[id]?.value == true }
+    func isFollowing(_ actorID: Int) -> Bool { follows?[String(actorID)]?.value == true }
 
     /// Folds another device's archive into this one.
     ///
@@ -107,6 +119,7 @@ struct LibraryArchive: Codable, Sendable {
         merged.membership = Self.merge(membership, other.membership)
         merged.tracking = Self.merge(tracking, other.tracking)
         merged.favorites = Self.merge(favorites, other.favorites)
+        merged.follows = Self.merge(follows ?? [:], other.follows ?? [:])
         merged.recentSearches = recentSearches.newer(other.recentSearches)
         merged.eventernoteAccount = Self.newer(eventernoteAccount, other.eventernoteAccount)
         merged.eventernoteProfile = Self.profile(forWinning: merged.eventernoteAccount,
@@ -156,6 +169,7 @@ struct LibraryArchive: Codable, Sendable {
 
         pruned.membership = membership.filter { $0.value.value || $0.value.modified > settled }
         pruned.favorites = favorites.filter { $0.value.value || $0.value.modified > settled }
+        pruned.follows = follows?.filter { $0.value.value || $0.value.modified > settled }
         pruned.events = events.filter { pruned.isInLibrary($0.key) || pruned.isFavorite($0.key) }
         pruned.tracking = tracking.filter {
             // A note survives its event leaving the library; an empty record does not.

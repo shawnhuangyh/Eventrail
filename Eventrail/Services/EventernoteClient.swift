@@ -58,7 +58,18 @@ nonisolated struct EventernoteClient: Sendable {
         return EventernotePages.performers(in: html, page: page, pageSize: Self.pageSize)
     }
 
-    /// Everything one performer is billed on, newest first.
+    /// Finds the profile page behind a name billed on an event.
+    ///
+    /// An event's billing publishes names, so the only way to the person's own
+    /// page is to search for the name. Only an exact match is taken: the search
+    /// matches on the kana reading too, so the next-best row is a different
+    /// person rather than a near miss of the same one.
+    func performer(named name: String) async throws -> PerformerProfile? {
+        try await searchPerformers(keyword: name).items.first { $0.name == name }
+    }
+
+    /// Everything one performer is billed on, from the furthest published date
+    /// backwards — so every upcoming appearance is at the front of the listing.
     ///
     /// The slug is already escaped exactly as Eventernote escaped it, so the URL
     /// is built by hand rather than re-encoded.

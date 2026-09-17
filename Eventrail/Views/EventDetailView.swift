@@ -35,6 +35,21 @@ struct EventDetailView: View {
     }
 
     var body: some View {
+        // A stack of its own, so a performer billed here opens their page
+        // inside this sheet rather than dismissing it. The sheet's own chrome
+        // is the Done button, so the bar stays hidden at the root and comes
+        // back — with its back button — on whatever is pushed onto it.
+        NavigationStack {
+            detail
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: PerformerLink.self) { link in
+                    PerformerView(link: link)
+                }
+        }
+        .presentationDragIndicator(.visible)
+    }
+
+    private var detail: some View {
         ZStack(alignment: .topTrailing) {
             ScrollView {
                 VStack(spacing: 14) {
@@ -56,7 +71,6 @@ struct EventDetailView: View {
                 .padding(.top, 8)
         }
         .washBackground()
-        .presentationDragIndicator(.visible)
         .task { await importPage() }
     }
 
@@ -309,8 +323,12 @@ struct EventDetailView: View {
 
     // MARK: - Performers
 
-    /// Eventernote bills performers by name and nothing else — no instrument,
-    /// no role — so the row shows the name and the billing order it was given in.
+    /// Eventernote bills performers by name and nothing else — no instrument, no
+    /// role, and no picture of them anywhere on the site — so a row is the name,
+    /// in the billing order it was given in, and nothing dressed up around it.
+    ///
+    /// The billing carries no link to the person's own page either, so opening
+    /// a row looks the name up first; ``PerformerView`` does that.
     private var performersCard: some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -324,32 +342,22 @@ struct EventDetailView: View {
 
             VStack(spacing: 3) {
                 ForEach(event.performers) { performer in
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(.quaternary)
-                            .overlay {
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .frame(width: 38, height: 38)
+                    NavigationLink(value: PerformerLink.billed(name: performer.name)) {
+                        HStack(spacing: 12) {
+                            Text(performer.name)
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Text(performer.name)
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if performer.name == event.artist {
-                            Text("Top billed")
-                                .font(.system(size: 10, weight: .semibold))
-                                .textCase(.uppercase)
-                                .foregroundStyle(Color.brandTint)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .glassCapsule()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.tertiary)
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 10)
+                        .contentShape(.rect)
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 8)
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens the performer")
                 }
             }
         }

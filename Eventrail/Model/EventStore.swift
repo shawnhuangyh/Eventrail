@@ -803,6 +803,36 @@ final class EventStore {
         return upcoming + past
     }
 
+    // MARK: - Followed performers
+
+    func isFollowing(_ performer: PerformerProfile) -> Bool {
+        archive.isFollowing(performer.id)
+    }
+
+    /// Follows a performer, or stops following them.
+    ///
+    /// The reader's own list, kept beside their library. The favourite list
+    /// their Eventernote account holds is theirs to edit on Eventernote — this
+    /// app only ever reads from there.
+    func toggleFollow(_ performer: PerformerProfile) {
+        var follows = archive.follows ?? [:]
+        follows[String(performer.id)] = Stamped(!isFollowing(performer))
+        archive.follows = follows
+        persist()
+    }
+
+    /// How many events in the library this performer is billed on and the
+    /// reader has marked attended.
+    ///
+    /// Counted over the library rather than over the appearances a performer's
+    /// page has read so far, so the number is the whole of it however little of
+    /// that listing has been paged in.
+    func attendedCount(billing name: String) -> Int {
+        attendedEvents.filter { event in
+            event.performers.contains { $0.name == name }
+        }.count
+    }
+
     // MARK: - Profile statistics
 
     private var attendedEvents: [Event] {

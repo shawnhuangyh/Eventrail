@@ -16,6 +16,19 @@ nonisolated struct PerformerProfile: Identifiable, Hashable, Codable, Sendable {
     let slug: String
 }
 
+nonisolated extension PerformerProfile {
+    /// The performer's own page on Eventernote.
+    ///
+    /// The slug arrives already percent-encoded, so it is set as the encoded
+    /// path rather than through `path`, which would escape the escapes and
+    /// break every name containing "!", "(" or a space.
+    var pageURL: URL {
+        var components = URLComponents(url: EventernoteClient.site, resolvingAgainstBaseURL: false)
+        components?.percentEncodedPath = "/actors/\(slug)/\(id)"
+        return components?.url ?? EventernoteClient.site
+    }
+}
+
 /// An Eventernote member's public page.
 ///
 /// Anyone can load this logged out — it is how the app imports a reader's own
@@ -29,7 +42,9 @@ nonisolated struct EventernoteProfile: Hashable, Sendable {
     /// How many events the site says the account has attended, if it printed it.
     let eventCount: Int?
     /// The performers the account lists as favourites. Imported for the count
-    /// shown before a link is confirmed; the app keeps no follow list of its own.
+    /// shown before a link is confirmed. Kept separate from the reader's own
+    /// follows in ``LibraryArchive``: this is what Eventernote holds, and the
+    /// app only ever reads it.
     let favoritePerformers: [PerformerProfile]
     let avatarURL: URL?
 }

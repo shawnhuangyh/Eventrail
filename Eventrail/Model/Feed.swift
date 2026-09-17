@@ -15,7 +15,10 @@ final class Feed<Item: Identifiable & Sendable> {
     private(set) var failure: String?
 
     private var page = 0
-    private var hasMore = false
+    /// Whether the site says there are pages after the ones already read.
+    /// Read by a screen that has to keep paging until it has the whole of
+    /// something, rather than only until the reader scrolls.
+    private(set) var hasMore = false
     // The listing itself is not something a view observes, only its results.
     @ObservationIgnored private var source: Source?
 

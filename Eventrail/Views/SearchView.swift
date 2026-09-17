@@ -39,8 +39,8 @@ struct SearchView: View {
                 }
             }
             .onSubmit(of: .search) { store.remember(search: term) }
-            .navigationDestination(for: PerformerProfile.self) { performer in
-                PerformerEventsView(performer: performer)
+            .navigationDestination(for: PerformerLink.self) { link in
+                PerformerView(link: link)
             }
             .sheet(item: $openEvent) { event in
                 EventDetailView(event: event)
@@ -250,17 +250,8 @@ private struct PerformerRow: View {
     let performer: PerformerProfile
 
     var body: some View {
-        NavigationLink(value: performer) {
+        NavigationLink(value: PerformerLink.profile(performer)) {
             HStack(spacing: 13) {
-                Circle()
-                    .fill(.quaternary)
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(width: 44, height: 44)
-
                 VStack(alignment: .leading, spacing: 4) {
                     Text(performer.name)
                         .font(.system(size: 14.5, weight: .semibold))
