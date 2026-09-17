@@ -270,8 +270,10 @@ final class EventStore {
         persist()
     }
 
-    /// Copying an event found in search into the library is always explicit — an
-    /// import never does it silently, and never undoes it.
+    /// Copying an event found in search into the library is always explicit: an
+    /// import never does it silently. Taking one back out is explicit too, and
+    /// answers only for this device and the reader's other ones — an event the
+    /// linked account still lists is imported again on the next refresh.
     func toggleLibraryMembership(_ event: Event) {
         let wasIn = isInLibrary(event)
         archive.membership[event.id] = Stamped(!wasIn)
@@ -290,7 +292,9 @@ final class EventStore {
     ///
     /// Each one is tombstoned rather than dropped, exactly as a single removal
     /// is: the other device has to be told a removal happened, or the next merge
-    /// would hand all of them straight back.
+    /// would hand all of them straight back. The tombstone answers for the
+    /// reader's devices and not for Eventernote — an event still on the linked
+    /// account is imported again by the next refresh.
     ///
     /// Favorites are left alone. Hearting an event says "keep this in front of
     /// me", which is a separate answer from whether it is in the library.
@@ -457,20 +461,23 @@ final class EventStore {
     ///
     /// The two lists stay distinct — the account's favourites are Eventernote's
     /// and this app only ever reads them; following is the reader's own record,
-    /// kept here. What this does is seed one from the other, under the same
-    /// rule the event import follows:
+    /// kept here. What this does is bring the second in line with the first:
     ///
-    /// - Somebody the reader unfollowed here stays unfollowed. The tombstone is
-    ///   honoured, or the next refresh would hand back exactly who they took out.
-    /// - An import only ever adds. A performer dropped from the favourites on
-    ///   the site is not unfollowed here: that would also reach everyone the
-    ///   reader followed in Eventrail alone, since the site never lists those.
+    /// - The favourites are taken as they stand. Somebody unfollowed here comes
+    ///   back if the account still favourites them, because the account is what
+    ///   the reader is asking to be followed when they tap Refresh — and it is
+    ///   the only way back for somebody they took out and then wanted again.
+    ///   Unfollowing for good means unfavouriting them on the site too.
+    /// - An import still only ever adds. A performer dropped from the
+    ///   favourites on the site is not unfollowed here: that would also reach
+    ///   everyone the reader followed in Eventrail alone, since the site never
+    ///   lists those.
     ///
     /// The favourites block prints no kana reading, so a profile already held —
     /// which came from performer search and carries one — is left alone rather
     /// than overwritten with the thinner copy.
     ///
-    /// Returns how many were newly followed, and whether anything at all
+    /// Returns how many this pass followed, and whether anything at all
     /// changed — naming somebody the archive was already following but could not
     /// name is a write with nothing to announce.
     private func adoptFollows(
@@ -485,14 +492,15 @@ final class EventStore {
 
         for performer in performers {
             let key = String(performer.id)
-            // Already answered, either way: a `true` needs nothing doing and a
-            // `false` is the reader saying no.
-            if follows[key] == nil {
+            // Anything but an existing `true` is written: a missing record is
+            // the first read of them, and a tombstone is undone by the same act
+            // that would have to undo it — asking Eventernote again.
+            if follows[key]?.value != true {
                 follows[key] = Stamped(true, at: now)
                 added += 1
                 changed = true
             }
-            guard follows[key]?.value == true, profiles[key] == nil else { continue }
+            guard profiles[key] == nil else { continue }
             // Also reaches a follow recorded before the app kept profiles, which
             // until now had an actor id and no way to name it.
             profiles[key] = performer
@@ -608,8 +616,10 @@ final class EventStore {
     ///
     /// Three rules keep this from talking over the reader:
     ///
-    /// - An event they removed stays removed. Its tombstone is honoured, or the
-    ///   next import would hand back exactly what they took out.
+    /// - An event they removed is imported again, because the account still
+    ///   lists it and the account is what they asked to be read. What a removal
+    ///   settles is their own devices, through the tombstone a merge honours;
+    ///   nothing here has ever claimed it settles Eventernote too.
     /// - The first import after linking fills in the tracking they have left
     ///   blank; every import after that only fills in events it has just added.
     ///   `Attendance.unrecorded` cannot be told apart from an answer the reader
@@ -676,9 +686,11 @@ final class EventStore {
         var filled = 0
 
         for event in imported {
-            // The reader took this one out. An import is not a reason to undo that.
-            if let membership = archive.membership[event.id], !membership.value { continue }
-
+            // A removal is not permanent. The account's history is what the
+            // reader is asking for when they tap Refresh, so an event they took
+            // out comes back if Eventernote still lists it — the same rule the
+            // favourites follow. Taking one out for good means taking it off the
+            // account, and an event that was never on it stays gone.
             let isNew = !archive.isInLibrary(event.id)
             if isNew {
                 archive.membership[event.id] = Stamped(true, at: now)
