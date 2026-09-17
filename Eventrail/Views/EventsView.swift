@@ -49,34 +49,38 @@ struct EventsView: View {
             // what is selected can stand where the thumb already is.
             .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
             .toolbar {
+                EventListToolbar(filter: $filter, grouping: $grouping,
+                                 isSelecting: $isSelecting,
+                                 counts: { store.events(matching: $0).count },
+                                 canSelect: eventCount > 0)
                 if isSelecting {
-                    // Changing the filter mid-selection would move the ground
-                    // under the choice, so the menu is put away while selecting
-                    // and the one way out takes its place.
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Done") { endSelecting() }
-                            .font(.system(size: 13.5, weight: .semibold))
-                    }
-                    ToolbarItemGroup(placement: .bottomBar) { selectionBar }
-                } else {
-                    ToolbarItem(placement: .primaryAction) { showMenu }
+                    SelectionToolbar(
+                        isEverythingSelected: selection == shownIDs,
+                        selectAll: { selection = selection == shownIDs ? [] : shownIDs },
+                        removeTitle: "Remove",
+                        canRemove: !selection.isEmpty,
+                        confirmation: RemovalConfirmation(
+                            isPresented: $isConfirmingRemoval,
+                            title: removalTitle,
+                            message: Text("This removes them from your other devices as well. Anything your Eventernote account still lists comes back on the next refresh; the rest you can add again from Search."),
+                            confirmTitle: "Remove",
+                            cancelTitle: "Keep them",
+                            confirm: {
+                                store.remove(chosen)
+                                endSelecting()
+                            }
+                        ),
+                        remove: { isConfirmingRemoval = true }
+                    )
                 }
             }
             .sheet(item: $openEvent) { event in
                 EventDetailView(event: event)
             }
-            .confirmationDialog(removalTitle, isPresented: $isConfirmingRemoval,
-                                titleVisibility: .visible) {
-                Button("Remove", role: .destructive) {
-                    store.remove(chosen)
-                    endSelecting()
-                }
-                Button("Keep them", role: .cancel) {}
-            } message: {
-                Text("They go from this device and from your other devices. You can add them again from Search.")
-            }
-            // Nothing is left selected behind a filter that no longer shows it.
+            // Nothing is left selected behind a filter that no longer shows it,
+            // and nothing survives leaving the mode that picked it.
             .onChange(of: filter) { selection.removeAll() }
+            .onChange(of: isSelecting) { selection.removeAll() }
         }
     }
 
@@ -117,73 +121,18 @@ struct EventsView: View {
         }
     }
 
-    @ViewBuilder
-    private var selectionBar: some View {
-        Button(selection == shownIDs ? "Deselect All" : "Select All") {
-            selection = selection == shownIDs ? [] : shownIDs
-        }
-
-        Spacer()
-
-        Button("Remove", systemImage: "trash", role: .destructive) {
-            isConfirmingRemoval = true
-        }
-        .disabled(selection.isEmpty)
-    }
-
+    /// Spelled out rather than inflected: a confirmation's title is handed to
+    /// UIKit as plain text, and the `^[…](inflect:)` markup that reads as a
+    /// count everywhere else in the app arrives there unprocessed.
     private var removalTitle: Text {
-        Text("Remove ^[\(selection.count) event](inflect: true) from your library?")
+        selection.count == 1
+            ? Text("Remove this event from your library?")
+            : Text("Remove \(selection.count) events from your library?")
     }
 
     private func endSelecting() {
         isSelecting = false
         selection.removeAll()
-    }
-
-    /// Everything that changes what the list shows, and the one thing that
-    /// changes what a tap on it does. Removal starts here rather than from a
-    /// button of its own: it is the rarer intention of the two, and the toolbar
-    /// reads better with the filter alone standing in it.
-    private var showMenu: some View {
-        Menu {
-            // No icon on purpose: the two pickers below put a checkmark in the
-            // menu's leading gutter, and an image of a different width here
-            // pushed this one title out of that shared column.
-            Button("Select Events") {
-                isSelecting = true
-            }
-            .disabled(eventCount == 0)
-
-            Picker(selection: $filter) {
-                ForEach(LibraryFilter.allCases) { option in
-                    Text(option.label).tag(option)
-                }
-            } label: {
-                Text("Show")
-            }
-            .pickerStyle(.inline)
-
-            Picker(selection: $grouping) {
-                ForEach(Grouping.allCases) { option in
-                    Text(option.label).tag(option)
-                }
-            } label: {
-                Text("Group by")
-            }
-            .pickerStyle(.inline)
-        } label: {
-            HStack(spacing: 6) {
-                Text(filter.label)
-                    .font(.system(size: 13.5, weight: .semibold))
-                Circle()
-                    .fill(.tertiary)
-                    .frame(width: 3.5, height: 3.5)
-                Text(grouping.byLabel)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityLabel("Show and group events")
     }
 
     private var emptyState: some View {

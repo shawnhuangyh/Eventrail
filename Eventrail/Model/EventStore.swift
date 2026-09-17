@@ -13,6 +13,15 @@ enum LibraryFilter: String, CaseIterable, Identifiable, Hashable {
         case .past: "Past"
         }
     }
+
+    /// The glyph beside the option in the Filter menu: a plain clock for what
+    /// is ahead, the rewound one for what has already happened.
+    var symbol: String {
+        switch self {
+        case .upcoming: "clock"
+        case .past: "clock.arrow.trianglehead.counterclockwise.rotate.90"
+        }
+    }
 }
 
 /// How the Events tab breaks the list into sections.
@@ -32,11 +41,11 @@ enum Grouping: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// The trailing half of the toolbar label: "by date".
-    var byLabel: LocalizedStringKey {
+    /// The glyph beside the option in the Sort menu.
+    var symbol: String {
         switch self {
-        case .date: "by date"
-        case .artist: "by artist"
+        case .date: "calendar"
+        case .artist: "music.mic"
         }
     }
 }
@@ -849,16 +858,29 @@ final class EventStore {
     // MARK: - Grouping
 
     func events(matching filter: LibraryFilter) -> [Event] {
+        events(in: library, matching: filter)
+    }
+
+    /// The same half of a list the caller has already chosen — the favorites,
+    /// say, rather than the whole library.
+    func events(in pool: some Sequence<Event>, matching filter: LibraryFilter) -> [Event] {
         switch filter {
         case .upcoming:
-            library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+            pool.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
         case .past:
-            library.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
+            pool.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
         }
     }
 
     func groups(filter: LibraryFilter, grouping: Grouping) -> [EventGroup] {
-        let events = events(matching: filter)
+        groups(of: library, filter: filter, grouping: grouping)
+    }
+
+    /// The same breakdown over a chosen list, for the screens that hold one
+    /// that is not the library.
+    func groups(of pool: some Sequence<Event>, filter: LibraryFilter,
+                grouping: Grouping) -> [EventGroup] {
+        let events = events(in: pool, matching: filter)
         switch grouping {
         case .date:
             // `events` is already date-ordered, so first appearance sets section order.
