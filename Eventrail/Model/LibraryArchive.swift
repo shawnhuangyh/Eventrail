@@ -56,14 +56,28 @@ struct LibraryArchive: Codable, Sendable {
     /// The performers the reader follows, keyed by Eventernote's actor id.
     ///
     /// The reader's own record rather than the site's — following here never
-    /// touches the favourite list their Eventernote account keeps. So it is
-    /// stamped and merged like the rest, and unfollowing writes a `false`
-    /// instead of dropping the key, for the same reason a removal is a
-    /// tombstone: a dropped key would be handed straight back by the next merge.
+    /// touches the favourite list their Eventernote account keeps, which the app
+    /// only ever reads. An import seeds this from that list, but only ever adds
+    /// to it. So it is stamped and merged like the rest, and unfollowing writes
+    /// a `false` instead of dropping the key, for the same reason a removal is a
+    /// tombstone: a dropped key would be handed straight back by the next
+    /// merge — or, here, by the next import.
     ///
     /// Optional on the outside only so that an archive written before this
     /// existed still decodes, exactly as ``eventernoteAccount`` is.
     var follows: [String: Stamped<Bool>]?
+    /// Who each followed actor id is, keyed the same way as ``follows``.
+    ///
+    /// Following records the reader's decision; this records Eventernote's
+    /// facts about the person they decided about — the name, the reading, and
+    /// the slug their listing is addressed by. Kept beside the flag rather than
+    /// inside it so the flag stays a plain tombstoned `Bool`, and so a merge
+    /// treats this the way it treats ``events``: not the reader's record, so no
+    /// timestamp, and whichever device read the page has it.
+    ///
+    /// Without this the Following tab would know only that some actor id
+    /// matters and have no way to name it or ask the site for its dates.
+    var followedPerformers: [String: PerformerProfile]?
     var recentSearches: Stamped<[String]> = Stamped([], at: .distantPast)
     var lastRefreshed: Date?
     /// The Eventernote account the reader imports their history from.
@@ -98,6 +112,17 @@ struct LibraryArchive: Codable, Sendable {
     func isFavorite(_ id: Event.ID) -> Bool { favorites[id]?.value == true }
     func isFollowing(_ actorID: Int) -> Bool { follows?[String(actorID)]?.value == true }
 
+    /// The performers the reader follows and the app can still name.
+    ///
+    /// A follow with no profile beside it is dropped rather than shown as a
+    /// blank row: an archive written before profiles were kept holds the id
+    /// alone, and an id is not a person.
+    var followedProfiles: [PerformerProfile] {
+        (follows ?? [:])
+            .compactMap { $0.value.value ? followedPerformers?[$0.key] : nil }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
     /// Folds another device's archive into this one.
     ///
     /// The reader's records merge record by record, newest edit winning. Event
@@ -120,6 +145,10 @@ struct LibraryArchive: Codable, Sendable {
         merged.tracking = Self.merge(tracking, other.tracking)
         merged.favorites = Self.merge(favorites, other.favorites)
         merged.follows = Self.merge(follows ?? [:], other.follows ?? [:])
+        // Both sides read the same public page, so either is true; this device's
+        // copy is kept so the merge stays stable.
+        merged.followedPerformers = (followedPerformers ?? [:])
+            .merging(other.followedPerformers ?? [:]) { mine, _ in mine }
         merged.recentSearches = recentSearches.newer(other.recentSearches)
         merged.eventernoteAccount = Self.newer(eventernoteAccount, other.eventernoteAccount)
         merged.eventernoteProfile = Self.profile(forWinning: merged.eventernoteAccount,
@@ -170,6 +199,9 @@ struct LibraryArchive: Codable, Sendable {
         pruned.membership = membership.filter { $0.value.value || $0.value.modified > settled }
         pruned.favorites = favorites.filter { $0.value.value || $0.value.modified > settled }
         pruned.follows = follows?.filter { $0.value.value || $0.value.modified > settled }
+        // Who someone is only matters while they are followed — the same reason
+        // an event nothing points at any more is dropped below.
+        pruned.followedPerformers = followedPerformers?.filter { pruned.follows?[$0.key]?.value == true }
         pruned.events = events.filter { pruned.isInLibrary($0.key) || pruned.isFavorite($0.key) }
         pruned.tracking = tracking.filter {
             // A note survives its event leaving the library; an empty record does not.

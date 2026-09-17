@@ -37,6 +37,15 @@ enum PreviewData {
                            note: "Encore was worth the queue."),
     ]
 
+    /// Two performers billed on the fixtures above, as performer search lists
+    /// them — enough for a preview of Following to have somebody to follow.
+    static let performers: [PerformerProfile] = [
+        PerformerProfile(id: 2890, name: "水瀬いのり", reading: "みなせいのり", fanCount: 5514,
+                         slug: "%E6%B0%B4%E7%80%AC%E3%81%84%E3%81%AE%E3%82%8A"),
+        PerformerProfile(id: 12703, name: "伊達さゆり", reading: "だてさゆり", fanCount: 1633,
+                         slug: "%E4%BC%8A%E9%81%94%E3%81%95%E3%82%86%E3%82%8A"),
+    ]
+
     private static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = Event.publishedZone
@@ -80,6 +89,19 @@ enum PreviewData {
 extension EventStore {
     /// A store holding the preview fixtures, with no file behind it.
     @MainActor static var preview: EventStore {
-        EventStore(file: nil, cloud: nil, calendar: nil, library: PreviewData.events, tracking: PreviewData.tracking)
+        EventStore(file: nil, cloud: nil, calendar: nil, library: PreviewData.events,
+                   tracking: PreviewData.tracking, follows: PreviewData.performers)
+    }
+}
+
+extension FollowedDates {
+    /// The dates a preview pretends to have read, so Following and the Me card
+    /// draw without reaching Eventernote.
+    @MainActor static var preview: FollowedDates {
+        FollowedDates(dates: PreviewData.performers.reduce(into: [:]) { dates, performer in
+            dates[performer.id] = PreviewData.events.filter { event in
+                event.isUpcoming && event.performers.contains { $0.name == performer.name }
+            }
+        })
     }
 }

@@ -41,10 +41,13 @@ nonisolated struct EventernoteProfile: Hashable, Sendable {
     let bio: String?
     /// How many events the site says the account has attended, if it printed it.
     let eventCount: Int?
-    /// The performers the account lists as favourites. Imported for the count
-    /// shown before a link is confirmed. Kept separate from the reader's own
-    /// follows in ``LibraryArchive``: this is what Eventernote holds, and the
-    /// app only ever reads it.
+    /// The performers the account lists as favourites. Shown as a count before
+    /// a link is confirmed, and seeded into the reader's own follows by an
+    /// import — see ``EventStore/adoptFollows(_:)`` for the rules that keeps it
+    /// from talking over them.
+    ///
+    /// Still Eventernote's list rather than the reader's: the app only ever
+    /// reads it, and following or unfollowing here never writes back.
     let favoritePerformers: [PerformerProfile]
     let avatarURL: URL?
 }

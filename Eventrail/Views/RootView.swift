@@ -2,21 +2,31 @@ import SwiftUI
 import Playgrounds
 
 enum AppTab: Hashable {
-    case events, search, me
+    case events, following, search, me
 }
 
-/// The three home tabs. On iOS 26 the tab bar is Liquid Glass over the wash,
-/// and the search tab gets the system's dedicated search treatment.
+/// The home tabs: what the reader has decided about, what is coming for the
+/// people they follow, and themselves. On iOS 26 the tab bar is Liquid Glass
+/// over the wash, and search stands beside it in the system's own detached
+/// search treatment rather than taking a place in the row.
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var store = EventStore()
+    /// Read from Eventernote rather than from the library, and shared by the
+    /// two screens that show it — the Following tab and the Me card — so a
+    /// followed performer's listing is asked for once per launch.
+    @State private var followed = FollowedDates()
     @State private var selection: AppTab = .events
 
     var body: some View {
         TabView(selection: $selection) {
             Tab("My Events", systemImage: "calendar", value: AppTab.events) {
                 EventsView()
+            }
+
+            Tab("Following", systemImage: "person.2", value: AppTab.following) {
+                FollowingView()
             }
 
             Tab("Me", systemImage: "person.crop.circle", value: AppTab.me) {
@@ -33,6 +43,7 @@ struct RootView: View {
         .tabViewSearchActivation(.searchTabSelection)
         #endif
         .environment(store)
+        .environment(followed)
         .tint(.brandTint)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only

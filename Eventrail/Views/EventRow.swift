@@ -1,11 +1,15 @@
 import SwiftUI
 
 /// Flyer, title, venue and timing — the part every event row shares.
-struct EventRowContent<Trailing: View>: View {
+struct EventRowContent<Billing: View, Trailing: View>: View {
     let event: Event
     /// Shown after the date: the start time in the library, the listed head
     /// count in search results.
     let detail: Text
+    /// Shown above the title where the row belongs to somebody rather than
+    /// standing on its own — whose date this is, on the Following list. Empty
+    /// everywhere the list is already about one thing.
+    @ViewBuilder var billing: Billing
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
@@ -16,6 +20,7 @@ struct EventRowContent<Trailing: View>: View {
             FlyerThumbnail(url: event.imageURL)
 
             VStack(alignment: .leading, spacing: 5) {
+                billing
                 Text(event.title)
                     .font(.system(size: 14.5, weight: .semibold))
                     .lineLimit(2)
@@ -43,6 +48,13 @@ struct EventRowContent<Trailing: View>: View {
             trailing
         }
         .padding(12)
+    }
+}
+
+extension EventRowContent where Billing == EmptyView {
+    /// A row about the event alone, which is every list but Following.
+    init(event: Event, detail: Text, @ViewBuilder trailing: () -> Trailing) {
+        self.init(event: event, detail: detail, billing: { EmptyView() }, trailing: trailing)
     }
 }
 

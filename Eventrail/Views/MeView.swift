@@ -7,6 +7,7 @@ import SwiftUI
 /// screen. What is left is the library itself.
 struct MeView: View {
     @Environment(EventStore.self) private var store
+    @Environment(FollowedDates.self) private var followed
 
     @State private var openEvent: Event?
     @State private var isLinking = false
@@ -20,12 +21,16 @@ struct MeView: View {
                     accountCard
                     statistics
                     favoritesCard
+                    followingCard
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             }
             .washBackground()
             .navigationTitle("Me")
+            .navigationDestination(for: PerformerLink.self) { link in
+                PerformerView(link: link)
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
@@ -46,6 +51,11 @@ struct MeView: View {
                 Button("Keep it", role: .cancel) {}
             } message: {
                 Text("The events already imported stay in your library.")
+            }
+            // The same read the Following tab does, and the same object holds
+            // it — whichever screen the reader opens first pays for it.
+            .task(id: store.followedPerformers.map(\.id)) {
+                await followed.load(for: store.followedPerformers)
             }
         }
     }
@@ -154,10 +164,9 @@ struct MeView: View {
         }
         // Counts and a short fall belong on the same line: "it worked" and "it
         // only got this far" are both true of a partial import.
-        if let summary = store.importSummary {
-            let counts = Text("Imported ^[\(summary.read) event](inflect: true) — \(summary.added) added, \(summary.filled) updated")
+        if let summary = store.importSummary, let counts = importCounts(summary) {
             guard let failure = store.refreshFailure else { return counts }
-            return counts + Text(verbatim: " ") + Text(verbatim: failure)
+            return Text("\(counts) \(failure)")
         }
         if let failure = store.refreshFailure {
             return Text(verbatim: failure)
@@ -166,6 +175,24 @@ struct MeView: View {
             return Text("Refreshed \(lastRefreshed, format: .relative(presentation: .named))")
         }
         return Text("Never refreshed")
+    }
+
+    /// What the last import changed. The performers are counted apart from the
+    /// events because they came from a different page — the account's own, and
+    /// its favourites block — rather than out of the history.
+    ///
+    /// Either half can be the whole of it: a history that reached nothing can
+    /// still have picked performers up, and usually neither number moves at all.
+    private func importCounts(_ summary: EventStore.ImportSummary) -> Text? {
+        var detail: Text?
+        if summary.read > 0 {
+            detail = Text("Imported ^[\(summary.read) event](inflect: true) — \(summary.added) added, \(summary.filled) updated")
+        }
+        if summary.followed > 0 {
+            let follows = Text("^[\(summary.followed) performer](inflect: true) followed from your favorites")
+            detail = detail.map { Text("\($0) · \(follows)") } ?? follows
+        }
+        return detail
     }
 
     /// Which of the two passes is running. They take very different amounts of
@@ -269,6 +296,102 @@ struct MeView: View {
         .glassPanel()
     }
 
+    // MARK: - Followed performers
+
+    /// Who the reader follows, and how much each of them has coming.
+    ///
+    /// The list is theirs, kept beside their library — it is not the favourite
+    /// list their Eventernote account holds, which this app only ever reads.
+    /// Unfollowing is here rather than only on a performer's own page, because
+    /// this is the one screen that shows the list as a list.
+    private var followingCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Following Performers")
+                    .font(.system(size: 17, weight: .bold))
+                if !store.followedPerformers.isEmpty {
+                    Text(store.followedPerformers.count.formatted())
+                        .font(.system(size: 12, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, store.followedPerformers.isEmpty ? 6 : 12)
+
+            if store.followedPerformers.isEmpty {
+                Text("Follow a performer from their page to keep them here. It stays in your library and is never written back to Eventernote.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(store.followedPerformers.enumerated()), id: \.element.id) { index, performer in
+                        followRow(performer, isFirst: index == 0)
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+        }
+        .glassPanel()
+    }
+
+    private func followRow(_ performer: PerformerProfile, isFirst: Bool) -> some View {
+        NavigationLink(value: PerformerLink.profile(performer)) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: performer.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                    followDetail(performer)
+                        .font(.system(size: 11.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    withAnimation(.snappy) { store.unfollow(performer) }
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.trackAttended)
+                        .frame(width: 32, height: 32)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Stop following")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            if !isFirst { Divider().padding(.leading, 16) }
+        }
+    }
+
+    /// The kana reading the site prints, and what they have coming — but only
+    /// once their listing has actually been read. A count of zero beside
+    /// somebody whose page has not answered yet would be a claim the app
+    /// cannot make.
+    private func followDetail(_ performer: PerformerProfile) -> Text {
+        let dates: Text
+        switch followed.count(for: performer) {
+        case .none: dates = Text("Reading their dates…")
+        case 0: dates = Text("No dates published yet")
+        case let count?: dates = Text("^[\(count) upcoming date](inflect: true)")
+        }
+        guard let reading = performer.reading else { return dates }
+        return Text("\(reading) · \(dates)")
+    }
+
     private func favoriteRow(_ event: Event, isFirst: Bool) -> some View {
         Button {
             openEvent = event
@@ -313,4 +436,5 @@ struct MeView: View {
 #Preview {
     MeView()
         .environment(EventStore.preview)
+        .environment(FollowedDates.preview)
 }

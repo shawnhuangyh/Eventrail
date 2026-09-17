@@ -107,6 +107,9 @@ final class EventStore {
         var read: Int
         var added: Int
         var filled: Int
+        /// Performers newly followed from the account's own favourites, which
+        /// come off the member page rather than out of the history.
+        var followed: Int = 0
     }
 
     /// Whether this device mirrors the library to iCloud. A per-device choice,
@@ -169,7 +172,8 @@ final class EventStore {
         calendar: CalendarSync? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
-        tracking: [Event.ID: Tracking] = [:]
+        tracking: [Event.ID: Tracking] = [:],
+        follows: [PerformerProfile] = []
     ) {
         self.file = file
         self.cloud = cloud
@@ -188,6 +192,10 @@ final class EventStore {
             loaded.events = Dictionary(library.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             loaded.membership = library.reduce(into: [:]) { $0[$1.id] = Stamped(true) }
             loaded.tracking = tracking.mapValues { Stamped($0) }
+        }
+        if loaded.follows == nil, !follows.isEmpty {
+            loaded.follows = follows.reduce(into: [:]) { $0[String($1.id)] = Stamped(true) }
+            loaded.followedPerformers = follows.reduce(into: [:]) { $0[String($1.id)] = $1 }
         }
         archive = loaded
 
@@ -392,12 +400,22 @@ final class EventStore {
             refreshStage = nil
         }
 
-        await refreshProfile()
+        let followed = await refreshAccount()
 
         // A history that failed still leaves events worth re-reading, so the
         // second pass runs either way and the first failure is the one reported.
         var landed = await importHistory()
         if await reimportDetails() { landed = true }
+
+        // The history pass owns the summary, but it only writes one when it read
+        // something. Follows adopted beside a history that reached nothing still
+        // have something to report, so they are folded in either way.
+        if followed > 0 {
+            landed = true
+            var summary = importSummary ?? ImportSummary(read: 0, added: 0, filled: 0)
+            summary.followed = followed
+            importSummary = summary
+        }
 
         // The timestamp moves only when something actually arrived, so a run
         // that reached nothing cannot pass itself off as a successful refresh.
@@ -406,22 +424,83 @@ final class EventStore {
         persist()
     }
 
-    /// Re-reads the linked account's own page for the name and picture the Me
-    /// screen captions it with.
+    /// Re-reads the linked account's own page: the name and picture the Me
+    /// screen captions it with, and the performers the account lists as
+    /// favourites.
     ///
     /// One request, against a history that takes several — and it is what fills
-    /// these in for an account linked before the app kept them, without asking
-    /// the reader to link it again. A page that will not load leaves the copy
-    /// already held and is not reported: a refresh is about the library, and
-    /// failing it over a portrait would be the wrong thing to tell the reader.
-    private func refreshProfile() async {
+    /// the name and picture in for an account linked before the app kept them,
+    /// without asking the reader to link it again. A page that will not load
+    /// leaves what is already held and is not reported: a refresh is about the
+    /// library, and failing it over a portrait would be the wrong thing to tell
+    /// the reader.
+    ///
+    /// Returns how many performers this pass newly followed.
+    @discardableResult
+    private func refreshAccount() async -> Int {
         guard let handle = eventernoteHandle,
               let read = try? await client.profile(forUser: handle)
-        else { return }
+        else { return 0 }
+
         let profile = LinkedProfile(name: read.name, avatarURL: read.avatarURL)
-        guard profile != archive.eventernoteProfile else { return }
-        archive.eventernoteProfile = profile
-        persist()
+        let changedProfile = profile != archive.eventernoteProfile
+        if changedProfile { archive.eventernoteProfile = profile }
+
+        let follows = adoptFollows(read.favoritePerformers)
+        if changedProfile || follows.changed { persist() }
+        return follows.added
+    }
+
+    /// Follows the performers the linked account has favourited on Eventernote.
+    ///
+    /// The two lists stay distinct — the account's favourites are Eventernote's
+    /// and this app only ever reads them; following is the reader's own record,
+    /// kept here. What this does is seed one from the other, under the same
+    /// rule the event import follows:
+    ///
+    /// - Somebody the reader unfollowed here stays unfollowed. The tombstone is
+    ///   honoured, or the next refresh would hand back exactly who they took out.
+    /// - An import only ever adds. A performer dropped from the favourites on
+    ///   the site is not unfollowed here: that would also reach everyone the
+    ///   reader followed in Eventrail alone, since the site never lists those.
+    ///
+    /// The favourites block prints no kana reading, so a profile already held —
+    /// which came from performer search and carries one — is left alone rather
+    /// than overwritten with the thinner copy.
+    ///
+    /// Returns how many were newly followed, and whether anything at all
+    /// changed — naming somebody the archive was already following but could not
+    /// name is a write with nothing to announce.
+    private func adoptFollows(
+        _ performers: [PerformerProfile]
+    ) -> (added: Int, changed: Bool) {
+        guard !performers.isEmpty else { return (0, false) }
+        let now = Date.now
+        var follows = archive.follows ?? [:]
+        var profiles = archive.followedPerformers ?? [:]
+        var added = 0
+        var changed = false
+
+        for performer in performers {
+            let key = String(performer.id)
+            // Already answered, either way: a `true` needs nothing doing and a
+            // `false` is the reader saying no.
+            if follows[key] == nil {
+                follows[key] = Stamped(true, at: now)
+                added += 1
+                changed = true
+            }
+            guard follows[key]?.value == true, profiles[key] == nil else { continue }
+            // Also reaches a follow recorded before the app kept profiles, which
+            // until now had an actor id and no way to name it.
+            profiles[key] = performer
+            changed = true
+        }
+
+        guard changed else { return (0, false) }
+        archive.follows = follows
+        archive.followedPerformers = profiles
+        return (added, true)
     }
 
     /// The events whose own page is worth asking for.
@@ -809,16 +888,43 @@ final class EventStore {
         archive.isFollowing(performer.id)
     }
 
+    /// Everyone the reader follows, by name.
+    ///
+    /// Ordered rather than merely listed: this is a settled list the reader
+    /// returns to, and a dictionary's order would reshuffle the Me card and the
+    /// Following filters between launches.
+    var followedPerformers: [PerformerProfile] { archive.followedProfiles }
+
     /// Follows a performer, or stops following them.
     ///
     /// The reader's own list, kept beside their library. The favourite list
     /// their Eventernote account holds is theirs to edit on Eventernote — this
     /// app only ever reads from there.
+    ///
+    /// Who they are is recorded alongside the decision: the Following tab has
+    /// to name them and ask the site for their dates, and neither is possible
+    /// from an actor id alone.
     func toggleFollow(_ performer: PerformerProfile) {
+        let following = !isFollowing(performer)
         var follows = archive.follows ?? [:]
-        follows[String(performer.id)] = Stamped(!isFollowing(performer))
+        follows[String(performer.id)] = Stamped(following)
         archive.follows = follows
+
+        var profiles = archive.followedPerformers ?? [:]
+        // Unfollowing leaves a tombstone but no profile — `pruned()` drops it,
+        // which is what keeps the archive from carrying people it no longer
+        // follows all the way to iCloud.
+        profiles[String(performer.id)] = following ? performer : nil
+        archive.followedPerformers = profiles
+
         persist()
+    }
+
+    /// Stops following someone from a list that shows them, where the profile
+    /// is the only handle on who they are.
+    func unfollow(_ performer: PerformerProfile) {
+        guard isFollowing(performer) else { return }
+        toggleFollow(performer)
     }
 
     /// How many events in the library this performer is billed on and the
