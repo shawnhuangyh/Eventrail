@@ -301,15 +301,22 @@ nonisolated enum EventernotePages {
     /// Address and capacity from a venue's page, in the form the detail sheet
     /// prints under the venue name.
     static func venueDetail(in html: String) -> String? {
+        let capacity = section("収容人数", in: html)?.htmlText
+
+        let parts = [venueAddress(in: html), capacity].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// The address alone, as a map can be asked for it. Kept separate from
+    /// ``venueDetail(in:)`` because the calendar mirror geocodes this and the
+    /// capacity printed beside it would only confuse the search.
+    static func venueAddress(in html: String) -> String? {
         let address = section("所在地", in: html)?.htmlText
             // The postal code adds a line's worth of digits and no information
             // the address below it does not already carry.
             .drop { $0 == "〒" || $0.isNumber || $0 == "-" }
             .trimmingCharacters(in: .whitespaces)
-        let capacity = section("収容人数", in: html)?.htmlText
-
-        let parts = [address, capacity].compactMap { $0 }.filter { !$0.isEmpty }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        return (address?.isEmpty ?? true) ? nil : address
     }
 
     /// The markup between one `gb_subtitle` heading and the next.

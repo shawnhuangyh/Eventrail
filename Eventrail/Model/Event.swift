@@ -35,6 +35,10 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     let venue: String
     /// Address and capacity, as printed on the venue's page.
     var venueDetail: String?
+    /// The address alone, without the capacity beside it. Kept apart from
+    /// ``venueDetail`` because a calendar entry needs something a map can
+    /// resolve, and "10,000人" is not part of any address.
+    var venueAddress: String?
     /// The venue's Eventernote id, so its page can be imported on demand.
     let placeID: Int?
     /// Midnight in the venue's zone on the day of the event. Eventernote always
@@ -128,6 +132,7 @@ nonisolated extension Event {
             // A list row has no venue detail; a re-import of one must not blank
             // out what the venue's page already supplied.
             venueDetail: imported.venueDetail ?? venueDetail,
+            venueAddress: imported.venueAddress ?? venueAddress,
             placeID: imported.placeID ?? placeID,
             date: imported.date,
             doorsOpen: imported.doorsOpen ?? doorsOpen,

@@ -137,6 +137,7 @@ nonisolated struct EventernoteClient: Sendable {
         if let placeID = imported.placeID,
            let venue = try? await html(at: "/places/\(placeID)", query: [:]) {
             imported.venueDetail = EventernotePages.venueDetail(in: venue)
+            imported.venueAddress = EventernotePages.venueAddress(in: venue)
         }
         return event.merging(imported)
     }

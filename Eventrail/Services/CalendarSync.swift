@@ -1,4 +1,6 @@
 import EventKit
+import MapKit
+import os
 import SwiftUI
 
 /// Mirrors the reader's library into their calendar.
@@ -25,6 +27,10 @@ final class CalendarSync {
     }
 
     private let store = EKEventStore()
+
+    /// What the last mirror wrote, in enough detail to tell an entry that
+    /// carries a place from one that carries only a line of text.
+    private static let log = Logger(subsystem: "com.shawnhuang.Eventrail", category: "calendar")
 
     /// The calendar Eventrail made, remembered per device: a calendar
     /// identifier belongs to this device's calendar database and means nothing
@@ -55,6 +61,7 @@ final class CalendarSync {
     /// the same event.
     func mirror(_ events: [Event]) async -> Outcome {
         guard await requestAccess() else { return .denied }
+        let places = await VenuePlaces.shared.mapItems(for: venuesToLookUp(in: events))
         do {
             let calendar = try calendar()
             var wanted = Dictionary(
@@ -69,7 +76,7 @@ final class CalendarSync {
                     try store.remove(entry, span: .thisEvent, commit: false)
                     continue
                 }
-                if apply(event, to: entry) {
+                if apply(event, to: entry, places: places) {
                     try store.save(entry, span: .thisEvent, commit: false)
                 }
             }
@@ -77,11 +84,13 @@ final class CalendarSync {
             for event in wanted.values {
                 let entry = EKEvent(eventStore: store)
                 entry.calendar = calendar
-                _ = apply(event, to: entry)
+                _ = apply(event, to: entry, places: places)
                 try store.save(entry, span: .thisEvent, commit: false)
             }
 
             try store.commit()
+            let located = events.filter { $0.venueQuery.flatMap { places[$0] } != nil }.count
+            Self.log.info("mirrored \(events.count, privacy: .public) events, \(located, privacy: .public) with a place on the map")
             return .mirrored(events.count)
         } catch {
             return .failed(error.localizedDescription)
@@ -167,7 +176,7 @@ final class CalendarSync {
     /// Writes the event onto the calendar entry, and says whether anything
     /// actually changed — an unchanged entry is not saved, so a mirror that
     /// finds nothing to do touches the reader's calendar not at all.
-    private func apply(_ event: Event, to entry: EKEvent) -> Bool {
+    private func apply(_ event: Event, to entry: EKEvent, places: [VenuePlaces.Venue: MKMapItem]) -> Bool {
         // Eventernote announces plenty of events months before it publishes a
         // time. Those land as all-day entries rather than at an invented hour.
         let isAllDay = event.startsAt == nil
@@ -181,8 +190,11 @@ final class CalendarSync {
             entry.title = event.title
             changed = true
         }
-        if entry.location != event.venue {
-            entry.location = event.venue
+        // A place rather than a line of text: given the map item, Calendar
+        // draws the venue on a map and can work out when to leave for it.
+        let place = Self.place(for: event, found: event.venueQuery.flatMap { places[$0] })
+        if !isSamePlace(entry.structuredLocation, place) {
+            entry.structuredLocation = place
             changed = true
         }
         if entry.isAllDay != isAllDay {
@@ -208,6 +220,78 @@ final class CalendarSync {
             changed = true
         }
         return changed
+    }
+
+    // MARK: - Where the event is
+
+    /// The entry's place.
+    ///
+    /// Built from the map item wherever Maps knew the hall, because that is
+    /// what the Calendar app wants: an entry made from a map item shows the
+    /// same map beside it as one the reader picked out of Calendar's own
+    /// location field, and can be given a travel time. Where Maps had nothing,
+    /// the published name and address still go on as text, which is no worse
+    /// than what was written before. Nil only where there is no venue at all —
+    /// Eventernote announces plenty of events before it has booked a hall.
+    private static func place(for event: Event, found: MKMapItem?) -> EKStructuredLocation? {
+        if let found { return EKStructuredLocation(mapItem: found) }
+        guard let title = event.locationTitle else { return nil }
+        return EKStructuredLocation(title: title)
+    }
+
+    /// Two places are the same when they read the same and sit in the same
+    /// spot. Worth checking, because an entry written before Maps had been
+    /// asked should be corrected once, and then left alone.
+    private func isSamePlace(_ lhs: EKStructuredLocation?, _ rhs: EKStructuredLocation?) -> Bool {
+        guard lhs?.title == rhs?.title else { return false }
+        switch (lhs?.geoLocation?.coordinate, rhs?.geoLocation?.coordinate) {
+        case (nil, nil): return true
+        case let (left?, right?): return left.latitude == right.latitude && left.longitude == right.longitude
+        default: return false
+        }
+    }
+
+    /// Every venue in the library, in the order they are worth asking about.
+    ///
+    /// The whole library, past included: a calendar is a diary as well as a
+    /// plan, and a night the reader was at should show where they were on the
+    /// map just as much as one they are going to.
+    ///
+    /// Order is what matters, because one mirror only has room for so many
+    /// searches. Upcoming events come first, soonest first, since those are the
+    /// ones about to be needed for directions; the past follows, most recent
+    /// first, and the rest is picked up by later mirrors.
+    private func venuesToLookUp(in events: [Event]) -> [VenuePlaces.Venue] {
+        let upcoming = events.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+        let past = events.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
+
+        var seen: Set<VenuePlaces.Venue> = []
+        return (upcoming + past)
+            .compactMap(\.venueQuery)
+            .filter { seen.insert($0).inserted }
+    }
+}
+
+nonisolated extension Event {
+    /// What Maps is asked about this event's hall, or nil where the site has
+    /// not named one yet.
+    var venueQuery: VenuePlaces.Venue? {
+        let address = (venueAddress?.isEmpty ?? true) ? nil : venueAddress
+        guard !venue.isEmpty || address != nil else { return nil }
+        return VenuePlaces.Venue(name: venue, address: address)
+    }
+
+    /// What the calendar entry calls its place when Maps could not find one.
+    ///
+    /// The address goes first, as Japanese addresses are written and as
+    /// Eventernote itself prints them, with the hall's name after it — unless
+    /// the published address already ends in that name, which it often does.
+    var locationTitle: String? {
+        guard let address = venueAddress, !address.isEmpty else {
+            return venue.isEmpty ? nil : venue
+        }
+        guard !venue.isEmpty, !address.contains(venue) else { return address }
+        return "\(address) \(venue)"
     }
 }
 
