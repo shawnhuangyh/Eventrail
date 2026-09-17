@@ -49,12 +49,16 @@ struct EventsView: View {
             // what is selected can stand where the thumb already is.
             .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { selectButton }
                 if isSelecting {
+                    // Changing the filter mid-selection would move the ground
+                    // under the choice, so the menu is put away while selecting
+                    // and the one way out takes its place.
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") { endSelecting() }
+                            .font(.system(size: 13.5, weight: .semibold))
+                    }
                     ToolbarItemGroup(placement: .bottomBar) { selectionBar }
                 } else {
-                    // Changing the filter mid-selection would move the ground
-                    // under the choice, so it is put away while selecting.
                     ToolbarItem(placement: .primaryAction) { showMenu }
                 }
             }
@@ -115,14 +119,6 @@ struct EventsView: View {
         }
     }
 
-    private var selectButton: some View {
-        Button(isSelecting ? "Done" : "Select") {
-            if isSelecting { endSelecting() } else { isSelecting = true }
-        }
-        .font(.system(size: 13.5, weight: .semibold))
-        .disabled(!isSelecting && eventCount == 0)
-    }
-
     @ViewBuilder
     private var selectionBar: some View {
         Button(selection == shownIDs ? "Deselect All" : "Select All") {
@@ -146,8 +142,17 @@ struct EventsView: View {
         selection.removeAll()
     }
 
+    /// Everything that changes what the list shows, and the one thing that
+    /// changes what a tap on it does. Removal starts here rather than from a
+    /// button of its own: it is the rarer intention of the two, and the toolbar
+    /// reads better with the filter alone standing in it.
     private var showMenu: some View {
         Menu {
+            Button("Select Events", systemImage: "checkmark.circle") {
+                isSelecting = true
+            }
+            .disabled(eventCount == 0)
+
             Picker(selection: $filter) {
                 ForEach(LibraryFilter.allCases) { option in
                     Text(option.label).tag(option)

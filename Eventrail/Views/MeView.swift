@@ -1,27 +1,25 @@
 import SwiftUI
 
 /// The reader's own library at a glance: what it holds, when it was last
-/// imported, and where it is kept.
+/// imported, and what it keeps in front of them.
+///
+/// Everything that configures the app lives behind the gear rather than on this
+/// screen. What is left is the library itself.
 struct MeView: View {
     @Environment(EventStore.self) private var store
 
     @State private var openEvent: Event?
     @State private var isLinking = false
     @State private var isConfirmingUnlink = false
-    @State private var isConfirmingDeleteAll = false
+    @State private var isShowingSettings = false
 
     var body: some View {
-        @Bindable var store = store
-
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    profileCard
+                    accountCard
                     statistics
-                    refreshCard
                     favoritesCard
-                    settingsCard(store: $store)
-                    footnote
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
@@ -29,13 +27,18 @@ struct MeView: View {
             .washBackground()
             .navigationTitle("Me")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) { settingsMenu }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
+                }
             }
             .sheet(item: $openEvent) { event in
                 EventDetailView(event: event)
             }
             .sheet(isPresented: $isLinking) {
                 EventernoteAccountSheet()
+            }
+            .sheet(isPresented: $isShowingSettings) {
+                SettingsView()
             }
             .confirmationDialog("Unlink this Eventernote account?",
                                 isPresented: $isConfirmingUnlink, titleVisibility: .visible) {
@@ -44,86 +47,37 @@ struct MeView: View {
             } message: {
                 Text("The events already imported stay in your library.")
             }
-            .confirmationDialog("Delete every event?", isPresented: $isConfirmingDeleteAll,
-                                titleVisibility: .visible) {
-                Button("Delete All Events", role: .destructive) { store.removeAllEvents() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                deleteAllDetail
-            }
         }
     }
 
-    /// Eventrail reads Eventernote's public pages and nothing else. There is no
-    /// account behind this screen, and the card has to say so rather than imply
-    /// a profile the app has not got.
-    private var profileCard: some View {
-        HStack(spacing: 14) {
-            Circle()
-                .fill(.quaternary)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(width: 58, height: 58)
+    // MARK: - The account, and the one thing it is for
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text("My library")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("^[\(store.library.count) event](inflect: true) · ^[\(store.favoriteEvents.count) favorite](inflect: true)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(Color.trackTicket)
-                        .frame(width: 6, height: 6)
-                    accountBadge
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(Color.trackTicket)
-                }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .glassCapsule()
-                .padding(.top, 2)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .glassPanel(cornerRadius: 28)
-    }
-
-    private var statistics: some View {
-        HStack(spacing: 11) {
-            StatTile(tint: .trackInterest, value: store.eventsThisYear.formatted(),
-                     label: "Events this year")
-            StatTile(tint: .trackTicket, value: store.venuesVisited.formatted(),
-                     label: "Venues visited")
-            StatTile(tint: .trackAttended, value: store.performersSeen.formatted(),
-                     label: "Performers seen")
-        }
-    }
-
-    // MARK: - Keeping the library current
-
-    /// The one thing this screen asks Eventernote for.
+    /// The account and the import it feeds are one card, because they are one
+    /// intention: bring the library up to date from Eventernote. Refresh needs
+    /// an account to refresh from, so the row that names one sits directly
+    /// beneath it rather than on a screen of its own.
     ///
-    /// Refreshing and importing an account were two buttons until it became
-    /// clear they are one intention: bring the library up to date from
-    /// Eventernote. Refresh is the whole of it now, and it needs an account to
-    /// refresh from — until one is named it stays put, with the row that names
-    /// one directly beneath it.
-    private var refreshCard: some View {
+    /// Eventrail reads Eventernote's public pages and nothing else. There is no
+    /// login behind this card, and nothing is ever written back.
+    private var accountCard: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 13) {
-                VStack(alignment: .leading, spacing: 4) {
-                    refreshTitle
-                        .font(.system(size: 14, weight: .semibold))
-                    refreshDetail
+            HStack(spacing: 14) {
+                Circle()
+                    .fill(.quaternary)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(width: 58, height: 58)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    accountTitle
+                        .font(.system(size: 16, weight: .semibold))
+                        .lineLimit(1)
+                    Text("^[\(store.library.count) event](inflect: true) · ^[\(store.favoriteEvents.count) favorite](inflect: true)")
                         .font(.system(size: 12))
-                        .foregroundStyle(store.refreshFailure == nil ? .secondary : Color.favorite)
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -140,15 +94,23 @@ struct MeView: View {
                 .buttonStyle(.plain)
                 .glassCapsule(interactive: true)
                 .disabled(store.isRefreshing || !store.isLinked)
+                .frame(maxHeight: .infinity, alignment: .top)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 15)
+            .padding(16)
+
+            refreshDetail
+                .font(.system(size: 12))
+                .foregroundStyle(store.refreshFailure == nil ? .secondary : Color.favorite)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
 
             if let fraction = refreshFraction {
                 ProgressView(value: fraction)
                     .tint(Color.trackTicket)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 14)
             }
 
             if store.eventernoteHandle == nil {
@@ -158,10 +120,10 @@ struct MeView: View {
                 accountRow("Unlink Account") { isConfirmingUnlink = true }
             }
         }
-        .glassPanel()
+        .glassPanel(cornerRadius: 28)
     }
 
-    private var refreshTitle: Text {
+    private var accountTitle: Text {
         if let handle = store.eventernoteHandle {
             Text(verbatim: "@\(handle)")
         } else {
@@ -222,41 +184,6 @@ struct MeView: View {
         }
     }
 
-    /// The settings this screen keeps out of the way. Destructive work lives
-    /// here rather than in the cards, where it would be one stray tap from the
-    /// Refresh button beside it.
-    private var settingsMenu: some View {
-        Menu {
-            Button("Delete All Events", systemImage: "trash", role: .destructive) {
-                isConfirmingDeleteAll = true
-            }
-            .disabled(store.library.isEmpty && store.favoriteEvents.isEmpty)
-        } label: {
-            Image(systemName: "gearshape")
-        }
-        .accessibilityLabel("Settings")
-    }
-
-    /// Says what actually goes, including the favorites the reader would
-    /// otherwise be left staring at.
-    private var deleteAllDetail: Text {
-        let events = Text("^[\(store.library.count) event](inflect: true)")
-        guard !store.favoriteEvents.isEmpty else {
-            return events + Text(" will be removed from this device and from your other devices. You can add them again from Search.")
-        }
-        return events + Text(" and ^[\(store.favoriteEvents.count) favorite](inflect: true) will be removed from this device and from your other devices. You can add them again from Search.")
-    }
-
-    /// The badge says what the app is reading, and never more than that: even
-    /// with an account named, this is one public page being read, not a login.
-    private var accountBadge: Text {
-        if let handle = store.eventernoteHandle {
-            Text("Reading @\(handle) — read only")
-        } else {
-            Text("No Eventernote account — read only")
-        }
-    }
-
     private func accountRow(_ label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
@@ -277,6 +204,21 @@ struct MeView: View {
             Divider().padding(.leading, 16)
         }
     }
+
+    // MARK: - What the library adds up to
+
+    private var statistics: some View {
+        HStack(spacing: 11) {
+            StatTile(tint: .trackInterest, value: store.eventsThisYear.formatted(),
+                     label: "Events this year")
+            StatTile(tint: .trackTicket, value: store.venuesVisited.formatted(),
+                     label: "Venues visited")
+            StatTile(tint: .trackAttended, value: store.performersSeen.formatted(),
+                     label: "Performers seen")
+        }
+    }
+
+    // MARK: - Favorites
 
     /// Events hearted from the detail sheet. Favoriting is separate from the
     /// three tracking fields: it says "keep this in front of me", not "I have a
@@ -355,106 +297,6 @@ struct MeView: View {
         .overlay(alignment: .top) {
             if !isFirst { Divider().padding(.leading, 66) }
         }
-    }
-
-    private func settingsCard(store: Bindable<EventStore>) -> some View {
-        VStack(spacing: 0) {
-            Toggle(isOn: store.iCloudSyncEnabled) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("iCloud Sync")
-                        .font(.system(size: 14, weight: .semibold))
-                    syncDetail
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(syncNeedsAttention ? Color.favorite : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-
-            if self.store.iCloudSyncEnabled, self.store.cloudUsage > 0.8 {
-                quotaMeter
-            }
-
-            settingsRow("About Eventrail")
-        }
-        .glassPanel()
-    }
-
-    /// Anything the reader has to act on is said in the colour used for
-    /// attention, not buried in the same grey as the ordinary case.
-    private var syncNeedsAttention: Bool {
-        guard store.iCloudSyncEnabled, let status = store.syncStatus else { return false }
-        return status != .synced
-    }
-
-    /// What syncing is actually doing right now — never a claim that it worked
-    /// when it did not.
-    private var syncDetail: Text {
-        guard store.iCloudSyncEnabled else {
-            return Text("This device only — nothing leaves it")
-        }
-        switch store.syncStatus {
-        case .notConfigured:
-            return Text("This build cannot use iCloud yet — it needs the iCloud capability enabled for the app")
-        case .signedOut:
-            return Text("Sign in to iCloud in Settings to sync this library")
-        case .tooLarge(let bytes):
-            return Text("Library is too large to sync (\(bytes.formatted(.byteCount(style: .file))))")
-        case .failed(let reason):
-            return Text(verbatim: reason)
-        case .synced, .none:
-            if let lastSynced = store.lastSynced {
-                return Text("Events, notes and tracking synced \(lastSynced, format: .relative(presentation: .named))")
-            }
-            return Text("Your events, notes and tracking sync privately")
-        }
-    }
-
-    /// iCloud's key-value storage has a fixed ceiling, and a library that grows
-    /// past it stops syncing silently. The reader gets the warning before that.
-    private var quotaMeter: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ProgressView(value: min(store.cloudUsage, 1))
-                .tint(store.cloudUsage >= 1 ? Color.favorite : Color.trackTicket)
-            Text("\(Int(store.cloudUsage * 100))% of the space iCloud allows for this library")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
-    }
-
-    private func settingsRow(_ label: LocalizedStringKey) -> some View {
-        Button {
-            // The destination lands with the About screen.
-        } label: {
-            HStack(spacing: 12) {
-                Text(label)
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 15)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .top) {
-            Divider().padding(.leading, 16)
-        }
-    }
-
-    private var footnote: some View {
-        Text("Your notes, interest, ticket status and attendance belong to you. They stay on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
-            .padding(.top, 4)
     }
 }
 

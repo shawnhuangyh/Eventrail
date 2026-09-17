@@ -126,12 +126,35 @@ final class EventStore {
 
     private static let syncPreferenceKey = "iCloudSyncEnabled"
 
+    /// Whether this device copies ticketed events into the reader's calendar.
+    ///
+    /// Per-device for the same reason ``iCloudSyncEnabled`` is, and then some:
+    /// the calendar Eventrail writes to is this device's, and the permission
+    /// behind it was granted on this device alone.
+    ///
+    /// Off by default. Writing to someone's calendar is not something to start
+    /// doing on their behalf, and turning it on is what asks for permission.
+    var calendarSyncEnabled: Bool {
+        didSet {
+            guard calendarSyncEnabled != oldValue else { return }
+            UserDefaults.standard.set(calendarSyncEnabled, forKey: Self.calendarPreferenceKey)
+            Task { await mirrorCalendar() }
+        }
+    }
+
+    private static let calendarPreferenceKey = "calendarSyncEnabled"
+
+    /// What the last mirror to the calendar did, or why it could not. Nil until
+    /// one has run.
+    private(set) var calendarStatus: CalendarSync.Outcome?
+
     /// Events met in search but never added. Transient: they are not the
     /// reader's, so they are neither saved nor synced until one is kept.
     private var seen: [Event.ID: Event] = [:]
 
     private let file: LibraryFile?
     private let cloud: CloudSync?
+    private let calendar: CalendarSync?
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var cloudChanges: Task<Void, Never>?
@@ -143,18 +166,22 @@ final class EventStore {
     init(
         file: LibraryFile? = .shared,
         cloud: CloudSync? = .shared,
+        calendar: CalendarSync? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
         tracking: [Event.ID: Tracking] = [:]
     ) {
         self.file = file
         self.cloud = cloud
+        self.calendar = calendar
         self.client = client
 
         // On by default: a reader with more than one device expects their own
         // records to follow them. A preview has no file and never syncs.
         iCloudSyncEnabled = file != nil
             && (UserDefaults.standard.object(forKey: Self.syncPreferenceKey) as? Bool ?? true)
+        calendarSyncEnabled = calendar != nil
+            && UserDefaults.standard.bool(forKey: Self.calendarPreferenceKey)
 
         var loaded = file?.load() ?? LibraryArchive()
         if loaded.membership.isEmpty, !library.isEmpty {
@@ -573,6 +600,9 @@ final class EventStore {
     /// Merges whatever iCloud holds and pushes the result back, so the two
     /// copies agree in both directions rather than one overwriting the other.
     func syncNow() async {
+        // A ticket bought on the other device is a calendar entry owed on this
+        // one, so the mirror runs whether or not iCloud is in the picture.
+        defer { Task { await mirrorCalendar() } }
         guard iCloudSyncEnabled, let cloud else { return }
         guard cloud.isConfigured else {
             syncStatus = .notConfigured
@@ -613,6 +643,32 @@ final class EventStore {
         cloud?.usage(of: archive) ?? 0
     }
 
+    /// The events a calendar entry is owed: everything in the library, upcoming
+    /// and past alike.
+    ///
+    /// Adding an event to the library is already the reader saying it is theirs,
+    /// and that is the whole of the rule — the mirror does not go on to second-
+    /// guess it by tracking field. An earlier cut on the ticket field quietly
+    /// left every past event out, because nothing back-fills a ticket for a
+    /// night already over.
+    var calendarEvents: [Event] { library }
+
+    /// Brings the calendar into line with the library, or clears it out when
+    /// the reader has turned the mirror off.
+    ///
+    /// Safe to call after any edit: with the mirror off and nothing ever
+    /// written, it does nothing at all — in particular it never asks for
+    /// calendar permission on its own.
+    func mirrorCalendar() async {
+        guard let calendar else { return }
+        guard calendarSyncEnabled else {
+            await calendar.stop()
+            calendarStatus = nil
+            return
+        }
+        calendarStatus = await calendar.mirror(calendarEvents)
+    }
+
     /// Another device wrote. Merge rather than adopt: this device may have
     /// edits of its own that have not been pushed yet.
     private func observeCloudChanges() {
@@ -651,9 +707,14 @@ final class EventStore {
                 file?.save(archive)
                 return cloud?.save(archive)
             }.value
-            guard !Task.isCancelled, let self, let outcome else { return }
-            self.syncStatus = outcome
-            if outcome == .synced { self.lastSynced = .now }
+            guard !Task.isCancelled, let self else { return }
+            if let outcome {
+                self.syncStatus = outcome
+                if outcome == .synced { self.lastSynced = .now }
+            }
+            // The calendar follows the same pause as the disk write: a ticket
+            // toggled twice while deciding should reach EventKit once.
+            await self.mirrorCalendar()
         }
     }
 

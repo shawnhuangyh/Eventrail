@@ -34,6 +34,11 @@ struct RootView: View {
         #endif
         .environment(store)
         .tint(.brandTint)
+        // A cold launch is a change of scene phase to nobody: `onChange` only
+        // hears the ones after the first. Without this the calendar would only
+        // ever catch up after an edit or a trip to the background, so a library
+        // imported on another device could sit unmirrored indefinitely.
+        .task { await store.mirrorCalendar() }
         // Edits are written after a short pause; leaving the app cuts that
         // short, so the last one is flushed here rather than lost. Coming back
         // is the moment to pick up whatever another device wrote meanwhile.

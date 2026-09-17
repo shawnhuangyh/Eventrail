@@ -121,7 +121,11 @@ struct EventDetailView: View {
         if let doors = event.doorsLine { parts.append(String(localized: "Doors \(doors)")) }
         if let start = event.timeLine {
             parts.append(String(localized: "Start \(start)"))
-        } else if event.doorsLine == nil {
+        }
+        if let ends = event.endsLine {
+            parts.append(String(localized: "End \(ends)"))
+        }
+        if event.timeLine == nil, event.doorsLine == nil {
             parts.append(isImporting
                          ? String(localized: "Importing times…")
                          : String(localized: "Times to be announced"))
@@ -217,7 +221,12 @@ struct EventDetailView: View {
             StatTile(tint: .trackInterest, value: event.listedAttendees?.formatted() ?? "—",
                      label: "Listed on Eventernote")
             StatTile(tint: .trackTicket, value: event.doorsLine ?? "—", label: "Doors open")
-            StatTile(tint: .trackAttended, value: event.timeLine ?? "—", label: "Performance")
+            // The end time qualifies the start rather than standing on its own,
+            // so it sits under it — and stays away entirely when the page has
+            // published no end.
+            StatTile(tint: .trackAttended, value: event.timeLine ?? "—",
+                     sub: event.endsLine.map { Text("ends \($0)") },
+                     label: "Performance")
         }
         .padding(.horizontal, 18)
     }

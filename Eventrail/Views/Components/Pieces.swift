@@ -59,6 +59,10 @@ struct StatTile: View {
     let tint: Color
     /// A formatted number or time, so not a localizable key.
     let value: String
+    /// A second line under the value, for a fact that only qualifies it — the
+    /// hour a performance ends under the hour it starts. Nil where the public
+    /// page published nothing to put there.
+    var sub: Text?
     let label: LocalizedStringKey
 
     var body: some View {
@@ -70,6 +74,13 @@ struct StatTile: View {
             Text(value)
                 .font(.system(size: 21, weight: .bold))
                 .monospacedDigit()
+            if let sub {
+                sub
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, -2)
+            }
             Text(label)
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(.secondary)
