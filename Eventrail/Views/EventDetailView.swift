@@ -118,7 +118,7 @@ struct EventDetailView: View {
                     .font(.system(size: 22, weight: .bold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                timingLine
+                dateLine
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -128,25 +128,17 @@ struct EventDetailView: View {
         }
     }
 
-    /// The day, then whichever of the two times Eventernote has published. An
-    /// event announced without them says so rather than showing a made-up hour.
-    private var timingLine: Text {
-        var parts = [event.longDateLine]
-        if let doors = event.doorsLine { parts.append(String(localized: "Doors \(doors)")) }
-        if let start = event.timeLine {
-            parts.append(String(localized: "Start \(start)"))
-        }
-        if let ends = event.endsLine {
-            parts.append(String(localized: "End \(ends)"))
-        }
-        if event.timeLine == nil, event.doorsLine == nil {
-            parts.append(isImporting
-                         ? String(localized: "Importing times…")
-                         : String(localized: "Times to be announced"))
-        }
-        // Already-localized fragments around imported times, so assembled as a
-        // string rather than as a localizable key.
-        return Text(verbatim: parts.joined(separator: " · "))
+    /// The day, and only the day.
+    ///
+    /// Doors, start and end used to trail it here as well, which put the same
+    /// three times twice on one screen — once in a run-on line under the title
+    /// and again, labelled, in the tiles a scroll below. The tiles are where a
+    /// time is read from, and they already say "—" for one the page has yet to
+    /// publish, so the header is left with the one fact a title needs beside it.
+    private var dateLine: Text {
+        // An already-formatted date, so it is shown as given rather than as a
+        // localizable key.
+        Text(verbatim: event.longDateLine)
     }
 
     private var doneButton: some View {
