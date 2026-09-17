@@ -16,24 +16,26 @@ enum LibraryFilter: String, CaseIterable, Identifiable, Hashable {
 }
 
 /// How the Events tab breaks the list into sections.
+///
+/// By date means by month: the library reads as a run of months, and an
+/// ungrouped list of everything was the same thing with its signposts taken
+/// away.
 enum Grouping: String, CaseIterable, Identifiable, Hashable {
-    case date, month, artist
+    case date, artist
 
     var id: Self { self }
 
     var label: LocalizedStringKey {
         switch self {
         case .date: "Date"
-        case .month: "Month"
         case .artist: "Artist"
         }
     }
 
-    /// The trailing half of the toolbar label: "by month".
+    /// The trailing half of the toolbar label: "by date".
     var byLabel: LocalizedStringKey {
         switch self {
         case .date: "by date"
-        case .month: "by month"
         case .artist: "by artist"
         }
     }
@@ -847,8 +849,6 @@ final class EventStore {
         let events = events(matching: filter)
         switch grouping {
         case .date:
-            return events.isEmpty ? [] : [EventGroup(id: "all", label: "", events: events)]
-        case .month:
             // `events` is already date-ordered, so first appearance sets section order.
             var order: [String] = []
             var buckets: [String: [Event]] = [:]

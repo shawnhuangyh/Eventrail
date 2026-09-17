@@ -231,16 +231,20 @@ struct EventDetailView: View {
     /// An em dash stands in for a field the public page does not carry — the
     /// app never fills one in itself.
     private var statistics: some View {
-        HStack(spacing: 11) {
+        HStack(alignment: .top, spacing: 11) {
+            // The head count reads as a number needing a noun, so the tile is
+            // named for where it comes from and says what was counted under it.
             StatTile(tint: .trackInterest, value: event.listedAttendees?.formatted() ?? "—",
-                     label: "Listed on Eventernote")
-            StatTile(tint: .trackTicket, value: event.doorsLine ?? "—", label: "Doors open")
+                     sub: event.listedAttendees.map { _ in Text("people listed") },
+                     label: "Eventernote", layout: .field)
+            StatTile(tint: .trackTicket, value: event.doorsLine ?? "—",
+                     label: "Doors open", layout: .field)
             // The end time qualifies the start rather than standing on its own,
             // so it sits under it — and stays away entirely when the page has
             // published no end.
             StatTile(tint: .trackAttended, value: event.timeLine ?? "—",
-                     sub: event.endsLine.map { Text("ends \($0)") },
-                     label: "Performance")
+                     sub: event.endsLine.map { Text("Ends \($0)") },
+                     label: "Performance", layout: .field)
         }
         .padding(.horizontal, 18)
     }

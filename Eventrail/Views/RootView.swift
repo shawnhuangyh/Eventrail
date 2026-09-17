@@ -69,5 +69,5 @@ struct RootView: View {
 
 #Playground {
     let store = EventStore.preview
-    _ = store.groups(filter: .upcoming, grouping: .month).map(\.label)
+    _ = store.groups(filter: .upcoming, grouping: .date).map(\.label)
 }

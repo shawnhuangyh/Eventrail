@@ -87,7 +87,7 @@ struct FollowingView: View {
     private var subtitle: Text {
         guard !performers.isEmpty else { return Text("Nobody followed yet") }
         let people = Text("^[\(performers.count) performer](inflect: true)")
-        let dates = Text("^[\(followed.events(for: performers).count) published date](inflect: true)")
+        let dates = Text("^[\(followed.events(for: performers).count) event](inflect: true)")
         return Text("\(people) · \(dates)")
     }
 
@@ -153,19 +153,25 @@ struct FollowingView: View {
 
     // MARK: - The dates themselves
 
+    /// Sectioned and pinned, the way the library tab's own months are: a long
+    /// list of published dates is read by month, so the month being read stays
+    /// on screen while it is being read.
     private var months: some View {
-        LazyVStack(alignment: .leading, spacing: 9) {
+        LazyVStack(alignment: .leading, spacing: 9, pinnedViews: .sectionHeaders) {
             ForEach(groups) { group in
-                GroupHeader(label: Text(group.label), count: group.events.count)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 4)
-
-                ForEach(group.events) { event in
-                    FollowedDateRow(event: event,
-                                    billing: followed.billed(on: event, among: performers)) {
-                        openEvent = event
+                Section {
+                    ForEach(group.events) { event in
+                        FollowedDateRow(event: event,
+                                        billing: followed.billed(on: event, among: performers)) {
+                            openEvent = event
+                        }
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.horizontal, 16)
+                } header: {
+                    GroupHeader(label: Text(group.label), count: group.events.count)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }

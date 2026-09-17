@@ -95,10 +95,8 @@ struct EventsView: View {
                             .listRowSeparator(.hidden)
                     }
                 } header: {
-                    if !group.label.isEmpty {
-                        GroupHeader(label: Text(group.label), count: group.events.count)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
-                    }
+                    GroupHeader(label: Text(group.label), count: group.events.count)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
                 }
             }
         }

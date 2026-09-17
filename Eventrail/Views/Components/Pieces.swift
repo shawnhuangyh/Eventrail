@@ -56,6 +56,18 @@ struct StatusBadge: View {
 
 /// One cell of a three-up statistics row.
 struct StatTile: View {
+    /// The two arrangements the design draws this tile in.
+    enum Layout {
+        /// A number with its caption under it. Three of these read as one row
+        /// of counts, which is what the Me and performer screens show.
+        case caption
+        /// The name on top beside the dot, the value under it, and a line
+        /// under that qualifying the value. An event's facts are three
+        /// different things rather than three counts, so each one is named
+        /// before it is read.
+        case field
+    }
+
     let tint: Color
     /// A formatted number or time, so not a localizable key.
     let value: String
@@ -64,37 +76,79 @@ struct StatTile: View {
     /// page published nothing to put there.
     var sub: Text?
     let label: LocalizedStringKey
+    var layout: Layout = .caption
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(tint)
-                .frame(width: 9, height: 9)
-                .padding(.bottom, 3)
-            Text(value)
-                .font(.system(size: 21, weight: .bold))
-                .monospacedDigit()
-            if let sub {
-                sub
-                    .font(.system(size: 11.5, weight: .semibold))
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 15)
+            .glassPanel(cornerRadius: 24)
+            .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch layout {
+        case .caption:
+            VStack(alignment: .leading, spacing: 5) {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(tint)
+                    .frame(width: 9, height: 9)
+                    .padding(.bottom, 3)
+                Text(value)
+                    .font(.system(size: 21, weight: .bold))
+                    .monospacedDigit()
+                if let sub {
+                    sub
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, -2)
+                }
+                Text(label)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .field:
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 9, height: 9)
+                    Text(label)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Text(value)
+                    .font(.system(size: 25, weight: .bold))
+                    .kerning(-0.75)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                // The three tiles stand as one row, so a tile with nothing to
+                // qualify its value keeps the line rather than standing shorter
+                // than the two beside it.
+                (sub ?? Text(verbatim: " "))
+                    .font(.system(size: 12, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
-                    .padding(.top, -2)
+                    .lineLimit(1)
             }
-            Text(label)
-                .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 13)
-        .padding(.vertical, 15)
-        .glassPanel(cornerRadius: 24)
-        .accessibilityElement(children: .combine)
     }
 }
 
-/// The section header pill on the Events list.
+/// The section header pill that stands over a month of events.
+///
+/// It reads the same wherever it is used, which takes saying twice: a `List`
+/// section header arrives with the system's own uppercased, secondary styling,
+/// and a header pinned over a scrolling list has the rows passing behind it.
+/// Both are answered here rather than at each call site, so the Events tab and
+/// the Following tab cannot drift apart again.
 struct GroupHeader: View {
     /// A formatted month, an imported artist name, or the filter's own name.
     let label: Text
@@ -105,16 +159,20 @@ struct GroupHeader: View {
             label
                 .font(.system(size: 12, weight: .bold))
                 .kerning(0.24)
-                .textCase(nil)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .glassCapsule()
+                // Under the glass rather than over it: the pill refracts an
+                // opaque slice of the wash, so a flyer scrolling behind a
+                // pinned header cannot darken the month it is covering.
+                .background(Color.washBase, in: .capsule)
             Text("^[\(count) event](inflect: true)")
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
-                .textCase(nil)
                 .foregroundStyle(.tertiary)
         }
+        .textCase(nil)
+        .foregroundStyle(.primary)
         .padding(.vertical, 2)
     }
 }

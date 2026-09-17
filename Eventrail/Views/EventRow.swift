@@ -74,12 +74,19 @@ struct LibraryRow: View {
     var body: some View {
         Button(action: open) {
             EventRowContent(event: event, detail: detail) {
-                VStack(alignment: .trailing, spacing: 7) {
+                // Held apart over the row's full height rather than packed into
+                // the middle of it: the badge belongs beside the title it
+                // qualifies, and the chevron in the corner it points out of.
+                VStack(alignment: .trailing, spacing: 0) {
                     StatusBadge(status: store.status(for: event))
+                    Spacer(minLength: 7)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
+                .frame(maxHeight: .infinity)
+                .padding(.top, 2)
+                .padding(.bottom, 4)
             }
         }
         .buttonStyle(.plain)
