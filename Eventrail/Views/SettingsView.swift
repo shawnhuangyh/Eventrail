@@ -44,13 +44,6 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .confirmationDialog("Delete every event?", isPresented: $isConfirmingDeleteAll,
-                                titleVisibility: .visible) {
-                Button("Delete All Events", role: .destructive) { store.removeAllEvents() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                deleteAllDetail
-            }
         }
     }
 
@@ -216,16 +209,32 @@ struct SettingsView: View {
         .glassPanel(interactive: true)
         .disabled(store.library.isEmpty && store.favoriteEvents.isEmpty)
         .padding(.top, 6)
+        // Asked from the button rather than from the screen, so the sheet
+        // points at what opened it.
+        .confirmationDialog("Delete every event?", isPresented: $isConfirmingDeleteAll,
+                            titleVisibility: .visible) {
+            Button("Delete All Events", role: .destructive) { store.removeAllEvents() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            deleteAllDetail
+        }
     }
 
     /// Says what actually goes, including the favorites the reader would
     /// otherwise be left staring at.
+    /// Spelled out rather than inflected, for the reason ``EventsView``'s own
+    /// removal gives: a dialog's words reach UIKit as plain text, and the
+    /// `^[…](inflect:)` markup arrives there unprocessed.
     private var deleteAllDetail: Text {
-        let events = Text("^[\(store.library.count) event](inflect: true)")
-        guard !store.favoriteEvents.isEmpty else {
-            return events + Text(" will be removed from this device and from your other devices. You can add them again from Search.")
+        let events = store.library.count
+        let favorites = store.favoriteEvents.count
+        let what = events == 1 ? Text("1 event") : Text("\(events) events")
+        let all: Text = switch favorites {
+        case 0: what
+        case 1: Text("\(what) and 1 favorite")
+        default: Text("\(what) and \(favorites) favorites")
         }
-        return events + Text(" and ^[\(store.favoriteEvents.count) favorite](inflect: true) will be removed from this device and from your other devices. You can add them again from Search.")
+        return Text("\(all) will go from this device and from your other devices. Anything your Eventernote account still lists comes back on the next refresh; the rest you can add again from Search.")
     }
 
     private var footnote: some View {

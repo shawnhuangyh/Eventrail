@@ -62,13 +62,6 @@ struct MeView: View {
             .sheet(isPresented: $isShowingSettings) {
                 SettingsView()
             }
-            .confirmationDialog("Unlink this Eventernote account?",
-                                isPresented: $isConfirmingUnlink, titleVisibility: .visible) {
-                Button("Unlink", role: .destructive) { store.unlinkAccount() }
-                Button("Keep it", role: .cancel) {}
-            } message: {
-                Text("The events already imported stay in your library.")
-            }
             // The same read the Following tab does, and the same object holds
             // it — whichever screen the reader opens first pays for it.
             .task(id: store.followedPerformers.map(\.id)) {
@@ -137,7 +130,18 @@ struct MeView: View {
                 accountRow("Link Eventernote Account") { isLinking = true }
             } else {
                 accountRow("Change Account") { isLinking = true }
+                // The sheet hangs off the row that opens it: iOS points a
+                // confirmation at whatever presented it, and one attached to the
+                // whole screen arrives pointing at nothing in particular.
                 accountRow("Unlink Account") { isConfirmingUnlink = true }
+                    .confirmationDialog("Unlink this Eventernote account?",
+                                        isPresented: $isConfirmingUnlink,
+                                        titleVisibility: .visible) {
+                        Button("Unlink", role: .destructive) { store.unlinkAccount() }
+                        Button("Keep it", role: .cancel) {}
+                    } message: {
+                        Text("The events already imported stay in your library.")
+                    }
             }
         }
         .glassPanel(cornerRadius: 28)
