@@ -105,3 +105,18 @@ extension FollowedDates {
         })
     }
 }
+
+extension Feed where Item == Event {
+    /// A feed already holding the fixture listing, for a `#Preview` of a screen
+    /// that is handed one rather than loading its own.
+    @MainActor static var preview: Feed<Event> {
+        let feed = Feed<Event>()
+        Task {
+            await feed.load { page in
+                EventernotePage(items: PreviewData.events, total: PreviewData.events.count,
+                                page: page, pageSize: PreviewData.events.count)
+            }
+        }
+        return feed
+    }
+}

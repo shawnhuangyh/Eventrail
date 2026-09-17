@@ -267,18 +267,37 @@ struct PerformerView: View {
 
     // MARK: - What they are billed on
 
+    /// How much of each half a section shows before sending the rest to a
+    /// screen of its own. Enough to say what the performer has coming and what
+    /// they have just done, few enough that a performer with years behind them
+    /// cannot bury the cards under the sections.
+    private static let sectionLimit = 5
+
     private var upcoming: [Event] {
-        feed.items.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+        PerformerAppearancesView.Half.upcoming.rows(of: feed.items)
     }
 
     private var past: [Event] {
-        feed.items.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
+        PerformerAppearancesView.Half.past.rows(of: feed.items)
     }
 
     /// True once a past appearance has been read, or the listing has run out —
     /// either way every upcoming one is in hand.
     private var hasEveryUpcoming: Bool {
         !feed.hasMore || feed.items.contains { !$0.isUpcoming }
+    }
+
+    /// Whether Upcoming has anything the section is not showing. The listing is
+    /// read until a past row appears, so while that is still running there may
+    /// be dates ahead of the ones in hand.
+    private var hasMoreUpcoming: Bool {
+        upcoming.count > Self.sectionLimit || (!hasEveryUpcoming && !upcoming.isEmpty)
+    }
+
+    /// The same for Past appearances, where `feed.hasMore` settles it: every
+    /// page still unread is a past one once the upcoming half is whole.
+    private var hasMorePast: Bool {
+        past.count > Self.sectionLimit || feed.hasMore
     }
 
     @ViewBuilder
@@ -296,13 +315,15 @@ struct PerformerView: View {
             .padding(.top, 32)
         } else {
             statistics
-            section("Upcoming", count: hasEveryUpcoming ? upcoming.count : nil,
-                    events: upcoming, empty: "No dates published yet.")
+            section(half: .upcoming, count: hasEveryUpcoming ? upcoming.count : nil,
+                    events: upcoming, empty: "No dates published yet.",
+                    hasMore: hasMoreUpcoming)
             // The count is left off while pages are still coming: a heading
             // that said "12" beside a listing the reader can keep scrolling
             // would be counting the reading, not the performer.
-            section("Past appearances", count: feed.hasMore ? nil : past.count,
-                    events: past, empty: "Nothing published before today.")
+            section(half: .past, count: feed.hasMore ? nil : past.count,
+                    events: past, empty: "Nothing published before today.",
+                    hasMore: hasMorePast)
             if feed.isLoadingMore { SearchProgress(compact: true) }
             if !sameBill.isEmpty { sameBillCard }
             openInEventernote
@@ -326,11 +347,12 @@ struct PerformerView: View {
     }
 
     private func section(
-        _ title: LocalizedStringKey, count: Int?, events: [Event], empty: LocalizedStringKey
+        half: PerformerAppearancesView.Half, count: Int?, events: [Event],
+        empty: LocalizedStringKey, hasMore: Bool
     ) -> some View {
         LazyVStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title)
+                Text(half.title)
                     .font(.system(size: 17, weight: .bold))
                 if let count {
                     Text(count.formatted())
@@ -338,6 +360,8 @@ struct PerformerView: View {
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
+                Spacer(minLength: 8)
+                if hasMore { seeAll(half) }
             }
             .padding(.horizontal, 17)
             .padding(.top, 16)
@@ -353,7 +377,7 @@ struct PerformerView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 17)
             } else {
-                ForEach(events) { event in
+                ForEach(events.prefix(Self.sectionLimit)) { event in
                     Divider().opacity(0.45).padding(.leading, 12)
                     AppearanceRow(event: event) { openEvent = event }
                         .task { await readMore(after: event) }
@@ -363,6 +387,27 @@ struct PerformerView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassPanel(cornerRadius: 28)
         .padding(.horizontal, 18)
+    }
+
+    /// The way into the whole of a half the section only samples.
+    ///
+    /// The destination is handed this page's feed rather than a query, so it
+    /// opens on what is already read and pages on from there — and whatever it
+    /// reads is here in the section when the reader comes back.
+    private func seeAll(_ half: PerformerAppearancesView.Half) -> some View {
+        NavigationLink {
+            PerformerAppearancesView(performer: link.name, half: half, feed: feed)
+        } label: {
+            HStack(spacing: 2) {
+                Text("See All")
+                    .font(.system(size: 13, weight: .semibold))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(Color.brandTint)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Who they share a bill with
@@ -459,9 +504,10 @@ struct PerformerView: View {
     }
 }
 
-/// One event a performer is billed on. The badge appears only where the reader
-/// has recorded something — an untracked row has nothing to say there.
-private struct AppearanceRow: View {
+/// One event a performer is billed on, on this page and on the screen behind
+/// its See All. The badge appears only where the reader has recorded something
+/// — an untracked row has nothing to say there.
+struct AppearanceRow: View {
     @Environment(EventStore.self) private var store
 
     let event: Event
