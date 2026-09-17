@@ -217,6 +217,14 @@ final class EventStore {
     /// The Eventernote account the reader imports from, if they have named one.
     var eventernoteHandle: String? { archive.eventernoteAccount?.value }
 
+    /// How the linked account presents itself, as of the last page read from it.
+    var eventernoteProfile: LinkedProfile? {
+        // Guarded on the handle: an unlink leaves nothing to caption, and a
+        // profile merged in beside a handle this device does not hold would
+        // name an account the reader is not linked to.
+        isLinked ? archive.eventernoteProfile : nil
+    }
+
     /// Whether an account has been named. ``refresh()`` needs one — it is the
     /// list being refreshed from.
     var isLinked: Bool { eventernoteHandle != nil }
@@ -384,6 +392,8 @@ final class EventStore {
             refreshStage = nil
         }
 
+        await refreshProfile()
+
         // A history that failed still leaves events worth re-reading, so the
         // second pass runs either way and the first failure is the one reported.
         var landed = await importHistory()
@@ -393,6 +403,24 @@ final class EventStore {
         // that reached nothing cannot pass itself off as a successful refresh.
         guard landed else { return }
         archive.lastRefreshed = .now
+        persist()
+    }
+
+    /// Re-reads the linked account's own page for the name and picture the Me
+    /// screen captions it with.
+    ///
+    /// One request, against a history that takes several — and it is what fills
+    /// these in for an account linked before the app kept them, without asking
+    /// the reader to link it again. A page that will not load leaves the copy
+    /// already held and is not reported: a refresh is about the library, and
+    /// failing it over a portrait would be the wrong thing to tell the reader.
+    private func refreshProfile() async {
+        guard let handle = eventernoteHandle,
+              let read = try? await client.profile(forUser: handle)
+        else { return }
+        let profile = LinkedProfile(name: read.name, avatarURL: read.avatarURL)
+        guard profile != archive.eventernoteProfile else { return }
+        archive.eventernoteProfile = profile
         persist()
     }
 
@@ -466,7 +494,13 @@ final class EventStore {
     }
 
     func link(_ profile: EventernoteProfile) {
-        guard profile.handle != eventernoteHandle else { return }
+        // Re-linking the same account is not a reason to import it again, but the
+        // reader has just looked at a fresh copy of their page — it is the newest
+        // the app will have until the next refresh, so it is kept either way.
+        let isSameAccount = profile.handle == eventernoteHandle
+        archive.eventernoteProfile = LinkedProfile(name: profile.name, avatarURL: profile.avatarURL)
+        guard !isSameAccount else { return persist() }
+
         archive.eventernoteAccount = Stamped(profile.handle)
         archive.lastImported = nil
         importSummary = nil
@@ -482,6 +516,7 @@ final class EventStore {
         // A nil inside the stamp rather than a dropped record, so the unlink
         // reaches the other device instead of being merged away.
         archive.eventernoteAccount = Stamped(nil)
+        archive.eventernoteProfile = nil
         archive.lastImported = nil
         importSummary = nil
         refreshFailure = nil

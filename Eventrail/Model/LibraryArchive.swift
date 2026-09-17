@@ -24,6 +24,18 @@ struct Stamped<Value: Codable & Hashable & Sendable>: Codable, Hashable, Sendabl
     }
 }
 
+/// How a linked Eventernote account presents itself.
+///
+/// Kept with the library rather than fetched when a screen wants it: the Me tab
+/// shows the reader their own account every time it opens, and it should not
+/// have to reach the network — or show a blank circle until it answers — to do
+/// that.
+struct LinkedProfile: Codable, Hashable, Sendable {
+    /// The display name Eventernote prints above the handle.
+    var name: String
+    var avatarURL: URL?
+}
+
 /// Everything the reader has accumulated, in the form it is written to disk and
 /// handed to iCloud.
 ///
@@ -56,6 +68,13 @@ struct LibraryArchive: Codable, Sendable {
     /// a property's default value, so a new non-optional key here would read as
     /// a corrupt file and empty every library in the field.
     var eventernoteAccount: Stamped<String?>?
+    /// How the linked account presents itself: the display name and picture from
+    /// its public page.
+    ///
+    /// These are Eventernote's facts about the account rather than the reader's
+    /// own records, so like event facts they carry no timestamp of their own —
+    /// they follow whichever link record wins a merge.
+    var eventernoteProfile: LinkedProfile?
     /// When the linked account's history was last imported.
     var lastImported: Date?
 
@@ -90,10 +109,28 @@ struct LibraryArchive: Codable, Sendable {
         merged.favorites = Self.merge(favorites, other.favorites)
         merged.recentSearches = recentSearches.newer(other.recentSearches)
         merged.eventernoteAccount = Self.newer(eventernoteAccount, other.eventernoteAccount)
+        merged.eventernoteProfile = Self.profile(forWinning: merged.eventernoteAccount,
+                                                 mine: self, theirs: other)
         merged.lastRefreshed = [lastRefreshed, other.lastRefreshed].compactMap { $0 }.max()
         merged.lastImported = [lastImported, other.lastImported].compactMap { $0 }.max()
 
         return merged.pruned()
+    }
+
+    /// The name and picture belonging to the link that won.
+    ///
+    /// Picked by which account each side holds rather than by recency: the
+    /// other device's picture beside a handle it was never taken from would
+    /// caption the newly linked account with the old one's face. A device that
+    /// has not read the page yet defers to one that has.
+    private static func profile(
+        forWinning account: Stamped<String?>?, mine: LibraryArchive, theirs: LibraryArchive
+    ) -> LinkedProfile? {
+        guard let handle = account?.value else { return nil }
+        return [mine, theirs]
+            .filter { $0.eventernoteAccount?.value == handle }
+            .compactMap(\.eventernoteProfile)
+            .first
     }
 
     /// The newer of two records either device may not have at all.

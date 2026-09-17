@@ -208,10 +208,25 @@ nonisolated enum EventernotePages {
         return performers
     }
 
+    /// The picture in the profile's cover block, which is the only `thumb` on
+    /// the page above the fold — anchored to the cover so a later one cannot be
+    /// mistaken for it.
+    ///
+    /// An account that took its picture from Twitter still has it announced over
+    /// plain HTTP, which App Transport Security refuses outright: loaded as
+    /// printed, the image would simply never appear. The scheme is promoted
+    /// here rather than at the view, so what the model holds is a URL that can
+    /// actually be fetched. An account with no picture prints `src=""`, which
+    /// reads as no picture at all.
     private static func avatarImage(in html: String) -> URL? {
         var cursor = HTMLCursor(html)
-        guard cursor.advance(past: #"<div class="thumb">"#) else { return nil }
-        return cursor.text(after: #"src=""#, upTo: "\"").flatMap(URL.init(string:))
+        guard cursor.advance(past: #"<div class="mod_mypage_cover"#),
+              cursor.advance(past: #"<div class="thumb">"#),
+              let source = cursor.text(after: #"src=""#, upTo: "\""),
+              var components = URLComponents(string: source)
+        else { return nil }
+        if components.scheme == "http" { components.scheme = "https" }
+        return components.url
     }
 
     // MARK: - An event's own page

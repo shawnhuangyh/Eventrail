@@ -62,20 +62,13 @@ struct MeView: View {
     private var accountCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                Circle()
-                    .fill(.quaternary)
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(width: 58, height: 58)
+                AccountAvatar(url: store.eventernoteProfile?.avatarURL, width: 58)
 
                 VStack(alignment: .leading, spacing: 5) {
                     accountTitle
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(1)
-                    Text("^[\(store.library.count) event](inflect: true) · ^[\(store.favoriteEvents.count) favorite](inflect: true)")
+                    accountDetail
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -123,12 +116,29 @@ struct MeView: View {
         .glassPanel(cornerRadius: 28)
     }
 
+    /// The account's own name when Eventernote has printed one, since that is
+    /// how the reader knows themselves there; the handle alone otherwise, which
+    /// is all a library linked before the app read the page has.
     private var accountTitle: Text {
-        if let handle = store.eventernoteHandle {
+        if let name = store.eventernoteProfile?.name {
+            Text(verbatim: name)
+        } else if let handle = store.eventernoteHandle {
             Text(verbatim: "@\(handle)")
         } else {
             Text("Eventernote")
         }
+    }
+
+    /// What the library holds, behind the handle when the title has given way to
+    /// a display name. The handle is what every request is addressed to and what
+    /// tells two accounts apart, so it stays on the card either way rather than
+    /// only inside the sheet that changes it.
+    private var accountDetail: Text {
+        let counts = Text("^[\(store.library.count) event](inflect: true) · ^[\(store.favoriteEvents.count) favorite](inflect: true)")
+        guard store.eventernoteProfile != nil, let handle = store.eventernoteHandle else {
+            return counts
+        }
+        return Text(verbatim: "@\(handle) · ") + counts
     }
 
     /// The honest wording: the app reports when it last *succeeded*, never that
