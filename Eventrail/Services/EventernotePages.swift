@@ -124,16 +124,24 @@ nonisolated enum EventernotePages {
         searchTotal(in: html) ?? attendedTotal(in: html)
     }
 
-    /// "689件見つかりました。" — the count a search page prints.
+    /// "689件見つかりました。" — the count a listing prints over its rows.
     ///
-    /// The count follows its element immediately, so anything longer than a
-    /// number means the two markers matched different parts of the page.
+    /// Read back from the phrase rather than forward from the element that
+    /// carries it. A performer's own listing prints its sort control in the
+    /// same `t2` class *above* the count, so anchoring on the class read the
+    /// sort line, failed the length check, and left the total unknown — which
+    /// made `hasMore` false on every performer listing and stopped both the
+    /// Following read and a performer's page at their first page.
+    ///
+    /// The count still has to follow its element immediately: anything longer
+    /// than a number means the phrase was matched somewhere unrelated.
     private static func searchTotal(in html: String) -> Int? {
-        var cursor = HTMLCursor(html)
-        guard let found = cursor.text(after: #"class="t2">"#, upTo: "件見つかりました"),
-              found.count <= 20
+        guard let phrase = html.range(of: "件見つかりました"),
+              let opening = html[..<phrase.lowerBound].lastIndex(of: ">")
         else { return nil }
-        return number(in: found)
+        let found = html[html.index(after: opening) ..< phrase.lowerBound]
+        guard found.count <= 20 else { return nil }
+        return number(in: String(found))
     }
 
     /// "参加イベント一覧(879)" — the heading a member's own event list carries
