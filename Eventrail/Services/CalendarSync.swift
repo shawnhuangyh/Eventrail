@@ -234,14 +234,23 @@ final class CalendarSync {
     /// than what was written before. Nil only where there is no venue at all —
     /// Eventernote announces plenty of events before it has booked a hall.
     ///
+    /// A located entry reads as the hall's name alone: the coordinate already
+    /// says where it is, so an address in the title only repeats the map back
+    /// at the reader in a line the Calendar app has to truncate. Where Maps
+    /// knew nothing the address stays, because it is then the only thing that
+    /// places the hall at all.
+    ///
     /// The name is always Eventernote's, never the one Maps came back with. A
     /// hall the site calls Kアリーナ横浜 is that in the reader's calendar even
     /// where Maps files it under something shorter or in another language: the
     /// map item is being asked where the place is, not what to call it.
     private static func place(for event: Event, found: MKMapItem?) -> EKStructuredLocation? {
-        guard let title = event.locationTitle else { return nil }
-        let place = found.map(EKStructuredLocation.init(mapItem:)) ?? EKStructuredLocation(title: title)
-        place.title = title
+        guard let written = event.locationTitle else { return nil }
+        guard let found else { return EKStructuredLocation(title: written) }
+        let place = EKStructuredLocation(mapItem: found)
+        // `written` only where the site named no hall — then it is the address
+        // on its own, and better than nothing to read.
+        place.title = event.venue.isEmpty ? written : event.venue
         return place
     }
 
