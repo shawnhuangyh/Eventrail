@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Eventrail app icon</title>
+  <desc>An ivory ticket with an E-shaped trail and three event stops on a blue background.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="0.8" y2="1">
+      <stop stop-color="#347BCD"/>
+      <stop offset="1" stop-color="#205CB2"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F3F1F6"/>
+    </linearGradient>
+    <mask id="ticket-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <path fill="white" d="M230 210 H794 Q854 210 854 270 V434 A78 78 0 0 0 854 590 V754 Q854 814 794 814 H230 Q170 814 170 754 V590 A78 78 0 0 0 170 434 V270 Q170 210 230 210 Z"/>
+      <path d="M664 346 H436 A83 83 0 0 0 436 512 H512 M436 512 A83 83 0 0 0 436 678 H664" fill="none" stroke="black" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+      <g fill="black">
+        <circle cx="664" cy="346" r="57"/>
+        <circle cx="512" cy="512" r="57"/>
+        <circle cx="664" cy="678" r="57"/>
+      </g>
+    </mask>
+  </defs>
+  <path fill="url(#background)" d="M0 0 H1024 V1024 H0 Z"/>
+  <g transform="rotate(-11 512 512)">
+    <path fill="url(#paper)" mask="url(#ticket-cutout)" d="M0 0 H1024 V1024 H0 Z"/>
+  </g>
+</svg>
