@@ -22,8 +22,11 @@ nonisolated struct EventernoteClient: Sendable {
     /// The site serves a desktop template unless the request looks like a phone,
     /// and it is the phone template this importer reads. The product name is
     /// kept in front of it so the traffic is attributable.
+    ///
+    /// ASCII throughout, deliberately: a header field is bytes, and a value
+    /// outside that range is left to whatever the stack decides to do with it.
     private static let userAgent =
-        "Eventrail/1.0 (iPhone; iOS 26_0) Mobile — https://www.eventernote.com"
+        "Eventrail/1.0 (iPhone; iOS 26_0) Mobile - https://www.eventernote.com"
 
     enum Failure: Error, LocalizedError {
         case http(Int)
