@@ -1,3 +1,4 @@
+import MapKit
 import SwiftUI
 
 /// One event: what Eventernote publishes about it, and what the reader records
@@ -373,16 +374,7 @@ struct EventDetailView: View {
 
     private var venueCard: some View {
         VStack(spacing: 0) {
-            Rectangle()
-                .fill(.quaternary)
-                .overlay {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(Color.favorite)
-                        .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
-                }
-                .frame(height: 150)
-                .accessibilityLabel("Venue map")
+            VenueMap(event: event, directionsURL: directionsURL)
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -449,6 +441,72 @@ struct EventDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 26)
         .padding(.top, 2)
+    }
+}
+
+/// The venue, drawn where it is.
+///
+/// Eventernote publishes an address and no coordinate, so the hall is looked up
+/// in ``VenuePlaces`` — the same lookup, and the same kept answers, the calendar
+/// mirror uses, so whichever of the two asks first pays for it.
+///
+/// Until that comes back, and for a hall Maps does not have, the panel is the
+/// pin on plain ground it has always been: a map that cannot say where the place
+/// is would be worse than not drawing one.
+private struct VenueMap: View {
+    let event: Event
+    let directionsURL: URL?
+
+    @State private var place: MKMapItem?
+
+    /// Close enough to show which block the hall is on, far enough to show the
+    /// station or the road that gets the reader there.
+    private static let span: CLLocationDistance = 700
+
+    var body: some View {
+        Group {
+            if let coordinate = place?.location.coordinate {
+                map(around: coordinate)
+            } else {
+                pin.background(.quaternary)
+            }
+        }
+        .frame(height: 150)
+        .accessibilityLabel("Venue map")
+        // The first time an event at a hall nothing has looked up yet is
+        // opened, this is what goes and finds it — whether or not the reader
+        // mirrors anything to their calendar.
+        .task(id: event.id) { place = await VenuePlaces.shared.mapItem(for: event) }
+    }
+
+    /// Fixed rather than scrollable: this sits inside a sheet that scrolls, and
+    /// a map that swallowed the drag would trap it. A tap opens Maps proper,
+    /// which is where panning around belongs.
+    private func map(around coordinate: CLLocationCoordinate2D) -> some View {
+        let region = MKCoordinateRegion(
+            center: coordinate,
+            latitudinalMeters: Self.span,
+            longitudinalMeters: Self.span
+        )
+        return Map(initialPosition: .region(region), interactionModes: []) {
+            Annotation(event.venue, coordinate: coordinate) { pin }
+                .annotationTitles(.hidden)
+        }
+        .allowsHitTesting(false)
+        .overlay {
+            if let directionsURL {
+                Link(destination: directionsURL) { Color.clear.contentShape(.rect) }
+                    .accessibilityLabel("Open the venue in Maps")
+            }
+        }
+    }
+
+    private var pin: some View {
+        Image(systemName: "mappin.circle.fill")
+            .font(.system(size: 28))
+            .foregroundStyle(Color.favorite)
+            .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

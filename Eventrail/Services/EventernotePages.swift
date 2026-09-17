@@ -319,6 +319,23 @@ nonisolated enum EventernotePages {
         return (address?.isEmpty ?? true) ? nil : address
     }
 
+    /// The address back out of a line this adapter joined.
+    ///
+    /// ``venueDetail(in:)`` prints the address and the capacity together, and
+    /// that was for a while the only place either was kept. An event imported
+    /// then still carries its address in there, and re-importing a whole
+    /// library to recover what is already on disk would be a poor trade.
+    ///
+    /// A venue page that published a capacity and no address leaves that line
+    /// starting with "8,028席", which is why the answer has to name a
+    /// prefecture to be believed.
+    static func address(inDetail detail: String) -> String? {
+        guard let first = detail.components(separatedBy: " · ").first,
+              first.contains(where: { "都道府県".contains($0) })
+        else { return nil }
+        return first
+    }
+
     /// The markup between one `gb_subtitle` heading and the next.
     private static func section(_ heading: String, in html: String) -> Substring? {
         var cursor = HTMLCursor(html)
