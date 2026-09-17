@@ -197,14 +197,21 @@ struct EventDetailView: View {
                 .accessibilityLabel(store.isFavorite(event) ? "Remove from favorites" : "Add to favorites")
             }
 
+            // Both of these were a tap deeper under an ellipsis menu, which
+            // held nothing else worth the indirection.
             circularAction {
-                Menu {
-                    Link("Open in Eventernote", destination: event.sourceURL)
-                    ShareLink("Share Link", item: event.sourceURL)
-                } label: {
-                    actionIcon("ellipsis", tint: .primary)
+                Link(destination: event.sourceURL) {
+                    actionIcon("safari", tint: .brandTint)
                 }
-                .accessibilityLabel("More actions")
+                .accessibilityLabel("Open in Eventernote")
+            }
+
+            circularAction {
+                ShareLink(item: event.sourceURL) {
+                    actionIcon("square.and.arrow.up", tint: .primary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share link")
             }
         }
         .padding(.top, 4)

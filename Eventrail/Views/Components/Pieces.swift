@@ -230,3 +230,160 @@ struct FlowLayout: Layout {
         return rows
     }
 }
+
+/// One favorited event: the flyer, what and where it is, and the heart that
+/// takes it back out again.
+///
+/// Shared by the card on the Me tab and the full list behind its See All, so
+/// that the short version and the long one cannot drift apart.
+///
+/// The heart is a sibling of the row's own button rather than a button inside
+/// its label. Nested, the row's tap target covers it and a tap on the heart
+/// opens the event instead of un-favoriting it.
+struct FavoriteEventRow: View {
+    @Environment(EventStore.self) private var store
+
+    let event: Event
+    /// Drawn above the row rather than below it, so a list ends on a row and
+    /// not on a line.
+    var showsDivider = false
+    /// While the screen is picking rows, the mark stands in front of the flyer
+    /// and the heart stands down: a tap anywhere on the row is the choice, and
+    /// a heart that still un-favorited would be a second, contradictory way to
+    /// take the same event out.
+    var isSelecting = false
+    var isSelected = false
+    var open: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: open) {
+                HStack(spacing: 12) {
+                    if isSelecting {
+                        SelectionMark(isSelected: isSelected)
+                    }
+
+                    FlyerThumbnail(url: event.imageURL, width: 38, cornerRadius: 10)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(event.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(1)
+                        Text(verbatim: "\(event.dayLine) · \(event.venue)")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+
+            if !isSelecting {
+                Button {
+                    withAnimation(.snappy) { store.toggleFavorite(event) }
+                } label: {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.favorite)
+                        .frame(width: 32, height: 32)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove from favorites")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .overlay(alignment: .top) {
+            if showsDivider { Divider().padding(.leading, 66) }
+        }
+    }
+}
+
+/// One followed performer: who they are, what they have coming, and the mark
+/// that stops following them.
+///
+/// Shared by the Me card and the full list behind its See All. The unfollow
+/// button sits beside the link rather than inside it, for the reason
+/// ``FavoriteEventRow`` gives.
+struct FollowedPerformerRow: View {
+    @Environment(EventStore.self) private var store
+    @Environment(FollowedDates.self) private var followed
+
+    let performer: PerformerProfile
+    var showsDivider = false
+    /// While the screen is picking rows, the row chooses rather than pushes,
+    /// for the reason ``FavoriteEventRow`` gives.
+    var isSelecting = false
+    var isSelected = false
+    /// What a tap does while picking. Unused otherwise.
+    var choose: () -> Void = {}
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if isSelecting {
+                Button(action: choose) {
+                    HStack(spacing: 12) {
+                        SelectionMark(isSelected: isSelected)
+                        name
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            } else {
+                NavigationLink(value: PerformerLink.profile(performer)) {
+                    name.contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    withAnimation(.snappy) { store.unfollow(performer) }
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.trackAttended)
+                        .frame(width: 32, height: 32)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Stop following")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .overlay(alignment: .top) {
+            if showsDivider { Divider().padding(.leading, 16) }
+        }
+    }
+
+    private var name: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(verbatim: performer.name)
+                .font(.system(size: 14, weight: .semibold))
+                .lineLimit(1)
+            detail
+                .font(.system(size: 11.5))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The kana reading the site prints, and what they have coming — but only
+    /// once their listing has actually been read. A count of zero beside
+    /// somebody whose page has not answered yet would be a claim the app
+    /// cannot make.
+    private var detail: Text {
+        let events: Text
+        switch followed.count(for: performer) {
+        case .none: events = Text("Reading their events…")
+        case 0: events = Text("No events published yet")
+        case let count?: events = Text("^[\(count) upcoming event](inflect: true)")
+        }
+        guard let reading = performer.reading else { return events }
+        return Text("\(reading) · \(events)")
+    }
+}

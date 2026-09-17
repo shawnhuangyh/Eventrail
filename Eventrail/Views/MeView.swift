@@ -1,5 +1,10 @@
 import SwiftUI
 
+/// Which of the Me tab's two lists has been opened in full.
+enum MeList: Hashable {
+    case favorites, following
+}
+
 /// The reader's own library at a glance: what it holds, when it was last
 /// imported, and what it keeps in front of them.
 ///
@@ -13,6 +18,12 @@ struct MeView: View {
     @State private var isLinking = false
     @State private var isConfirmingUnlink = false
     @State private var isShowingSettings = false
+
+    /// How much of each list the cards show before sending the rest to a
+    /// screen of its own. Enough to be a summary of what is there, few enough
+    /// that the two cards below the account cannot push each other off the
+    /// bottom as the library grows.
+    private static let cardLimit = 5
 
     var body: some View {
         NavigationStack {
@@ -30,6 +41,12 @@ struct MeView: View {
             .navigationTitle("Me")
             .navigationDestination(for: PerformerLink.self) { link in
                 PerformerView(link: link)
+            }
+            .navigationDestination(for: MeList.self) { list in
+                switch list {
+                case .favorites: FavoriteEventsView()
+                case .following: FollowedPerformersView()
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -139,12 +156,16 @@ struct MeView: View {
         }
     }
 
-    /// What the library holds, behind the handle when the title has given way to
-    /// a display name. The handle is what every request is addressed to and what
+    /// What the account brought over, behind the handle when the title has
+    /// given way to a display name. Both halves come from Eventernote: the
+    /// history the import read, and the performers seeded from the favourites
+    /// on the site. The handle is what every request is addressed to and what
     /// tells two accounts apart, so it stays on the card either way rather than
     /// only inside the sheet that changes it.
     private var accountDetail: Text {
-        let counts = Text("^[\(store.library.count) event](inflect: true) · ^[\(store.favoriteEvents.count) favorite](inflect: true)")
+        // "following" is not inflected: a count of them is still "following",
+        // never "followings".
+        let counts = Text("^[\(store.library.count) event](inflect: true) · \(store.followedPerformers.count) following")
         guard store.eventernoteProfile != nil, let handle = store.eventernoteHandle else {
             return counts
         }
@@ -271,6 +292,10 @@ struct MeView: View {
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
+                Spacer(minLength: 8)
+                if !store.favoriteEvents.isEmpty {
+                    seeAll(.favorites)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
@@ -286,8 +311,11 @@ struct MeView: View {
                     .padding(.bottom, 16)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(store.favoriteEvents.enumerated()), id: \.element.id) { index, event in
-                        favoriteRow(event, isFirst: index == 0)
+                    let shown = Array(store.favoriteEvents.prefix(Self.cardLimit))
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, event in
+                        FavoriteEventRow(event: event, showsDivider: index > 0) {
+                            openEvent = event
+                        }
                     }
                 }
                 .padding(.bottom, 6)
@@ -315,6 +343,10 @@ struct MeView: View {
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
+                Spacer(minLength: 8)
+                if !store.followedPerformers.isEmpty {
+                    seeAll(.following)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
@@ -330,8 +362,9 @@ struct MeView: View {
                     .padding(.bottom, 16)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(store.followedPerformers.enumerated()), id: \.element.id) { index, performer in
-                        followRow(performer, isFirst: index == 0)
+                    let shown = Array(store.followedPerformers.prefix(Self.cardLimit))
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, performer in
+                        FollowedPerformerRow(performer: performer, showsDivider: index > 0)
                     }
                 }
                 .padding(.bottom, 6)
@@ -340,96 +373,22 @@ struct MeView: View {
         .glassPanel()
     }
 
-    private func followRow(_ performer: PerformerProfile, isFirst: Bool) -> some View {
-        NavigationLink(value: PerformerLink.profile(performer)) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(verbatim: performer.name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .lineLimit(1)
-                    followDetail(performer)
-                        .font(.system(size: 11.5))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button {
-                    withAnimation(.snappy) { store.unfollow(performer) }
-                } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.trackAttended)
-                        .frame(width: 32, height: 32)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Stop following")
+    /// The way into the whole of a list the card only samples. It stands there
+    /// whenever the list has anything in it, short one included: the full
+    /// screen is where a list is worked on — reordered, opened, unfollowed —
+    /// and that has to be reachable without waiting for a sixth row to arrive.
+    private func seeAll(_ list: MeList) -> some View {
+        NavigationLink(value: list) {
+            HStack(spacing: 2) {
+                Text("See All")
+                    .font(.system(size: 13, weight: .semibold))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .foregroundStyle(Color.brandTint)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .overlay(alignment: .top) {
-            if !isFirst { Divider().padding(.leading, 16) }
-        }
-    }
-
-    /// The kana reading the site prints, and what they have coming — but only
-    /// once their listing has actually been read. A count of zero beside
-    /// somebody whose page has not answered yet would be a claim the app
-    /// cannot make.
-    private func followDetail(_ performer: PerformerProfile) -> Text {
-        let dates: Text
-        switch followed.count(for: performer) {
-        case .none: dates = Text("Reading their dates…")
-        case 0: dates = Text("No dates published yet")
-        case let count?: dates = Text("^[\(count) upcoming date](inflect: true)")
-        }
-        guard let reading = performer.reading else { return dates }
-        return Text("\(reading) · \(dates)")
-    }
-
-    private func favoriteRow(_ event: Event, isFirst: Bool) -> some View {
-        Button {
-            openEvent = event
-        } label: {
-            HStack(spacing: 12) {
-                FlyerThumbnail(url: event.imageURL, width: 38, cornerRadius: 10)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(event.title)
-                        .font(.system(size: 14, weight: .semibold))
-                        .lineLimit(1)
-                    Text(verbatim: "\(event.dayLine) · \(event.venue)")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button {
-                    withAnimation(.snappy) { store.toggleFavorite(event) }
-                } label: {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.favorite)
-                        .frame(width: 32, height: 32)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove from favorites")
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .top) {
-            if !isFirst { Divider().padding(.leading, 66) }
-        }
     }
 }
 
