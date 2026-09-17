@@ -108,4 +108,6 @@ The icon is an Icon Composer document at [`Eventrail/AppIcon.icon`](Eventrail/Ap
 
 ## License
 
-Not yet specified.
+[MIT](LICENSE). The license covers this app's own source; it says nothing about
+Eventernote's content, which remains the site's — see the note on the
+integration above.
