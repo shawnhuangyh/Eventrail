@@ -13,6 +13,12 @@ struct EventDetailView: View {
     private let source: Event
     @State private var isImporting = false
 
+    /// Where Maps says the hall is. Nil until the lookup comes back, and for a
+    /// hall Maps has never heard of.
+    @State private var place: MKMapItem?
+
+    @Environment(\.openURL) private var openURL
+
     init(event: Event) {
         source = event
     }
@@ -30,9 +36,45 @@ struct EventDetailView: View {
         )
     }
 
-    private var directionsURL: URL? {
-        let query = event.venue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        return URL(string: "https://maps.apple.com/?q=\(query)")
+    /// Whether there is anywhere to go. Eventernote announces plenty of events
+    /// before it has booked a hall, and nothing is offered for those.
+    private var hasVenue: Bool {
+        !event.venue.isEmpty || place != nil
+    }
+
+    /// What a lookup is actually asking about. The sheet asks again whenever
+    /// this changes: an event opened from a search row carries the hall's name
+    /// and no address until its own page is imported, and that address is often
+    /// what finally places a hall Maps does not answer to by name.
+    private var venueKey: String {
+        "\(event.venue)\n\(event.publishedAddress ?? "")"
+    }
+
+    /// Opens Maps on the hall itself.
+    ///
+    /// The map item wherever ``VenuePlaces`` placed it, so Maps opens the point
+    /// on the map — the hall's own card, its pin, its directions — rather than
+    /// running a search for the name and leaving the reader to pick the right
+    /// one out of a list of near misses. A hall Maps has not placed still falls
+    /// back to that search, which is the best there is to offer for it.
+    private func openVenueInMaps(directions: Bool) {
+        if let place {
+            var options: [String: Any] = [:]
+            if directions {
+                options[MKLaunchOptionsDirectionsModeKey] = MKLaunchOptionsDirectionsModeDefault
+            }
+            place.openInMaps(launchOptions: options)
+        } else if let url = venueSearchURL(directions: directions) {
+            openURL(url)
+        }
+    }
+
+    /// The hall by name, for Maps to find for itself.
+    private func venueSearchURL(directions: Bool) -> URL? {
+        guard !event.venue.isEmpty,
+              let query = event.venue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else { return nil }
+        return URL(string: "https://maps.apple.com/?\(directions ? "daddr" : "q")=\(query)")
     }
 
     var body: some View {
@@ -73,6 +115,10 @@ struct EventDetailView: View {
         }
         .washBackground()
         .task { await importPage() }
+        // The first time an event at a hall nothing has looked up yet is
+        // opened, this is what goes and finds it — whether or not the reader
+        // mirrors anything to their calendar.
+        .task(id: venueKey) { place = await VenuePlaces.shared.mapItem(for: event) }
     }
 
     /// Imports the event's own page for the times, billing and head count a
@@ -155,11 +201,14 @@ struct EventDetailView: View {
 
     private var actions: some View {
         HStack(spacing: 13) {
-            if let directionsURL {
+            if hasVenue {
                 circularAction {
-                    Link(destination: directionsURL) {
+                    Button {
+                        openVenueInMaps(directions: true)
+                    } label: {
                         actionIcon("location.fill", tint: .brandTint)
                     }
+                    .buttonStyle(.plain)
                     .accessibilityLabel("Directions to the venue")
                 }
             }
@@ -374,7 +423,7 @@ struct EventDetailView: View {
 
     private var venueCard: some View {
         VStack(spacing: 0) {
-            VenueMap(event: event, directionsURL: directionsURL)
+            VenueMap(event: event, place: place) { openVenueInMaps(directions: false) }
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -388,14 +437,17 @@ struct EventDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                if let directionsURL, !event.venue.isEmpty {
-                    Link(destination: directionsURL) {
+                if hasVenue {
+                    Button {
+                        openVenueInMaps(directions: true)
+                    } label: {
                         Text("Directions")
                             .font(.system(size: 12.5, weight: .semibold))
                             .foregroundStyle(Color.brandTint)
                             .padding(.horizontal, 15)
                             .padding(.vertical, 9)
                     }
+                    .buttonStyle(.plain)
                     .glassCapsule(interactive: true)
                 }
             }
@@ -448,16 +500,18 @@ struct EventDetailView: View {
 ///
 /// Eventernote publishes an address and no coordinate, so the hall is looked up
 /// in ``VenuePlaces`` — the same lookup, and the same kept answers, the calendar
-/// mirror uses, so whichever of the two asks first pays for it.
+/// mirror uses, so whichever of the two asks first pays for it. The sheet does
+/// the asking, because the same answer is what its Directions button opens.
 ///
 /// Until that comes back, and for a hall Maps does not have, the panel is the
 /// pin on plain ground it has always been: a map that cannot say where the place
 /// is would be worse than not drawing one.
 private struct VenueMap: View {
     let event: Event
-    let directionsURL: URL?
-
-    @State private var place: MKMapItem?
+    let place: MKMapItem?
+    /// Opens the hall in Maps. A tap anywhere on the map does it, which is
+    /// where panning around belongs.
+    let open: () -> Void
 
     /// Close enough to show which block the hall is on, far enough to show the
     /// station or the road that gets the reader there.
@@ -473,10 +527,6 @@ private struct VenueMap: View {
         }
         .frame(height: 150)
         .accessibilityLabel("Venue map")
-        // The first time an event at a hall nothing has looked up yet is
-        // opened, this is what goes and finds it — whether or not the reader
-        // mirrors anything to their calendar.
-        .task(id: event.id) { place = await VenuePlaces.shared.mapItem(for: event) }
     }
 
     /// Fixed rather than scrollable: this sits inside a sheet that scrolls, and
@@ -494,10 +544,9 @@ private struct VenueMap: View {
         }
         .allowsHitTesting(false)
         .overlay {
-            if let directionsURL {
-                Link(destination: directionsURL) { Color.clear.contentShape(.rect) }
-                    .accessibilityLabel("Open the venue in Maps")
-            }
+            Button(action: open) { Color.clear.contentShape(.rect) }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open the venue in Maps")
         }
     }
 
