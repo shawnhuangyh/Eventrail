@@ -45,16 +45,9 @@ struct WelcomeView: View {
 
     @State private var step: Step = .hello
 
-    // What step two is holding: what was typed, who it turned out to be, and
-    // whether the reader has said yes to them.
-    @State private var typed = ""
-    @State private var found: EventernoteProfile?
-    @State private var picked = false
-    @State private var isLooking = false
-    /// A handle nobody goes by, as opposed to a page that would not load.
-    @State private var missed = false
-    @State private var failure: String?
-    @FocusState private var isFocused: Bool
+    /// Step two's answer, and the whole of what it keeps. The asking is
+    /// ``AccountFinder``, which the Me tab's sheet shows too.
+    @State private var chosen: EventernoteProfile?
 
     // Step three: where the reader's own records live.
     @State private var wantsCloud = false
@@ -65,8 +58,6 @@ struct WelcomeView: View {
     /// Step four's answer. Both switches are seeded from the store so a second
     /// visit shows them where the reader left them rather than where they start.
     @State private var wantsCalendar = false
-
-    private var query: String { typed.trimmingCharacters(in: .whitespaces) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -82,11 +73,9 @@ struct WelcomeView: View {
         }
         .washBackground()
         .onAppear {
-            typed = store.eventernoteHandle ?? ""
             wantsCloud = store.iCloudSyncEnabled
             wantsCalendar = store.calendarSyncEnabled
         }
-        .task(id: query) { await look() }
         // JSON beside the app's own type for the reason Settings gives: a
         // `library.json` lifted off a device is still readable here.
         .fileImporter(isPresented: $isChoosingBackup,
@@ -175,91 +164,17 @@ struct WelcomeView: View {
 
     // MARK: - Two: whose record this is
 
-    /// Named, not searched. Eventernote publishes no member search, so the one
-    /// honest question here is "is there an account by this name" — which is
-    /// the same confirmation ``EventernoteAccountSheet`` does, because a
-    /// mistyped handle would import a stranger's history into their library.
+    /// A heading over ``AccountFinder``, and nothing else. Why it looks a name
+    /// up rather than searching for one, and what it does with the answer, is
+    /// written where that lives — this step and the Me tab's sheet are the same
+    /// question in two frames.
     private var account: some View {
         VStack(alignment: .leading, spacing: 18) {
             heading("Find your account",
                     "Name your Eventernote account to bring in the events you have already been to. Read only — no password, and nothing is written back.")
 
-            field
-
-            VStack(alignment: .leading, spacing: 9) {
-                if let label = resultLabel {
-                    Text(label)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .kerning(0.35)
-                        .textCase(.uppercase)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 6)
-                }
-                if let found {
-                    result(found)
-                } else if missed {
-                    note(Text("No Eventernote user goes by that name. Check the spelling, or skip — you can name an account any time from Me."))
-                } else if let failure {
-                    note(Text(verbatim: failure))
-                }
-            }
+            AccountFinder(chosen: $chosen)
         }
-    }
-
-    private var resultLabel: LocalizedStringKey? {
-        if found != nil { return "Match" }
-        if missed { return "No match" }
-        return nil
-    }
-
-    private var field: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.tertiary)
-            // A login name, so none of the keyboard's help applies to it: every
-            // correction it would make here is a wrong one.
-            TextField("Eventernote username", text: $typed)
-                .font(.system(size: 16))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.done)
-                .focused($isFocused)
-            if isLooking {
-                ProgressView().controlSize(.small)
-            } else if !query.isEmpty {
-                Button {
-                    typed = ""
-                    isFocused = true
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear")
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .glassPanel(cornerRadius: 14)
-    }
-
-    /// Who the name turned out to be, and a tap to say yes or change their
-    /// mind — the reader confirms the account before anything is linked.
-    ///
-    /// The same row ``EventernoteAccountSheet`` shows, down to the tick.
-    private func result(_ profile: EventernoteProfile) -> some View {
-        Button {
-            picked.toggle()
-            isFocused = false
-        } label: {
-            FoundAccount(profile: profile, isChosen: picked)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .glassPanel(interactive: true)
-        .accessibilityAddTraits(picked ? [.isSelected] : [])
     }
 
     // MARK: - Three: where the reader's own records live
@@ -427,29 +342,14 @@ struct WelcomeView: View {
         .padding(.horizontal, 6)
     }
 
-    /// Takes a `Text` rather than a key: one of the two things said here is a
-    /// message the client already localized, and looking it up a second time
-    /// would find nothing.
-    private func note(_ text: Text) -> some View {
-        text
-            .font(.system(size: 12.5))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 16)
-            .glassPanel(cornerRadius: 24)
-    }
-
     // MARK: - What carries on
 
     private var footer: some View {
         VStack(spacing: 2) {
             if step == .account {
                 Button("Skip for now") {
-                    typed = ""
-                    isFocused = false
-                    step = .calendar
+                    chosen = nil
+                    step = .records
                 }
                 .font(.system(size: 14.5, weight: .medium))
                 .foregroundStyle(Color.brandTint)
@@ -482,8 +382,8 @@ struct WelcomeView: View {
         case .hello:
             Text("Get Started")
         case .account:
-            if picked, let found {
-                Text("Continue as @\(found.handle)")
+            if let chosen {
+                Text("Continue as @\(chosen.handle)")
             } else {
                 Text("Continue")
             }
@@ -495,7 +395,6 @@ struct WelcomeView: View {
     }
 
     private func advance() {
-        isFocused = false
         guard step == .calendar else {
             step = Step(rawValue: step.rawValue + 1) ?? .calendar
             return
@@ -509,12 +408,12 @@ struct WelcomeView: View {
     /// reader who backs out of a step has not already changed the app by
     /// visiting it.
     private func finish() {
-        if picked, let found {
+        if let chosen {
             // A fresh link is a library waiting to be filled, and the screen
             // has just promised to fill it. Re-naming the account already held
             // is not: there is nothing new to read until the reader asks.
-            let isNewAccount = found.handle != store.eventernoteHandle
-            store.link(found)
+            let isNewAccount = chosen.handle != store.eventernoteHandle
+            store.link(chosen)
             if isNewAccount {
                 Task { await store.refresh() }
             }
@@ -528,36 +427,6 @@ struct WelcomeView: View {
         dismiss()
     }
 
-    /// Confirms the typed name against the live page, a pause after the last
-    /// keystroke rather than on every one. `task(id:)` cancels the previous
-    /// look on each change, so only the name they stopped on is ever asked for.
-    private func look() async {
-        found = nil
-        picked = false
-        missed = false
-        failure = nil
-        guard !query.isEmpty else { return }
-
-        try? await Task.sleep(for: .milliseconds(450))
-        guard !Task.isCancelled else { return }
-
-        isLooking = true
-        defer { isLooking = false }
-        do {
-            let profile = try await store.lookUpAccount(query)
-            found = profile
-            // One exact match and nothing to choose between: it is taken as
-            // the answer, and the row is still there to take it back.
-            picked = true
-        } catch let error as EventernoteClient.Failure {
-            switch error {
-            case .http(404), .unreadable: missed = true
-            case .http: failure = error.errorDescription
-            }
-        } catch {
-            failure = String(localized: "Could not reach Eventernote. Try again in a moment.")
-        }
-    }
 }
 
 #Preview {

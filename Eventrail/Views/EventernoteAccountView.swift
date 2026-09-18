@@ -7,28 +7,21 @@ import SwiftUI
 /// it never holds a password, a session or a cookie of theirs, and it still only
 /// ever reads. The handle is confirmed against the live page before it is kept,
 /// because a mistyped one would import a stranger's history into their library.
+///
+/// The asking itself is ``AccountFinder``, shared with ``WelcomeView``. What is
+/// left here is the frame around it: a sheet, an explanation, and Link.
 struct EventernoteAccountSheet: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    @State private var typed = ""
-    @State private var found: EventernoteProfile?
-    @State private var isLooking = false
-    @State private var failure: String?
-    @FocusState private var isFocused: Bool
+    /// The account the reader has settled on, or nil while they have not.
+    @State private var chosen: EventernoteProfile?
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    entryCard
-                    if let found {
-                        // Always ticked: on this screen there is one account
-                        // and the Link button is what takes it. The mark says
-                        // which account that is, not which of several.
-                        FoundAccount(profile: found, isChosen: true)
-                            .glassPanel()
-                    }
+                VStack(alignment: .leading, spacing: 14) {
+                    AccountFinder(chosen: $chosen)
                     explanation
                 }
                 .padding(.horizontal, 16)
@@ -43,69 +36,15 @@ struct EventernoteAccountSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Link") {
-                        guard let found else { return }
-                        store.link(found)
+                        guard let chosen else { return }
+                        store.link(chosen)
                         dismiss()
                     }
                     .font(.system(size: 15, weight: .semibold))
-                    .disabled(found == nil)
+                    .disabled(chosen == nil)
                 }
             }
         }
-        .onAppear {
-            typed = store.eventernoteHandle ?? ""
-            isFocused = typed.isEmpty
-        }
-    }
-
-    private var entryCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Your account name")
-                .font(.system(size: 14, weight: .semibold))
-
-            HStack(spacing: 8) {
-                Text(verbatim: "@")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                // The handle is a login name, so none of the keyboard's help
-                // applies to it — every correction it makes here is a wrong one.
-                TextField("account", text: $typed)
-                    .font(.system(size: 16))
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .submitLabel(.search)
-                    .focused($isFocused)
-                    .onSubmit { Task { await look() } }
-                    .onChange(of: typed) { found = nil; failure = nil }
-
-                Button {
-                    Task { await look() }
-                } label: {
-                    Text(isLooking ? "Checking" : "Find")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.brandTint)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-                .glassCapsule(interactive: true)
-                .disabled(isLooking || typed.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-
-            if let failure {
-                Text(verbatim: failure)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.favorite)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("It is the name in your Eventernote profile's address, after /users/.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(16)
-        .glassPanel()
     }
 
     private var explanation: some View {
@@ -117,40 +56,192 @@ struct EventernoteAccountSheet: View {
             .padding(.horizontal, 8)
             .padding(.top, 4)
     }
+}
 
+/// Naming an Eventernote account, and confirming the name against the live page.
+///
+/// The whole of the question, in one place: the field, the look-up, who the
+/// name turned out to belong to, and what to say when it belonged to nobody.
+/// Both screens that ask it — ``EventernoteAccountSheet`` and ``WelcomeView`` —
+/// show this and nothing of their own, so there is no second copy of the rules
+/// to drift out of step with the first. What each screen keeps is the frame
+/// around it and what it does with the answer: Link on one, Continue on the
+/// other.
+///
+/// Eventernote publishes no member search, so this looks a name up rather than
+/// searching for it: the site answers for an exact name or not at all, which is
+/// also what keeps a mistyped handle from importing a stranger's history.
+struct AccountFinder: View {
+    @Environment(EventStore.self) private var store
+
+    /// The account the reader has settled on, and the only thing this reports.
+    ///
+    /// One source of truth for both the tick and the caller's own button: a
+    /// screen that clears this — the welcome's Skip does — unticks the row by
+    /// the same stroke, so the two can never disagree about whether an account
+    /// has been chosen.
+    @Binding var chosen: EventernoteProfile?
+
+    @State private var typed = ""
+    @State private var found: EventernoteProfile?
+    @State private var isLooking = false
+    /// A name nobody goes by, as opposed to a page that would not load.
+    @State private var missed = false
+    @State private var failure: String?
+    @FocusState private var isFocused: Bool
+
+    private var query: String { typed.trimmingCharacters(in: .whitespaces) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            field
+
+            if let label = resultLabel {
+                Text(label)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .kerning(0.35)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 6)
+            }
+
+            if let found {
+                FoundAccount(profile: found, isChosen: isChosen) { isFocused = false }
+            } else if missed {
+                note(Text("No Eventernote user goes by that name. Check the spelling, or skip — you can name an account any time from Me."))
+            } else if let failure {
+                note(Text(verbatim: failure))
+            } else {
+                Text("It is the name in your Eventernote profile's address, after /users/.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 6)
+            }
+        }
+        .onAppear { typed = store.eventernoteHandle ?? "" }
+        .task(id: query) { await look() }
+    }
+
+    /// Derived rather than stored, so ``chosen`` is the only thing that says
+    /// whether an account has been settled on.
+    private var isChosen: Binding<Bool> {
+        Binding { chosen != nil } set: { chosen = $0 ? found : nil }
+    }
+
+    private var resultLabel: LocalizedStringKey? {
+        if found != nil { return "Match" }
+        if missed { return "No match" }
+        return nil
+    }
+
+    private var field: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.tertiary)
+            // A login name, so none of the keyboard's help applies to it: every
+            // correction it would make here is a wrong one.
+            TextField("Eventernote username", text: $typed)
+                .font(.system(size: 16))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .focused($isFocused)
+            if isLooking {
+                ProgressView().controlSize(.small)
+            } else if !query.isEmpty {
+                Button {
+                    typed = ""
+                    isFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .glassPanel(cornerRadius: 14)
+    }
+
+    /// Takes a `Text` rather than a key: one of the two things said this way is
+    /// a message the client already localized, and looking it up a second time
+    /// would find nothing.
+    private func note(_ text: Text) -> some View {
+        text
+            .font(.system(size: 12.5))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 16)
+            .glassPanel(cornerRadius: 24)
+    }
+
+    /// Confirms the typed name against the live page, a pause after the last
+    /// keystroke rather than on every one. `task(id:)` cancels the previous
+    /// look on each change, so only the name they stopped on is ever asked for.
     private func look() async {
-        guard !isLooking else { return }
-        isLooking = true
-        failure = nil
         found = nil
-        defer { isLooking = false }
+        chosen = nil
+        missed = false
+        failure = nil
+        guard !query.isEmpty else { return }
 
+        try? await Task.sleep(for: .milliseconds(450))
+        guard !Task.isCancelled else { return }
+
+        isLooking = true
+        defer { isLooking = false }
         do {
-            found = try await store.lookUpAccount(typed)
-            isFocused = false
+            let profile = try await store.lookUpAccount(query)
+            found = profile
+            // One exact match and nothing to choose between: it is taken as the
+            // answer, and the row is still there to take it back.
+            chosen = profile
         } catch let error as EventernoteClient.Failure {
-            failure = error.errorDescription
+            switch error {
+            case .http(404), .unreadable: missed = true
+            case .http: failure = error.errorDescription
+            }
         } catch {
             failure = String(localized: "Could not reach Eventernote. Try again in a moment.")
         }
     }
 }
 
-/// The account a typed name turned out to belong to, shown before anything is
+/// The account a typed name turned out to belong to, offered before anything is
 /// linked to it.
 ///
-/// One row for both screens that ask the question — ``EventernoteAccountSheet``
-/// and ``WelcomeView`` — because it is the same question in both, and a reader
-/// who meets it twice should not have to read two different things to answer
-/// it. The tick is the whole of the difference: on the welcome it is a control
-/// the reader can take back, and in the sheet it is the mark on the one account
-/// the Link button will take.
+/// A control, not a caption. A name is confirmed against the live page, but the
+/// app still has no business deciding that the account it found is the one the
+/// reader meant, so the tick is theirs to take back. It comes already ticked,
+/// because one exact match is not a choice between several.
 struct FoundAccount: View {
     let profile: EventernoteProfile
     /// Whether this is the account the screen will act on.
-    var isChosen: Bool
+    @Binding var isChosen: Bool
+    /// Run beside the toggle, for whatever the screen wants to put away once
+    /// the reader has answered — a keyboard, so far.
+    var onChoose: () -> Void = {}
 
     var body: some View {
+        Button {
+            isChosen.toggle()
+            onChoose()
+        } label: {
+            row.contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .glassPanel(interactive: true)
+        .accessibilityAddTraits(isChosen ? [.isSelected] : [])
+    }
+
+    private var row: some View {
         HStack(spacing: 14) {
             AccountAvatar(url: profile.avatarURL, width: 52)
 
@@ -180,11 +271,8 @@ struct FoundAccount: View {
 extension EventernoteProfile {
     /// What the account is carrying, as the line under its name.
     ///
-    /// Shared by the two screens that confirm an account before linking it —
-    /// ``EventernoteAccountSheet`` and ``WelcomeView`` — because it is the
-    /// same question in both: is this the record the reader meant. A count
-    /// that disagrees with what they remember is how a mistyped handle gives
-    /// itself away.
+    /// A count that disagrees with what the reader remembers is how a mistyped
+    /// handle gives itself away.
     var holdings: Text {
         let events = eventCount.map {
             Text("^[\($0) event](inflect: true)")
