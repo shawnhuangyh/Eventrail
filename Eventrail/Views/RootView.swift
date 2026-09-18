@@ -25,6 +25,16 @@ struct RootView: View {
     /// rather than in Settings: the app can be opened from a file while any tab
     /// is showing, and from a cold launch with no Settings sheet at all.
     @State private var openedBackup: URL?
+    /// Whether this device has been through the welcome. Per-device and not
+    /// synced, for the reason ``WelcomeView/seenKey`` gives: a fresh install on
+    /// a second device is a first launch there too.
+    @AppStorage(WelcomeView.seenKey) private var hasSeenWelcome = false
+
+    /// Read inverted so ``WelcomeView`` needs nothing but `dismiss()`: the one
+    /// thing that closes it is also the one thing that records it was seen.
+    private var isWelcoming: Binding<Bool> {
+        Binding { !hasSeenWelcome } set: { hasSeenWelcome = !$0 }
+    }
 
     var body: some View {
         TabView(selection: $selection) {
@@ -57,6 +67,11 @@ struct RootView: View {
         // after them wraps around them, which puts it outside the environment
         // they set — and this one reads the store out of it.
         .restoringBackup($openedBackup, asking: true)
+        // Above the `.environment` lines for the same reason, and over
+        // everything: the first launch has no tab worth showing yet.
+        .fullScreenCover(isPresented: isWelcoming) {
+            WelcomeView()
+        }
         .environment(store)
         .environment(followed)
         .environment(venues)

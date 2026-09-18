@@ -115,7 +115,7 @@ struct EventernoteAccountSheet: View {
                 Text(verbatim: "@\(profile.handle)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                holdings(profile)
+                profile.holdings
                     .font(.system(size: 12))
                     .foregroundStyle(Color.trackTicket)
                     .fixedSize(horizontal: false, vertical: true)
@@ -124,15 +124,6 @@ struct EventernoteAccountSheet: View {
         }
         .padding(16)
         .glassPanel()
-    }
-
-    private func holdings(_ profile: EventernoteProfile) -> Text {
-        let events = profile.eventCount.map {
-            Text("^[\($0) event](inflect: true)")
-        } ?? Text("Events")
-        guard !profile.favoritePerformers.isEmpty else { return events }
-        return events + Text(verbatim: " · ")
-            + Text("^[\(profile.favoritePerformers.count) favorite performer](inflect: true)")
     }
 
     private var explanation: some View {
@@ -160,6 +151,24 @@ struct EventernoteAccountSheet: View {
         } catch {
             failure = String(localized: "Could not reach Eventernote. Try again in a moment.")
         }
+    }
+}
+
+extension EventernoteProfile {
+    /// What the account is carrying, as the line under its name.
+    ///
+    /// Shared by the two screens that confirm an account before linking it —
+    /// ``EventernoteAccountSheet`` and ``WelcomeView`` — because it is the
+    /// same question in both: is this the record the reader meant. A count
+    /// that disagrees with what they remember is how a mistyped handle gives
+    /// itself away.
+    var holdings: Text {
+        let events = eventCount.map {
+            Text("^[\($0) event](inflect: true)")
+        } ?? Text("Events")
+        guard !favoritePerformers.isEmpty else { return events }
+        return events + Text(verbatim: " · ")
+            + Text("^[\(favoritePerformers.count) favorite performer](inflect: true)")
     }
 }
 

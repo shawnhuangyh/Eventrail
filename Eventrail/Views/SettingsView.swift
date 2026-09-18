@@ -25,6 +25,10 @@ struct SettingsView: View {
     @State private var picked: URL?
     /// The backup file waiting for the share sheet, rewritten on every change.
     @State private var exported: URL?
+    /// The welcome, asked for again. Its own state rather than the flag
+    /// ``RootView`` watches: replaying it is not un-launching the app, and a
+    /// device that has seen it has still seen it.
+    @State private var isReplayingWelcome = false
 
     /// Shown beside About, from the bundle rather than written down here, so a
     /// released build cannot claim a version it is not.
@@ -54,6 +58,7 @@ struct SettingsView: View {
                     sectionHeader("About")
                         .padding(.top, 6)
                     aboutRow
+                    welcomeRow
                     deleteAllButton
                     footnote
                 }
@@ -68,6 +73,9 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .fullScreenCover(isPresented: $isReplayingWelcome) {
+                WelcomeView()
             }
         }
     }
@@ -375,6 +383,29 @@ struct SettingsView: View {
     }
 
     // MARK: - About
+
+    /// The first-launch screen, on request.
+    ///
+    /// Under About rather than beside it: it is not a setting, it is the two
+    /// questions this screen already answers, asked the way a new reader is
+    /// asked them. Both answers still only take effect at its Done.
+    private var welcomeRow: some View {
+        Button {
+            isReplayingWelcome = true
+        } label: {
+            rowLabel("hand.wave", "Welcome Screen",
+                     Text("The four cards Eventrail opens with the first time")) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .glassPanel(interactive: true)
+    }
 
     private var aboutRow: some View {
         NavigationLink {
