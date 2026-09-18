@@ -43,6 +43,7 @@ struct SettingsView: View {
 
                     sectionHeader("Location")
                         .padding(.top, 6)
+                    preciseVenuesCard(store: $store)
                     locationCard
 
                     sectionHeader("Data")
@@ -181,6 +182,19 @@ struct SettingsView: View {
     /// one of the things a placed hall mends, and the line underneath says so
     /// — but only while the mirror is on, because promising a calendar entry
     /// to someone who has not asked for one is how a screen starts lying.
+    /// Whether a hall Maps could not place may be narrowed from its block to
+    /// its building — see ``VenueBuildings`` for why that is a separate
+    /// question and a separate service.
+    private func preciseVenuesCard(store: Bindable<EventStore>) -> some View {
+        Toggle(isOn: store.preciseVenuesEnabled) {
+            rowLabel("scope", "Precise Venue Locations",
+                     Text("Where Apple Maps has no such hall, ask OpenStreetMap which building at the published address it is."))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .glassPanel()
+    }
+
     private var locationCard: some View {
         Button {
             Task { await store.refreshVenues() }

@@ -140,6 +140,19 @@ final class EventStore {
 
     private static let syncPreferenceKey = "iCloudSyncEnabled"
 
+    /// Whether this device asks OpenStreetMap which building at the published
+    /// address is the hall — see ``VenueBuildings``.
+    ///
+    /// Held here rather than read straight off ``VenuePlaces`` so that a
+    /// switch on a screen redraws when it is thrown; the preference itself
+    /// lives there, per device, along with the answers it produces.
+    var preciseVenuesEnabled: Bool {
+        didSet {
+            guard preciseVenuesEnabled != oldValue else { return }
+            venues?.usesOpenStreetMap = preciseVenuesEnabled
+        }
+    }
+
     /// Whether this device copies ticketed events into the reader's calendar.
     ///
     /// Per-device for the same reason ``iCloudSyncEnabled`` is, and then some:
@@ -219,6 +232,7 @@ final class EventStore {
             && (UserDefaults.standard.object(forKey: Self.syncPreferenceKey) as? Bool ?? true)
         calendarSyncEnabled = calendar != nil
             && UserDefaults.standard.bool(forKey: Self.calendarPreferenceKey)
+        preciseVenuesEnabled = venues?.usesOpenStreetMap ?? false
 
         var loaded = file?.load() ?? LibraryArchive()
         if loaded.membership.isEmpty, !library.isEmpty {

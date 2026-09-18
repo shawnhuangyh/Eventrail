@@ -91,28 +91,93 @@ final class VenuePlaces {
         /// Which reading of Maps' answers produced this one. Optional because
         /// an answer written before there were any carries none.
         var ruleset: Int?
+        /// Who answered — ``Source``'s raw value, and nil where nobody did.
+        /// Kept as a string so a source added later reads back as an unknown
+        /// one rather than taking the whole cache down with it.
+        var source: String?
 
         var wasFound: Bool { latitude != nil && longitude != nil }
 
-        var mapItem: MKMapItem? {
+        var placing: Placing? {
             guard let latitude, let longitude else { return nil }
             let item = MKMapItem(
                 location: CLLocation(latitude: latitude, longitude: longitude),
                 address: address.flatMap { MKAddress(fullAddress: $0, shortAddress: nil) }
             )
             item.name = name
-            return item
+            // An answer written before there were sources reads as the blunt
+            // one, which is the safe way round: it widens a frame that did not
+            // need widening, rather than claiming a precision it may not have.
+            let source = self.source.flatMap(Source.init(rawValue:)) ?? .register
+            return Placing(item: item, uncertainty: source.uncertainty)
         }
 
-        init(_ found: MKMapItem?) {
+        init(_ found: MKMapItem?, from source: Source?) {
             name = found?.name
             address = found?.address?.fullAddress
             latitude = found?.location.coordinate.latitude
             longitude = found?.location.coordinate.longitude
             asked = .now
             ruleset = VenuePlaces.ruleset
+            self.source = source?.rawValue
         }
     }
+
+    /// Which of the two answers placed a hall.
+    ///
+    /// Written down because a silent fallback is indistinguishable from a
+    /// working search, and because the two are not the same kind of answer:
+    /// Maps places the building, the register places the block it stands on.
+    /// The log says which, and so does the kept answer.
+    private enum Source: String {
+        case maps
+        case register
+        case openStreetMap = "osm"
+
+        /// How far the coordinate might be from the hall's door.
+        ///
+        /// Zero where the answer names the building; the width of a 丁目 where
+        /// it names the block the building stands on. Carried so that neither
+        /// screen draws a block-level answer as though it were a doorstep —
+        /// see ``VenuePlaces/Placing``.
+        var uncertainty: CLLocationDistance {
+            switch self {
+            case .maps, .openStreetMap: 0
+            case .register: 300
+            }
+        }
+    }
+
+    /// A hall, and how precisely it is placed.
+    ///
+    /// The second half matters because the three answers are not equally
+    /// sharp, and a sharp pin on a blunt answer is a claim this app has not
+    /// earned. The map under the venue widens its frame for one, and the
+    /// calendar entry carries it as the radius EventKit keeps for exactly this.
+    struct Placing: Sendable {
+        let item: MKMapItem
+        let uncertainty: CLLocationDistance
+    }
+
+    /// Whether this device may ask OpenStreetMap which building at the block
+    /// is the hall — see ``VenueBuildings``.
+    ///
+    /// Per-device, like every other preference here, and on by default: it is
+    /// only ever reached for a hall Maps could not place at all, and without
+    /// it such a hall stays pinned to the middle of its 丁目. The switch exists
+    /// because the service is donated and its policy is a real constraint, so
+    /// the reader gets to stop this app from using it.
+    var usesOpenStreetMap: Bool {
+        get {
+            UserDefaults.standard.object(forKey: Self.buildingsKey) as? Bool ?? true
+        }
+        set {
+            guard newValue != usesOpenStreetMap else { return }
+            UserDefaults.standard.set(newValue, forKey: Self.buildingsKey)
+        }
+    }
+
+    private static let buildingsKey = "venueBuildings"
 
     /// Cached per device rather than in the archive: these are facts about the
     /// world, not records the reader owns, and every device can look them up
@@ -122,9 +187,12 @@ final class VenuePlaces {
     /// Which reading of Maps' answers the kept ones were made under. Raised
     /// whenever that reading changes, and everything older is simply asked
     /// again — now that an answer is kept only where Maps files it at the
-    /// address Eventernote published rather than argued out of its name, and
-    /// now that a hall outside Japan is looked for at all.
-    private static let ruleset = 6
+    /// address Eventernote published rather than argued out of its name, now
+    /// that a hall outside Japan is looked for at all, and now that a hall
+    /// Maps had nothing for is asked of the register before being given up on.
+    /// That last one is why every "no such place" already written down has to
+    /// be asked again: most of them were never about the hall.
+    private static let ruleset = 7
 
     /// How long "Maps has never heard of this hall" is believed for.
     ///
@@ -224,7 +292,7 @@ final class VenuePlaces {
     /// the sheets have looked up. An event at a hall nobody has opened yet is
     /// simply absent, and its entry carries the hall's name and no map until a
     /// later mirror, after the reader has opened it.
-    func mapItems(for events: [Event]) -> [Event.ID: MKMapItem] {
+    func mapItems(for events: [Event]) -> [Event.ID: Placing] {
         let cache = cache
         return events.reduce(into: [:]) { placed, event in
             // Read under the same rule a sheet reads it under, so an answer
@@ -232,9 +300,9 @@ final class VenuePlaces {
             // written into the reader's calendar.
             guard let venue = Venue(event),
                   let answer = cache[venue.key], !Self.isWorthAskingAgain(answer),
-                  let item = answer.mapItem
+                  let placing = answer.placing
             else { return }
-            placed[event.id] = item
+            placed[event.id] = placing
         }
     }
 
@@ -244,17 +312,19 @@ final class VenuePlaces {
     /// reader opens an event at a hall nothing has looked up yet, this is what
     /// goes and finds it and writes the answer down for everything after, the
     /// calendar mirror included.
-    func mapItem(for event: Event) async -> MKMapItem? {
+    func mapItem(for event: Event) async -> Placing? {
         guard let venue = Venue(event) else { return nil }
         if let answer = cache[venue.key], !Self.isWorthAskingAgain(answer) {
-            return answer.mapItem
+            return answer.placing
         }
         let known = cache[venue.key]
         do {
-            let item = try await search(venue)
-            let answer = Answer(item)
+            // The one caller that may upgrade a block to a building: somebody
+            // is looking at this hall, and it is one hall. See ``VenueBuildings``.
+            let found = try await search(venue, upgrading: usesOpenStreetMap)
+            let answer = Answer(found?.item, from: found?.source)
             remember(answer, for: venue.key)
-            Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(item), privacy: .public)")
+            Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(found), privacy: .public)")
             // A hall that has just arrived somewhere it was not before. The
             // calendar entry written while it was nowhere is now wrong, and
             // this is what sends anything holding one back to correct it.
@@ -262,7 +332,7 @@ final class VenuePlaces {
                answer.latitude != known?.latitude || answer.longitude != known?.longitude {
                 placed.continuation.yield()
             }
-            return item
+            return Answer(found?.item, from: found?.source).placing
         } catch {
             // Not written down, so the next screen to ask tries again.
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
@@ -310,11 +380,14 @@ final class VenuePlaces {
             // written so far is already kept.
             guard !Task.isCancelled else { return .refreshed(found: found, of: index) }
             do {
-                let item = try await search(venue)
-                remember(Answer(item), for: venue.key)
-                if item != nil { found += 1 }
+                // Never upgraded here: a refresh is hundreds of halls at once,
+                // which is the one thing OpenStreetMap's policy forbids. The
+                // block stands until the reader opens the event.
+                let placed = try await search(venue, upgrading: false)
+                remember(Answer(placed?.item, from: placed?.source), for: venue.key)
+                if placed != nil { found += 1 }
                 failures = 0
-                Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(item), privacy: .public)")
+                Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(placed), privacy: .public)")
             } catch {
                 // The hall keeps whatever answer it had; only a run of these
                 // ends the refresh.
@@ -355,22 +428,64 @@ final class VenuePlaces {
     /// opened straight from a search row has only the name until its own page
     /// is imported, and it is worth the wait: a name on its own is how a
     /// concert in Shanghai came to be pinned to a Mercedes showroom in Nara.
-    private func search(_ venue: Venue) async throws -> MKMapItem? {
+    private func search(_ venue: Venue, upgrading: Bool) async throws -> (item: MKMapItem, source: Source)? {
         guard let address = venue.address, !address.isEmpty else { return nil }
 
         for region in [Self.japan, nil] {
             if !venue.plainName.isEmpty {
                 let halls = try await results(for: venue.plainName, kinds: [.pointOfInterest], in: region)
                 if let hall = halls.first(where: { Self.stands($0, at: address) }) {
-                    return hall
+                    return (hall, .maps)
                 }
             }
             let places = try await results(for: address, kinds: [.pointOfInterest, .address], in: region)
             if let place = places.first(where: { Self.stands($0, at: address) }) {
-                return place
+                return (place, .maps)
             }
         }
-        return nil
+
+        // Maps had nothing, which is where the register is asked — see
+        // ``JapanAddresses``. Second rather than first because Maps' answer is
+        // the better one wherever there is one: it places the building and
+        // names it in the reader's language, and this places the block. A
+        // reader whose phone can see Japan never reaches this line.
+        guard let block = try await JapanAddresses.shared.place(at: address) else { return nil }
+
+        // The block is the answer. Where somebody is waiting on this hall, it
+        // is also the thing that makes it safe to ask which building at that
+        // block carries the name — every candidate is held against a
+        // coordinate the register already vouched for.
+        if upgrading, !venue.plainName.isEmpty,
+           let building = try? await VenueBuildings.shared.building(
+               named: venue.plainName, near: block.coordinate) {
+            let item = MKMapItem(
+                location: CLLocation(latitude: building.coordinate.latitude,
+                                     longitude: building.coordinate.longitude),
+                address: MKAddress(fullAddress: block.title, shortAddress: nil)
+            )
+            // Eventernote's name, not the map's, for the reason the register's
+            // answer keeps it too — see ``item(at:called:)``.
+            item.name = venue.plainName
+            return (item, .openStreetMap)
+        }
+        return (Self.item(at: block, called: venue.plainName), .register)
+    }
+
+    /// The register's block as a map item, so that everything downstream —
+    /// the kept answer, the map under the venue, the calendar entry — handles
+    /// it exactly as it handles one of Maps' own.
+    ///
+    /// The hall keeps Eventernote's name for it. There is no name in the
+    /// register's answer to take instead, and the site's is the one the reader
+    /// knows: it is already what the calendar entry reads, and it is what Maps
+    /// drops a pin under when the reader taps through.
+    private static func item(at block: JapanAddresses.Place, called name: String) -> MKMapItem {
+        let item = MKMapItem(
+            location: CLLocation(latitude: block.coordinate.latitude, longitude: block.coordinate.longitude),
+            address: MKAddress(fullAddress: block.title, shortAddress: nil)
+        )
+        item.name = name.isEmpty ? block.title : name
+        return item
     }
 
     /// One search. A hall Maps has never heard of is an empty list, not a
@@ -446,12 +561,18 @@ final class VenuePlaces {
         return !answer.wasFound && answer.asked.timeIntervalSinceNow < -patience
     }
 
-    /// What the log says a lookup came back with.
-    private static func describe(_ item: MKMapItem?) -> String {
-        guard let item else { return "Maps has no such place" }
-        let coordinate = item.location.coordinate
-        let kind = item.pointOfInterestCategory.map { "\($0.rawValue)" } ?? "the address"
-        return "\(item.name ?? "?") (\(kind)) at \(coordinate.latitude),\(coordinate.longitude)"
+    /// What the log says a lookup came back with, and who said it.
+    ///
+    /// The source is in the line because the two answers are not
+    /// interchangeable: `maps` placed the building, `register` placed the
+    /// block the address names, and a run of the second where the first used
+    /// to answer is this device having lost sight of Japan rather than the
+    /// halls having moved.
+    private static func describe(_ found: (item: MKMapItem, source: Source)?) -> String {
+        guard let found else { return "nobody has such a place" }
+        let coordinate = found.item.location.coordinate
+        let kind = found.item.pointOfInterestCategory.map { "\($0.rawValue)" } ?? "the address"
+        return "[\(found.source.rawValue)] \(found.item.name ?? "?") (\(kind)) at \(coordinate.latitude),\(coordinate.longitude)"
     }
 
     /// Drops anything in brackets, nesting included, and what is left of the whitespace around it.

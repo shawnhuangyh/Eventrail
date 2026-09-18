@@ -179,7 +179,7 @@ final class CalendarSync {
     /// Writes the event onto the calendar entry, and says whether anything
     /// actually changed — an unchanged entry is not saved, so a mirror that
     /// finds nothing to do touches the reader's calendar not at all.
-    private func apply(_ event: Event, to entry: EKEvent, places: [Event.ID: MKMapItem]) -> Bool {
+    private func apply(_ event: Event, to entry: EKEvent, places: [Event.ID: VenuePlaces.Placing]) -> Bool {
         // Eventernote announces plenty of events months before it publishes a
         // time. Those land as all-day entries rather than at an invented hour.
         let isAllDay = event.startsAt == nil
@@ -249,18 +249,23 @@ final class CalendarSync {
     /// hall the site calls Kアリーナ横浜 is that in the reader's calendar even
     /// where Maps files it under something shorter or in another language: the
     /// map item is being asked where the place is, not what to call it.
-    private static func place(for event: Event, found: MKMapItem?) -> EKStructuredLocation? {
+    private static func place(for event: Event, found: VenuePlaces.Placing?) -> EKStructuredLocation? {
         guard let title = event.venue.isEmpty ? event.locationTitle : event.venue else { return nil }
         guard let found else { return EKStructuredLocation(title: title) }
-        let place = EKStructuredLocation(mapItem: found)
+        let place = EKStructuredLocation(mapItem: found.item)
         place.title = title
+        // How sure the coordinate is, which EKStructuredLocation keeps a field
+        // for. A hall placed by its address rather than by its own listing
+        // sits at the middle of its block, and saying so is the difference
+        // between a location and a claim — see ``VenuePlaces/Placing``.
+        place.radius = found.uncertainty
         // Built from the map item, so the entry carries whatever else Calendar
         // wants of a place — but the coordinate is what makes it a point on the
         // map rather than a line of text, and an item rebuilt from the kept
         // answer has no placemark for `init(mapItem:)` to read it out of. So it
         // is set here rather than assumed.
         if place.geoLocation == nil {
-            place.geoLocation = found.location
+            place.geoLocation = found.item.location
         }
         return place
     }

@@ -15,7 +15,7 @@ struct EventDetailView: View {
 
     /// Where Maps says the hall is. Nil until the lookup comes back, and for a
     /// hall Maps has never heard of.
-    @State private var place: MKMapItem?
+    @State private var place: VenuePlaces.Placing?
 
     @Environment(\.openURL) private var openURL
 
@@ -63,7 +63,7 @@ struct EventDetailView: View {
             if directions {
                 options[MKLaunchOptionsDirectionsModeKey] = MKLaunchOptionsDirectionsModeDefault
             }
-            place.openInMaps(launchOptions: options)
+            place.item.openInMaps(launchOptions: options)
         } else if let url = venueSearchURL(directions: directions) {
             openURL(url)
         }
@@ -525,19 +525,21 @@ struct EventDetailView: View {
 /// is would be worse than not drawing one.
 private struct VenueMap: View {
     let event: Event
-    let place: MKMapItem?
+    let place: VenuePlaces.Placing?
     /// Opens the hall in Maps. A tap anywhere on the map does it, which is
     /// where panning around belongs.
     let open: () -> Void
 
     /// Close enough to show which block the hall is on, far enough to show the
     /// station or the road that gets the reader there.
+    /// How much ground the map shows. Wide enough that the hall and the
+    /// streets naming it are both in the frame.
     private static let span: CLLocationDistance = 700
 
     var body: some View {
         Group {
-            if let coordinate = place?.location.coordinate {
-                map(around: coordinate)
+            if let place {
+                map(around: place.item.location.coordinate, uncertainty: place.uncertainty)
             } else {
                 pin.background(.quaternary)
             }
@@ -549,11 +551,19 @@ private struct VenueMap: View {
     /// Fixed rather than scrollable: this sits inside a sheet that scrolls, and
     /// a map that swallowed the drag would trap it. A tap opens Maps proper,
     /// which is where panning around belongs.
-    private func map(around coordinate: CLLocationCoordinate2D) -> some View {
+    /// A hall placed by its address rather than by its own listing sits at the
+    /// middle of its block, and the door can be three hundred metres off that
+    /// — which at the ordinary span puts it against the edge of the frame or
+    /// past it. So the frame opens up by what the placing is unsure of, twice
+    /// over, and the hall stays in the picture. An exactly placed hall is
+    /// unaffected: its uncertainty is zero.
+    private func map(around coordinate: CLLocationCoordinate2D,
+                     uncertainty: CLLocationDistance) -> some View {
+        let span = Self.span + uncertainty * 2
         let region = MKCoordinateRegion(
             center: coordinate,
-            latitudinalMeters: Self.span,
-            longitudinalMeters: Self.span
+            latitudinalMeters: span,
+            longitudinalMeters: span
         )
         return Map(initialPosition: .region(region), interactionModes: []) {
             Annotation(event.venue, coordinate: coordinate) { pin }
