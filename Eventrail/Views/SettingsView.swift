@@ -2,9 +2,10 @@ import SwiftUI
 
 /// Where the library is kept, and how to empty it.
 ///
-/// Both switches here decide where the reader's own records go, so they stand
-/// together under one heading. Everything destructive is at the bottom, well
-/// away from the Refresh button on the screen behind.
+/// Two headings, because the switches answer two different questions. Calendar
+/// Sync decides what Eventrail writes into a diary the reader keeps elsewhere;
+/// Data decides where the reader's own records live. Everything destructive is
+/// at the bottom, well away from the Refresh button on the screen behind.
 struct SettingsView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -23,8 +24,12 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    sectionHeader("Sync")
-                    syncCard(store: $store)
+                    sectionHeader("Calendar")
+                    calendarCard(store: $store)
+
+                    sectionHeader("Data")
+                        .padding(.top, 6)
+                    iCloudCard(store: $store)
 
                     sectionHeader("About")
                         .padding(.top, 6)
@@ -56,23 +61,28 @@ struct SettingsView: View {
             .padding(.horizontal, 6)
     }
 
+    // MARK: - What Eventrail writes to the calendar
+
+    private func calendarCard(store: Bindable<EventStore>) -> some View {
+        Toggle(isOn: store.calendarSyncEnabled) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Calendar Sync")
+                    .font(.system(size: 14, weight: .semibold))
+                calendarDetail
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(calendarNeedsAttention ? Color.favorite : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .glassPanel()
+    }
+
     // MARK: - Where the reader's records go
 
-    private func syncCard(store: Bindable<EventStore>) -> some View {
+    private func iCloudCard(store: Bindable<EventStore>) -> some View {
         VStack(spacing: 0) {
-            Toggle(isOn: store.calendarSyncEnabled) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Calendar Sync")
-                        .font(.system(size: 14, weight: .semibold))
-                    calendarDetail
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(calendarNeedsAttention ? Color.favorite : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-
             Toggle(isOn: store.iCloudSyncEnabled) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("iCloud Sync")
@@ -85,9 +95,6 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .overlay(alignment: .top) {
-                Divider().padding(.leading, 16)
-            }
 
             if self.store.iCloudSyncEnabled, self.store.cloudUsage > 0.8 {
                 quotaMeter
