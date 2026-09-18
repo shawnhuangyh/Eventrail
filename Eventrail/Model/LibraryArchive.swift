@@ -8,7 +8,7 @@ import OSLog
 /// the newer of two edits rather than the newer of two whole files, which is
 /// what keeps a note typed on one device from being erased by an unrelated
 /// change made on the other.
-struct Stamped<Value: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
+nonisolated struct Stamped<Value: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
     var value: Value
     var modified: Date
 
@@ -30,7 +30,7 @@ struct Stamped<Value: Codable & Hashable & Sendable>: Codable, Hashable, Sendabl
 /// shows the reader their own account every time it opens, and it should not
 /// have to reach the network — or show a blank circle until it answers — to do
 /// that.
-struct LinkedProfile: Codable, Hashable, Sendable {
+nonisolated struct LinkedProfile: Codable, Hashable, Sendable {
     /// The display name Eventernote prints above the handle.
     var name: String
     var avatarURL: URL?
@@ -43,7 +43,7 @@ struct LinkedProfile: Codable, Hashable, Sendable {
 /// is replaced wholesale by an import, while ``tracking``, ``membership`` and
 /// ``favorites`` are only ever written by the reader and are merged, never
 /// overwritten.
-struct LibraryArchive: Codable, Sendable {
+nonisolated struct LibraryArchive: Codable, Sendable {
     /// Every event worth remembering, keyed by Eventernote's id — the library,
     /// plus anything favorited that is not in it.
     var events: [Event.ID: Event] = [:]
@@ -159,6 +159,42 @@ struct LibraryArchive: Codable, Sendable {
         return merged.pruned()
     }
 
+    /// Folds a backup the reader asked to restore into this archive.
+    ///
+    /// A restore is a merge with one difference, and it is the difference an
+    /// import already makes: asking for the backup back outranks the removal
+    /// made before it. A record the backup holds and this device says no to —
+    /// a tombstoned event, an unfollowed performer, a note cleared by Delete
+    /// All — is taken from the backup and stamped as of now, so the merge stops
+    /// answering with the removal.
+    ///
+    /// Only a *no* is overruled. A note this device still holds keeps whichever
+    /// copy was typed later, exactly as a sync would settle it, and nothing this
+    /// device has that the backup does not is touched. So restoring the wrong
+    /// file adds; it never erases.
+    func restoring(_ backup: LibraryArchive) -> LibraryArchive {
+        let now = Date.now
+        var raised = backup
+
+        for (id, record) in backup.membership where record.value && !isInLibrary(id) {
+            raised.membership[id] = Stamped(true, at: now)
+        }
+        for (id, record) in backup.favorites where record.value && !isFavorite(id) {
+            raised.favorites[id] = Stamped(true, at: now)
+        }
+        var follows = raised.follows ?? [:]
+        for (key, record) in backup.follows ?? [:] where record.value && self.follows?[key]?.value != true {
+            follows[key] = Stamped(true, at: now)
+        }
+        if !follows.isEmpty { raised.follows = follows }
+        for (id, record) in backup.tracking
+        where !record.value.isEmpty && (tracking[id]?.value.isEmpty ?? true) {
+            raised.tracking[id] = Stamped(record.value, at: now)
+        }
+
+        return merging(raised)
+    }
+
     /// The name and picture belonging to the link that won.
     ///
     /// Picked by which account each side holds rather than by recency: the
@@ -254,7 +290,7 @@ nonisolated struct LibraryFile: Sendable {
 }
 
 /// The archive as it was written before records carried timestamps.
-private struct LegacyArchive: Codable {
+private nonisolated struct LegacyArchive: Codable {
     var events: [Event] = []
     var tracking: [Event.ID: Tracking] = [:]
     var favorites: Set<Event.ID> = []

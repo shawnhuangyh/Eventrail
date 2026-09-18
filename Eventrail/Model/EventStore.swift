@@ -857,6 +857,7 @@ final class EventStore {
         // Pruning here, not only on merge: an event the reader removed must stop
         // being uploaded, not linger in iCloud until some other device syncs.
         archive = archive.pruned()
+        revision += 1
         let archive = archive
         let file = file
         let cloud = iCloudSyncEnabled ? cloud : nil
@@ -925,6 +926,65 @@ final class EventStore {
                 // Busiest artist first, then alphabetically so the order is stable.
                 .sorted { ($0.events.count, $1.label) > ($1.events.count, $0.label) }
         }
+    }
+
+    // MARK: - Backups
+
+    /// Everything the reader owns, as one file they can keep outside the app.
+    ///
+    /// Cheap to ask for — the archive is a value; writing it out is the
+    /// expensive part, and that is the caller's to do.
+    var backup: LibraryBackup { LibraryBackup(archive: archive) }
+
+    /// Counts every write the reader has made this launch.
+    ///
+    /// A screen holding something derived from the whole archive — the export
+    /// file, which has to exist before the share sheet can preview it — watches
+    /// this rather than trying to spot the change itself. Counting records
+    /// would not do: a removal leaves a tombstone behind and an emptied note
+    /// keeps its key, so the archive can change without changing size.
+    private(set) var revision = 0
+
+    /// What a restore put back, in the two numbers worth stating: what was
+    /// missing and came back, and what was already here.
+    ///
+    /// Counted from the library on either side of the merge rather than from
+    /// the file, so it reports what actually changed instead of what the backup
+    /// happened to contain.
+    struct RestoreSummary: Hashable {
+        var events: Int
+        var follows: Int
+        /// Notes, interest, ticket status and attendance brought back.
+        var records: Int
+
+        var isEmpty: Bool { events == 0 && follows == 0 && records == 0 }
+    }
+
+    /// Reads a backup the reader picked and folds it in.
+    ///
+    /// Additive by design — see ``LibraryArchive/restoring(_:)``. Restoring a
+    /// file brings back what this device no longer has; it never takes away
+    /// what the file was written before.
+    @discardableResult
+    func restore(from url: URL) throws -> RestoreSummary {
+        let backup = try LibraryBackup.read(at: url)
+        let before = archive
+        archive = archive.restoring(backup.archive)
+        persist()
+        let held = Self.held(in: archive)
+        let was = Self.held(in: before)
+        return RestoreSummary(events: held.events - was.events,
+                              follows: held.follows - was.follows,
+                              records: held.records - was.records)
+    }
+
+    /// How much of each kind an archive holds, for either side of a restore.
+    private static func held(in archive: LibraryArchive) -> RestoreSummary {
+        RestoreSummary(
+            events: archive.membership.values.count { $0.value },
+            follows: (archive.follows ?? [:]).values.count { $0.value },
+            records: archive.tracking.values.count { !$0.value.isEmpty }
+        )
     }
 
     // MARK: - Favorites

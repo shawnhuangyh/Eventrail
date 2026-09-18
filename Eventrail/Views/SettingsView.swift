@@ -1,16 +1,23 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Where the library is kept, and how to empty it.
 ///
 /// Two headings, because the switches answer two different questions. Calendar
 /// Sync decides what Eventrail writes into a diary the reader keeps elsewhere;
-/// Data decides where the reader's own records live. Everything destructive is
-/// at the bottom, well away from the Refresh button on the screen behind.
+/// Data decides where the reader's own records live — on their devices through
+/// iCloud, and in a file they hold themselves. Everything destructive is at the
+/// bottom, well away from the Refresh button on the screen behind.
 struct SettingsView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
     @State private var isConfirmingDeleteAll = false
+    @State private var isChoosingBackup = false
+    /// The file the reader picked, handed to ``BackupRestore`` to read.
+    @State private var picked: URL?
+    /// The backup file waiting for the share sheet, rewritten on every change.
+    @State private var exported: URL?
 
     /// Shown beside About, from the bundle rather than written down here, so a
     /// released build cannot claim a version it is not.
@@ -30,6 +37,7 @@ struct SettingsView: View {
                     sectionHeader("Data")
                         .padding(.top, 6)
                     iCloudCard(store: $store)
+                    backupCard
 
                     sectionHeader("About")
                         .padding(.top, 6)
@@ -170,6 +178,95 @@ struct SettingsView: View {
         .padding(.bottom, 12)
     }
 
+    // MARK: - The copy the reader keeps
+
+    /// Export and restore, under the same heading as iCloud Sync because they
+    /// answer the same question — where the reader's records live — and a
+    /// different half of it. Sync keeps this device and the next one agreeing,
+    /// which means a deletion travels too; a file is the one copy nothing done
+    /// in the app afterwards can reach.
+    private var backupCard: some View {
+        VStack(spacing: 0) {
+            exportRow
+            restoreRow
+        }
+        .glassPanel(interactive: true)
+        // Written before the share sheet is opened rather than when it asks for
+        // the file. Handed a file that exists, the system composes the preview
+        // the reader already knows from every other app — its name, its kind
+        // and its icon — where a `Transferable` leaves that to this screen,
+        // which has no business drawing a file.
+        .task(id: store.revision) { await prepareExport() }
+        // JSON is allowed beside our own type only so that the app's own
+        // `library.json` can be rescued — see ``LibraryBackup/read(at:)``.
+        .fileImporter(isPresented: $isChoosingBackup,
+                      allowedContentTypes: [.eventrailBackup, .json]) { result in
+            picked = try? result.get()
+        }
+        // No second question: the reader picked this file out of a picker they
+        // opened from a button that says Restore.
+        .restoringBackup($picked, asking: false)
+    }
+
+    @ViewBuilder private var exportRow: some View {
+        let row = backupRow("Export Backup", symbol: "square.and.arrow.up",
+                            detail: "Save your events, notes and tracking as a file you keep")
+        if let exported {
+            ShareLink(item: exported) { row }
+                .buttonStyle(.plain)
+        } else {
+            // The moment before the file is on disk. Dimmed rather than
+            // removed, so the card does not change height under a thumb.
+            row.opacity(0.4)
+        }
+    }
+
+    private var restoreRow: some View {
+        Button {
+            isChoosingBackup = true
+        } label: {
+            backupRow("Restore from Backup", symbol: "square.and.arrow.down",
+                      detail: "Puts back what a backup holds and this device no longer does. Nothing here is erased.")
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            Divider().padding(.leading, 16)
+        }
+    }
+
+    /// Writes the file the share sheet will hand over.
+    ///
+    /// Off the main actor: encoding and compressing a large library is real
+    /// work, and Settings should not stutter open because of it. Run again
+    /// whenever the reader changes anything, so what leaves is never the
+    /// library as it stood when this screen opened.
+    private func prepareExport() async {
+        let backup = store.backup
+        exported = await Task.detached { try? backup.write() }.value
+    }
+
+    private func backupRow(_ title: LocalizedStringKey, symbol: String,
+                           detail: LocalizedStringKey) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .contentShape(.rect)
+    }
+
     // MARK: - About
 
     private var aboutRow: some View {
@@ -246,7 +343,7 @@ struct SettingsView: View {
     }
 
     private var footnote: some View {
-        Text("Your notes, interest, ticket status and attendance belong to you. They stay on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
+        Text("Your notes, interest, ticket status and attendance belong to you. They stay on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. A backup you export goes only where you send it. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)

@@ -9,7 +9,7 @@ Eventrail is an iPhone/iPad SwiftUI app (single target `Eventrail`, bundle id `c
 Source is grouped as:
 
 - [Eventrail/Model/](Eventrail/Model/) — `Event`, the reader's private `Tracking` record, `Feed` (one page of an Eventernote listing at a time), and `EventStore`, an `@Observable` store passed down through `.environment`. `FollowedDates` is the second thing in that environment: the upcoming dates read from each followed performer's listing, held for the life of the launch so the Following tab and the Me card share one read instead of asking twice. [PreviewData.swift](Eventrail/Model/PreviewData.swift) is fixtures for `#Preview` and the playground only; the running app starts with an empty library.
-- [Eventrail/Services/](Eventrail/Services/) — the Eventernote import adapter. See below.
+- [Eventrail/Services/](Eventrail/Services/) — the Eventernote import adapter, plus `CloudSync`, `CalendarSync` and `LibraryBackup`. See below.
 - [Eventrail/Views/](Eventrail/Views/) — one file per screen, plus [Components/](Eventrail/Views/Components/) for the shared glass panel, wash background, and small repeated parts.
 
 ## The Eventernote import
@@ -45,6 +45,14 @@ iCloud sync goes through [CloudSync.swift](Eventrail/Services/CloudSync.swift) o
 - The payload is zlib-compressed before it goes to iCloud. Measured on real data: ~646 bytes/event of JSON compresses to ~134, so the 900 KB guard under Apple's 1 MB quota fits roughly 6,700 events. `CloudSync.save` refuses to write past the guard rather than letting the store drop it silently, and the Me screen shows a meter past 80%.
 - `iCloudSyncEnabled` is a **per-device** preference in `UserDefaults` and deliberately does not sync — turning it off on a phone must not turn it off on the iPad.
 - `LibraryFile.load()` falls back to `LegacyArchive` for files written before records carried timestamps. Don't remove that until you're sure no device holds a pre-sync file.
+
+`LibraryBackup` is the other copy: one file the reader exports and keeps themselves, with no size ceiling. Sync and backup are deliberately different answers — sync keeps devices agreeing, so a removal travels; a file is the one copy nothing done in the app afterwards can reach.
+
+The file is the app's own format, `.eventrail`: the eight bytes `EVNTRAIL`, a version byte, then the archive as zlib-compressed JSON. The signature makes a wrong file wrong before anything is decoded, and the extension keeps a backup from looking like a document any app may open and edit. It is a container, not encryption. The type is declared in [Info.plist](Info.plist) and reached in code as `UTType.eventrailBackup`; the importer also accepts `.json` so the app's own `library.json`, lifted off a device, can still be read. Three things follow:
+
+- **A new field means a new version byte.** `LibraryBackup.currentFormat` guards only the container; `LibraryArchive` still decodes its own older files, and a file whose version byte is higher than this build's is refused rather than read with its unknown fields dropped.
+- **Export goes through the share sheet, not `fileExporter`.** `ENABLE_USER_SELECTED_FILES = readonly`, so the app may read a file the reader picks and may not write one. Settings writes the backup into the temporary directory and hands `ShareLink` that URL, rewriting it whenever `EventStore.revision` changes. A `Transferable` would write it more lazily, but handing the share sheet a file that exists is what makes the system compose its own preview — name, kind and icon — instead of leaving a screen to draw a picture of a file.
+- **Restoring is `LibraryArchive.restoring(_:)`, not `merging(_:)`.** A plain merge would lose to a tombstone, so a backup restored after "Delete All Events" would bring back nothing. A restore raises the backup's *positive* records over this device's no — the same licence an import has — and only those: a note this device still holds keeps whichever copy was typed later, and nothing the file lacks is dropped. A restore adds; it never erases.
 
 `EventStore.removeAllEvents` empties tracking as well as membership and favorites, writing an empty `Stamped(Tracking())` rather than dropping the key, for the same reason a removal is a tombstone. A single removal still keeps the note — the two are different promises.
 
@@ -88,6 +96,7 @@ chore: update development dependencies
 
 - The `Eventrail` group is a **PBXFileSystemSynchronizedRootGroup** (`objectVersion = 90`). New `.swift` files dropped anywhere under [Eventrail/](Eventrail/) are picked up automatically — do **not** hand-edit `project.pbxproj` to register sources. Only build settings, targets, and capabilities need project-file edits.
 - `Eventrail.xcodeproj/xcuserdata/` is user state and is checked in here by accident of the initial commit; avoid touching it.
+- [Info.plist](Info.plist) at the repo root holds the one key that cannot be expressed as a build setting: `UTExportedTypeDeclarations`, for the `.eventrail` backup type. `GENERATE_INFOPLIST_FILE` stays `YES` and `INFOPLIST_FILE` points at it — Xcode merges every `INFOPLIST_KEY_*` setting into that file rather than replacing it, so the usage strings and scene manifest still come from build settings. It sits at the root beside the entitlements, outside the synchronized group, so it is not also bundled as a resource.
 
 ## Platform and language constraints
 
