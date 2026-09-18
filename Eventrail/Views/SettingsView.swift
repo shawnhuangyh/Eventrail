@@ -499,11 +499,11 @@ struct SettingsView: View {
         case 1: Text("\(what) and 1 favorite")
         default: Text("\(what) and \(favorites) favorites")
         }
-        return Text("\(all) will go from this device and from your other devices, along with every note and ticket status you recorded. Anything your Eventernote account still lists comes back on the next refresh, but what you wrote does not; the rest you can add again from Search.")
+        return Text("\(all) will go from this device and from your other devices, along with everything you wrote on them — your notes, your seats, and what the tickets cost. Anything your Eventernote account still lists comes back on the next refresh, but what you wrote does not; the rest you can add again from Search.")
     }
 
     private var footnote: some View {
-        Text("Your notes and ticket statuses belong to you. They stay on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. A backup you export goes only where you send it. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
+        Text("What you write on an event — a note, a seat, what it cost — belongs to you. It stays on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. A backup you export goes only where you send it. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)

@@ -292,9 +292,9 @@ struct MeView: View {
 
     // MARK: - Favorites
 
-    /// Events hearted from the detail sheet. Favoriting is separate from the
-    /// three tracking fields: it says "keep this in front of me", not "I have a
-    /// ticket".
+    /// Events hearted from the detail sheet. Favoriting is separate from what
+    /// the reader records about a ticket: it says "keep this in front of me",
+    /// not "I have a ticket".
     private var favoritesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {

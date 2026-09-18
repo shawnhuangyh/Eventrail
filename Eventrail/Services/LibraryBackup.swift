@@ -32,7 +32,11 @@ nonisolated struct LibraryBackup: Sendable {
 
     /// The shape of what follows the header. Only the container is versioned —
     /// ``LibraryArchive`` already decodes its own older files.
-    static let currentFormat: UInt8 = 1
+    ///
+    /// 2: a tracking record carries the seat and what the ticket cost. A build
+    /// that has never heard of either would read the file, drop them, and write
+    /// the loss back on the next sync, so it is told to refuse instead.
+    static let currentFormat: UInt8 = 2
 
     var app: String
     var created: Date

@@ -331,32 +331,85 @@ struct EventDetailView: View {
                     .glassCapsule()
             }
 
-            // The one question the library does not already answer. Whether
-            // the reader means to go is what keeping the event says, and
-            // whether they went is what its date says once it has passed —
-            // see ``Tracking``.
-            segment("Ticket", selection: tracking.ticket, options: TicketStatus.allCases)
+            // The one question the library does not already answer, and only
+            // while it is still open to ask. Whether the reader means to go is
+            // what keeping the event says, and whether they went is what its
+            // date says once it has passed — see ``Tracking``. A night already
+            // over was a night they held a ticket for, so the picker gives way
+            // to what that ticket turned out to be.
+            if event.isUpcoming {
+                segment("Ticket", selection: tracking.ticket, options: TicketStatus.allCases)
+            }
+
+            if hasTicket { ticketCard }
 
             VStack(alignment: .leading, spacing: 7) {
                 fieldLabel("Notes")
-                TextField(
-                    "Notes",
-                    text: tracking.note,
-                    prompt: Text("Something only you will see"),
-                    axis: .vertical
-                )
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .lineLimit(2...6)
-                .labelsHidden()
-                .padding(.horizontal, 14)
-                .padding(.vertical, 13)
-                .glassPanel(cornerRadius: 20)
+                writing {
+                    TextField(
+                        "Notes",
+                        text: tracking.note,
+                        prompt: Text("Something only you will see"),
+                        axis: .vertical
+                    )
+                    .lineLimit(2...6)
+                }
             }
         }
         .padding(18)
         .glassPanel(cornerRadius: 28)
         .padding(.horizontal, 18)
+    }
+
+    /// Whether there is a ticket to say anything about.
+    ///
+    /// Not asked for a past event: the night happened, so the ticket existed.
+    /// Still to come, it is there when the reader says they have bought it.
+    private var hasTicket: Bool {
+        !event.isUpcoming || store.tracking(for: event).ticket == .purchased
+    }
+
+    /// What the ticket turned out to be: the seat it named, and what it cost.
+    ///
+    /// Side by side because neither is more than a line, and asking for them
+    /// one under the other would push the notes off the bottom of the card.
+    private var ticketCard: some View {
+        HStack(alignment: .top, spacing: 11) {
+            VStack(alignment: .leading, spacing: 7) {
+                fieldLabel("Seat")
+                writing {
+                    // A block, a row and a number in three languages worth of
+                    // conventions: nothing the keyboard would correct here is
+                    // a correction.
+                    TextField("Seat", text: tracking.seat, prompt: Text("Row and number"))
+                        .autocorrectionDisabled()
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 7) {
+                fieldLabel("Cost")
+                writing {
+                    // The em dash the imported tiles use for a fact nobody
+                    // published, for the same thing here: nobody wrote it down.
+                    TextField("Cost", value: tracking.cost, format: .yen,
+                              prompt: Text(verbatim: "¥—"))
+                        .keyboardType(.numberPad)
+                }
+            }
+            .frame(width: 112)
+        }
+    }
+
+    /// The glass a field the reader writes in sits in. One helper so the three
+    /// of them are the same field asked three questions.
+    private func writing<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .textFieldStyle(.plain)
+            .font(.system(size: 13))
+            .labelsHidden()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .glassPanel(cornerRadius: 20)
     }
 
     /// Written for the one enum left rather than for any of them. It was
