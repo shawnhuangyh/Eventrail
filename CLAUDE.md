@@ -66,11 +66,31 @@ The UI comes from the Claude Design canvas "Eventernote Mobile App Design" (`Eve
 
 ```bash
 # Build for the simulator
-xcodebuild -scheme Eventrail -destination 'platform=iOS Simulator,name=iPhone 17' build
+xcodebuild -scheme Eventrail -destination 'platform=iOS Simulator,name=iPhone 18 Pro' build
 
 # Clean build folder when the project file or build settings change
 xcodebuild -scheme Eventrail clean
 ```
+
+**Xcode 27 ships no `Simulator.app`.** The bundled simulator UI is now
+`DeviceHub.app` (bundle id `com.apple.dt.Devices`), and the whole
+`Xcode.app/Contents/Developer/Applications/` directory is gone — Instruments,
+Create ML, FileMerge and the rest moved up to `Xcode.app/Contents/Applications/`.
+So `open -a Simulator` fails with "Unable to find application named 'Simulator'";
+launch the UI as `open -b com.apple.dt.Devices` instead. Any tool that hardcodes
+the old name breaks here — SweetPad's "Launch" task is the one this repo hit,
+which is why [.vscode/run-simulator.sh](.vscode/run-simulator.sh) exists to build,
+install and launch on a simulator itself.
+
+`xcrun simctl` is **unchanged** — boot, install, launch and `--console-pty` all
+still work exactly as before. Only the app that draws the window was renamed, so
+prefer `simctl` for anything scriptable and treat DeviceHub as just the window.
+
+Don't hardcode a device name without checking `xcodebuild -scheme Eventrail
+-showdestinations` first. The installed runtime is iOS 27.0 and the simulators
+are iPhone 18 Pro, iPhone Air and the iPads; the `iPhone 17` this file used to
+name no longer resolves, and a missing name fails the build rather than falling
+back to another device.
 
 `xcodebuild test` will fail until a test target exists; add one in Xcode (File > New > Target > Unit Testing Bundle) before writing tests, then run a single test with
 `xcodebuild test -scheme Eventrail -destination '<dest>' -only-testing:EventrailTests/SomeTests/testSomething`.
