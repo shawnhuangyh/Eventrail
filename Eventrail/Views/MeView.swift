@@ -88,10 +88,17 @@ struct MeView: View {
                     accountTitle
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(1)
-                    accountDetail
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        if let handle = store.eventernoteProfile != nil
+                            ? store.eventernoteHandle : nil {
+                            Text(verbatim: "@\(handle)")
+                                .lineLimit(1)
+                        }
+                        accountCounts
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -166,14 +173,17 @@ struct MeView: View {
     /// on the site. The handle is what every request is addressed to and what
     /// tells two accounts apart, so it stays on the card either way rather than
     /// only inside the sheet that changes it.
-    private var accountDetail: Text {
-        // "following" is not inflected: a count of them is still "following",
-        // never "followings".
-        let counts = Text("^[\(store.library.count) event](inflect: true) · \(store.followedPerformers.count) following")
-        guard store.eventernoteProfile != nil, let handle = store.eventernoteHandle else {
-            return counts
-        }
-        return Text(verbatim: "@\(handle) · ") + counts
+    /// What the library holds, on a line of its own under the handle.
+    ///
+    /// Two lines rather than one: the handle and the counts are different
+    /// kinds of fact — who this is, and what they have — and run together they
+    /// wrapped wherever the name happened to end, breaking mid-count against
+    /// the Refresh button.
+    ///
+    /// "following" is not inflected: a count of them is still "following",
+    /// never "followings".
+    private var accountCounts: Text {
+        Text("^[\(store.library.count) event](inflect: true) · \(store.followedPerformers.count) following")
     }
 
     /// The honest wording: the app reports when it last *succeeded*, never that
