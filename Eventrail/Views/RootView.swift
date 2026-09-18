@@ -18,6 +18,10 @@ struct RootView: View {
     /// followed performer's listing is asked for once per launch.
     @State private var followed = FollowedDates()
     @State private var selection: AppTab = .events
+    /// A backup the reader opened in Files and sent here. Received at the root
+    /// rather than in Settings: the app can be opened from a file while any tab
+    /// is showing, and from a cold launch with no Settings sheet at all.
+    @State private var openedBackup: URL?
 
     var body: some View {
         TabView(selection: $selection) {
@@ -42,6 +46,14 @@ struct RootView: View {
         #if !os(visionOS)
         .tabViewSearchActivation(.searchTabSelection)
         #endif
+        .onOpenURL { openedBackup = $0 }
+        // Asked about first: tapping a file is not by itself a request to fold
+        // its contents into the library.
+        //
+        // Above the two `.environment` lines on purpose. A modifier written
+        // after them wraps around them, which puts it outside the environment
+        // they set — and this one reads the store out of it.
+        .restoringBackup($openedBackup, asking: true)
         .environment(store)
         .environment(followed)
         .tint(.brandTint)
