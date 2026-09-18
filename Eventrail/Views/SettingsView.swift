@@ -270,8 +270,8 @@ struct SettingsView: View {
     // MARK: - About
 
     private var aboutRow: some View {
-        Button {
-            // The destination lands with the About screen.
+        NavigationLink {
+            AboutView()
         } label: {
             HStack(spacing: 12) {
                 Text("About Eventrail")
