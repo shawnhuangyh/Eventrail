@@ -109,7 +109,7 @@ struct EventDetailView: View {
             }
             .ignoresSafeArea(edges: .top)
 
-            doneButton
+            closeButton
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
         }
@@ -188,13 +188,30 @@ struct EventDetailView: View {
         Text(verbatim: event.longDateLine)
     }
 
-    private var doneButton: some View {
-        Button("Done") { dismiss() }
-            .font(.system(size: 14.5, weight: .semibold))
-            .buttonStyle(.plain)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 9)
-            .glassCapsule(interactive: true)
+    /// The way out of the sheet.
+    ///
+    /// A glyph rather than the word Done, because nothing here is being
+    /// confirmed: every switch, note and star on this sheet has already taken
+    /// effect, and a button that says Done invites the reader to think
+    /// something is being saved by pressing it — and that leaving another way
+    /// would lose it. It is the mark the system closes things with, in the
+    /// same glass circle the actions under the title wear.
+    ///
+    /// The label survives as the accessibility one. A close button with no
+    /// name is a button VoiceOver can only call "x mark".
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 36, height: 36)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .glassCircle(interactive: true)
+        .accessibilityLabel("Close")
     }
 
     // MARK: - Actions
