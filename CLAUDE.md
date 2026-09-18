@@ -46,6 +46,8 @@ iCloud sync goes through [CloudSync.swift](Eventrail/Services/CloudSync.swift) o
 - `iCloudSyncEnabled` is a **per-device** preference in `UserDefaults` and deliberately does not sync — turning it off on a phone must not turn it off on the iPad.
 - `LibraryFile.load()` falls back to `LegacyArchive` for files written before records carried timestamps. Don't remove that until you're sure no device holds a pre-sync file.
 
+`EventStore.removeAllEvents` empties tracking as well as membership and favorites, writing an empty `Stamped(Tracking())` rather than dropping the key, for the same reason a removal is a tombstone. A single removal still keeps the note — the two are different promises.
+
 **Capability:** sync needs `com.apple.developer.ubiquity-kvstore-identifier`, which lives in [Eventrail.entitlements](Eventrail.entitlements) at the repo root (outside the synchronized group, so it is not bundled as a resource) and is wired via `CODE_SIGN_ENTITLEMENTS` in both configurations. Simulator builds sign locally and work as-is; a **device build needs iCloud enabled on the App ID in the developer portal**, otherwise signing fails.
 
 The UI comes from the Claude Design canvas "Eventernote Mobile App Design" (`Eventrail.dc.html`), which specifies a Liquid Glass treatment in light and dark. All glass goes through `glassBackground(in:interactive:)` in [WashBackground.swift](Eventrail/Views/Components/WashBackground.swift) — that one helper also holds a `#if os(visionOS)` material fallback, kept from when the target still built for visionOS. Palette colours are colorsets in `Assets.xcassets` generated from the design's oklch values, with light and dark variants.

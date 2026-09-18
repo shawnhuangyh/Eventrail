@@ -260,6 +260,17 @@ final class EventStore {
 
     func isFavorite(_ event: Event) -> Bool { archive.isFavorite(event.id) }
 
+    /// Whether emptying the library would still take anything.
+    ///
+    /// The library and the favorites are not the whole of it: a note, a ticket
+    /// status or an attendance outlives the event it was written on, so this
+    /// stays true while any of that is still held.
+    var hasRecordsToDelete: Bool {
+        !library.isEmpty
+            || !favoriteEvents.isEmpty
+            || archive.tracking.contains { !$0.value.value.isEmpty }
+    }
+
     /// The freshest copy of an event this app holds, wherever it came from.
     func event(id: Event.ID) -> Event? {
         archive.events[id] ?? seen[id]
@@ -313,16 +324,30 @@ final class EventStore {
         persist()
     }
 
-    /// Empties the library, and the favorites with it.
+    /// Empties the library, and with it the favorites and everything the reader
+    /// wrote on top of the events.
     ///
     /// Favorites go too here, unlike a removal of some events: a reader who
     /// asked for every event to go should not be left looking at a Favorites
-    /// card that still lists a few.
+    /// card that still lists a few. Tracking goes for the same reason, and it is
+    /// the one place it does: a single removal keeps the note typed on an event
+    /// so re-adding it brings the note back, but there is nothing to come back
+    /// to once the reader has asked for all of it to go — and an import that
+    /// restores the events would otherwise restore them wearing interest and
+    /// ticket badges the reader thought they had just deleted.
+    ///
+    /// Each record is emptied rather than dropped, for the same reason a removal
+    /// is a tombstone: a dropped key would let the next merge hand the other
+    /// device's copy of the note straight back. An empty record is pruned once
+    /// it has settled, exactly as a tombstone is.
     func removeAllEvents() {
         let now = Date.now
         for event in library { tombstone(event.id, at: now) }
         for id in archive.favorites.filter(\.value.value).keys {
             archive.favorites[id] = Stamped(false, at: now)
+        }
+        for (id, record) in archive.tracking where !record.value.isEmpty {
+            archive.tracking[id] = Stamped(Tracking(), at: now)
         }
         persist()
     }

@@ -207,7 +207,7 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .glassPanel(interactive: true)
-        .disabled(store.library.isEmpty && store.favoriteEvents.isEmpty)
+        .disabled(!store.hasRecordsToDelete)
         .padding(.top, 6)
         // Asked from the button rather than from the screen, so the sheet
         // points at what opened it.
@@ -220,8 +220,9 @@ struct SettingsView: View {
         }
     }
 
-    /// Says what actually goes, including the favorites the reader would
-    /// otherwise be left staring at.
+    /// Says what actually goes: the favorites the reader would otherwise be left
+    /// staring at, and the records they wrote themselves — which, unlike the
+    /// events, no refresh brings back.
     /// Spelled out rather than inflected, for the reason ``EventsView``'s own
     /// removal gives: a dialog's words reach UIKit as plain text, and the
     /// `^[…](inflect:)` markup arrives there unprocessed.
@@ -234,7 +235,7 @@ struct SettingsView: View {
         case 1: Text("\(what) and 1 favorite")
         default: Text("\(what) and \(favorites) favorites")
         }
-        return Text("\(all) will go from this device and from your other devices. Anything your Eventernote account still lists comes back on the next refresh; the rest you can add again from Search.")
+        return Text("\(all) will go from this device and from your other devices, along with every note, interest, ticket status and attendance you recorded. Anything your Eventernote account still lists comes back on the next refresh, but what you wrote does not; the rest you can add again from Search.")
     }
 
     private var footnote: some View {
