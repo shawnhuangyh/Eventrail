@@ -162,6 +162,17 @@ final class EventStore {
     /// one has run.
     private(set) var calendarStatus: CalendarSync.Outcome?
 
+    /// What a refresh of the venues is doing, or what the last one did. Nil
+    /// until the reader asks for one.
+    private(set) var venueStatus: VenuePlaces.Refresh?
+
+    /// Whether one is running now. The button that starts it says so, and does
+    /// not start a second.
+    var isRefreshingVenues: Bool {
+        if case .asking = venueStatus { return true }
+        return false
+    }
+
     /// Events met in search but never added. Transient: they are not the
     /// reader's, so they are neither saved nor synced until one is kept.
     private var seen: [Event.ID: Event] = [:]
@@ -169,6 +180,7 @@ final class EventStore {
     private let file: LibraryFile?
     private let cloud: CloudSync?
     private let calendar: CalendarSync?
+    private let venues: VenuePlaces?
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var cloudChanges: Task<Void, Never>?
@@ -181,6 +193,7 @@ final class EventStore {
         file: LibraryFile? = .shared,
         cloud: CloudSync? = .shared,
         calendar: CalendarSync? = .shared,
+        venues: VenuePlaces? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
         tracking: [Event.ID: Tracking] = [:],
@@ -189,6 +202,7 @@ final class EventStore {
         self.file = file
         self.cloud = cloud
         self.calendar = calendar
+        self.venues = venues
         self.client = client
 
         // On by default: a reader with more than one device expects their own
@@ -829,6 +843,39 @@ final class EventStore {
             return
         }
         calendarStatus = await calendar.mirror(calendarEvents)
+    }
+
+    /// Every event whose hall is worth asking about: the library and the
+    /// favorites, which need not be in it — an event favorited out of Search
+    /// draws the same map on its own sheet.
+    private var placeableEvents: [Event] {
+        var seen: Set<Event.ID> = []
+        return (library + favoriteEvents).filter { seen.insert($0.id).inserted }
+    }
+
+    /// Whether there is any hall to ask about. A library of events the site
+    /// has not booked a venue for yet is nothing to send Maps after.
+    var hasVenuesToPlace: Bool {
+        placeableEvents.contains { !$0.venue.isEmpty || $0.publishedAddress != nil }
+    }
+
+    /// Asks Maps again about every hall the reader holds, and then writes what
+    /// comes back into their calendar.
+    ///
+    /// The one place anything looks up halls in bulk — see ``VenuePlaces`` for
+    /// why that is otherwise avoided, and why this takes minutes rather than
+    /// seconds. The mirror afterwards is the point as much as the lookup is:
+    /// entries written while a hall was still unplaced carry its name and no
+    /// map, and nothing else goes back to correct them.
+    func refreshVenues() async {
+        guard let venues, !isRefreshingVenues else { return }
+        // Nothing counted yet: how many halls there are is the refresh's own
+        // answer, once it has sorted the events into the halls they share.
+        venueStatus = .asking(done: 0, of: 0)
+        venueStatus = await venues.refresh(placeableEvents) { progress in
+            self.venueStatus = progress
+        }
+        await mirrorCalendar()
     }
 
     /// Another device wrote. Merge rather than adopt: this device may have

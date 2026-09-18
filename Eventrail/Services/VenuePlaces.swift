@@ -19,15 +19,29 @@ import os
 /// Calendar app to draw its own map beside an entry. So the lookup lives here
 /// rather than in either of them.
 ///
-/// **Only the sheet does the asking.** A hall is looked up when the reader
-/// opens an event at it: one question, asked because somebody is waiting for
-/// the answer. The mirror reads what has been found and searches for nothing
-/// itself — it is handed the whole library at once, and a run of hundreds of
-/// searches is what got the app throttled into placing nothing at all.
+/// **Only the sheet does the asking**, unless the reader asks for all of it.
+/// A hall is looked up when the reader opens an event at it: one question,
+/// asked because somebody is waiting for the answer. The mirror reads what has
+/// been found and searches for nothing itself — it is handed the whole library
+/// at once, and a run of hundreds of searches is what got the app throttled
+/// into placing nothing at all. ``refresh(_:onProgress:)`` is the one way to
+/// ask about everything, from a button in Settings, and it is paced for
+/// exactly that reason.
 ///
 /// The answers are kept, because a hall does not move.
 final class VenuePlaces {
     static let shared = VenuePlaces()
+
+    /// How a refresh of every hall the reader holds is going, or how it ended.
+    ///
+    /// `asking` is the only one anything waits on: a run of hundreds of halls
+    /// takes minutes, and a screen that said nothing until it finished would
+    /// be indistinguishable from one that had hung.
+    enum Refresh: Hashable {
+        case asking(done: Int, of: Int)
+        case refreshed(found: Int, of: Int)
+        case failed(String)
+    }
 
     /// Says what happened to each lookup. A silent fallback to plain text is
     /// indistinguishable from a broken search, and this is the only place that
@@ -120,6 +134,23 @@ final class VenuePlaces {
     /// A month is long enough that nothing is asked repeatedly.
     private static let patience: TimeInterval = 30 * 24 * 60 * 60
 
+    /// How long a refresh waits between halls.
+    ///
+    /// The reason this file says only a sheet does the asking: Maps throttles,
+    /// and the run of searches a whole library makes at once is what once got
+    /// every lookup refused until the app was restarted. A refresh asks for
+    /// one hall at a time with a gap between them, which is slow — a few
+    /// hundred halls is a couple of minutes — and is the price of getting an
+    /// answer for all of them rather than for the first few.
+    private static let pace: Duration = .milliseconds(500)
+
+    /// How many halls in a row may fail before a refresh gives up.
+    ///
+    /// A single failure is an ordinary hiccup and the hall keeps whatever
+    /// answer it had. Three in a row is Maps refusing to talk to this device,
+    /// and carrying on would only be asking to be refused for longer.
+    private static let givesUpAfter = 3
+
     /// How long an answer is kept once nothing has asked about it.
     ///
     /// A hall the reader still goes to is asked about again a year later and
@@ -201,6 +232,65 @@ final class VenuePlaces {
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
             return nil
         }
+    }
+
+    /// Asks Maps again about every hall in `events`, whatever is already
+    /// known about them, and writes down what comes back.
+    ///
+    /// The one thing in this file that goes looking for halls nobody is
+    /// waiting on, and it exists because the alternative is worse: an answer
+    /// settled when a hall was too new for Maps to have it, or before this app
+    /// knew to check an answer against the published address, stays wrong
+    /// until the reader happens to open that event again. A refresh is the
+    /// reader saying "ask about all of them now".
+    ///
+    /// Asked one at a time, with ``pace`` between them, and abandoned after
+    /// ``givesUpAfter`` failures in a row — see those for why. `onProgress` is
+    /// called after each hall, because this takes long enough that a screen
+    /// has to be able to say where it has got to.
+    ///
+    /// A hall the site published no address for is skipped rather than asked
+    /// about: nothing here places a hall by name alone, so the answer would be
+    /// "no such place" and it would not be true.
+    func refresh(_ events: [Event], onProgress: (Refresh) -> Void) async -> Refresh {
+        var venues: [Venue] = []
+        var asked: Set<String> = []
+        for event in events {
+            guard let venue = Venue(event), venue.address?.isEmpty == false,
+                  asked.insert(venue.key).inserted
+            else { continue }
+            venues.append(venue)
+        }
+        guard !venues.isEmpty else { return .refreshed(found: 0, of: 0) }
+
+        Self.log.info("refreshing \(venues.count, privacy: .public) venues")
+        var found = 0
+        var failures = 0
+        for (index, venue) in venues.enumerated() {
+            if index > 0 {
+                try? await Task.sleep(for: Self.pace)
+            }
+            // Not an error to report: the app is going away, and every answer
+            // written so far is already kept.
+            guard !Task.isCancelled else { return .refreshed(found: found, of: index) }
+            do {
+                let item = try await search(venue)
+                remember(Answer(item), for: venue.key)
+                if item != nil { found += 1 }
+                failures = 0
+                Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(item), privacy: .public)")
+            } catch {
+                // The hall keeps whatever answer it had; only a run of these
+                // ends the refresh.
+                failures += 1
+                Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
+                if failures >= Self.givesUpAfter {
+                    return .failed(error.localizedDescription)
+                }
+            }
+            onProgress(.asking(done: index + 1, of: venues.count))
+        }
+        return .refreshed(found: found, of: venues.count)
     }
 
     /// The hall, as Maps has it. A throw is the search itself failing —
