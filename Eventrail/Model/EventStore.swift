@@ -146,8 +146,14 @@ final class EventStore {
     /// the calendar Eventrail writes to is this device's, and the permission
     /// behind it was granted on this device alone.
     ///
-    /// Off by default. Writing to someone's calendar is not something to start
-    /// doing on their behalf, and turning it on is what asks for permission.
+    /// Off by default, and off is quiet: until the reader turns this on, the
+    /// app never reaches EventKit at all. Only two calls ask for calendar
+    /// permission — ``CalendarSync/mirror(_:)``, which ``mirrorCalendar()``
+    /// reaches only while this is true, and ``CalendarSync/stop()``, which
+    /// returns before asking unless a calendar of the app's own was actually
+    /// made. So the system's permission sheet is the answer to this switch and
+    /// to nothing else. Writing to someone's calendar is not something to
+    /// start doing on their behalf, and asking for the right to is not either.
     var calendarSyncEnabled: Bool {
         didSet {
             guard calendarSyncEnabled != oldValue else { return }

@@ -3,11 +3,18 @@ import UniformTypeIdentifiers
 
 /// Where the library is kept, and how to empty it.
 ///
-/// Two headings, because the switches answer two different questions. Calendar
-/// Sync decides what Eventrail writes into a diary the reader keeps elsewhere;
-/// Data decides where the reader's own records live — on their devices through
-/// iCloud, and in a file they hold themselves. Everything destructive is at the
+/// Four headings, because the rows answer four different questions. Calendar
+/// decides what Eventrail writes into a diary the reader keeps elsewhere;
+/// Location is where its events are on the map, which the calendar wants and
+/// so does every event's own sheet; Data decides where the reader's own
+/// records live — on their devices through iCloud, and in a file they hold
+/// themselves; About is the app itself. Everything destructive is at the
 /// bottom, well away from the Refresh button on the screen behind.
+///
+/// Every row reads the same way — an icon in the gutter, what it is, and a
+/// line underneath saying what it is doing *now* rather than what it would do
+/// in general. That line is the whole point of the screen: a toggle that says
+/// only "iCloud Sync" cannot tell the reader it has been failing for a week.
 struct SettingsView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -33,6 +40,10 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     sectionHeader("Calendar")
                     calendarCard(store: $store)
+
+                    sectionHeader("Location")
+                        .padding(.top, 6)
+                    locationCard
 
                     sectionHeader("Data")
                         .padding(.top, 6)
@@ -69,45 +80,71 @@ struct SettingsView: View {
             .padding(.horizontal, 6)
     }
 
-    // MARK: - What Eventrail writes to the calendar
+    // MARK: - One row's face
 
-    private func calendarCard(store: Bindable<EventStore>) -> some View {
-        Toggle(isOn: store.calendarSyncEnabled) {
+    /// The shape every row on this screen takes: an icon, a name, the line
+    /// underneath, and whatever the row puts on the right — a switch, a
+    /// spinner, a version number.
+    ///
+    /// One helper rather than a shape per row, so a toggle and a button that
+    /// sit in the same card line up down to the pixel: the icons share a
+    /// gutter of the same width whether or not a row has anything to put in
+    /// it, which is what keeps the titles on one left edge.
+    ///
+    /// The padding is left to the caller, because it belongs to whatever is
+    /// tappable — the whole `Toggle` for a switch, the label alone inside a
+    /// `Button`.
+    private func rowLabel<Trailing: View>(
+        _ symbol: String,
+        _ title: LocalizedStringKey,
+        _ detail: Text?,
+        needsAttention: Bool = false,
+        tint: Color = .secondary,
+        titleTint: Color = .primary,
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 20)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Calendar Sync")
+                Text(title)
                     .font(.system(size: 14, weight: .semibold))
-                calendarDetail
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(calendarNeedsAttention ? Color.favorite : .secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .glassPanel()
-    }
-
-    // MARK: - Where the reader's records go
-
-    private func iCloudCard(store: Bindable<EventStore>) -> some View {
-        VStack(spacing: 0) {
-            Toggle(isOn: store.iCloudSyncEnabled) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("iCloud Sync")
-                        .font(.system(size: 14, weight: .semibold))
-                    syncDetail
+                    .foregroundStyle(titleTint)
+                if let detail {
+                    detail
                         .font(.system(size: 11.5))
-                        .foregroundStyle(syncNeedsAttention ? Color.favorite : .secondary)
+                        .foregroundStyle(needsAttention ? Color.favorite : .secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-
-            if self.store.iCloudSyncEnabled, self.store.cloudUsage > 0.8 {
-                quotaMeter
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            trailing()
         }
+    }
+
+    /// The hairline between two rows of one card, inset past the icon gutter
+    /// so it starts under the text rather than cutting the icons off.
+    private var rowDivider: some View {
+        Divider().padding(.leading, 48)
+    }
+
+    // MARK: - What Eventrail writes to the calendar
+
+    /// One switch, and nothing happens until it is flipped.
+    ///
+    /// Off until the reader turns it on — see ``EventStore/calendarSyncEnabled``.
+    /// Nothing on this screen asks for calendar access on the way in; the
+    /// system's permission sheet is the answer to the switch, which is the
+    /// only place the reader has said they want their diary written to.
+    private func calendarCard(store: Bindable<EventStore>) -> some View {
+        Toggle(isOn: store.calendarSyncEnabled) {
+            rowLabel("calendar", "Calendar Sync", calendarDetail,
+                     needsAttention: calendarNeedsAttention)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .glassPanel()
     }
 
@@ -116,7 +153,7 @@ struct SettingsView: View {
     /// turn off and never trust again.
     private var calendarDetail: Text {
         guard store.calendarSyncEnabled else {
-            return Text("Off — nothing is written to your calendar")
+            return Text("Off — nothing is written to your calendar, and nothing asks for access to it")
         }
         switch store.calendarStatus {
         case .denied:
@@ -132,6 +169,80 @@ struct SettingsView: View {
         guard store.calendarSyncEnabled, let status = store.calendarStatus else { return false }
         if case .mirrored = status { return false }
         return true
+    }
+
+    // MARK: - Where the events are
+
+    /// Its own heading rather than a second row under Calendar.
+    ///
+    /// Where a hall is is not a calendar setting: it is what draws the map on
+    /// an event's own sheet, and what Maps opens when the reader taps it,
+    /// whether or not they ever write a thing to their diary. The calendar is
+    /// one of the things a placed hall mends, and the line underneath says so
+    /// — but only while the mirror is on, because promising a calendar entry
+    /// to someone who has not asked for one is how a screen starts lying.
+    private var locationCard: some View {
+        Button {
+            Task { await store.refreshVenues() }
+        } label: {
+            rowLabel("mappin.and.ellipse", "Refresh Venue Locations", venueDetail,
+                     needsAttention: venueNeedsAttention) {
+                if store.isRefreshingVenues {
+                    ProgressView()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isRefreshingVenues || !store.hasVenuesToPlace)
+        .glassPanel(interactive: true)
+    }
+
+    /// What the refresh is doing, and then what it found — never a bare
+    /// "done", because a run that placed nothing is worth saying out loud.
+    private var venueDetail: Text {
+        switch store.venueStatus {
+        case .asking(let done, let of) where of > 0:
+            return Text("Asking Maps — \(done) of \(of) venues")
+        case .asking:
+            return Text("Asking Maps about your venues…")
+        case .refreshed(let found, let of):
+            let placed = Text("Placed \(found) of \(of) venues on the map")
+            guard store.calendarSyncEnabled else { return placed }
+            return Text("\(placed), and wrote them to your calendar")
+        case .failed(let reason):
+            return Text(verbatim: reason)
+        case .none:
+            guard store.calendarSyncEnabled else {
+                return Text("Looks up every venue again, so each event's map is the one Maps has now. This takes a while.")
+            }
+            return Text("Looks up every venue again, and writes the ones it finds into your calendar. This takes a while.")
+        }
+    }
+
+    private var venueNeedsAttention: Bool {
+        if case .failed = store.venueStatus { return true }
+        return false
+    }
+
+    // MARK: - Where the reader's records go
+
+    private func iCloudCard(store: Bindable<EventStore>) -> some View {
+        VStack(spacing: 0) {
+            Toggle(isOn: store.iCloudSyncEnabled) {
+                rowLabel("icloud", "iCloud Sync", syncDetail,
+                         needsAttention: syncNeedsAttention)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+
+            if self.store.iCloudSyncEnabled, self.store.cloudUsage > 0.8 {
+                quotaMeter
+            }
+        }
+        .glassPanel()
     }
 
     /// Anything the reader has to act on is said in the colour used for
@@ -209,8 +320,11 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var exportRow: some View {
-        let row = backupRow("Export Backup", symbol: "square.and.arrow.up",
-                            detail: "Save your events, notes and tracking as a file you keep")
+        let row = rowLabel("square.and.arrow.up", "Export Backup",
+                           Text("Save your events, notes and tracking as a file you keep"))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(.rect)
         if let exported {
             ShareLink(item: exported) { row }
                 .buttonStyle(.plain)
@@ -225,13 +339,14 @@ struct SettingsView: View {
         Button {
             isChoosingBackup = true
         } label: {
-            backupRow("Restore from Backup", symbol: "square.and.arrow.down",
-                      detail: "Puts back what a backup holds and this device no longer does. Nothing here is erased.")
+            rowLabel("square.and.arrow.down", "Restore from Backup",
+                     Text("Puts back what a backup holds and this device no longer does. Nothing here is erased."))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .overlay(alignment: .top) {
-            Divider().padding(.leading, 16)
-        }
+        .overlay(alignment: .top) { rowDivider }
     }
 
     /// Writes the file the share sheet will hand over.
@@ -245,38 +360,13 @@ struct SettingsView: View {
         exported = await Task.detached { try? backup.write() }.value
     }
 
-    private func backupRow(_ title: LocalizedStringKey, symbol: String,
-                           detail: LocalizedStringKey) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                Text(detail)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .contentShape(.rect)
-    }
-
     // MARK: - About
 
     private var aboutRow: some View {
         NavigationLink {
             AboutView()
         } label: {
-            HStack(spacing: 12) {
-                Text("About Eventrail")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            rowLabel("info.circle", "About Eventrail", nil) {
                 Text(verbatim: "Version \(version)")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.tertiary)
@@ -294,20 +384,19 @@ struct SettingsView: View {
 
     // MARK: - Emptying the library
 
+    /// The one row that reads in the attention colour rather than wearing it
+    /// only when something has gone wrong: it is the only thing on this screen
+    /// that takes something away.
     private var deleteAllButton: some View {
         Button {
             isConfirmingDeleteAll = true
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "trash")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("Delete All Events")
-                    .font(.system(size: 14.5, weight: .semibold))
-            }
-            .foregroundStyle(Color.favorite)
-            .frame(maxWidth: .infinity)
-            .padding(16)
-            .contentShape(.rect)
+            rowLabel("trash", "Delete All Events",
+                     Text("Empties this device and your other devices"),
+                     tint: .favorite, titleTint: .favorite)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .glassPanel(interactive: true)
