@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Tapping a backup in Files opens it here. Viewer, because a restore only
-	     ever reads the file: Eventrail never writes one back. -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -19,25 +17,17 @@
 			</array>
 		</dict>
 	</array>
-	<!-- The file is read where it sits rather than copied into an Inbox folder
-	     the app would then have to tidy up after itself. -->
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.shawnhuang.Eventrail.backup</string>
-			<key>UTTypeDescription</key>
-			<string>Eventrail Backup</string>
-			<!-- public.data only. Conforming to public.archive as well handed
-			     the file to the Files app's own archive handling, which tapped
-			     it, failed to unpack it and said "inappropriate file type or
-			     format" instead of passing it to Eventrail. -->
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
 			</array>
+			<key>UTTypeDescription</key>
+			<string>Eventrail Backup</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.shawnhuang.Eventrail.backup</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

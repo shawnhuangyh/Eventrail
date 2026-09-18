@@ -1,19 +1,30 @@
 {
-  "fill": {
-    "automatic-gradient": "extended-srgb:0.1796,0.4132,0.6966,1.00000"
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.17960,0.41320,0.69660,1.00000"
   },
-  "groups": [
+  "groups" : [
     {
-      "layers": [
+      "layers" : [
         {
-          "image-name": "Ticket.svg",
-          "name": "Ticket"
+          "image-name" : "Ticket.svg",
+          "name" : "Ticket"
         }
-      ]
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.3
+      }
     }
   ],
-  "supported-platforms": {
-    "squares": [
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : [
       "iOS"
     ]
   }
