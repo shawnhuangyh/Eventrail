@@ -205,6 +205,8 @@ final class EventStore {
     private var cloudChanges: Task<Void, Never>?
     private var venuePlacings: Task<Void, Never>?
     private var pendingMirror: Task<Void, Never>?
+    /// The halls an import brought in, being placed behind it.
+    private var venuePlacement: Task<Void, Never>?
 
     /// The default store reads the reader's own library from disk and, if they
     /// have sync on, merges whatever iCloud holds. Previews and the playground
@@ -504,6 +506,41 @@ final class EventStore {
         guard landed else { return }
         archive.lastRefreshed = .now
         persist()
+        placeArrivedVenues()
+    }
+
+    /// Sends the import's new halls off to Maps, and does not wait for them.
+    ///
+    /// Behind the import rather than inside it, for two reasons. The reader is
+    /// watching a Refresh button, and a hall a second is not what they are
+    /// waiting on — the events are already in their library, and the map under
+    /// one of them is the only thing still missing. And an import that reached
+    /// Eventernote has done what it said it would; a Maps run that fails
+    /// afterwards is not a failed import and must not be reported as one.
+    ///
+    /// Only what has no answer yet, which is what makes it safe to do without
+    /// being asked — see ``VenuePlaces/placeUnplaced(_:onProgress:)``. The
+    /// second import of a library that has not moved asks Maps nothing, says
+    /// nothing, and mirrors nothing.
+    private func placeArrivedVenues() {
+        venuePlacement?.cancel()
+        venuePlacement = Task { [weak self] in
+            guard let self, venues != nil, !isRefreshingVenues else { return }
+            let outcome = await venues?.placeUnplaced(placeableEvents) { progress in
+                self.venueStatus = progress
+            }
+            // Nothing to ask about is nothing to report: a status here would
+            // put "Placed 0 of 0 venues" under a Settings row that had done
+            // no work, where nil correctly leaves it saying what it would do.
+            guard let outcome, outcome != .refreshed(found: 0, of: 0) else {
+                venueStatus = nil
+                return
+            }
+            venueStatus = outcome
+            // The one mirror the whole run gets, for the reason a refresh from
+            // Settings mirrors once at the end rather than per hall.
+            await mirrorCalendar()
+        }
     }
 
     /// Re-reads the linked account's own page: the name and picture the Me

@@ -359,17 +359,59 @@ final class VenuePlaces {
     /// about: nothing here places a hall by name alone, so the answer would be
     /// "no such place" and it would not be true.
     func refresh(_ events: [Event], onProgress: (Refresh) -> Void) async -> Refresh {
+        let venues = questions(in: events) { _ in true }
+        Self.log.info("refreshing \(venues.count, privacy: .public) venues")
+        return await ask(venues, onProgress: onProgress)
+    }
+
+    /// Asks Maps about the halls nothing has an answer for yet, and leaves
+    /// every hall it already knows alone.
+    ///
+    /// What an import owes the reader, and the reason it can be done without
+    /// their asking where ``refresh(_:onProgress:)`` cannot: the work is the
+    /// size of what has just arrived rather than the size of the library, so
+    /// a re-import of a library that has not moved asks Maps nothing at all.
+    /// A first import of a hundred halls is still a hundred questions, paced
+    /// the same way and for the same reason, which is why it runs on its own
+    /// behind the import rather than holding it open.
+    ///
+    /// Like a refresh and unlike a sheet, it never upgrades a block to a
+    /// building: that is OpenStreetMap's one forbidden use, and it stands
+    /// until the reader opens the event. See ``VenueBuildings``.
+    func placeUnplaced(_ events: [Event], onProgress: (Refresh) -> Void) async -> Refresh {
+        let cache = cache
+        let venues = questions(in: events) { venue in
+            guard let answer = cache[venue.key] else { return true }
+            return Self.isWorthAskingAgain(answer)
+        }
+        Self.log.info("placing \(venues.count, privacy: .public) venues nothing had yet")
+        return await ask(venues, onProgress: onProgress)
+    }
+
+    /// One question per hall, in the order the halls are first met, keeping
+    /// only those `include` wants asked about.
+    ///
+    /// Keyed by the hall rather than the event for the reason ``Venue`` gives:
+    /// two events in the same building are one question.
+    private func questions(in events: [Event], include: (Venue) -> Bool) -> [Venue] {
         var venues: [Venue] = []
         var asked: Set<String> = []
         for event in events {
             guard let venue = Venue(event), venue.address?.isEmpty == false,
-                  asked.insert(venue.key).inserted
+                  asked.insert(venue.key).inserted, include(venue)
             else { continue }
             venues.append(venue)
         }
-        guard !venues.isEmpty else { return .refreshed(found: 0, of: 0) }
+        return venues
+    }
 
-        Self.log.info("refreshing \(venues.count, privacy: .public) venues")
+    /// The paced run itself, shared by the two ways of starting one.
+    private func ask(_ venues: [Venue], onProgress: (Refresh) -> Void) async -> Refresh {
+        guard !venues.isEmpty else { return .refreshed(found: 0, of: 0) }
+        // The count before the first answer, so a screen watching this has
+        // something truthful to show for the minutes that follow.
+        onProgress(.asking(done: 0, of: venues.count))
+
         var found = 0
         var failures = 0
         for (index, venue) in venues.enumerated() {
