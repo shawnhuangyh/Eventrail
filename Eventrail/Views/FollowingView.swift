@@ -341,6 +341,22 @@ private struct FollowingFilterSheet: View {
     /// The span the calendars offer: the first published date to the last, as
     /// the reader's own calendar writes them — see ``Event/localDay``. There is
     /// no sense in offering a month nobody is playing in.
+    /// What the range opens on: tomorrow, through to the furthest published
+    /// date.
+    ///
+    /// Tomorrow rather than the soonest published date, so that the range opens
+    /// on the same day whoever is on screen — the soonest date moves with the
+    /// performer chips, and a start that shifts about as the list is narrowed
+    /// is not a default the reader can hold in their head. It is clamped to the
+    /// far end, because a span that has already run out would otherwise be
+    /// handed a start later than its end.
+    private var opening: ClosedRange<Date> {
+        let calendar = Calendar.current
+        let tomorrow = calendar.date(byAdding: .day, value: 1,
+                                     to: calendar.startOfDay(for: .now)) ?? span.lowerBound
+        return min(tomorrow, span.upperBound) ... span.upperBound
+    }
+
     private var span: ClosedRange<Date> {
         let days = events.map(\.localDay)
         guard let first = days.min(), let last = days.max(), first <= last else {
@@ -352,7 +368,7 @@ private struct FollowingFilterSheet: View {
     /// The range the calendar reads and writes. Nil stands for the whole
     /// published span, so the calendar never has to draw an absent range.
     private var chosenDays: Binding<ClosedRange<Date>> {
-        Binding(get: { filter.days ?? span }, set: { filter.days = $0 })
+        Binding(get: { filter.days ?? opening }, set: { filter.days = $0 })
     }
 
     /// What the calendar will let the reader page to: the published span,
@@ -360,7 +376,7 @@ private struct FollowingFilterSheet: View {
     /// shortens the span, and a picker whose own selection sits outside its
     /// bounds has nothing sensible to show.
     private var reachable: Range<Date> {
-        let days = filter.days ?? span
+        let days = filter.days ?? opening
         let first = min(span.lowerBound, days.lowerBound)
         let last = max(span.upperBound, days.upperBound)
         let calendar = Calendar.current
@@ -370,12 +386,12 @@ private struct FollowingFilterSheet: View {
             ..< (calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: last)) ?? last)
     }
 
-    /// The switch itself. Turning it on starts on the whole published span, so
-    /// nothing disappears at the moment it is switched on: the reader pulls the
-    /// ends in from there.
+    /// The switch itself. Turning it on starts on tomorrow through to the
+    /// furthest published date, so nothing ahead disappears at the moment it is
+    /// switched on: the reader pulls the ends in from there.
     private var isFilteringByDate: Binding<Bool> {
         Binding(get: { filter.days != nil },
-                set: { isOn in filter.days = isOn ? span : nil })
+                set: { isOn in filter.days = isOn ? opening : nil })
     }
 
     var body: some View {
@@ -485,12 +501,19 @@ private struct FollowingFilterSheet: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// The month is abbreviated and the line is held to one: "September 19,
+    /// 2026" does not fit beside its other half at this size, and a date broken
+    /// over two lines reads as two dates. Where even the short form will not go
+    /// — a long locale, or large type — it scales down rather than wrapping.
+    ///
     /// A flat fill rather than a second pane of glass: this sits on the card,
     /// and glass on glass is the one thing the material is not for.
     private func endPill(_ day: Date) -> some View {
-        Text(day.formatted(.dateTime.month(.wide).day().year()))
+        Text(day.formatted(.dateTime.month(.abbreviated).day().year()))
             .font(.system(size: 13.5, weight: .semibold))
             .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(.fill.tertiary, in: .rect(cornerRadius: 12, style: .continuous))
