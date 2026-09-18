@@ -108,8 +108,9 @@ final class VenuePlaces {
     /// Which reading of Maps' answers the kept ones were made under. Raised
     /// whenever that reading changes, and everything older is simply asked
     /// again — now that an answer is kept only where Maps files it at the
-    /// address Eventernote published, rather than argued out of its name.
-    private static let ruleset = 5
+    /// address Eventernote published rather than argued out of its name, and
+    /// now that a hall outside Japan is looked for at all.
+    private static let ruleset = 6
 
     /// How long "Maps has never heard of this hall" is believed for.
     ///
@@ -128,9 +129,12 @@ final class VenuePlaces {
     private static let keep: TimeInterval = 365 * 24 * 60 * 60
 
     /// Where a search looks first. Eventernote is a Japanese site publishing
-    /// Japanese venues — the same assumption ``Event/publishedZone`` makes. A
-    /// hint, not a filter: the address decides, and a hall billed abroad is
-    /// found by name like any other.
+    /// Japanese venues — the same assumption ``Event/publishedZone`` makes.
+    ///
+    /// A hint rather than a filter, but a strong one: pointed at Japan, Maps
+    /// will not offer Shanghai at all. So it is only where a search looks
+    /// *first*, and a hall it does not find there is asked for again with no
+    /// hint — see ``search(_:)``.
     private static let japan = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 36.2, longitude: 138.25),
         span: MKCoordinateSpan(latitudeDelta: 14, longitudeDelta: 18)
@@ -212,6 +216,15 @@ final class VenuePlaces {
     /// the right block rather than the hall's own listing. That is the whole
     /// of what a map under the venue and a place on a calendar entry need.
     ///
+    /// Both questions are asked twice: once pointed at Japan, where nearly
+    /// every hall is, and then with no hint at all. The hint is strong enough
+    /// to be a filter in practice — a search pointed at Japan will not offer
+    /// Shanghai whatever it is asked — and dropping it is the whole of what a
+    /// hall abroad needs. There is no switching maps to be done: the phone's
+    /// own Maps has 梅赛德斯-奔驰文化中心 and answers with it as soon as it is
+    /// not being told to look in Japan. The second pass costs a request only
+    /// on a hall the first one missed.
+    ///
     /// Nothing is placed without an address to check it against. An event
     /// opened straight from a search row has only the name until its own page
     /// is imported, and it is worth the wait: a name on its own is how a
@@ -219,22 +232,37 @@ final class VenuePlaces {
     private func search(_ venue: Venue) async throws -> MKMapItem? {
         guard let address = venue.address, !address.isEmpty else { return nil }
 
-        if !venue.plainName.isEmpty {
-            let halls = try await results(for: venue.plainName, kinds: [.pointOfInterest])
-            if let hall = halls.first(where: { Self.stands($0, at: address) }) {
-                return hall
+        for region in [Self.japan, nil] {
+            if !venue.plainName.isEmpty {
+                let halls = try await results(for: venue.plainName, kinds: [.pointOfInterest], in: region)
+                if let hall = halls.first(where: { Self.stands($0, at: address) }) {
+                    return hall
+                }
+            }
+            let places = try await results(for: address, kinds: [.pointOfInterest, .address], in: region)
+            if let place = places.first(where: { Self.stands($0, at: address) }) {
+                return place
             }
         }
-
-        return try await results(for: address, kinds: [.pointOfInterest, .address])
-            .first { Self.stands($0, at: address) }
+        return nil
     }
 
     /// One search. A hall Maps has never heard of is an empty list, not a
     /// failure: it is an answer, and it is worth writing down.
-    private func results(for query: String, kinds: MKLocalSearch.ResultType) async throws -> [MKMapItem] {
-        let request = MKLocalSearch.Request(naturalLanguageQuery: query, region: Self.japan)
-        request.regionPriority = .default
+    ///
+    /// A nil region leaves the hint off altogether, which is how Maps is
+    /// asked about somewhere it has no reason to think of.
+    private func results(
+        for query: String,
+        kinds: MKLocalSearch.ResultType,
+        in region: MKCoordinateRegion?
+    ) async throws -> [MKMapItem] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        if let region {
+            request.region = region
+            request.regionPriority = .default
+        }
         request.resultTypes = kinds
         do {
             return try await MKLocalSearch(request: request).start().mapItems
@@ -256,7 +284,12 @@ final class VenuePlaces {
     private static func stands(_ item: MKMapItem, at address: String) -> Bool {
         let published = numbers(in: address)
         guard !published.isEmpty else { return true }
-        guard let found = item.address?.fullAddress else { return false }
+        // An address Maps answers with as a place of its own carries it as its
+        // name and leaves the address field empty — 上海市浦东新区世博大道
+        // 1200号 comes back exactly so, and it is the best answer there is for
+        // that hall.
+        guard let found = (item.address?.fullAddress).flatMap({ $0.isEmpty ? nil : $0 }) ?? item.name
+        else { return false }
         return !published.isDisjoint(with: numbers(in: found))
     }
 
