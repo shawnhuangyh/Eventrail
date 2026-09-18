@@ -21,6 +21,7 @@ struct EventernoteAccountSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    masthead
                     AccountFinder(chosen: $chosen)
                     explanation
                 }
@@ -45,6 +46,29 @@ struct EventernoteAccountSheet: View {
                 }
             }
         }
+    }
+
+    /// What naming an account is about to do, which is not the same thing for
+    /// a reader who has never named one as for a reader changing theirs.
+    ///
+    /// The second is the one worth saying out loud: a library is the reader's,
+    /// and pointing the app at somebody else's page does not take it off them.
+    /// Naming an account only settles where Eventrail looks next — the same
+    /// promise ``EventStore/unlinkAccount()`` makes for letting one go.
+    private var masthead: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(store.isLinked ? "Change account" : "Your account name")
+                .font(.system(size: 28, weight: .bold))
+                .kerning(-0.84)
+            Text(store.isLinked
+                 ? "Everything already imported stays in your library, whichever account you name. Only where Eventrail reads next changes."
+                 : "Eventrail imports what your Eventernote profile already lists — the events you have been to, and the performers you favourite.")
+                .font(.system(size: 13.5))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 2)
     }
 
     private var explanation: some View {
