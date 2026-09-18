@@ -61,7 +61,10 @@ final class CalendarSync {
     /// the same event.
     func mirror(_ events: [Event]) async -> Outcome {
         guard await requestAccess() else { return .denied }
-        let places = await VenuePlaces.shared.mapItems(for: events)
+        // Whatever has been looked up already. The mirror never searches for a
+        // hall itself — see ``VenuePlaces`` — so an event at a hall the reader
+        // has not opened yet gets its name and waits for a later mirror.
+        let places = VenuePlaces.shared.mapItems(for: events)
         do {
             let calendar = try calendar()
             var wanted = Dictionary(
@@ -230,27 +233,35 @@ final class CalendarSync {
     /// what the Calendar app wants: an entry made from a map item shows the
     /// same map beside it as one the reader picked out of Calendar's own
     /// location field, and can be given a travel time. Where Maps had nothing,
-    /// the published name and address still go on as text, which is no worse
-    /// than what was written before. Nil only where there is no venue at all —
-    /// Eventernote announces plenty of events before it has booked a hall.
+    /// the hall goes on as text and the next mirror tries again for it. Nil
+    /// only where there is no venue at all — Eventernote announces plenty of
+    /// events before it has booked a hall.
     ///
-    /// A located entry reads as the hall's name alone: the coordinate already
-    /// says where it is, so an address in the title only repeats the map back
-    /// at the reader in a line the Calendar app has to truncate. Where Maps
-    /// knew nothing the address stays, because it is then the only thing that
-    /// places the hall at all.
+    /// An entry reads as the hall's name alone. The coordinate is what says
+    /// where the place is, and an address in the title only repeats the map
+    /// back at the reader in a line the Calendar app has to truncate — and
+    /// where Maps has not placed the hall yet, a name is still the thing
+    /// Calendar can resolve for itself, which a street address elided at the
+    /// third word is not. The address is the title only where the site has
+    /// named no hall at all and it is the one thing left to go on.
     ///
     /// The name is always Eventernote's, never the one Maps came back with. A
     /// hall the site calls Kアリーナ横浜 is that in the reader's calendar even
     /// where Maps files it under something shorter or in another language: the
     /// map item is being asked where the place is, not what to call it.
     private static func place(for event: Event, found: MKMapItem?) -> EKStructuredLocation? {
-        guard let written = event.locationTitle else { return nil }
-        guard let found else { return EKStructuredLocation(title: written) }
+        guard let title = event.venue.isEmpty ? event.locationTitle : event.venue else { return nil }
+        guard let found else { return EKStructuredLocation(title: title) }
         let place = EKStructuredLocation(mapItem: found)
-        // `written` only where the site named no hall — then it is the address
-        // on its own, and better than nothing to read.
-        place.title = event.venue.isEmpty ? written : event.venue
+        place.title = title
+        // Built from the map item, so the entry carries whatever else Calendar
+        // wants of a place — but the coordinate is what makes it a point on the
+        // map rather than a line of text, and an item rebuilt from the kept
+        // answer has no placemark for `init(mapItem:)` to read it out of. So it
+        // is set here rather than assumed.
+        if place.geoLocation == nil {
+            place.geoLocation = found.location
+        }
         return place
     }
 
