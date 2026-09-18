@@ -190,6 +190,8 @@ final class EventStore {
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var cloudChanges: Task<Void, Never>?
+    private var venuePlacings: Task<Void, Never>?
+    private var pendingMirror: Task<Void, Never>?
 
     /// The default store reads the reader's own library from disk and, if they
     /// have sync on, merges whatever iCloud holds. Previews and the playground
@@ -230,6 +232,10 @@ final class EventStore {
         }
         archive = loaded
 
+        // Before the guard below, which returns: a hall being placed is owed a
+        // mirror whether or not this device syncs to iCloud.
+        observeVenuePlacings()
+
         guard iCloudSyncEnabled, let cloud else { return }
         // Whatever another device wrote while this one was closed is merged
         // before the first screen reads anything.
@@ -242,6 +248,8 @@ final class EventStore {
 
     deinit {
         cloudChanges?.cancel()
+        venuePlacings?.cancel()
+        pendingMirror?.cancel()
         pendingSave?.cancel()
     }
 
@@ -882,6 +890,42 @@ final class EventStore {
             self.venueStatus = progress
         }
         await mirrorCalendar()
+    }
+
+    /// A hall has been placed that was not placed before, so whatever was
+    /// written into the calendar about it is now out of date.
+    ///
+    /// The mirror only ever writes what ``VenuePlaces`` already knows — it
+    /// never goes looking for a hall itself — so an event at a hall nothing
+    /// had looked up became an entry with the hall's name and no map. Opening
+    /// that event is what finally asks Maps, and this is what then goes back
+    /// and corrects the entry. Without it the reader would be left with an
+    /// entry Calendar cannot draw a map for or work out a journey to, and
+    /// nothing short of an edit to the library would ever mend it.
+    private func observeVenuePlacings() {
+        guard let venues, calendar != nil else { return }
+        venuePlacings = Task { [weak self] in
+            for await _ in venues.placings {
+                self?.mirrorSoon()
+            }
+        }
+    }
+
+    /// Mirrors once the halls stop arriving.
+    ///
+    /// Coalesced the way ``persist()`` coalesces a burst of edits, and for the
+    /// same reason: a reader flicking through four events in a row places four
+    /// halls, and that is one mirror's worth of work rather than four. The
+    /// wait is long enough to cover reading a screen and short enough that the
+    /// calendar is right by the time they look at it.
+    private func mirrorSoon() {
+        guard calendarSyncEnabled else { return }
+        pendingMirror?.cancel()
+        pendingMirror = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            await self?.mirrorCalendar()
+        }
     }
 
     /// Another device wrote. Merge rather than adopt: this device may have

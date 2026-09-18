@@ -171,6 +171,33 @@ final class VenuePlaces {
         span: MKCoordinateSpan(latitudeDelta: 14, longitudeDelta: 18)
     )
 
+    /// Halls that have just been placed, for anything holding a copy of where
+    /// the reader's events are.
+    ///
+    /// The calendar mirror writes what is known when it runs, and a hall
+    /// nothing has looked up yet goes in as a line of text — see
+    /// ``mapItems(for:)``. When the reader opens that event and Maps answers,
+    /// the entry already in their calendar is the stale one: a name and no
+    /// map. Nothing would ever go back for it, because the mirror runs on the
+    /// reader's own edits and opening an event is not one.
+    ///
+    /// So a hall that has just been placed says so here, and ``EventStore``
+    /// mirrors again. Only *newly* placed halls: a hall Maps still has nothing
+    /// for changes no entry, and neither does one that came back where it
+    /// already was.
+    ///
+    /// A refresh deliberately says nothing here, though it places halls by the
+    /// hundred — it is started from a screen that mirrors the calendar itself
+    /// once the whole run is done, which is one mirror rather than hundreds.
+    var placings: AsyncStream<Void> { placed.stream }
+
+    /// Buffering the newest alone, because these are a nudge rather than a
+    /// list: a consumer that was busy needs to know that *something* moved,
+    /// and a queue of them would only make it mirror twice.
+    private let placed = AsyncStream<Void>.makeStream(
+        of: Void.self, bufferingPolicy: .bufferingNewest(1)
+    )
+
     private var cache: [String: Answer] {
         get {
             guard let data = UserDefaults.standard.data(forKey: Self.cacheKey) else { return [:] }
@@ -222,10 +249,19 @@ final class VenuePlaces {
         if let answer = cache[venue.key], !Self.isWorthAskingAgain(answer) {
             return answer.mapItem
         }
+        let known = cache[venue.key]
         do {
             let item = try await search(venue)
-            remember(Answer(item), for: venue.key)
+            let answer = Answer(item)
+            remember(answer, for: venue.key)
             Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(item), privacy: .public)")
+            // A hall that has just arrived somewhere it was not before. The
+            // calendar entry written while it was nowhere is now wrong, and
+            // this is what sends anything holding one back to correct it.
+            if answer.wasFound,
+               answer.latitude != known?.latitude || answer.longitude != known?.longitude {
+                placed.continuation.yield()
+            }
             return item
         } catch {
             // Not written down, so the next screen to ask tries again.
