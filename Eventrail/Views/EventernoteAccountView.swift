@@ -72,7 +72,7 @@ struct EventernoteAccountSheet: View {
     }
 
     private var explanation: some View {
-        Text("Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. The first import marks the events you have been to as attended and the ones still to come as planned, wherever you have not answered for yourself; later imports only rule on the events they add.")
+        Text("Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it.")
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)

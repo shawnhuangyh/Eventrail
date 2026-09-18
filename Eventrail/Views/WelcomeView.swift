@@ -293,7 +293,7 @@ struct WelcomeView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         promise("Doors and start time, venue and floor, on the right day")
                         promise("Edits and cancellations follow your library")
-                        promise("Past events you attended are filled in too")
+                        promise("The events you have already been to are filled in too")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)

@@ -331,9 +331,11 @@ struct EventDetailView: View {
                     .glassCapsule()
             }
 
-            segment("Interest", selection: tracking.interest, options: Interest.allCases)
+            // The one question the library does not already answer. Whether
+            // the reader means to go is what keeping the event says, and
+            // whether they went is what its date says once it has passed —
+            // see ``Tracking``.
             segment("Ticket", selection: tracking.ticket, options: TicketStatus.allCases)
-            segment("Attendance", selection: tracking.attendance, options: Attendance.allCases)
 
             VStack(alignment: .leading, spacing: 7) {
                 fieldLabel("Notes")
@@ -357,29 +359,23 @@ struct EventDetailView: View {
         .padding(.horizontal, 18)
     }
 
-    private func segment<Value: Hashable & Identifiable>(
+    /// Written for the one enum left rather than for any of them. It was
+    /// generic over three, with a type switch to find each one's label,
+    /// because three different questions were asked the same way.
+    private func segment(
         _ label: LocalizedStringKey,
-        selection: Binding<Value>,
-        options: [Value]
-    ) -> some View where Value.ID == Value {
+        selection: Binding<TicketStatus>,
+        options: [TicketStatus]
+    ) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             fieldLabel(label)
             Picker(label, selection: selection) {
                 ForEach(options) { option in
-                    Text(title(of: option)).tag(option)
+                    Text(option.label).tag(option)
                 }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-        }
-    }
-
-    private func title<Value>(of option: Value) -> LocalizedStringKey {
-        switch option {
-        case let value as Interest: value.label
-        case let value as TicketStatus: value.label
-        case let value as Attendance: value.label
-        default: ""
         }
     }
 

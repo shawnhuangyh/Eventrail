@@ -221,7 +221,7 @@ struct MeView: View {
     private func importCounts(_ summary: EventStore.ImportSummary) -> Text? {
         var detail: Text?
         if summary.read > 0 {
-            detail = Text("Imported ^[\(summary.read) event](inflect: true) — \(summary.added) added, \(summary.filled) updated")
+            detail = Text("Imported ^[\(summary.read) event](inflect: true) — \(summary.added) added")
         }
         if summary.followed > 0 {
             let follows = Text("^[\(summary.followed) performer](inflect: true) followed from your favorites")

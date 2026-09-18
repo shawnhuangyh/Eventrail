@@ -50,7 +50,7 @@ struct AboutView: View {
                 .font(.system(size: 12.5))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
-            Text("A companion for Eventernote: browse events, keep your own record of what you're interested in, hold and attended, and follow the performers you care about.")
+            Text("A companion for Eventernote: browse events, keep your own record of what you have been to and what you are going to, and follow the performers you care about.")
                 .font(.system(size: 12.5))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

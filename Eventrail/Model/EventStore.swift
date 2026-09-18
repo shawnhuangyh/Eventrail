@@ -108,16 +108,17 @@ final class EventStore {
         case reimporting(read: Int, total: Int)
     }
 
-    /// What one import changed. `added` and `filled` are counted separately
-    /// because they are different promises: one grew the library, the other only
-    /// wrote a tracking field the reader had left alone.
+    /// What one import changed.
+    ///
+    /// Read and added are different numbers because the account lists events
+    /// the library already holds: an import that read ninety and added none is
+    /// a library already in step rather than an import that failed.
     ///
     /// A summary and a ``refreshFailure`` can both be set: a history that read
     /// six pages of nine still adopted those six.
     struct ImportSummary: Hashable {
         var read: Int
         var added: Int
-        var filled: Int
         /// Performers newly followed from the account's own favourites, which
         /// come off the member page rather than out of the history.
         var followed: Int = 0
@@ -296,8 +297,19 @@ final class EventStore {
         archive.tracking[event.id]?.value ?? Tracking()
     }
 
+    /// The one badge a row wears, read from where the event stands.
+    ///
+    /// An event in the library that has already happened is one the reader
+    /// went to — that is what putting it there means, and it is why there is
+    /// no attendance to record. Still to come, the ticket is the only thing
+    /// left that the library does not already say. An event nobody has kept is
+    /// untracked however its date reads, so a past search result does not
+    /// announce itself as attended.
     func status(for event: Event) -> TrackingStatus {
-        TrackingStatus(tracking(for: event))
+        let isKept = isInLibrary(event)
+        if isKept, !event.isUpcoming { return .attended }
+        if tracking(for: event).ticket == .purchased { return .ticketed }
+        return isKept ? .planned : .untracked
     }
 
     func isInLibrary(_ event: Event) -> Bool { archive.isInLibrary(event.id) }
@@ -306,9 +318,9 @@ final class EventStore {
 
     /// Whether emptying the library would still take anything.
     ///
-    /// The library and the favorites are not the whole of it: a note, a ticket
-    /// status or an attendance outlives the event it was written on, so this
-    /// stays true while any of that is still held.
+    /// The library and the favorites are not the whole of it: a note or a
+    /// ticket status outlives the event it was written on, so this stays true
+    /// while either is still held.
     var hasRecordsToDelete: Bool {
         !library.isEmpty
             || !favoriteEvents.isEmpty
@@ -344,10 +356,10 @@ final class EventStore {
         if wasIn {
             if archive.tracking[event.id]?.value.isEmpty ?? true { archive.tracking[event.id] = nil }
         } else {
+            // Nothing to write down: being in the library is what says the
+            // reader means to go, which is what a tracking record used to be
+            // opened to say for it.
             keep(event)
-            if archive.tracking[event.id] == nil {
-                archive.tracking[event.id] = Stamped(Tracking(interest: .interested))
-            }
         }
         persist()
     }
@@ -377,8 +389,8 @@ final class EventStore {
     /// the one place it does: a single removal keeps the note typed on an event
     /// so re-adding it brings the note back, but there is nothing to come back
     /// to once the reader has asked for all of it to go — and an import that
-    /// restores the events would otherwise restore them wearing interest and
-    /// ticket badges the reader thought they had just deleted.
+    /// restores the events would otherwise restore them wearing ticket badges
+    /// the reader thought they had just deleted.
     ///
     /// Each record is emptied rather than dropped, for the same reason a removal
     /// is a tombstone: a dropped key would let the next merge hand the other
@@ -496,7 +508,7 @@ final class EventStore {
         // have something to report, so they are folded in either way.
         if followed > 0 {
             landed = true
-            var summary = importSummary ?? ImportSummary(read: 0, added: 0, filled: 0)
+            var summary = importSummary ?? ImportSummary(read: 0, added: 0)
             summary.followed = followed
             importSummary = summary
         }
@@ -727,29 +739,25 @@ final class EventStore {
 
     /// Imports every event the linked account is listed as attending.
     ///
-    /// Three rules keep this from talking over the reader:
+    /// Two rules keep this from talking over the reader:
     ///
     /// - An event they removed is imported again, because the account still
     ///   lists it and the account is what they asked to be read. What a removal
     ///   settles is their own devices, through the tombstone a merge honours;
     ///   nothing here has ever claimed it settles Eventernote too.
-    /// - The first import after linking fills in the tracking they have left
-    ///   blank; every import after that only fills in events it has just added.
-    ///   `Attendance.unrecorded` cannot be told apart from an answer the reader
-    ///   gave, so a later import that re-asserted it would quietly undo them
-    ///   marking a registered event as one they did not go to.
     /// - A page that fails does not discard the pages that worked. The import
     ///   adopts what it read and says it stopped short.
     ///
-    /// Notes and ticket status are never written by an import at all.
+    /// What the reader wrote — a note, a ticket status — is never written by an
+    /// import at all. Nor is anything else: an import used to rule on the
+    /// tracking they had left blank, and there is nothing left for it to rule
+    /// on, because putting the event in the library is the whole of what the
+    /// account evidences.
     ///
     /// Reports whether anything was adopted, so ``refresh()`` knows whether the
     /// pass is worth stamping.
     private func importHistory() async -> Bool {
         guard let handle = eventernoteHandle else { return false }
-        // Read before the import stamps itself, so the catch-up run knows it is
-        // the catch-up run.
-        let isCatchingUp = archive.lastImported == nil
         refreshStage = .readingHistory(read: 0, total: 0)
 
         var imported: [Event] = []
@@ -780,23 +788,24 @@ final class EventStore {
         var seen: Set<Event.ID> = []
         let distinct = imported.filter { seen.insert($0.id).inserted }
 
-        let counts = adopt(distinct, fillingBlanks: isCatchingUp)
         archive.lastImported = .now
-        importSummary = ImportSummary(read: distinct.count, added: counts.added,
-                                      filled: counts.filled)
+        importSummary = ImportSummary(read: distinct.count, added: adopt(distinct))
         return true
     }
 
-    /// Folds an imported history into the archive under the rules above.
+    /// Folds an imported history into the archive under the rules above, and
+    /// answers how many events it grew the library by.
     ///
-    /// `fillingBlanks` reaches events already in the library — the ones saved
-    /// from Search before the account was linked. Without it only the events
-    /// this import adds are ruled on, and everything the reader has already
-    /// answered, or deliberately left blank, stays as they left it.
-    private func adopt(_ imported: [Event], fillingBlanks: Bool) -> (added: Int, filled: Int) {
+    /// Nothing but membership and the event's own facts is written. An import
+    /// used to fill in the tracking the reader had left blank — how interested
+    /// they were, whether they turned up — and there is nothing left to fill:
+    /// putting the event in the library is the whole of what the account
+    /// evidences, and the badge is read from that. What the reader wrote
+    /// themselves was never an import's to touch and still is not.
+    @discardableResult
+    private func adopt(_ imported: [Event]) -> Int {
         let now = Date.now
         var added = 0
-        var filled = 0
 
         for event in imported {
             // A removal is not permanent. The account's history is what the
@@ -810,30 +819,8 @@ final class EventStore {
                 added += 1
             }
             keep(event)
-
-            guard isNew || fillingBlanks else { continue }
-            let recorded = archive.tracking[event.id]?.value ?? Tracking()
-            let completed = completing(recorded, for: event)
-            // Only a real change is stamped: rewriting an unchanged record would
-            // make this device win a merge it has nothing new to say in.
-            if completed != recorded {
-                archive.tracking[event.id] = Stamped(completed, at: now)
-                filled += 1
-            }
         }
-        return (added, filled)
-    }
-
-    /// Fills the one field the account listing actually evidences, and only when
-    /// the reader has not answered it themselves.
-    private func completing(_ tracking: Tracking, for event: Event) -> Tracking {
-        var completed = tracking
-        if event.isUpcoming {
-            if completed.interest == .none { completed.interest = .planning }
-        } else if completed.attendance == .unrecorded {
-            completed.attendance = .attended
-        }
-        return completed
+        return added
     }
 
     // MARK: - Syncing
@@ -1102,7 +1089,7 @@ final class EventStore {
     struct RestoreSummary: Hashable {
         var events: Int
         var follows: Int
-        /// Notes, interest, ticket status and attendance brought back.
+        /// Notes and ticket statuses brought back.
         var records: Int
 
         var isEmpty: Bool { events == 0 && follows == 0 && records == 0 }
@@ -1195,7 +1182,7 @@ final class EventStore {
     }
 
     /// How many events in the library this performer is billed on and the
-    /// reader has marked attended.
+    /// reader has already been to.
     ///
     /// Counted over the library rather than over the appearances a performer's
     /// page has read so far, so the number is the whole of it however little of
@@ -1208,8 +1195,14 @@ final class EventStore {
 
     // MARK: - Profile statistics
 
+    /// What the reader went to: the library's own past.
+    ///
+    /// Keeping an event is what says they mean to go, so an event still in the
+    /// library once its date has passed is one they went to. Nothing else is
+    /// recorded, and nothing else needs to be — an event they did not go to is
+    /// one they take out.
     private var attendedEvents: [Event] {
-        library.filter { tracking(for: $0).attendance == .attended }
+        library.filter { !$0.isUpcoming }
     }
 
     var eventsThisYear: Int {

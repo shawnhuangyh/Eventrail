@@ -30,10 +30,9 @@ enum PreviewData {
     ]
 
     static let tracking: [Event.ID: Tracking] = [
-        "492650": Tracking(interest: .interested),
-        "492514": Tracking(interest: .planning, ticket: .purchased,
+        "492514": Tracking(ticket: .purchased,
                            note: "Theatre 3, row H. Doors are tight — get there by 10:45."),
-        "396310": Tracking(interest: .planning, ticket: .purchased, attendance: .attended,
+        "396310": Tracking(ticket: .purchased,
                            note: "Encore was worth the queue."),
     ]
 
