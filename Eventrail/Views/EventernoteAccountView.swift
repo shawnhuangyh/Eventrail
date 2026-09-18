@@ -23,7 +23,11 @@ struct EventernoteAccountSheet: View {
                 VStack(spacing: 14) {
                     entryCard
                     if let found {
-                        foundCard(found)
+                        // Always ticked: on this screen there is one account
+                        // and the Link button is what takes it. The mark says
+                        // which account that is, not which of several.
+                        FoundAccount(profile: found, isChosen: true)
+                            .glassPanel()
                     }
                     explanation
                 }
@@ -104,28 +108,6 @@ struct EventernoteAccountSheet: View {
         .glassPanel()
     }
 
-    /// What the reader is about to link, shown before the app commits to it.
-    private func foundCard(_ profile: EventernoteProfile) -> some View {
-        HStack(spacing: 14) {
-            AccountAvatar(url: profile.avatarURL, width: 52)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: profile.name)
-                    .font(.system(size: 16, weight: .semibold))
-                Text(verbatim: "@\(profile.handle)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                profile.holdings
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.trackTicket)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(16)
-        .glassPanel()
-    }
-
     private var explanation: some View {
         Text("Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. The first import marks the events you have been to as attended and the ones still to come as planned, wherever you have not answered for yourself; later imports only rule on the events they add.")
             .font(.system(size: 11))
@@ -151,6 +133,47 @@ struct EventernoteAccountSheet: View {
         } catch {
             failure = String(localized: "Could not reach Eventernote. Try again in a moment.")
         }
+    }
+}
+
+/// The account a typed name turned out to belong to, shown before anything is
+/// linked to it.
+///
+/// One row for both screens that ask the question — ``EventernoteAccountSheet``
+/// and ``WelcomeView`` — because it is the same question in both, and a reader
+/// who meets it twice should not have to read two different things to answer
+/// it. The tick is the whole of the difference: on the welcome it is a control
+/// the reader can take back, and in the sheet it is the mark on the one account
+/// the Link button will take.
+struct FoundAccount: View {
+    let profile: EventernoteProfile
+    /// Whether this is the account the screen will act on.
+    var isChosen: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            AccountAvatar(url: profile.avatarURL, width: 52)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: profile.name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .lineLimit(1)
+                Text(verbatim: "@\(profile.handle)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                profile.holdings
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.trackTicket)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: isChosen ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 22))
+                .foregroundStyle(isChosen ? AnyShapeStyle(Color.trackAttended)
+                                          : AnyShapeStyle(.tertiary))
+        }
+        .padding(16)
     }
 }
 

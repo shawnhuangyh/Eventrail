@@ -25,16 +25,16 @@ struct RootView: View {
     /// rather than in Settings: the app can be opened from a file while any tab
     /// is showing, and from a cold launch with no Settings sheet at all.
     @State private var openedBackup: URL?
-    /// Whether this device has been through the welcome. Per-device and not
-    /// synced, for the reason ``WelcomeView/seenKey`` gives: a fresh install on
-    /// a second device is a first launch there too.
-    @AppStorage(WelcomeView.seenKey) private var hasSeenWelcome = false
-
-    /// Read inverted so ``WelcomeView`` needs nothing but `dismiss()`: the one
-    /// thing that closes it is also the one thing that records it was seen.
-    private var isWelcoming: Binding<Bool> {
-        Binding { !hasSeenWelcome } set: { hasSeenWelcome = !$0 }
-    }
+    /// Whether this launch still owes the reader the welcome.
+    ///
+    /// Seeded once from the per-device flag ``WelcomeView`` writes for itself
+    /// when the reader reaches the end of it. Deliberately not an `@AppStorage`
+    /// binding the cover writes through: SwiftUI clears a presentation binding
+    /// when the cover goes away for any reason, including the app being torn
+    /// down around it, which would record a welcome the reader never answered.
+    /// Closing it early costs them this launch's showing; it does not spend
+    /// the only one they get.
+    @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
 
     var body: some View {
         TabView(selection: $selection) {
@@ -69,7 +69,7 @@ struct RootView: View {
         .restoringBackup($openedBackup, asking: true)
         // Above the `.environment` lines for the same reason, and over
         // everything: the first launch has no tab worth showing yet.
-        .fullScreenCover(isPresented: isWelcoming) {
+        .fullScreenCover(isPresented: $isWelcoming) {
             WelcomeView()
         }
         .environment(store)

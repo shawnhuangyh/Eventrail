@@ -30,6 +30,9 @@ struct WelcomeView: View {
     /// reason ``EventStore/iCloudSyncEnabled`` is not: a fresh install on an
     /// iPad is a first launch on the iPad, whatever the phone has already been
     /// through.
+    ///
+    /// Written by ``finish()`` and nowhere else, so it means the reader reached
+    /// the end rather than that the screen was on the glass at some point.
     static let seenKey = "hasSeenWelcome"
 
     /// Records before calendar on purpose: the first two bring the reader's
@@ -105,12 +108,13 @@ struct WelcomeView: View {
                     step = Step(rawValue: step.rawValue - 1) ?? .hello
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.brandTint)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 36, height: 36)
                         .contentShape(.circle)
                 }
                 .buttonStyle(.plain)
+                .glassCircle(interactive: true)
                 .accessibilityLabel("Back")
                 .transition(.opacity)
             }
@@ -243,36 +247,18 @@ struct WelcomeView: View {
 
     /// Who the name turned out to be, and a tap to say yes or change their
     /// mind — the reader confirms the account before anything is linked.
+    ///
+    /// The same row ``EventernoteAccountSheet`` shows, down to the tick.
     private func result(_ profile: EventernoteProfile) -> some View {
         Button {
             picked.toggle()
             isFocused = false
         } label: {
-            HStack(spacing: 12) {
-                AccountAvatar(url: profile.avatarURL, width: 40)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: profile.name)
-                        .font(.system(size: 14.5, weight: .semibold))
-                        .lineLimit(1)
-                    Text(verbatim: "@\(profile.handle)")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                    profile.holdings
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Color.trackTicket)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: picked ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 21))
-                    .foregroundStyle(picked ? AnyShapeStyle(Color.trackAttended) : AnyShapeStyle(.tertiary))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .contentShape(.rect)
+            FoundAccount(profile: profile, isChosen: picked)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(cornerRadius: 24, interactive: true)
+        .glassPanel(interactive: true)
         .accessibilityAddTraits(picked ? [.isSelected] : [])
     }
 
@@ -471,15 +457,20 @@ struct WelcomeView: View {
                 .padding(.bottom, 8)
             }
 
+            // The system's own prominent glass rather than a flat fill: it is
+            // the one thing on this screen that is always tappable, and on iOS
+            // 26 that is what a primary action is made of. The tint carries the
+            // app's colour through it instead of painting over it.
             Button(action: advance) {
                 callToAction
                     .font(.system(size: 16.5, weight: .semibold))
-                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 17)
-                    .background(Color.brandTint, in: .rect(cornerRadius: 30, style: .continuous))
+                    .padding(.vertical, 6)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.extraLarge)
+            .tint(Color.brandTint)
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
@@ -530,6 +521,10 @@ struct WelcomeView: View {
         }
         store.iCloudSyncEnabled = wantsCloud
         store.calendarSyncEnabled = wantsCalendar
+        // Recorded here rather than by whoever presented this, so that only
+        // reaching the end counts as having been welcomed. A reader shown this
+        // again from Settings is writing the same true a second time.
+        UserDefaults.standard.set(true, forKey: Self.seenKey)
         dismiss()
     }
 
