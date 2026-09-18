@@ -17,6 +17,9 @@ struct RootView: View {
     /// two screens that show it — the Following tab and the Me card — so a
     /// followed performer's listing is asked for once per launch.
     @State private var followed = FollowedDates()
+    /// Where each hall is, read from Eventernote's own venue pages and kept for
+    /// the life of the launch beside the dates it places.
+    @State private var venues = VenueRegions()
     @State private var selection: AppTab = .events
     /// A backup the reader opened in Files and sent here. Received at the root
     /// rather than in Settings: the app can be opened from a file while any tab
@@ -56,6 +59,7 @@ struct RootView: View {
         .restoringBackup($openedBackup, asking: true)
         .environment(store)
         .environment(followed)
+        .environment(venues)
         .tint(.brandTint)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only

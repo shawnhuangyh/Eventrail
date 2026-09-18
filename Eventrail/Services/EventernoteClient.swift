@@ -142,6 +142,32 @@ nonisolated struct EventernoteClient: Sendable {
         return event.merging(imported)
     }
 
+    // MARK: - One venue
+
+    /// Where a hall is, found by the exact name a listing row prints.
+    ///
+    /// A listing row publishes the hall's name and nothing else — no address
+    /// and no place id — so the site's venue search is what turns the name into
+    /// a page, and the hall's own page is where the address is. Two GETs, and
+    /// both worth caching: see ``VenueRegions``.
+    ///
+    /// Only an exact match is taken, the rule ``performer(named:)`` follows and
+    /// for the same reason: the search matches on part of a name, so the
+    /// next-best row is a different hall in a different town. A name the site
+    /// files no hall under, or a hall whose page prints no address, is nil —
+    /// an answer, and a different thing from the request failing.
+    func address(forVenue venue: String) async throws -> String? {
+        let name = venue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+
+        let results = try await html(at: "/places/search",
+                                     query: ["keyword": name, "limit": "\(Self.pageSize)"])
+        guard let match = EventernotePages.places(in: results).first(where: { $0.name == name })
+        else { return nil }
+
+        return EventernotePages.venueAddress(in: try await html(at: "/places/\(match.id)", query: [:]))
+    }
+
     // MARK: - Fetching
 
     private func html(at path: String, query: [String: String], isPreEncoded: Bool = false) async throws -> String {

@@ -106,6 +106,15 @@ extension FollowedDates {
     }
 }
 
+extension VenueRegions {
+    /// The halls a preview pretends to have placed. The two fixtures that carry
+    /// an address place themselves; this is the third, so the filter sheet has
+    /// nothing left to look up and never reaches Eventernote.
+    @MainActor static var preview: VenueRegions {
+        VenueRegions(placed: ["ユナイテッド・シネマ豊洲": .kanto])
+    }
+}
+
 extension Feed where Item == Event {
     /// A feed already holding the fixture listing, for a `#Preview` of a screen
     /// that is handed one rather than loading its own.

@@ -52,6 +52,15 @@ nonisolated struct EventernoteProfile: Hashable, Sendable {
     let avatarURL: URL?
 }
 
+/// One hall, as the site's venue search lists it.
+///
+/// Name and id and nothing else: the search rows publish no address, which is
+/// why placing a venue takes the hall's own page as well.
+nonisolated struct PlaceListing: Hashable, Sendable {
+    let id: Int
+    let name: String
+}
+
 /// One page of a paged Eventernote listing.
 nonisolated struct EventernotePage<Item: Sendable>: Sendable {
     let items: [Item]
@@ -179,6 +188,30 @@ nonisolated enum EventernotePages {
         return event(id: id, title: title, day: day, venue: venue, venueDetail: nil,
                      placeID: nil, times: times, performers: performers,
                      listedAttendees: nil, imageURL: image, isDetailed: false)
+    }
+
+    /// The venue search results.
+    ///
+    /// The same `gb_listview` block the performer search uses, entered at its
+    /// list rather than at the div: the pager above the rows links back into
+    /// `/places/search`, and a scan that started at the div would read that
+    /// link as its first hall and give up on the page.
+    static func places(in html: String) -> [PlaceListing] {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="gb_listview">"#),
+              cursor.advance(past: "<ul"),
+              let list = cursor.take(upTo: "</ul>")
+        else { return [] }
+
+        var rows = HTMLCursor(list)
+        var places: [PlaceListing] = []
+        while rows.advance(past: #"<a href="/places/"#) {
+            guard let path = rows.take(upTo: "\""), let id = Int(path),
+                  let name = rows.text(after: ">", upTo: "</a>")
+            else { break }
+            places.append(PlaceListing(id: id, name: name))
+        }
+        return places
     }
 
     // MARK: - A member's own page
