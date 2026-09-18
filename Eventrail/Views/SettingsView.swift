@@ -11,6 +11,12 @@ import UniformTypeIdentifiers
 /// themselves; About is the app itself. Everything destructive is at the
 /// bottom, well away from the Refresh button on the screen behind.
 ///
+/// One card per heading, so the shape on the glass says the same thing the
+/// heading does: rows that share a card share a question. Delete All is the
+/// exception and sits outside the About card on its own — a row that empties
+/// the library has no business sharing a shape with a row that opens a version
+/// number.
+///
 /// Every row reads the same way — an icon in the gutter, what it is, and a
 /// line underneath saying what it is doing *now* rather than what it would do
 /// in general. That line is the whole point of the screen: a toggle that says
@@ -47,18 +53,15 @@ struct SettingsView: View {
 
                     sectionHeader("Location")
                         .padding(.top, 6)
-                    preciseVenuesCard(store: $store)
-                    locationCard
+                    locationCard(store: $store)
 
                     sectionHeader("Data")
                         .padding(.top, 6)
-                    iCloudCard(store: $store)
-                    backupCard
+                    dataCard(store: $store)
 
                     sectionHeader("About")
                         .padding(.top, 6)
-                    aboutRow
-                    welcomeRow
+                    aboutCard
                     deleteAllButton
                     footnote
                 }
@@ -135,6 +138,10 @@ struct SettingsView: View {
 
     /// The hairline between two rows of one card, inset past the icon gutter
     /// so it starts under the text rather than cutting the icons off.
+    ///
+    /// A sibling in the stack rather than something laid over the row beneath
+    /// it: an overlay renders at the mercy of whatever the row is made of, and
+    /// went missing over the one row here built from a `ShareLink`.
     private var rowDivider: some View {
         Divider().padding(.leading, 48)
     }
@@ -193,17 +200,25 @@ struct SettingsView: View {
     /// Whether a hall Maps could not place may be narrowed from its block to
     /// its building — see ``VenueBuildings`` for why that is a separate
     /// question and a separate service.
-    private func preciseVenuesCard(store: Bindable<EventStore>) -> some View {
+    private func locationCard(store: Bindable<EventStore>) -> some View {
+        VStack(spacing: 0) {
+            preciseVenuesRow(store: store)
+            rowDivider
+            venueRefreshRow
+        }
+        .glassPanel(interactive: true)
+    }
+
+    private func preciseVenuesRow(store: Bindable<EventStore>) -> some View {
         Toggle(isOn: store.preciseVenuesEnabled) {
             rowLabel("scope", "Precise Venue Locations",
                      Text("Where Apple Maps has no such hall, ask OpenStreetMap which building at the published address it is."))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .glassPanel()
     }
 
-    private var locationCard: some View {
+    private var venueRefreshRow: some View {
         Button {
             Task { await store.refreshVenues() }
         } label: {
@@ -219,7 +234,6 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .disabled(store.isRefreshingVenues || !store.hasVenuesToPlace)
-        .glassPanel(interactive: true)
     }
 
     /// What the refresh is doing, and then what it found — never a bare
@@ -251,7 +265,38 @@ struct SettingsView: View {
 
     // MARK: - Where the reader's records go
 
-    private func iCloudCard(store: Bindable<EventStore>) -> some View {
+    /// One card, because the three rows answer one question — where the
+    /// reader's records live — in three places: on their other devices, in a
+    /// file they keep, and back off one. Sync keeps devices agreeing, which
+    /// means a removal travels too; a file is the one copy nothing done in the
+    /// app afterwards can reach.
+    private func dataCard(store: Bindable<EventStore>) -> some View {
+        VStack(spacing: 0) {
+            iCloudRow(store: store)
+            rowDivider
+            exportRow
+            rowDivider
+            restoreRow
+        }
+        .glassPanel(interactive: true)
+        // Written before the share sheet is opened rather than when it asks for
+        // the file. Handed a file that exists, the system composes the preview
+        // the reader already knows from every other app — its name, its kind
+        // and its icon — where a `Transferable` leaves that to this screen,
+        // which has no business drawing a file.
+        .task(id: self.store.revision) { await prepareExport() }
+        // JSON is allowed beside our own type only so that the app's own
+        // `library.json` can be rescued — see ``LibraryBackup/read(at:)``.
+        .fileImporter(isPresented: $isChoosingBackup,
+                      allowedContentTypes: [.eventrailBackup, .json]) { result in
+            picked = try? result.get()
+        }
+        // No second question: the reader picked this file out of a picker they
+        // opened from a button that says Restore.
+        .restoringBackup($picked, asking: false)
+    }
+
+    private func iCloudRow(store: Bindable<EventStore>) -> some View {
         VStack(spacing: 0) {
             Toggle(isOn: store.iCloudSyncEnabled) {
                 rowLabel("icloud", "iCloud Sync", syncDetail,
@@ -264,7 +309,6 @@ struct SettingsView: View {
                 quotaMeter
             }
         }
-        .glassPanel()
     }
 
     /// Anything the reader has to act on is said in the colour used for
@@ -313,34 +357,6 @@ struct SettingsView: View {
 
     // MARK: - The copy the reader keeps
 
-    /// Export and restore, under the same heading as iCloud Sync because they
-    /// answer the same question — where the reader's records live — and a
-    /// different half of it. Sync keeps this device and the next one agreeing,
-    /// which means a deletion travels too; a file is the one copy nothing done
-    /// in the app afterwards can reach.
-    private var backupCard: some View {
-        VStack(spacing: 0) {
-            exportRow
-            restoreRow
-        }
-        .glassPanel(interactive: true)
-        // Written before the share sheet is opened rather than when it asks for
-        // the file. Handed a file that exists, the system composes the preview
-        // the reader already knows from every other app — its name, its kind
-        // and its icon — where a `Transferable` leaves that to this screen,
-        // which has no business drawing a file.
-        .task(id: store.revision) { await prepareExport() }
-        // JSON is allowed beside our own type only so that the app's own
-        // `library.json` can be rescued — see ``LibraryBackup/read(at:)``.
-        .fileImporter(isPresented: $isChoosingBackup,
-                      allowedContentTypes: [.eventrailBackup, .json]) { result in
-            picked = try? result.get()
-        }
-        // No second question: the reader picked this file out of a picker they
-        // opened from a button that says Restore.
-        .restoringBackup($picked, asking: false)
-    }
-
     @ViewBuilder private var exportRow: some View {
         let row = rowLabel("square.and.arrow.up", "Export Backup",
                            Text("Save your events, notes and tracking as a file you keep"))
@@ -368,7 +384,6 @@ struct SettingsView: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .overlay(alignment: .top) { rowDivider }
     }
 
     /// Writes the file the share sheet will hand over.
@@ -384,9 +399,22 @@ struct SettingsView: View {
 
     // MARK: - About
 
+    /// About and the welcome, which are one card and not two: both say what
+    /// the app is rather than change what it does. Delete All stays outside
+    /// it, alone — a row that empties the library has no business sharing a
+    /// shape with a row that opens a version number.
+    private var aboutCard: some View {
+        VStack(spacing: 0) {
+            aboutRow
+            rowDivider
+            welcomeRow
+        }
+        .glassPanel(interactive: true)
+    }
+
     /// The first-launch screen, on request.
     ///
-    /// Under About rather than beside it: it is not a setting, it is the two
+    /// Under About rather than beside it: it is not a setting, it is the four
     /// questions this screen already answers, asked the way a new reader is
     /// asked them. Both answers still only take effect at its Done.
     private var welcomeRow: some View {
@@ -404,7 +432,6 @@ struct SettingsView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(interactive: true)
     }
 
     private var aboutRow: some View {
@@ -424,7 +451,6 @@ struct SettingsView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(interactive: true)
     }
 
     // MARK: - Emptying the library
