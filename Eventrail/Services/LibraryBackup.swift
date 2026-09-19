@@ -36,7 +36,13 @@ nonisolated struct LibraryBackup: Sendable {
     /// 2: a tracking record carries the seat and what the ticket cost. A build
     /// that has never heard of either would read the file, drop them, and write
     /// the loss back on the next sync, so it is told to refuse instead.
-    static let currentFormat: UInt8 = 2
+    ///
+    /// 3: an event carries the description, the related links, the hashtags and
+    /// the edit history its own page publishes. These are Eventernote's facts
+    /// rather than the reader's, so an older build dropping them loses nothing
+    /// that cannot be imported again — but the rule is the rule, and a file is
+    /// refused by the build that cannot hold all of it.
+    static let currentFormat: UInt8 = 3
 
     var app: String
     var created: Date

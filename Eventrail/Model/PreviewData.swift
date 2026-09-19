@@ -14,7 +14,21 @@ enum PreviewData {
              performers: ["水瀬いのり"],
              venue: "京王アリーナTOKYO(武蔵野の森総合スポーツプラザ)メインアリーナ",
              venueDetail: "東京都調布市西町290-11 武蔵野の森総合スポーツプラザ · 10,000人",
-             y: 2027, m: 4, d: 25, doors: nil, start: nil, listed: 57),
+             y: 2027, m: 4, d: 25, doors: nil, start: nil, listed: 57,
+             summary: """
+             水瀬いのり、2027年のライブツアー開催決定！
+
+             ■チケット
+             ファンクラブ先行 2026年11月1日(日)12:00〜
+             一般発売 2027年1月16日(土)10:00〜
+             全席指定 8,800円(税込)
+             ※未就学児入場不可。小学生以上有料。
+
+             ■注意事項
+             開場/開演時間は決まり次第、公式サイトにて発表されます。
+             """,
+             links: ["https://www.inoriminase.com/", "https://x.com/inoriminase"],
+             hashtag: "#水瀬いのり", editedBy: "GJO_Ling", editedDaysAgo: 12),
         make(id: "492514",
              title: "『劇場版ダーウィンが来た！世界のネコのなかまたち』舞台挨拶付上映＜11:20の回＞",
              performers: ["水瀬いのり"],
@@ -26,7 +40,10 @@ enum PreviewData {
              performers: ["Liella!", "伊達さゆり", "Liyuu(黎獄)", "ペイトン尚未", "岬なこ"],
              venue: "大阪城ホール",
              venueDetail: "大阪府大阪市中央区大阪城3-1 · 16,000人",
-             y: 2025, m: 6, d: 14, doors: (14, 30), start: (15, 30), listed: 628),
+             y: 2025, m: 6, d: 14, doors: (14, 30), start: (15, 30), listed: 628,
+             summary: "6th LoveLive! Tour ～Let's be ONE～ 大阪公演 Day2。全席指定 9,900円(税込)。",
+             links: ["https://www.lovelive-anime.jp/yuigaoka/"],
+             hashtag: "#Liella", editedBy: "yuumakecha", editedDaysAgo: 421),
     ]
 
     static let tracking: [Event.ID: Tracking] = [
@@ -53,7 +70,9 @@ enum PreviewData {
 
     private static func make(
         id: String, title: String, performers: [String], venue: String, venueDetail: String?,
-        y: Int, m: Int, d: Int, doors: (Int, Int)?, start: (Int, Int)?, listed: Int
+        y: Int, m: Int, d: Int, doors: (Int, Int)?, start: (Int, Int)?, listed: Int,
+        summary: String? = nil, links: [String] = [], hashtag: String? = nil,
+        editedBy: String? = nil, editedDaysAgo: Int? = nil
     ) -> Event {
         let day = DateComponents(year: y, month: m, day: d)
         return Event(
@@ -70,10 +89,23 @@ enum PreviewData {
             timeZone: Event.publishedZone,
             listedAttendees: listed,
             performers: performers.map { Performer(name: $0) },
+            summary: summary,
+            relatedLinks: links.compactMap(URL.init(string:)),
+            hashtags: hashtag.map { [Hashtag(tag: $0, searchURL: search(for: $0))] } ?? [],
+            editedBy: editedBy,
+            editedAt: editedDaysAgo.flatMap { calendar.date(byAdding: .day, value: -$0, to: .now) },
             imageURL: URL(string: "https://eventernote.s3.amazonaws.com/images/events/\(id)_s.jpg"),
             sourceURL: EventernoteClient.site.appending(path: "events/\(id)"),
-            isDetailed: true
+            isDetailed: true,
+            detailFormat: Event.currentDetailFormat
         )
+    }
+
+    /// The timeline a hashtag links to, written the way the site writes it.
+    private static func search(for hashtag: String) -> URL {
+        let query = hashtag.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? hashtag
+        return URL(string: "https://mobile.twitter.com/search/?q=\(query)&s=typd")
+            ?? EventernoteClient.site
     }
 
     private static func date(_ day: DateComponents, _ time: (Int, Int)?) -> Date? {

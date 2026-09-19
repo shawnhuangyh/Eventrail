@@ -11,6 +11,9 @@ struct EventDetailView: View {
 
     private let source: Event
     @State private var isImporting = false
+    /// Whether the description is shown whole. Collapsed to begin with, for the
+    /// reason ``summaryCard`` gives.
+    @State private var isSummaryExpanded = false
 
     /// Where Maps says the hall is. Nil until the lookup comes back, and for a
     /// hall Maps has never heard of.
@@ -76,8 +79,10 @@ struct EventDetailView: View {
                     actions
                     statistics
                     trackingCard
+                    summaryCard
                     if !event.performers.isEmpty { performersCard }
                     venueCard
+                    linksCard
                     openInEventernote
                     footnote
                 }
@@ -97,10 +102,14 @@ struct EventDetailView: View {
         .task(id: venueKey) { place = await VenuePlaces.shared.mapItem(for: event) }
     }
 
-    /// Imports the event's own page for the times, billing and head count a
-    /// search row does not carry. A row already imported is left alone.
+    /// Imports the event's own page for the times, billing, description and
+    /// head count a search row does not carry.
+    ///
+    /// Asked of ``Event/isFullyDetailed`` rather than of `isDetailed`, so an
+    /// event imported by a build that read less of the page than this one does
+    /// is read again, once, the first time the reader opens it.
     private func importPage() async {
-        guard !event.isDetailed else { return }
+        guard !event.isFullyDetailed else { return }
         isImporting = true
         defer { isImporting = false }
         await store.loadDetail(for: event)
@@ -416,6 +425,170 @@ struct EventDetailView: View {
             .foregroundStyle(.tertiary)
     }
 
+    // MARK: - What the page says the event is
+
+    /// 概要: the one thing on an Eventernote event page somebody wrote out in
+    /// sentences.
+    ///
+    /// It is where everything the site has no field for ends up — ticket
+    /// prices, seat types, the on-sale date, which stage each act is on — so
+    /// for most events it is the fullest thing published about the night. It
+    /// also runs from one line to forty, which is why it opens collapsed: the
+    /// billing and the hall below it should not sit under a wall of ticket
+    /// terms the reader has already read once.
+    @ViewBuilder
+    private var summaryCard: some View {
+        if let summary = event.summary {
+            VStack(alignment: .leading, spacing: 12) {
+                CardHeader(title: "Overview")
+
+                // Imported text, shown as Eventernote published it — with the
+                // addresses written into it made tappable, which is the one
+                // thing this app adds to it.
+                Text(summary.linkingURLs)
+                    .font(.system(size: 13))
+                    .tint(Color.brandTint)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(2)
+                    .lineLimit(isSummaryExpanded ? nil : Self.collapsedSummaryLines)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if isLong(summary) {
+                    Button {
+                        withAnimation(.snappy) { isSummaryExpanded.toggle() }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(isSummaryExpanded ? "Show less" : "Show more")
+                                .font(.system(size: 12.5, weight: .semibold))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .rotationEffect(.degrees(isSummaryExpanded ? 180 : 0))
+                        }
+                        .foregroundStyle(Color.brandTint)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(18)
+            .glassPanel(cornerRadius: 28)
+            .padding(.horizontal, 18)
+        }
+    }
+
+    /// How much of a long description stands before the reader asks for the rest.
+    private static let collapsedSummaryLines = 8
+
+    /// Roughly whether anything is being cut off.
+    ///
+    /// What this wants is the laid-out line count, which SwiftUI will not give
+    /// for a `Text` inside a scroll view, so it is guessed from the text: eight
+    /// lines of the Japanese these are written in is around two hundred
+    /// characters. A guess can only be wrong in one direction here — a Show
+    /// more that opens onto nothing new — and it is the cheaper of the two
+    /// mistakes than a description silently ending mid-sentence.
+    private func isLong(_ summary: String) -> Bool {
+        summary.count > 200
+            || summary.split(whereSeparator: \.isNewline).count > Self.collapsedSummaryLines
+    }
+
+    // MARK: - Where the announcement was made
+
+    /// 関連リンク and Twitterハッシュタグ: the pages the event was announced on,
+    /// and what to follow the night under.
+    ///
+    /// One card rather than two, because both answer the same question — where
+    /// the rest of this is — and because most events publish one or the other
+    /// rather than both.
+    @ViewBuilder
+    private var linksCard: some View {
+        let links = event.relatedLinks ?? []
+        let hashtags = event.hashtags ?? []
+        if !links.isEmpty || !hashtags.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                CardHeader(title: "Links")
+
+                VStack(spacing: 0) {
+                    ForEach(links, id: \.self) { link in
+                        linkRow(link)
+                    }
+                }
+
+                if !hashtags.isEmpty {
+                    FlowLayout(spacing: 8) {
+                        ForEach(hashtags) { hashtag in
+                            Link(destination: hashtag.searchURL) {
+                                Text(verbatim: hashtag.tag)
+                                    .font(.system(size: 12.5, weight: .semibold))
+                                    .foregroundStyle(Color.brandTint)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .glassCapsule(interactive: true)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(18)
+            .glassPanel(cornerRadius: 28)
+            .padding(.horizontal, 18)
+        }
+    }
+
+    /// One published link: the site it goes to, and enough of the address under
+    /// it to tell two links to the same site apart.
+    ///
+    /// The host on its own line because that is the part a reader recognises —
+    /// the promoter, the ticket agency, the post that broke the news — and the
+    /// rest of these addresses is a tracking query nobody reads.
+    private func linkRow(_ link: URL) -> some View {
+        Link(destination: link) {
+            HStack(spacing: 12) {
+                Image(systemName: "link")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.brandTint)
+                    .frame(width: 20)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: host(of: link))
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .lineLimit(1)
+                    if let path = trail(of: link) {
+                        Text(verbatim: path)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 9)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The site, as a reader would name it: "www." is how a host is written
+    /// rather than part of who it belongs to.
+    private func host(of link: URL) -> String {
+        guard let host = link.host() else { return link.absoluteString }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    /// What follows the host, where there is anything worth printing. A link to
+    /// the front page of a site has nothing to add to its own name.
+    private func trail(of link: URL) -> String? {
+        let path = link.path()
+        return path.isEmpty || path == "/" ? nil : path
+    }
+
     // MARK: - Performers
 
     /// Eventernote bills performers by name and nothing else — no instrument, no
@@ -555,9 +728,26 @@ struct EventDetailView: View {
     private var footnote: some View {
         Footnote(isImporting
                  ? Text("Importing this event from its public Eventernote page…")
-                 : Text("Event data imported from the public Eventernote page."))
+                 : provenance)
             .padding(.horizontal, 26)
             .padding(.top, 2)
+    }
+
+    /// Where the facts came from and, where the page's history says so, who
+    /// wrote them down last.
+    ///
+    /// Eventernote's event pages are written by its members rather than by the
+    /// promoter, so how recently one was touched is part of reading it: an
+    /// upcoming night last edited two years ago has doors nobody has checked
+    /// since. The handle is shown as the site prints it.
+    private var provenance: Text {
+        let source = Text("Event data imported from the public Eventernote page.")
+        guard let editedAt = event.editedAt else { return source }
+        let when = Text(editedAt, format: .relative(presentation: .named))
+        guard let handle = event.editedBy else {
+            return Text("\(source) The page was last edited \(when).")
+        }
+        return Text("\(source) The page was last edited by \(Text(verbatim: handle)) \(when).")
     }
 }
 

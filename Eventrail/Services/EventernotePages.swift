@@ -365,10 +365,92 @@ nonisolated enum EventernotePages {
         var attendees = HTMLCursor(html)
         let listed = attendees.text(after: "このイベントに参加のイベンター(", upTo: ")").flatMap(number(in:))
 
-        return event(id: id, title: title, day: day, venue: venue, venueDetail: nil,
-                     placeID: placeID, times: section("開場/開演/終演時間", in: html)?.htmlText,
-                     performers: performers, listedAttendees: listed,
-                     imageURL: image, isDetailed: true)
+        guard var event = event(id: id, title: title, day: day, venue: venue, venueDetail: nil,
+                                placeID: placeID, times: section("開場/開演/終演時間", in: html)?.htmlText,
+                                performers: performers, listedAttendees: listed,
+                                imageURL: image, isDetailed: true)
+        else { return nil }
+
+        // Set here rather than passed through the shared factory: a listing row
+        // publishes none of them, so only an event's own page has anything to
+        // say. Empty is kept apart from nil for the reason ``Event/relatedLinks``
+        // gives — a re-import of a row must not blank these out.
+        event.summary = lines(ofSection: "概要", in: html)
+        event.relatedLinks = links(inSection: "関連リンク", in: html)
+        event.hashtags = hashtags(in: html)
+        let edit = lastEdit(in: html)
+        event.editedBy = edit?.handle
+        event.editedAt = edit?.at
+        event.detailFormat = Event.currentDetailFormat
+        return event
+    }
+
+    /// Every link a section points at, in the order it prints them.
+    ///
+    /// 関連リンク is a run of anchors in one paragraph, and the site prints the
+    /// href as the link's own text — so the text is no shorter than the address
+    /// and it is the address that is kept.
+    private static func links(inSection heading: String, in html: String) -> [URL] {
+        guard let markup = section(heading, in: html) else { return [] }
+        var cursor = HTMLCursor(markup)
+        var links: [URL] = []
+        // Read through ``HTMLCursor/text(after:upTo:)`` rather than taken raw,
+        // so "&amp;" in a query is a "&" by the time it is parsed as a URL.
+        while let href = cursor.text(after: #"<a href=""#, upTo: "\"") {
+            guard let url = URL(string: href), url.scheme?.hasPrefix("http") == true,
+                  // The same address twice is the same link, and two rows that
+                  // are the same row is one identity too few for a `ForEach`.
+                  !links.contains(url)
+            else { continue }
+            links.append(url)
+        }
+        return links
+    }
+
+    /// The Twitterハッシュタグ section: the tags as written, and the timeline
+    /// the site links them to.
+    ///
+    /// An event's tags are one field and one link, even when several are
+    /// written in it — "#チェンステ #チェンソーマン" is a single search for
+    /// both at once. **Don't split them.** The site publishes one link because
+    /// the search it points at is the one worth running: the night is tagged
+    /// both ways, and either tag on its own is a wider net than the event.
+    private static func hashtags(in html: String) -> [Hashtag] {
+        guard let markup = section("Twitterハッシュタグ", in: html) else { return [] }
+        var cursor = HTMLCursor(markup)
+        var tags: [Hashtag] = []
+        while let href = cursor.text(after: #"<a href=""#, upTo: "\""),
+              let tag = cursor.text(after: ">", upTo: "</a>"),
+              let url = URL(string: href) {
+            let hashtag = Hashtag(tag: tag, searchURL: url)
+            // The same tag twice is one identity too few for a `ForEach`.
+            if !tags.contains(hashtag) { tags.append(hashtag) }
+        }
+        return tags
+    }
+
+    /// The top row of イベント登録/最終更新履歴: who touched the page last, and
+    /// how long ago the site says that was.
+    ///
+    /// The history is printed newest first, with every row but the first
+    /// carrying `class="hide"` behind a "show all" the app does not draw — so
+    /// the first anchor after the list opens is the latest edit.
+    ///
+    /// The site prints the age as "127日前", which is a fact about the day it
+    /// was served rather than about the page. It is turned into a date here so
+    /// that a copy held for a year does not go on claiming the edit was 127
+    /// days ago. A row printed any other way leaves the date nil and keeps the
+    /// name, which is the half that cannot be wrong.
+    private static func lastEdit(in html: String) -> (handle: String, at: Date?)? {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"id="authors""#),
+              let handle = cursor.text(after: #"<a class="noline" href="/users/"#, upTo: "\"")
+        else { return nil }
+
+        guard let printed = cursor.text(after: #"<span class="s color2">"#, upTo: "</span>"),
+              printed.hasSuffix("日前"), let days = number(in: printed)
+        else { return (handle, nil) }
+        return (handle, Calendar.current.date(byAdding: .day, value: -days, to: .now))
     }
 
     /// Address and capacity from a venue's page, in the form the detail sheet

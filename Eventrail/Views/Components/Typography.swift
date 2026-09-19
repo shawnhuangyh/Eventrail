@@ -145,3 +145,33 @@ struct Footnote: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+nonisolated extension String {
+    /// This text with the web addresses written in it made tappable.
+    ///
+    /// Eventernote's members write an event's 概要 as plain text, and a ticket
+    /// link in the middle of it is printed as the address itself. A `Text` does
+    /// nothing with those, so they are detected and marked up here — which is
+    /// the difference between a reader tapping through to the ticket agency and
+    /// copying forty characters out by hand.
+    ///
+    /// Built by splicing the runs together rather than by attributing ranges in
+    /// place: the two index spaces are not the same, and this one cannot put a
+    /// link on the wrong words.
+    var linkingURLs: AttributedString {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        else { return AttributedString(self) }
+
+        var attributed = AttributedString()
+        var plain = startIndex
+        for match in detector.matches(in: self, range: NSRange(startIndex..., in: self)) {
+            guard let url = match.url, let found = Range(match.range, in: self) else { continue }
+            attributed += AttributedString(self[plain ..< found.lowerBound])
+            var link = AttributedString(self[found])
+            link.link = url
+            attributed += link
+            plain = found.upperBound
+        }
+        return attributed + AttributedString(self[plain...])
+    }
+}
