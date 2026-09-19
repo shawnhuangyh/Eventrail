@@ -1,4 +1,3 @@
-import MapKit
 import SwiftUI
 
 /// One event: what Eventernote publishes about it, and what the reader records
@@ -50,42 +49,21 @@ struct EventDetailView: View {
         "\(event.venue)\n\(event.publishedAddress ?? "")"
     }
 
-    /// Opens Maps on the hall itself.
-    ///
-    /// The map item wherever ``VenuePlaces`` placed it, so Maps opens the point
-    /// on the map — the hall's own card, its pin, its directions — rather than
-    /// running a search for the name and leaving the reader to pick the right
-    /// one out of a list of near misses. A hall Maps has not placed still falls
-    /// back to that search, which is the best there is to offer for it.
+    /// Opens Maps on the hall this event is at — see ``VenueDirections``.
     private func openVenueInMaps(directions: Bool) {
-        if let place {
-            var options: [String: Any] = [:]
-            if directions {
-                options[MKLaunchOptionsDirectionsModeKey] = MKLaunchOptionsDirectionsModeDefault
-            }
-            place.item.openInMaps(launchOptions: options)
-        } else if let url = venueSearchURL(directions: directions) {
-            openURL(url)
-        }
-    }
-
-    /// The hall by name, for Maps to find for itself.
-    private func venueSearchURL(directions: Bool) -> URL? {
-        guard !event.venue.isEmpty,
-              let query = event.venue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
-        else { return nil }
-        return URL(string: "https://maps.apple.com/?\(directions ? "daddr" : "q")=\(query)")
+        VenueDirections.open(event.venue, at: place, directions: directions, with: openURL)
     }
 
     var body: some View {
-        // A stack of its own, so a performer billed here opens their page
-        // inside this sheet rather than dismissing it. The sheet's own chrome
-        // is the Done button, so the bar stays hidden at the root and comes
-        // back — with its back button — on whatever is pushed onto it.
+        // A stack of its own, so a performer billed here — or the hall it is
+        // held at — opens inside this sheet rather than dismissing it. The
+        // sheet's own chrome is the Done button, so the bar stays hidden at the
+        // root and comes back — with its back button — on whatever is pushed
+        // onto it.
         NavigationStack {
             detail
                 .toolbar(.hidden, for: .navigationBar)
-                .performerDestination()
+                .venueDestination()
         }
         .presentationDragIndicator(.visible)
     }
@@ -480,19 +458,11 @@ struct EventDetailView: View {
 
     private var venueCard: some View {
         VStack(spacing: 0) {
-            VenueMap(event: event, place: place) { openVenueInMaps(directions: false) }
+            VenueMap(venue: event.venue, place: place) { openVenueInMaps(directions: false) }
 
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(event.venue.isEmpty ? String(localized: "Venue to be announced") : event.venue)
-                        .font(.system(size: 14.5, weight: .semibold))
-                    if let venueDetail = event.venueDetail {
-                        Text(venueDetail)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                venueName
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if hasVenue {
                     Button {
@@ -516,6 +486,57 @@ struct EventDetailView: View {
         .padding(.horizontal, 18)
     }
 
+    /// The hall's name, and — where the site has a page for it — the way to
+    /// everything else held there.
+    ///
+    /// A link rather than the Directions button beside it: those two are
+    /// different errands, one to Maps and one to the rest of the hall's
+    /// calendar. An event announced before a hall was booked has no name to
+    /// push, and stays the plain line it has always been.
+    @ViewBuilder
+    private var venueName: some View {
+        if event.venue.isEmpty {
+            venueLines
+        } else {
+            NavigationLink(value: venueLink) {
+                HStack(spacing: 7) {
+                    venueLines
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// The place id where the event's own page has been imported, and the name
+    /// alone otherwise — which the hall's page is found by, the way a billed
+    /// performer's is.
+    private var venueLink: VenueLink {
+        if let placeID = event.placeID {
+            .place(PlaceListing(id: placeID, name: event.venue))
+        } else {
+            .named(event.venue)
+        }
+    }
+
+    private var venueLines: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(event.venue.isEmpty ? String(localized: "Venue to be announced") : event.venue)
+                .font(.system(size: 14.5, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            if let venueDetail = event.venueDetail {
+                Text(venueDetail)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     // MARK: - Provenance
 
     /// Anything that changes the reader's Eventernote account happens on the
@@ -531,79 +552,6 @@ struct EventDetailView: View {
                  : Text("Event data imported from the public Eventernote page."))
             .padding(.horizontal, 26)
             .padding(.top, 2)
-    }
-}
-
-/// The venue, drawn where it is.
-///
-/// Eventernote publishes an address and no coordinate, so the hall is looked up
-/// in ``VenuePlaces`` — the same lookup, and the same kept answers, the calendar
-/// mirror uses, so whichever of the two asks first pays for it. The sheet does
-/// the asking, because the same answer is what its Directions button opens.
-///
-/// Until that comes back, and for a hall Maps does not have, the panel is the
-/// pin on plain ground it has always been: a map that cannot say where the place
-/// is would be worse than not drawing one.
-private struct VenueMap: View {
-    let event: Event
-    let place: VenuePlaces.Placing?
-    /// Opens the hall in Maps. A tap anywhere on the map does it, which is
-    /// where panning around belongs.
-    let open: () -> Void
-
-    /// Close enough to show which block the hall is on, far enough to show the
-    /// station or the road that gets the reader there.
-    /// How much ground the map shows. Wide enough that the hall and the
-    /// streets naming it are both in the frame.
-    private static let span: CLLocationDistance = 700
-
-    var body: some View {
-        Group {
-            if let place {
-                map(around: place.item.location.coordinate, uncertainty: place.uncertainty)
-            } else {
-                pin.background(.quaternary)
-            }
-        }
-        .frame(height: 150)
-        .accessibilityLabel("Venue map")
-    }
-
-    /// Fixed rather than scrollable: this sits inside a sheet that scrolls, and
-    /// a map that swallowed the drag would trap it. A tap opens Maps proper,
-    /// which is where panning around belongs.
-    /// A hall placed by its address rather than by its own listing sits at the
-    /// middle of its block, and the door can be three hundred metres off that
-    /// — which at the ordinary span puts it against the edge of the frame or
-    /// past it. So the frame opens up by what the placing is unsure of, twice
-    /// over, and the hall stays in the picture. An exactly placed hall is
-    /// unaffected: its uncertainty is zero.
-    private func map(around coordinate: CLLocationCoordinate2D,
-                     uncertainty: CLLocationDistance) -> some View {
-        let span = Self.span + uncertainty * 2
-        let region = MKCoordinateRegion(
-            center: coordinate,
-            latitudinalMeters: span,
-            longitudinalMeters: span
-        )
-        return Map(initialPosition: .region(region), interactionModes: []) {
-            Annotation(event.venue, coordinate: coordinate) { pin }
-                .annotationTitles(.hidden)
-        }
-        .allowsHitTesting(false)
-        .overlay {
-            Button(action: open) { Color.clear.contentShape(.rect) }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open the venue in Maps")
-        }
-    }
-
-    private var pin: some View {
-        Image(systemName: "mappin.circle.fill")
-            .font(.system(size: 28))
-            .foregroundStyle(Color.favorite)
-            .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

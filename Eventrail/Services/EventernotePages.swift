@@ -61,6 +61,46 @@ nonisolated struct PlaceListing: Hashable, Sendable {
     let name: String
 }
 
+/// One hall's own page: what Eventernote publishes about the place itself,
+/// rather than about anything held there.
+///
+/// Every field but the name is optional, and most halls leave several of them
+/// empty — the pages are written by the site's own members, so a small live
+/// house has a name and an address and nothing more, while an arena carries its
+/// seating breakdown and the walk from the station.
+///
+/// **There is no picture here**, for the reason a performer has none: the venue
+/// template publishes a map canvas and no photograph of the hall. The map on
+/// ``VenueView`` is drawn from the address by ``VenuePlaces``, which is a
+/// likeness of the place rather than a stand-in for one.
+nonisolated struct VenueProfile: Identifiable, Hashable, Sendable {
+    /// Eventernote's place id, as it appears in the page's path.
+    let id: Int
+    let name: String
+    /// 所在地, with the postal code dropped — the same line an event carries as
+    /// ``Event/venueAddress``, so a hall placed from one is placed from either.
+    let address: String?
+    /// 収容人数 verbatim. The site prints a total and often the breakdown
+    /// behind it, and the breakdown is the half a reader picking a seat wants.
+    let capacity: String?
+    let phone: String?
+    /// 公式サイト: the hall's own site, which is where a floor plan, an access
+    /// map and the cloakroom rules actually live.
+    let website: URL?
+    /// 座席情報, which the site publishes as a link to the hall's own chart
+    /// rather than as words.
+    let seatingChart: URL?
+    /// 会場TIPS: how to get there and what to know on the day, written by the
+    /// site's members. Kept with its line breaks — it is a list of exits and
+    /// walking times, and run together it is unreadable.
+    let tips: String?
+}
+
+nonisolated extension VenueProfile {
+    /// The hall's own page on Eventernote.
+    var pageURL: URL { EventernoteClient.site.appending(path: "places/\(id)") }
+}
+
 /// One page of a paged Eventernote listing.
 nonisolated struct EventernotePage<Item: Sendable>: Sendable {
     let items: [Item]
@@ -350,6 +390,65 @@ nonisolated enum EventernotePages {
             .drop { $0 == "〒" || $0.isNumber || $0 == "-" }
             .trimmingCharacters(in: .whitespaces)
         return (address?.isEmpty ?? true) ? nil : address
+    }
+
+    // MARK: - A venue's own page
+
+    /// Reads `/places/{id}`.
+    ///
+    /// Anchored on `mod_places_detail` so the name is read from the hall's own
+    /// block rather than from the first heading on the page, and the id is
+    /// passed in rather than read back out: it is what the page was asked for
+    /// by, and a template that stopped printing it should not silently change
+    /// which hall is being shown.
+    static func venue(in html: String, id: Int) -> VenueProfile? {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="mod_places_detail">"#),
+              let name = cursor.text(after: #"<h1 class="gb_subtitle gb_curl_effect">"#, upTo: "</h1>")
+        else { return nil }
+
+        return VenueProfile(
+            id: id,
+            name: name,
+            address: venueAddress(in: html),
+            capacity: text(ofSection: "収容人数", in: html),
+            phone: text(ofSection: "電話番号", in: html),
+            website: link(inSection: "公式サイト", in: html),
+            seatingChart: link(inSection: "座席情報", in: html),
+            tips: lines(ofSection: "会場TIPS", in: html)
+        )
+    }
+
+    /// One section's readable text, or nil where the hall left it empty — which
+    /// the template prints as an empty `<p class="t">` rather than by leaving
+    /// the heading out.
+    private static func text(ofSection heading: String, in html: String) -> String? {
+        let text = section(heading, in: html)?.htmlText
+        return (text?.isEmpty ?? true) ? nil : text
+    }
+
+    /// Where a section points rather than what it says. The site labels both
+    /// the official site and the seating chart with a word — "ウェブサイト",
+    /// "座席情報" — and puts the whole of the answer in the href.
+    private static func link(inSection heading: String, in html: String) -> URL? {
+        guard let markup = section(heading, in: html) else { return nil }
+        var cursor = HTMLCursor(markup)
+        guard let href = cursor.text(after: #"<a href=""#, upTo: "\"") else { return nil }
+        return URL(string: href)
+    }
+
+    /// A section written as lines, with the template's breaks kept as breaks.
+    ///
+    /// ``StringProtocol/htmlText`` drops every tag, which would run four exits
+    /// and their walking times into one sentence. So the breaks become newlines
+    /// before the tags go.
+    private static func lines(ofSection heading: String, in html: String) -> String? {
+        guard let markup = section(heading, in: html) else { return nil }
+        let broken = ["<br />", "<br/>", "<br>"].reduce(String(markup)) {
+            $0.replacingOccurrences(of: $1, with: "\n")
+        }
+        let text = broken.htmlText
+        return text.isEmpty ? nil : text
     }
 
     /// The address back out of a line this adapter joined.

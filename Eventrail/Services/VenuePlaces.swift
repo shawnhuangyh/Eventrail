@@ -55,13 +55,18 @@ final class VenuePlaces {
         let name: String
         let address: String?
 
+        /// Nil where there is no hall to ask about — neither a name nor an
+        /// address is something Maps can be asked for.
+        init?(name: String, address: String?) {
+            guard !name.isEmpty || address != nil else { return nil }
+            self.name = name
+            self.address = address
+        }
+
         /// Nil where the site has not named a hall yet — it announces plenty of
         /// events before it has booked one.
         init?(_ event: Event) {
-            let address = event.publishedAddress
-            guard !event.venue.isEmpty || address != nil else { return nil }
-            name = event.venue
-            self.address = address
+            self.init(name: event.venue, address: event.publishedAddress)
         }
 
         /// The hall's name without the alias Eventernote is apt to append in
@@ -314,6 +319,22 @@ final class VenuePlaces {
     /// calendar mirror included.
     func mapItem(for event: Event) async -> Placing? {
         guard let venue = Venue(event) else { return nil }
+        return await mapItem(for: venue)
+    }
+
+    /// The same question asked about a hall rather than about something held
+    /// there, for ``VenueView`` — which knows the hall's own page and so knows
+    /// its name and address without an event in front of it.
+    ///
+    /// Keyed on exactly what an event's lookup is keyed on, so a hall the
+    /// reader has already opened an event at is answered from what that
+    /// lookup wrote down rather than asked about again.
+    func mapItem(forVenue name: String, address: String?) async -> Placing? {
+        guard let venue = Venue(name: name, address: address) else { return nil }
+        return await mapItem(for: venue)
+    }
+
+    private func mapItem(for venue: Venue) async -> Placing? {
         if let answer = cache[venue.key], !Self.isWorthAskingAgain(answer) {
             return answer.placing
         }

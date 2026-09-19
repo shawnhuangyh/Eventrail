@@ -1,3 +1,4 @@
+import MapKit
 import SwiftUI
 
 /// The event flyer Eventernote hosts, with the placeholder the design uses
@@ -400,5 +401,119 @@ struct FollowedPerformerRow: View {
         }
         guard let reading = performer.reading else { return events }
         return Text("\(reading) · \(events)")
+    }
+}
+
+/// Opens a hall in Maps, however well it has been placed.
+///
+/// The map item wherever ``VenuePlaces`` placed it, so Maps opens the point on
+/// the map — the hall's own card, its pin, its directions — rather than running
+/// a search for the name and leaving the reader to pick the right one out of a
+/// list of near misses. A hall Maps has not placed still falls back to that
+/// search, which is the best there is to offer for it.
+///
+/// Two screens send the reader to Maps — an event's sheet and the hall's own
+/// page — and both do it from the map and from a Directions button, so the rule
+/// is written once here rather than four times between them.
+enum VenueDirections {
+    static func open(
+        _ venue: String, at place: VenuePlaces.Placing?, directions: Bool, with openURL: OpenURLAction
+    ) {
+        if let place {
+            var options: [String: Any] = [:]
+            if directions {
+                options[MKLaunchOptionsDirectionsModeKey] = MKLaunchOptionsDirectionsModeDefault
+            }
+            place.item.openInMaps(launchOptions: options)
+        } else if let url = searchURL(venue, directions: directions) {
+            openURL(url)
+        }
+    }
+
+    /// The hall by name, for Maps to find for itself.
+    private static func searchURL(_ venue: String, directions: Bool) -> URL? {
+        guard !venue.isEmpty,
+              let query = venue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else { return nil }
+        return URL(string: "https://maps.apple.com/?\(directions ? "daddr" : "q")=\(query)")
+    }
+}
+
+/// The venue, drawn where it is.
+///
+/// Eventernote publishes an address and no coordinate, so the hall is looked up
+/// in ``VenuePlaces`` — the same lookup, and the same kept answers, the calendar
+/// mirror uses, so whichever of the three asks first pays for it. An event's
+/// sheet and a hall's own page both do the asking, because the same answer is
+/// what their Directions button opens.
+///
+/// Until that comes back, and for a hall Maps does not have, the panel is the
+/// pin on plain ground it has always been: a map that cannot say where the place
+/// is would be worse than not drawing one.
+///
+/// It takes the hall's name rather than the event at it: ``VenueView`` draws
+/// the same map with no event in front of it, and the name is all the pin was
+/// ever labelled with.
+struct VenueMap: View {
+    /// The hall as Eventernote names it, which is the pin's label.
+    let venue: String
+    let place: VenuePlaces.Placing?
+    /// Opens the hall in Maps. A tap anywhere on the map does it, which is
+    /// where panning around belongs.
+    let open: () -> Void
+
+    /// Close enough to show which block the hall is on, far enough to show the
+    /// station or the road that gets the reader there.
+    /// How much ground the map shows. Wide enough that the hall and the
+    /// streets naming it are both in the frame.
+    private static let span: CLLocationDistance = 700
+
+    var body: some View {
+        Group {
+            if let place {
+                map(around: place.item.location.coordinate, uncertainty: place.uncertainty)
+            } else {
+                pin.background(.quaternary)
+            }
+        }
+        .frame(height: 150)
+        .accessibilityLabel("Venue map")
+    }
+
+    /// Fixed rather than scrollable: this sits inside a sheet that scrolls, and
+    /// a map that swallowed the drag would trap it. A tap opens Maps proper,
+    /// which is where panning around belongs.
+    /// A hall placed by its address rather than by its own listing sits at the
+    /// middle of its block, and the door can be three hundred metres off that
+    /// — which at the ordinary span puts it against the edge of the frame or
+    /// past it. So the frame opens up by what the placing is unsure of, twice
+    /// over, and the hall stays in the picture. An exactly placed hall is
+    /// unaffected: its uncertainty is zero.
+    private func map(around coordinate: CLLocationCoordinate2D,
+                     uncertainty: CLLocationDistance) -> some View {
+        let span = Self.span + uncertainty * 2
+        let region = MKCoordinateRegion(
+            center: coordinate,
+            latitudinalMeters: span,
+            longitudinalMeters: span
+        )
+        return Map(initialPosition: .region(region), interactionModes: []) {
+            Annotation(venue, coordinate: coordinate) { pin }
+                .annotationTitles(.hidden)
+        }
+        .allowsHitTesting(false)
+        .overlay {
+            Button(action: open) { Color.clear.contentShape(.rect) }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open the venue in Maps")
+        }
+    }
+
+    private var pin: some View {
+        Image(systemName: "mappin.circle.fill")
+            .font(.system(size: 28))
+            .foregroundStyle(Color.favorite)
+            .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -1,32 +1,54 @@
 import SwiftUI
 
-/// One half of a performer's listing in full — every upcoming date, or every
-/// past appearance.
+/// Who or what a listing of events belongs to.
 ///
-/// ``PerformerView`` shows the first few of each half and sends the rest here,
-/// for the reason ``FavoriteEventsView`` gives: a card that grows without limit
-/// stops being a summary of the listing and becomes the listing, and on a
-/// performer with years behind them it buries everything under it.
+/// Eventernote publishes one listing per performer and one per hall, in the
+/// same block and in the same order, and this app reads both the same way. The
+/// difference is only in the words over them: a hall does not appear anywhere,
+/// and a performer is not a place where events are held.
+nonisolated enum ListingSubject: Hashable {
+    case performer(String)
+    case venue(String)
+
+    /// The imported name, shown in the language Eventernote published it in.
+    var name: String {
+        switch self {
+        case .performer(let name), .venue(let name): name
+        }
+    }
+}
+
+/// One half of a listing in full — every upcoming date, or everything already
+/// behind it.
+///
+/// ``PerformerView`` and ``VenueView`` each show the first few of both halves
+/// and send the rest here, for the reason ``FavoriteEventsView`` gives: a card
+/// that grows without limit stops being a summary of the listing and becomes
+/// the listing, and on a performer with years behind them — or a hall with
+/// years behind it — it buries everything under it.
 ///
 /// The feed is handed over rather than rebuilt, so opening this screen costs no
 /// request — and the pages read on from here are already in the sections behind
 /// it when the reader goes back.
-struct PerformerAppearancesView: View {
+struct ListingHalfView: View {
     /// Which side of today this screen lists. One listing to Eventernote, two
     /// different questions to the reader.
     enum Half {
         case upcoming, past
 
-        var title: LocalizedStringKey {
-            switch self {
-            case .upcoming: "Upcoming"
-            case .past: "Past appearances"
+        /// Titled for whose listing it is: the same rows are a performer's
+        /// appearances and a hall's bookings.
+        func title(of subject: ListingSubject) -> LocalizedStringKey {
+            switch (self, subject) {
+            case (.upcoming, _): "Upcoming"
+            case (.past, .performer): "Past appearances"
+            case (.past, .venue): "Past events"
             }
         }
 
         /// What stands where the rows would, when this half has none.
         ///
-        /// Said in two places — under the section on a performer's page and on
+        /// Said in two places — under the section on a subject's page and on
         /// this screen behind its See All — so it is named here rather than
         /// written out at both.
         var emptyNote: LocalizedStringKey {
@@ -56,9 +78,9 @@ struct PerformerAppearancesView: View {
     @Environment(EventStore.self) private var store
 
     /// Shown as the subtitle, because the title is the half rather than the
-    /// person and there is nothing else on the screen to say whose dates these
-    /// are.
-    let performer: String
+    /// performer or the hall, and there is nothing else on the screen to say
+    /// whose dates these are.
+    let subject: ListingSubject
     let half: Half
     let feed: Feed<Event>
 
@@ -72,7 +94,7 @@ struct PerformerAppearancesView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
                         if index > 0 { Divider().opacity(0.45).padding(.leading, 17) }
-                        AppearanceRow(event: event) { openEvent = event }
+                        AppearanceRow(event: event, subject: subject) { openEvent = event }
                             .padding(.horizontal, 5)
                             .task { await store.pageOn(feed, after: event) }
                     }
@@ -103,22 +125,22 @@ struct PerformerAppearancesView: View {
             .task(id: feed.items.count) { await readOn() }
         }
         .washBackground()
-        .navigationTitle(half.title)
+        .navigationTitle(half.title(of: subject))
         // An imported name, shown in the language Eventernote published it in.
-        .navigationSubtitle(Text(verbatim: performer))
+        .navigationSubtitle(Text(verbatim: subject.name))
         .navigationBarTitleDisplayMode(.inline)
         .eventSheet($openEvent)
     }
 
     /// Pages on while this half is still empty.
     ///
-    /// Past appearances can sit entirely behind a page ``PerformerView`` never
-    /// needed — it stops as soon as the upcoming half is whole — and with no row
-    /// on screen there is nothing for the row-by-row paging to hang off. Keyed
-    /// on the item count so it asks again for each page that turns up nothing,
-    /// and does nothing at all the moment a first row of this half arrives. A
-    /// page that adds no row of any kind leaves the count where it was, so this
-    /// stops rather than spinning.
+    /// The past half can sit entirely behind a page the page before this one
+    /// never needed — it stops as soon as the upcoming half is whole — and with
+    /// no row on screen there is nothing for the row-by-row paging to hang off.
+    /// Keyed on the item count so it asks again for each page that turns up
+    /// nothing, and does nothing at all the moment a first row of this half
+    /// arrives. A page that adds no row of any kind leaves the count where it
+    /// was, so this stops rather than spinning.
     private func readOn() async {
         guard events.isEmpty, feed.hasMore, !feed.isLoadingMore else { return }
         await feed.loadMore()
@@ -128,7 +150,7 @@ struct PerformerAppearancesView: View {
 
 #Preview {
     NavigationStack {
-        PerformerAppearancesView(performer: "水瀬いのり", half: .past, feed: .preview)
+        ListingHalfView(subject: .performer("水瀬いのり"), half: .past, feed: .preview)
     }
     .environment(EventStore.preview)
 }

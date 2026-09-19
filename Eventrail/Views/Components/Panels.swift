@@ -84,4 +84,11 @@ extension View {
     func performerDestination() -> some View {
         navigationDestination(for: PerformerLink.self) { PerformerView(link: $0) }
     }
+
+    /// Registers a venue's page on this stack, with the performer's — a hall's
+    /// page lists who plays there, and each of those names pushes a performer.
+    func venueDestination() -> some View {
+        performerDestination()
+            .navigationDestination(for: VenueLink.self) { VenueView(link: $0) }
+    }
 }

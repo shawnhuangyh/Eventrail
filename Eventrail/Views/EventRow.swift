@@ -6,6 +6,10 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
     /// Shown after the date: the start time in the library, the listed head
     /// count in search results.
     let detail: Text
+    /// The line under the title. Where the event is, in every list that could
+    /// be about anywhere — and who is on it where the list is already one
+    /// hall's, since there the venue is the one thing every row has in common.
+    var caption: Text
     /// Shown above the title where the row belongs to somebody rather than
     /// standing on its own — whose date this is, on the Following list. Empty
     /// everywhere the list is already about one thing.
@@ -25,7 +29,7 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
                     .font(.system(size: 14.5, weight: .semibold))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(event.venue)
+                caption
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -51,10 +55,24 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
     }
 }
 
+extension EventRowContent {
+    /// The venue under the title, which is what places a row in every list that
+    /// is not already about one place.
+    init(
+        event: Event, detail: Text,
+        @ViewBuilder billing: () -> Billing, @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.init(event: event, detail: detail, caption: Text(event.venue),
+                  billing: billing, trailing: trailing)
+    }
+}
+
 extension EventRowContent where Billing == EmptyView {
     /// A row about the event alone, which is every list but Following.
-    init(event: Event, detail: Text, @ViewBuilder trailing: () -> Trailing) {
-        self.init(event: event, detail: detail, billing: { EmptyView() }, trailing: trailing)
+    init(event: Event, detail: Text, caption: Text? = nil,
+         @ViewBuilder trailing: () -> Trailing) {
+        self.init(event: event, detail: detail, caption: caption ?? Text(event.venue),
+                  billing: { EmptyView() }, trailing: trailing)
     }
 }
 
@@ -98,6 +116,43 @@ struct LibraryRow: View {
         }
         .buttonStyle(.plain)
         .glassPanel(interactive: true)
+        .accessibilityHint("Opens the event")
+    }
+}
+
+/// One event out of a performer's or a hall's listing — on either page and on
+/// the screen behind its See All. The badge appears only where the reader has
+/// recorded something; an untracked row has nothing to say there.
+struct AppearanceRow: View {
+    @Environment(EventStore.self) private var store
+
+    let event: Event
+    /// Whose listing this row is in, which decides the line under the title:
+    /// see ``EventRowContent/caption``.
+    let subject: ListingSubject
+    let open: () -> Void
+
+    /// The bill, for a hall's own listing. Eventernote prints one name per
+    /// line; a row has one line, so they are run together on it.
+    private var caption: Text? {
+        guard case .venue = subject, !event.performers.isEmpty else { return nil }
+        return Text(verbatim: event.performers.map(\.name).joined(separator: "・"))
+    }
+
+    var body: some View {
+        Button(action: open) {
+            EventRowContent(event: event, detail: event.timeDetail, caption: caption) {
+                let status = store.status(for: event)
+                HStack(spacing: 8) {
+                    if status != .untracked { StatusBadge(status: status) }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 5)
+        }
+        .buttonStyle(.plain)
         .accessibilityHint("Opens the event")
     }
 }

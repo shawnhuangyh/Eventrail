@@ -1229,6 +1229,17 @@ final class EventStore {
         }.count
     }
 
+    /// How many events in the library at this hall the reader has already been
+    /// to, counted over the library for the reason above.
+    ///
+    /// Matched on the name the site printed, which is the only thing a listing
+    /// row publishes about a hall and so the only thing every event in the
+    /// library carries — an event imported from a search row has no place id
+    /// to match on.
+    func attendedCount(atVenue name: String) -> Int {
+        attendedEvents.filter { $0.venue == name }.count
+    }
+
     // MARK: - Profile statistics
 
     /// What the reader went to: the library's own past.

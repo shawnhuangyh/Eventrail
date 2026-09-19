@@ -62,6 +62,10 @@ struct PerformerView: View {
         if case .found(let profile) = lookup { return profile } else { return nil }
     }
 
+    /// Whose listing this is, for the screens and headings that are shared with
+    /// a hall's page.
+    private var subject: ListingSubject { .performer(link.name) }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
@@ -266,11 +270,11 @@ struct PerformerView: View {
     private static let sectionLimit = 5
 
     private var upcoming: [Event] {
-        PerformerAppearancesView.Half.upcoming.rows(of: feed.items)
+        ListingHalfView.Half.upcoming.rows(of: feed.items)
     }
 
     private var past: [Event] {
-        PerformerAppearancesView.Half.past.rows(of: feed.items)
+        ListingHalfView.Half.past.rows(of: feed.items)
     }
 
     /// True once a past appearance has been read, or the listing has run out —
@@ -337,10 +341,10 @@ struct PerformerView: View {
     }
 
     private func section(
-        half: PerformerAppearancesView.Half, count: Int?, events: [Event], hasMore: Bool
+        half: ListingHalfView.Half, count: Int?, events: [Event], hasMore: Bool
     ) -> some View {
         LazyVStack(alignment: .leading, spacing: 0) {
-            CardHeader(title: half.title, count: count) {
+            CardHeader(title: half.title(of: subject), count: count) {
                 if hasMore { seeAll(half) }
             }
             .padding(.horizontal, 17)
@@ -359,7 +363,7 @@ struct PerformerView: View {
             } else {
                 ForEach(events.prefix(Self.sectionLimit)) { event in
                     Divider().opacity(0.45).padding(.leading, 12)
-                    AppearanceRow(event: event) { openEvent = event }
+                    AppearanceRow(event: event, subject: subject) { openEvent = event }
                         .task { await store.pageOn(feed, after: event) }
                 }
             }
@@ -374,9 +378,9 @@ struct PerformerView: View {
     /// The destination is handed this page's feed rather than a query, so it
     /// opens on what is already read and pages on from there — and whatever it
     /// reads is here in the section when the reader comes back.
-    private func seeAll(_ half: PerformerAppearancesView.Half) -> some View {
+    private func seeAll(_ half: ListingHalfView.Half) -> some View {
         NavigationLink {
-            PerformerAppearancesView(performer: link.name, half: half, feed: feed)
+            ListingHalfView(subject: subject, half: half, feed: feed)
         } label: {
             SeeAllLabel()
         }
@@ -456,33 +460,6 @@ struct PerformerView: View {
         Footnote(Text("Appearances come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back."))
             .padding(.horizontal, 26)
             .padding(.top, 2)
-    }
-}
-
-/// One event a performer is billed on, on this page and on the screen behind
-/// its See All. The badge appears only where the reader has recorded something
-/// — an untracked row has nothing to say there.
-struct AppearanceRow: View {
-    @Environment(EventStore.self) private var store
-
-    let event: Event
-    let open: () -> Void
-
-    var body: some View {
-        Button(action: open) {
-            EventRowContent(event: event, detail: event.timeDetail) {
-                let status = store.status(for: event)
-                HStack(spacing: 8) {
-                    if status != .untracked { StatusBadge(status: status) }
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.horizontal, 5)
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Opens the event")
     }
 }
 

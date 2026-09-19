@@ -151,21 +151,51 @@ nonisolated struct EventernoteClient: Sendable {
     /// a page, and the hall's own page is where the address is. Two GETs, and
     /// both worth caching: see ``VenueRegions``.
     ///
-    /// Only an exact match is taken, the rule ``performer(named:)`` follows and
-    /// for the same reason: the search matches on part of a name, so the
-    /// next-best row is a different hall in a different town. A name the site
-    /// files no hall under, or a hall whose page prints no address, is nil —
-    /// an answer, and a different thing from the request failing.
+    /// A name the site files no hall under, or a hall whose page prints no
+    /// address, is nil — an answer, and a different thing from the request
+    /// failing.
     func address(forVenue venue: String) async throws -> String? {
+        guard let match = try await self.venue(named: venue) else { return nil }
+        return EventernotePages.venueAddress(in: try await html(at: "/places/\(match.id)", query: [:]))
+    }
+
+    /// The hall the site files under exactly this name.
+    ///
+    /// The exact match is the rule ``performer(named:)`` follows and for the
+    /// same reason: the search matches on part of a name, so the next-best row
+    /// is a different hall in a different town. A name the site files no hall
+    /// under is nil — an answer, and a different thing from the request failing.
+    func venue(named venue: String) async throws -> PlaceListing? {
         let name = venue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return nil }
 
         let results = try await html(at: "/places/search",
                                      query: ["keyword": name, "limit": "\(Self.pageSize)"])
-        guard let match = EventernotePages.places(in: results).first(where: { $0.name == name })
-        else { return nil }
+        return EventernotePages.places(in: results).first { $0.name == name }
+    }
 
-        return EventernotePages.venueAddress(in: try await html(at: "/places/\(match.id)", query: [:]))
+    /// One hall's own page: where it is, how many it holds, and the walk from
+    /// the station.
+    func venue(id: Int) async throws -> VenueProfile {
+        let page = try await html(at: "/places/\(id)", query: [:])
+        guard let venue = EventernotePages.venue(in: page, id: id) else {
+            throw Failure.unreadable
+        }
+        return venue
+    }
+
+    /// Everything held at one hall, from the furthest published date backwards
+    /// — so every date still to come sits at the front of the listing, exactly
+    /// as it does for a performer.
+    ///
+    /// The hall's own page carries the first ten of these itself, but says no
+    /// more than "372件" about the rest of them. This is the listing behind
+    /// that link, which pages and prints its total the way every other listing
+    /// on the site does.
+    func events(atVenue id: Int, page: Int = 1) async throws -> EventernotePage<Event> {
+        let html = try await html(at: "/places/\(id)/events",
+                                  query: ["limit": "\(Self.pageSize)", "page": "\(page)"])
+        return EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
     // MARK: - Fetching
