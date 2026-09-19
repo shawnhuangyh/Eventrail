@@ -459,6 +459,13 @@ struct EventDetailView: View {
     private var venueCard: some View {
         VStack(spacing: 0) {
             VenueMap(venue: event.venue, place: place) { openVenueInMaps(directions: false) }
+                // The map alone is clipped, and only where the card's own
+                // corners are. Clipping the whole card clips the glass with
+                // it, and a clipped glass effect stops sampling what is behind
+                // it and flattens to a plain light fill.
+                .clipShape(.rect(topLeadingRadius: 28, bottomLeadingRadius: 0,
+                                 bottomTrailingRadius: 0, topTrailingRadius: 28,
+                                 style: .continuous))
 
             HStack(spacing: 12) {
                 venueName
@@ -482,7 +489,6 @@ struct EventDetailView: View {
             .padding(.vertical, 15)
         }
         .glassPanel(cornerRadius: 28)
-        .clipShape(.rect(cornerRadius: 28, style: .continuous))
         .padding(.horizontal, 18)
     }
 

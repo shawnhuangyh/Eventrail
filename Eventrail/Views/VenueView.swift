@@ -264,6 +264,14 @@ struct VenueView: View {
                 VenueMap(venue: profile.name, place: place) {
                     VenueDirections.open(profile.name, at: place, directions: false, with: openURL)
                 }
+                // Only the map is clipped, and only where the card's own
+                // corners are. Clipping the whole card — which is what it used
+                // to do — clips the glass with it, and a clipped glass effect
+                // stops sampling what is behind it and flattens to a plain
+                // light fill.
+                .clipShape(.rect(topLeadingRadius: 28, bottomLeadingRadius: 0,
+                                 bottomTrailingRadius: 0, topTrailingRadius: 28,
+                                 style: .continuous))
 
                 VStack(spacing: 0) {
                     if let address = profile.address {
@@ -291,7 +299,6 @@ struct VenueView: View {
                 .padding(.vertical, 6)
             }
             .glassPanel(cornerRadius: 28)
-            .clipShape(.rect(cornerRadius: 28, style: .continuous))
             .padding(.horizontal, 18)
         }
     }
