@@ -498,23 +498,20 @@ private struct FollowingFilterSheet: View {
 
     // MARK: - Where in the country
 
+    /// Every area the site has, whether or not anything has landed in one yet.
+    ///
+    /// The list is ``Region/allCases`` rather than the areas the tally has
+    /// found, because the halls are read while the sheet is open: a list of
+    /// what is placed so far would grow a row at a time under the reader's
+    /// thumb, moving whatever they were reaching for. Fixed rows and a count
+    /// that climbs says the same thing without the list ever changing shape.
     private var areaCard: some View {
         VStack(spacing: 0) {
-            let placed = Region.allCases.filter { (tally[$0] ?? 0) > 0 }
             let unplaced = tally[Region?.none] ?? 0
 
-            if placed.isEmpty, unplaced == 0 {
-                Text("Nothing to place yet.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-            }
-
-            ForEach(placed) { region in
+            ForEach(Region.allCases) { region in
                 row(isOn: filter.areas.contains(region),
-                    showsDivider: region != placed.first,
+                    showsDivider: region != Region.allCases.first,
                     title: Text(region.label),
                     detail: Text(region.detail),
                     count: tally[region] ?? 0) {
@@ -526,9 +523,13 @@ private struct FollowingFilterSheet: View {
                 }
             }
 
-            if unplaced > 0 {
+            // The one row that is not a fixed part of the country. It starts
+            // holding everything and empties as the halls are read, so it is
+            // dropped only once it has nothing left to offer — and kept while
+            // it is picked, so a filter in force never loses its own control.
+            if unplaced > 0 || filter.unplaced {
                 row(isOn: filter.unplaced,
-                    showsDivider: !placed.isEmpty,
+                    showsDivider: true,
                     title: Text("Not Placed"),
                     detail: unplacedDetail,
                     count: unplaced) {

@@ -8,18 +8,39 @@ import SwiftUI
 /// grouping is borrowed: the app never asks the site to filter for it, because
 /// a followed performer's listing takes no area of its own.
 ///
-/// The site's sixth area, 海外, is deliberately absent. Abroad is a *negative*
+/// The whole of that facet, as the `<select name="area_id">` on `/events`
+/// spells it, so nobody has to fetch the page again to check a case against it:
+///
+/// | `area_id` | The site's own name | Here |
+/// | --- | --- | --- |
+/// | 1 | 関東 | ``kanto`` |
+/// | 2 | 関西 | ``kansai`` |
+/// | 3 | 東海 | ``tokai`` |
+/// | 4 | 北海道・東北・甲信・北陸 | ``north`` |
+/// | 5 | 中国・四国・九州・沖縄 | ``west`` |
+/// | 6 | 海外 | — |
+///
+/// Five cases for six areas, and ``prefectures`` covers all 47 of them exactly
+/// once. Splitting one further — 北海道 out of ``north``, say — would be free
+/// to implement, since the area is worked out here from the prefecture at the
+/// head of the address rather than asked of the site; it is not done because
+/// an area that is not one of these six would stop answering the way the site
+/// answers.
+///
+/// The sixth, 海外, is deliberately absent. Abroad is a *negative*
 /// fact about an address — that no Japanese prefecture is named in it — and
 /// this app never turns a field it could not read into one it claims to have.
 /// A hall abroad is unplaced, which is the same thing as a hall whose page has
 /// not been read yet: neither is put anywhere it might not belong.
 enum Region: String, CaseIterable, Identifiable, Hashable {
+    /// In the site's own order, which is the order they are offered in.
     case kanto, kansai, tokai, north, west
 
     var id: Self { self }
 
-    /// Short enough to stand in a chip. The prefectures each one covers are in
-    /// ``detail`` and in ``prefectures``.
+    /// Short enough to stand in a chip, which is why the last two are named
+    /// rather than spelled out the way the site spells them: ``detail`` carries
+    /// the site's own chain of place names, and ``prefectures`` the whole of it.
     var label: LocalizedStringKey {
         switch self {
         case .kanto: "Kantō"
