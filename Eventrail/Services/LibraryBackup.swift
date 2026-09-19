@@ -43,10 +43,10 @@ nonisolated struct LibraryBackup: Sendable {
     /// that cannot be imported again — but the rule is the rule, and a file is
     /// refused by the build that cannot hold all of it.
     ///
-    /// 4: a tracking record carries how many lottery entries the reader put in
-    /// and which ticket tier got them in. The reader's own, like the seat and
-    /// the cost at 2 — nothing can import them back — so a build that has never
-    /// heard of them is told to refuse the file rather than drop them.
+    /// 4: a tracking record carries how many lottery entries the reader put
+    /// in. The reader's own, like the seat and the cost at 2 — nothing can
+    /// import it back — so a build that has never heard of it is told to refuse
+    /// the file rather than drop it.
     static let currentFormat: UInt8 = 4
 
     var app: String

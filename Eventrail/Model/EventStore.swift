@@ -1265,11 +1265,11 @@ final class EventStore {
         Set(attendedEvents.flatMap { $0.performers.map(\.name) }).count
     }
 
-    /// How many nights every count below is out of.
+    /// How many nights the count below is out of.
     ///
-    /// The two the reader fills in by hand are only ever part-filled, so each
-    /// of them says what it is counted out of. A total over records nobody
-    /// wrote is not a total.
+    /// The one thing the reader fills in by hand is only ever part-filled, so
+    /// it says what it is counted out of. A total over records nobody wrote is
+    /// not a total.
     var eventsAttended: Int {
         attendedEvents.count
     }
@@ -1279,69 +1279,14 @@ final class EventStore {
     /// The nights they went to, and not the ones still coming: an entry written
     /// down for a lottery still open is kept, and joins this the day the event
     /// passes — the same rule the venue and performer counts above already
-    /// follow, so the five numbers are five readings of one library.
+    /// follow, so the four numbers are four readings of one library.
     var lotteryEntries: Int {
         attendedEvents.reduce(0) { $0 + (tracking(for: $1).lotteryEntries ?? 0) }
     }
 
     /// How many of those nights have a lottery count at all. A blank is not a
-    /// zero, so it is left out of both numbers rather than out of one.
+    /// zero, so it is left out of the total rather than counted as none.
     var lotteryEntriesRecorded: Int {
         attendedEvents.count { tracking(for: $0).lotteryEntries != nil }
     }
-
-    /// Which tickets got the reader in, and how often each one did.
-    ///
-    /// One night counts once, for the one tier it was recorded under — the
-    /// lottery count beside it never adds to this, because applying six times
-    /// is still the one seat that arrived.
-    ///
-    /// Spellings are gathered under ``TicketCategory/key(for:)`` and shown
-    /// under the most recent of them, which is the reader's own latest word for
-    /// the tier. Ordered by how many nights, then by the most recent of them,
-    /// then by the key, so a tie does not reshuffle itself between reads.
-    var ticketCategories: [TicketCategoryCount] {
-        var counted: [String: TicketCategoryCount] = [:]
-        for event in attendedEvents {
-            let name = tracking(for: event).ticketCategory
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { continue }
-            let key = TicketCategory.key(for: name)
-            guard let found = counted[key] else {
-                counted[key] = TicketCategoryCount(key: key, name: name,
-                                                   count: 1, latest: event.date)
-                continue
-            }
-            counted[key] = TicketCategoryCount(
-                key: key,
-                name: event.date > found.latest ? name : found.name,
-                count: found.count + 1,
-                latest: max(found.latest, event.date))
-        }
-        return counted.values.sorted {
-            if $0.count != $1.count { return $0.count > $1.count }
-            if $0.latest != $1.latest { return $0.latest > $1.latest }
-            return $0.key < $1.key
-        }
-    }
-
-    /// How many of those nights have a ticket tier written down, counted from
-    /// the tiers themselves so the coverage and the bars cannot disagree.
-    var ticketCategoriesRecorded: Int {
-        ticketCategories.reduce(0) { $0 + $1.count }
-    }
-}
-
-/// One ticket tier, as often as it got the reader in.
-nonisolated struct TicketCategoryCount: Identifiable, Hashable {
-    /// What two spellings of this tier are counted under.
-    let key: String
-    /// The most recent spelling the reader used, which is what is shown.
-    let name: String
-    let count: Int
-    /// The last night it got them in — the tiebreak, and the reason the name is
-    /// the latest one rather than the first.
-    let latest: Date
-
-    var id: String { key }
 }

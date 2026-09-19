@@ -377,21 +377,11 @@ struct EventDetailView: View {
         }
     }
 
-    /// What the ticket turned out to be: the seat it named, what it cost, and
-    /// which tier it was sold as.
+    /// What the ticket turned out to be: the seat it named, and what it cost.
     ///
-    /// The first two side by side because neither is more than a line, and
-    /// asking for them one under the other would push the notes off the bottom
-    /// of the card. The tier takes the width under them, because a promoter's
-    /// own name for it runs longer than either.
+    /// Side by side because neither is more than a line, and asking for them
+    /// one under the other would push the notes off the bottom of the card.
     private var ticketCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            ticketFacts
-            categoryField
-        }
-    }
-
-    private var ticketFacts: some View {
         HStack(alignment: .top, spacing: 11) {
             VStack(alignment: .leading, spacing: 7) {
                 fieldLabel("Seat")
@@ -418,52 +408,34 @@ struct EventDetailView: View {
         }
     }
 
-    /// Which ticket it was: S席, 一般, 通し券.
+    /// The field the reader writes in. One helper so the four of them are the
+    /// same field asked four questions.
     ///
-    /// A menu of the usual answers over a field that takes anything. A closed
-    /// list would be wrong for the next event announced — promoters name their
-    /// own tiers, and 先行SS席 is a real one — so the menu only saves the
-    /// typing, and what the reader writes is kept as they wrote it.
-    private var categoryField: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            fieldLabel("Ticket category")
-            writing {
-                HStack(spacing: 8) {
-                    TextField("Ticket category", text: tracking.ticketCategory,
-                              prompt: Text(verbatim: "S席 · 一般 · 通し券"))
-                        .autocorrectionDisabled()
-                    Menu {
-                        ForEach(TicketCategory.allCases) { category in
-                            Button {
-                                tracking.ticketCategory.wrappedValue = category.rawValue
-                            } label: {
-                                Text(verbatim: category.rawValue)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.brandTint)
-                            .frame(width: 24, height: 24)
-                            .contentShape(.rect)
-                    }
-                    .accessibilityLabel("Common ticket categories")
-                }
-            }
-        }
-    }
-
-    /// The glass a field the reader writes in sits in. One helper so the five
-    /// of them are the same field asked five questions.
+    /// Flat rather than glass. Liquid Glass is the system's treatment for
+    /// something floating *over* content — a toolbar, a sheet's own chrome, the
+    /// round buttons under the flyer — and these are not floating over
+    /// anything: they are inside a card that is already glass. Glass on glass
+    /// has nothing to refract, which is why they read as empty pills rather
+    /// than as somewhere to type.
+    ///
+    /// The radius is concentric with that card rather than chosen: 28 at the
+    /// card's edge, less the 18 of inset the field sits behind, is 10 here, so
+    /// the two sets of corners run parallel instead of bulging inside one
+    /// another. The 20 they had was nearly half the field's own height, which
+    /// is what made them look like capsules that had been squashed.
     private func writing<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .textFieldStyle(.plain)
             .font(.system(size: 13))
             .labelsHidden()
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-            .glassPanel(cornerRadius: 20)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .background(.quaternary.opacity(0.5), in: Self.fieldShape)
+            .overlay { Self.fieldShape.strokeBorder(.quaternary, lineWidth: 0.5) }
     }
+
+    /// 28 − 18: see ``writing(content:)``.
+    private static let fieldShape = RoundedRectangle(cornerRadius: 10, style: .continuous)
 
     /// Written for the one enum left rather than for any of them. It was
     /// generic over three, with a type switch to find each one's label,
