@@ -245,6 +245,14 @@ struct FlowLayout: Layout {
 struct FavoriteEventRow: View {
     @Environment(EventStore.self) private var store
 
+    /// What stands where these rows would, when there are none.
+    ///
+    /// Kept beside the row rather than written out on each of the two screens
+    /// that show a list of them: the card on the Me tab and the full list
+    /// behind its See All are the same list, and were saying the same sentence
+    /// in two copies.
+    static let emptyNote: LocalizedStringKey = "Tap the heart on any event to keep it here."
+
     let event: Event
     /// Drawn above the row rather than below it, so a list ends on a row and
     /// not on a line.
@@ -313,6 +321,11 @@ struct FavoriteEventRow: View {
 struct FollowedPerformerRow: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
+
+    /// What stands where these rows would, when there are none — for the
+    /// reason ``FavoriteEventRow/emptyNote`` gives.
+    static let emptyNote: LocalizedStringKey =
+        "Follow a performer from their page to keep them here. It stays in your library and is never written back to Eventernote."
 
     let performer: PerformerProfile
     var showsDivider = false

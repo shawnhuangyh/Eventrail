@@ -31,7 +31,7 @@ struct FollowedPerformersView: View {
             VStack(spacing: 0) {
                 if performers.isEmpty {
                     // Reachable by unfollowing the last one from this screen.
-                    Text("Follow a performer from their page to keep them here. It stays in your library and is never written back to Eventernote.")
+                    Text(FollowedPerformerRow.emptyNote)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

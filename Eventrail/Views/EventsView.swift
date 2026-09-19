@@ -74,9 +74,7 @@ struct EventsView: View {
                     )
                 }
             }
-            .sheet(item: $openEvent) { event in
-                EventDetailView(event: event)
-            }
+            .eventSheet($openEvent)
             // Nothing is left selected behind a filter that no longer shows it,
             // and nothing survives leaving the mode that picked it.
             .onChange(of: filter) { selection.removeAll() }

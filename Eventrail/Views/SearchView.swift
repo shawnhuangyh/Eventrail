@@ -39,12 +39,8 @@ struct SearchView: View {
                 }
             }
             .onSubmit(of: .search) { store.remember(search: term) }
-            .navigationDestination(for: PerformerLink.self) { link in
-                PerformerView(link: link)
-            }
-            .sheet(item: $openEvent) { event in
-                EventDetailView(event: event)
-            }
+            .performerDestination()
+            .eventSheet($openEvent)
             .task(id: Request(term: term, scope: scope)) { await search() }
         }
     }
@@ -97,11 +93,11 @@ struct SearchView: View {
                 .padding(.top, 48)
         } else {
             LazyVStack(alignment: .leading, spacing: 9) {
-                resultCount("^[\(events.total) result](inflect: true) on Eventernote")
+                SectionLabel(label: "^[\(events.total) result](inflect: true) on Eventernote")
 
                 ForEach(events.items) { event in
                     SearchResultRow(event: event) { openEvent = event }
-                        .task { await loadMoreEvents(after: event) }
+                        .task { await store.pageOn(events, after: event) }
                 }
 
                 if events.isLoadingMore { SearchProgress(compact: true) }
@@ -109,12 +105,6 @@ struct SearchView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
-    }
-
-    private func loadMoreEvents(after event: Event) async {
-        guard events.isNearEnd(event) else { return }
-        await events.loadMore()
-        store.remember(events.items)
     }
 
     @ViewBuilder
@@ -128,7 +118,7 @@ struct SearchView: View {
                 .padding(.top, 48)
         } else {
             LazyVStack(alignment: .leading, spacing: 9) {
-                resultCount("^[\(performers.total) performer](inflect: true) on Eventernote")
+                SectionLabel(label: "^[\(performers.total) performer](inflect: true) on Eventernote")
 
                 ForEach(performers.items) { performer in
                     PerformerRow(performer: performer)
@@ -145,21 +135,14 @@ struct SearchView: View {
         }
     }
 
-    private func resultCount(_ label: LocalizedStringKey) -> some View {
-        Text(label)
-            .font(.system(size: 11.5, weight: .semibold))
-            .kerning(0.35)
-            .textCase(.uppercase)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 6)
-    }
-
     // MARK: - Before a search
 
     private var startingPoints: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !store.recentSearches.isEmpty {
                 HStack {
+                    // Not a ``SectionLabel``: that carries its own inset, and
+                    // this one is set by the row it shares with Clear.
                     Text("Recent")
                         .font(.system(size: 11.5, weight: .semibold))
                         .kerning(0.35)
@@ -206,38 +189,20 @@ struct SearchView: View {
 /// A search result. The circular control adds the event to the library, or
 /// removes it again — always an explicit choice.
 struct SearchResultRow: View {
-    @Environment(EventStore.self) private var store
-
     let event: Event
     let open: () -> Void
 
-    private var isSaved: Bool { store.isInLibrary(event) }
-
-    /// A search row carries no head count, so it shows what the row does know.
+    /// A search row carries no head count, so it shows what the row does know
+    /// — the listed head count where there is one, and otherwise whatever the
+    /// row would have said about the time anyway.
     private var detail: Text {
-        if let listed = event.listedAttendees {
-            Text("\(listed.formatted()) going")
-        } else if let time = event.timeLine {
-            Text(verbatim: time)
-        } else {
-            Text("Time to be announced")
-        }
+        guard let listed = event.listedAttendees else { return event.timeDetail }
+        return Text("\(listed.formatted()) going")
     }
 
     var body: some View {
         EventRowContent(event: event, detail: detail) {
-            Button {
-                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-            } label: {
-                Image(systemName: isSaved ? "checkmark" : "plus")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(isSaved ? Color.trackAttended : Color.brandTint)
-                    .frame(width: 38, height: 38)
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(.plain)
-            .glassCircle(interactive: true)
-            .accessibilityLabel(isSaved ? "Remove from my events" : "Add to my events")
+            LibraryToggle(event: event)
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)

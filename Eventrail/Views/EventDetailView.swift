@@ -85,9 +85,7 @@ struct EventDetailView: View {
         NavigationStack {
             detail
                 .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(for: PerformerLink.self) { link in
-                    PerformerView(link: link)
-                }
+                .performerDestination()
         }
         .presentationDragIndicator(.visible)
     }
@@ -450,14 +448,7 @@ struct EventDetailView: View {
     /// a row looks the name up first; ``PerformerView`` does that.
     private var performersCard: some View {
         VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Performers")
-                    .font(.system(size: 17, weight: .bold))
-                Text(event.performers.count.formatted())
-                    .font(.system(size: 12, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            }
+            CardHeader(title: "Performers", count: event.performers.count)
 
             VStack(spacing: 3) {
                 ForEach(event.performers) { performer in
@@ -530,35 +521,16 @@ struct EventDetailView: View {
     /// Anything that changes the reader's Eventernote account happens on the
     /// official site, where they authenticate directly.
     private var openInEventernote: some View {
-        Link(destination: event.sourceURL) {
-            HStack(spacing: 9) {
-                Text("Open in Eventernote")
-                    .font(.system(size: 14.5, weight: .semibold))
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundStyle(Color.brandTint)
-            .frame(maxWidth: .infinity)
-            .padding(16)
-        }
-        .glassPanel(interactive: true)
-        .padding(.horizontal, 18)
+        ExternalLinkPanel(title: "Open in Eventernote", destination: event.sourceURL)
+            .padding(.horizontal, 18)
     }
 
     private var footnote: some View {
-        Group {
-            if isImporting {
-                Text("Importing this event from its public Eventernote page…")
-            } else {
-                Text("Event data imported from the public Eventernote page.")
-            }
-        }
-        .font(.system(size: 11))
-        .foregroundStyle(.tertiary)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 26)
-        .padding(.top, 2)
+        Footnote(isImporting
+                 ? Text("Importing this event from its public Eventernote page…")
+                 : Text("Event data imported from the public Eventernote page."))
+            .padding(.horizontal, 26)
+            .padding(.top, 2)
     }
 }
 

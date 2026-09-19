@@ -58,6 +58,19 @@ extension EventRowContent where Billing == EmptyView {
     }
 }
 
+extension Event {
+    /// What a row says after the day.
+    ///
+    /// Eventernote routinely announces an event months before it publishes a
+    /// start time, and a performer's own listing prints one for some rows and
+    /// not others, so a row says so rather than inventing an hour. Three lists
+    /// each said it in their own identical copy; a search result has one more
+    /// thing to offer and says so for itself.
+    var timeDetail: Text {
+        timeLine.map { Text(verbatim: $0) } ?? Text("Time to be announced")
+    }
+}
+
 /// A row in the reader's own library. Tapping it opens the event.
 struct LibraryRow: View {
     @Environment(EventStore.self) private var store
@@ -65,15 +78,9 @@ struct LibraryRow: View {
     let event: Event
     let open: () -> Void
 
-    /// Eventernote often announces an event months before it publishes a
-    /// start time, so the row says so rather than inventing one.
-    private var detail: Text {
-        event.timeLine.map { Text(verbatim: $0) } ?? Text("Time to be announced")
-    }
-
     var body: some View {
         Button(action: open) {
-            EventRowContent(event: event, detail: detail) {
+            EventRowContent(event: event, detail: event.timeDetail) {
                 // Held apart over the row's full height rather than packed into
                 // the middle of it: the badge belongs beside the title it
                 // qualifies, and the chevron in the corner it points out of.

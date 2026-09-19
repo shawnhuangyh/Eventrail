@@ -56,18 +56,12 @@ struct EventernoteAccountSheet: View {
     /// Naming an account only settles where Eventrail looks next — the same
     /// promise ``EventStore/unlinkAccount()`` makes for letting one go.
     private var masthead: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(store.isLinked ? "Change account" : "Your account name")
-                .font(.system(size: 28, weight: .bold))
-                .kerning(-0.84)
-            Text(store.isLinked
-                 ? "Everything already imported stays in your library, whichever account you name. Only where Eventrail reads next changes."
-                 : "Eventrail imports what your Eventernote profile already lists — the events you have been to, and the performers you favourite.")
-                .font(.system(size: 13.5))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 6)
+        ScreenHeading(
+            title: store.isLinked ? "Change account" : "Your account name",
+            detail: store.isLinked
+                ? "Everything already imported stays in your library, whichever account you name. Only where Eventrail reads next changes."
+                : "Eventrail imports what your Eventernote profile already lists — the events you have been to, and the performers you favourite."
+        )
         .padding(.top, 2)
     }
 
@@ -121,12 +115,7 @@ struct AccountFinder: View {
             field
 
             if let label = resultLabel {
-                Text(label)
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .kerning(0.35)
-                    .textCase(.uppercase)
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 6)
+                SectionLabel(label: label)
             }
 
             if let found {

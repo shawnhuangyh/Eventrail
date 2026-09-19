@@ -45,17 +45,11 @@ struct FollowingView: View {
         return events.filter { filter.matches($0, in: venues.region(of: $0)) }
     }
 
+    /// Broken into months the same way the library's own list is — ``events``
+    /// is already date-ordered, which is all ``EventGroup/byMonth(_:)`` asks of
+    /// its caller.
     private var groups: [EventGroup] {
-        // `events` is already date-ordered, so first appearance sets section
-        // order — the same way the library groups its months.
-        var order: [String] = []
-        var buckets: [String: [Event]] = [:]
-        for event in events {
-            let key = event.monthGroupLabel
-            if buckets[key] == nil { order.append(key) }
-            buckets[key, default: []].append(event)
-        }
-        return order.map { EventGroup(id: $0, label: $0, events: buckets[$0] ?? []) }
+        EventGroup.byMonth(events)
     }
 
     var body: some View {
@@ -93,12 +87,8 @@ struct FollowingView: View {
                     ToolbarItem(placement: .primaryAction) { filterButton }
                 }
             }
-            .navigationDestination(for: PerformerLink.self) { link in
-                PerformerView(link: link)
-            }
-            .sheet(item: $openEvent) { event in
-                EventDetailView(event: event)
-            }
+            .performerDestination()
+            .eventSheet($openEvent)
             .sheet(isPresented: $isFiltering) {
                 FollowingFilterSheet(filter: $filter, events: published)
             }
@@ -279,11 +269,7 @@ struct FollowingView: View {
     }
 
     private var footnote: some View {
-        Text("Dates come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back.")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Footnote(Text("Dates come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back."))
             .padding(.horizontal, 26)
             .padding(.top, 6)
     }
@@ -398,10 +384,10 @@ private struct FollowingFilterSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    sectionHeader("When")
+                    SectionLabel(label: "When")
                     datesCard
 
-                    sectionHeader("Where")
+                    SectionLabel(label: "Where")
                         .padding(.top, 6)
                     areaCard
                     areaFootnote
@@ -449,15 +435,6 @@ private struct FollowingFilterSheet: View {
     private var subtitle: Text {
         let matching = events.filter { filter.matches($0, in: venues.region(of: $0)) }.count
         return Text("\(matching) of \(Text("^[\(events.count) event](inflect: true)"))")
-    }
-
-    private func sectionHeader(_ label: LocalizedStringKey) -> some View {
-        Text(label)
-            .font(.system(size: 11.5, weight: .semibold))
-            .kerning(0.35)
-            .textCase(.uppercase)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 6)
     }
 
     // MARK: - One day
@@ -702,22 +679,12 @@ private struct RangeCalendar: View {
 /// on it. Tapping the caption opens that performer; the circular control adds
 /// the event to the library, or takes it out again.
 private struct FollowedDateRow: View {
-    @Environment(EventStore.self) private var store
-
     let event: Event
     let billing: [PerformerProfile]
     let open: () -> Void
 
-    private var isSaved: Bool { store.isInLibrary(event) }
-
-    /// A performer's listing prints times for some rows and not others, and an
-    /// announced date says so rather than being given an invented hour.
-    private var detail: Text {
-        event.timeLine.map { Text(verbatim: $0) } ?? Text("Time to be announced")
-    }
-
     var body: some View {
-        EventRowContent(event: event, detail: detail) {
+        EventRowContent(event: event, detail: event.timeDetail) {
             if let first = billing.first {
                 // The whole caption leads to the first name on it. Two followed
                 // performers sharing a bill is the uncommon case, and a row is
@@ -738,18 +705,7 @@ private struct FollowedDateRow: View {
                 .buttonStyle(.plain)
             }
         } trailing: {
-            Button {
-                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-            } label: {
-                Image(systemName: isSaved ? "checkmark" : "plus")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(isSaved ? Color.trackAttended : Color.brandTint)
-                    .frame(width: 38, height: 38)
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(.plain)
-            .glassCircle(interactive: true)
-            .accessibilityLabel(isSaved ? "Remove from my events" : "Add to my events")
+            LibraryToggle(event: event)
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)

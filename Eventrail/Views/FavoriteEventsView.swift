@@ -40,7 +40,7 @@ struct FavoriteEventsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if favorites.isEmpty {
                     // Reachable by un-hearting the last one from this screen.
-                    note("Tap the heart on any event to keep it here.")
+                    note(FavoriteEventRow.emptyNote)
                 } else if groups.isEmpty {
                     note(filter == .upcoming
                          ? "Nothing you have hearted is still to come."
@@ -84,9 +84,7 @@ struct FavoriteEventsView: View {
                 )
             }
         }
-        .sheet(item: $openEvent) { event in
-            EventDetailView(event: event)
-        }
+        .eventSheet($openEvent)
         .onChange(of: filter) { selection.removeAll() }
         .onChange(of: isSelecting) { selection.removeAll() }
     }

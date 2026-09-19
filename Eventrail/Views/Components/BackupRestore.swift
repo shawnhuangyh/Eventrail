@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Folds a backup file into the library, wherever the file came from.
 ///
@@ -97,6 +98,33 @@ struct BackupRestore: ViewModifier {
     }
 }
 
+/// The document picker the reader reaches a backup through, and the reading
+/// that follows it.
+///
+/// Two screens offer this — Settings, and the welcome's third step — and the
+/// file the picker hands back is of no interest to either of them beyond
+/// passing it straight on, so neither holds it any more. That also keeps the
+/// one thing about the picker worth getting right in a single place: JSON is
+/// allowed beside the app's own type so that a `library.json` lifted off an old
+/// device can still be rescued.
+///
+/// No second question, on either screen: the reader picked this out of a picker
+/// they opened from a row that says Restore.
+struct BackupPicker: ViewModifier {
+    @Binding var isPresented: Bool
+
+    @State private var picked: URL?
+
+    func body(content: Content) -> some View {
+        content
+            .fileImporter(isPresented: $isPresented,
+                          allowedContentTypes: [.eventrailBackup, .json]) { result in
+                picked = try? result.get()
+            }
+            .restoringBackup($picked, asking: false)
+    }
+}
+
 extension View {
     /// Restores whatever backup file is put into `file`.
     ///
@@ -104,5 +132,10 @@ extension View {
     ///   arrived from outside the app, false for one the reader picked here.
     func restoringBackup(_ file: Binding<URL?>, asking: Bool) -> some View {
         modifier(BackupRestore(file: file, asks: asking))
+    }
+
+    /// Opens the document picker on a backup, and reads whatever comes back.
+    func choosingBackup(_ isPresented: Binding<Bool>) -> some View {
+        modifier(BackupPicker(isPresented: isPresented))
     }
 }

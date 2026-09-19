@@ -88,9 +88,7 @@ struct PerformerView: View {
         // An imported name, shown in the language Eventernote published it in.
         .navigationTitle(Text(verbatim: link.name))
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $openEvent) { event in
-            EventDetailView(event: event)
-        }
+        .eventSheet($openEvent)
         .task { await load() }
     }
 
@@ -150,12 +148,6 @@ struct PerformerView: View {
             // A page that adds nothing would otherwise spin here forever.
             guard feed.items.count > read else { break }
         }
-        store.remember(feed.items)
-    }
-
-    private func readMore(after event: Event) async {
-        guard feed.isNearEnd(event) else { return }
-        await feed.loadMore()
         store.remember(feed.items)
     }
 
@@ -316,14 +308,12 @@ struct PerformerView: View {
         } else {
             statistics
             section(half: .upcoming, count: hasEveryUpcoming ? upcoming.count : nil,
-                    events: upcoming, empty: "No dates published yet.",
-                    hasMore: hasMoreUpcoming)
+                    events: upcoming, hasMore: hasMoreUpcoming)
             // The count is left off while pages are still coming: a heading
             // that said "12" beside a listing the reader can keep scrolling
             // would be counting the reading, not the performer.
             section(half: .past, count: feed.hasMore ? nil : past.count,
-                    events: past, empty: "Nothing published before today.",
-                    hasMore: hasMorePast)
+                    events: past, hasMore: hasMorePast)
             if feed.isLoadingMore { SearchProgress(compact: true) }
             if !sameBill.isEmpty { sameBillCard }
             openInEventernote
@@ -347,20 +337,10 @@ struct PerformerView: View {
     }
 
     private func section(
-        half: PerformerAppearancesView.Half, count: Int?, events: [Event],
-        empty: LocalizedStringKey, hasMore: Bool
+        half: PerformerAppearancesView.Half, count: Int?, events: [Event], hasMore: Bool
     ) -> some View {
         LazyVStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(half.title)
-                    .font(.system(size: 17, weight: .bold))
-                if let count {
-                    Text(count.formatted())
-                        .font(.system(size: 12, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer(minLength: 8)
+            CardHeader(title: half.title, count: count) {
                 if hasMore { seeAll(half) }
             }
             .padding(.horizontal, 17)
@@ -368,7 +348,7 @@ struct PerformerView: View {
             .padding(.bottom, events.isEmpty ? 0 : 5)
 
             if events.isEmpty {
-                Text(empty)
+                Text(half.emptyNote)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -380,7 +360,7 @@ struct PerformerView: View {
                 ForEach(events.prefix(Self.sectionLimit)) { event in
                     Divider().opacity(0.45).padding(.leading, 12)
                     AppearanceRow(event: event) { openEvent = event }
-                        .task { await readMore(after: event) }
+                        .task { await store.pageOn(feed, after: event) }
                 }
             }
         }
@@ -398,14 +378,7 @@ struct PerformerView: View {
         NavigationLink {
             PerformerAppearancesView(performer: link.name, half: half, feed: feed)
         } label: {
-            HStack(spacing: 2) {
-                Text("See All")
-                    .font(.system(size: 13, weight: .semibold))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .foregroundStyle(Color.brandTint)
-            .contentShape(.rect)
+            SeeAllLabel()
         }
         .buttonStyle(.plain)
     }
@@ -431,14 +404,10 @@ struct PerformerView: View {
 
     private var sameBillCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Often on the same bill")
-                    .font(.system(size: 17, weight: .bold))
-                Text("^[Across the \(feed.items.count) appearance](inflect: true) read so far.")
-                    .font(.system(size: 11.5))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            }
+            CardHeader(
+                title: "Often on the same bill",
+                caption: Text("^[Across the \(feed.items.count) appearance](inflect: true) read so far.")
+            )
 
             VStack(spacing: 3) {
                 ForEach(sameBill, id: \.name) { other in
@@ -477,28 +446,14 @@ struct PerformerView: View {
     @ViewBuilder
     private var openInEventernote: some View {
         if let profile {
-            Link(destination: profile.pageURL) {
-                HStack(spacing: 9) {
-                    Text("Open performer on Eventernote")
-                        .font(.system(size: 14.5, weight: .semibold))
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(Color.brandTint)
-                .frame(maxWidth: .infinity)
-                .padding(16)
-            }
-            .glassPanel(interactive: true)
-            .padding(.horizontal, 18)
+            ExternalLinkPanel(title: "Open performer on Eventernote",
+                              destination: profile.pageURL)
+                .padding(.horizontal, 18)
         }
     }
 
     private var footnote: some View {
-        Text("Appearances come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back.")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Footnote(Text("Appearances come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back."))
             .padding(.horizontal, 26)
             .padding(.top, 2)
     }
@@ -513,15 +468,9 @@ struct AppearanceRow: View {
     let event: Event
     let open: () -> Void
 
-    /// A performer's own listing prints times for some rows and not others, and
-    /// an announced date says so rather than being given an invented hour.
-    private var detail: Text {
-        event.timeLine.map { Text(verbatim: $0) } ?? Text("Time to be announced")
-    }
-
     var body: some View {
         Button(action: open) {
-            EventRowContent(event: event, detail: detail) {
+            EventRowContent(event: event, detail: event.timeDetail) {
                 let status = store.status(for: event)
                 HStack(spacing: 8) {
                     if status != .untracked { StatusBadge(status: status) }

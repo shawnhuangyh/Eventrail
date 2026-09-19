@@ -24,13 +24,32 @@ struct PerformerAppearancesView: View {
             }
         }
 
+        /// What stands where the rows would, when this half has none.
+        ///
+        /// Said in two places — under the section on a performer's page and on
+        /// this screen behind its See All — so it is named here rather than
+        /// written out at both.
+        var emptyNote: LocalizedStringKey {
+            switch self {
+            case .upcoming: "No dates published yet."
+            case .past: "Nothing published before today."
+            }
+        }
+
         /// The listing arrives newest first and in one piece, so each half is a
         /// filter over it — in the order that half is read in.
-        func rows(of events: [Event]) -> [Event] {
+        ///
+        /// Which is the same question the library asks of itself, so it is the
+        /// same answer: ``LibraryFilter/rows(of:)``.
+        var filter: LibraryFilter {
             switch self {
-            case .upcoming: events.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
-            case .past: events.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
+            case .upcoming: .upcoming
+            case .past: .past
             }
+        }
+
+        func rows(of events: [Event]) -> [Event] {
+            filter.rows(of: events)
         }
     }
 
@@ -55,12 +74,12 @@ struct PerformerAppearancesView: View {
                         if index > 0 { Divider().opacity(0.45).padding(.leading, 17) }
                         AppearanceRow(event: event) { openEvent = event }
                             .padding(.horizontal, 5)
-                            .task { await readMore(after: event) }
+                            .task { await store.pageOn(feed, after: event) }
                     }
                     if events.isEmpty, !feed.hasMore {
                         // Only reachable for the past half: the upcoming one is
                         // whole before this screen can be opened.
-                        Text("Nothing published before today.")
+                        Text(half.emptyNote)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -88,15 +107,7 @@ struct PerformerAppearancesView: View {
         // An imported name, shown in the language Eventernote published it in.
         .navigationSubtitle(Text(verbatim: performer))
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $openEvent) { event in
-            EventDetailView(event: event)
-        }
-    }
-
-    private func readMore(after event: Event) async {
-        guard feed.isNearEnd(event) else { return }
-        await feed.loadMore()
-        store.remember(feed.items)
+        .eventSheet($openEvent)
     }
 
     /// Pages on while this half is still empty.

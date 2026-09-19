@@ -39,9 +39,7 @@ struct MeView: View {
             }
             .washBackground()
             .navigationTitle("Me")
-            .navigationDestination(for: PerformerLink.self) { link in
-                PerformerView(link: link)
-            }
+            .performerDestination()
             .navigationDestination(for: MeList.self) { list in
                 switch list {
                 case .favorites: FavoriteEventsView()
@@ -53,9 +51,7 @@ struct MeView: View {
                     Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
                 }
             }
-            .sheet(item: $openEvent) { event in
-                EventDetailView(event: event)
-            }
+            .eventSheet($openEvent)
             .sheet(isPresented: $isLinking) {
                 EventernoteAccountSheet()
             }
@@ -297,16 +293,8 @@ struct MeView: View {
     /// not "I have a ticket".
     private var favoritesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Favorite Events")
-                    .font(.system(size: 17, weight: .bold))
-                if !store.favoriteEvents.isEmpty {
-                    Text(store.favoriteEvents.count.formatted())
-                        .font(.system(size: 12, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer(minLength: 8)
+            CardHeader(title: "Favorite Events",
+                       count: store.favoriteEvents.isEmpty ? nil : store.favoriteEvents.count) {
                 if !store.favoriteEvents.isEmpty {
                     seeAll(.favorites)
                 }
@@ -316,7 +304,7 @@ struct MeView: View {
             .padding(.bottom, store.favoriteEvents.isEmpty ? 6 : 12)
 
             if store.favoriteEvents.isEmpty {
-                Text("Tap the heart on any event to keep it here.")
+                Text(FavoriteEventRow.emptyNote)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -348,16 +336,9 @@ struct MeView: View {
     /// this is the one screen that shows the list as a list.
     private var followingCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Following Performers")
-                    .font(.system(size: 17, weight: .bold))
-                if !store.followedPerformers.isEmpty {
-                    Text(store.followedPerformers.count.formatted())
-                        .font(.system(size: 12, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer(minLength: 8)
+            CardHeader(title: "Following Performers",
+                       count: store.followedPerformers.isEmpty
+                           ? nil : store.followedPerformers.count) {
                 if !store.followedPerformers.isEmpty {
                     seeAll(.following)
                 }
@@ -367,7 +348,7 @@ struct MeView: View {
             .padding(.bottom, store.followedPerformers.isEmpty ? 6 : 12)
 
             if store.followedPerformers.isEmpty {
-                Text("Follow a performer from their page to keep them here. It stays in your library and is never written back to Eventernote.")
+                Text(FollowedPerformerRow.emptyNote)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -392,17 +373,8 @@ struct MeView: View {
     /// screen is where a list is worked on — reordered, opened, unfollowed —
     /// and that has to be reachable without waiting for a sixth row to arrive.
     private func seeAll(_ list: MeList) -> some View {
-        NavigationLink(value: list) {
-            HStack(spacing: 2) {
-                Text("See All")
-                    .font(.system(size: 13, weight: .semibold))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .foregroundStyle(Color.brandTint)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
+        NavigationLink(value: list) { SeeAllLabel() }
+            .buttonStyle(.plain)
     }
 }
 

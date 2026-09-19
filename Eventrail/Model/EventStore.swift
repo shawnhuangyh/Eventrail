@@ -22,6 +22,21 @@ enum LibraryFilter: String, CaseIterable, Identifiable, Hashable {
         case .past: "clock.arrow.trianglehead.counterclockwise.rotate.90"
         }
     }
+
+    /// This half of a list, in the order this half is read in: what is coming
+    /// runs towards the reader, what has happened runs away from them.
+    ///
+    /// Lives on the filter rather than on the store because it is a fact about
+    /// the two halves rather than about the library — a performer's listing is
+    /// split the same way, and used to be split by a second copy of this.
+    func rows(of events: some Sequence<Event>) -> [Event] {
+        switch self {
+        case .upcoming:
+            events.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+        case .past:
+            events.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
+        }
+    }
 }
 
 /// How the Events tab breaks the list into sections.
@@ -70,6 +85,26 @@ struct EventGroup: Identifiable {
     /// Imported names (artists) and formatted dates, so not a localizable key.
     let label: String
     let events: [Event]
+
+    /// A date-ordered run of events broken into the months it spans.
+    ///
+    /// The caller has already put the events in the order the reader will read
+    /// them, so first appearance sets section order — which is what keeps the
+    /// past running backwards and the future forwards without this having to
+    /// know which it was handed.
+    ///
+    /// The library groups its months with it and so does the Following tab,
+    /// which used to hold a second copy of the same loop, comment included.
+    static func byMonth(_ events: [Event]) -> [EventGroup] {
+        var order: [String] = []
+        var buckets: [String: [Event]] = [:]
+        for event in events {
+            let key = event.monthGroupLabel
+            if buckets[key] == nil { order.append(key) }
+            buckets[key, default: []].append(event)
+        }
+        return order.map { EventGroup(id: $0, label: $0, events: buckets[$0] ?? []) }
+    }
 }
 
 /// The reader's library, and every write to it.
@@ -422,6 +457,20 @@ final class EventStore {
         for event in events where archive.events[event.id] == nil {
             seen[event.id] = event
         }
+    }
+
+    /// Reads the next page of a listing once the reader has scrolled close
+    /// enough to the end of the one in hand, and holds on to what it brings.
+    ///
+    /// Three screens page a listing of events this way — search results, a
+    /// performer's page, and the screen behind its See All — and all three have
+    /// to remember what arrives, or a row tapped after paging would open a
+    /// sheet with nothing behind it. Written out at each of them, the remember
+    /// was one edit away from being dropped at one and kept at the other two.
+    func pageOn(_ feed: Feed<Event>, after event: Event) async {
+        guard feed.isNearEnd(event) else { return }
+        await feed.loadMore()
+        remember(feed.items)
     }
 
     func remember(search term: String) {
@@ -1025,12 +1074,7 @@ final class EventStore {
     /// The same half of a list the caller has already chosen — the favorites,
     /// say, rather than the whole library.
     func events(in pool: some Sequence<Event>, matching filter: LibraryFilter) -> [Event] {
-        switch filter {
-        case .upcoming:
-            pool.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
-        case .past:
-            pool.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
-        }
+        filter.rows(of: pool)
     }
 
     func groups(filter: LibraryFilter, grouping: Grouping) -> [EventGroup] {
@@ -1044,15 +1088,7 @@ final class EventStore {
         let events = events(in: pool, matching: filter)
         switch grouping {
         case .date:
-            // `events` is already date-ordered, so first appearance sets section order.
-            var order: [String] = []
-            var buckets: [String: [Event]] = [:]
-            for event in events {
-                let key = event.monthGroupLabel
-                if buckets[key] == nil { order.append(key) }
-                buckets[key, default: []].append(event)
-            }
-            return order.map { EventGroup(id: $0, label: $0, events: buckets[$0] ?? []) }
+            return EventGroup.byMonth(events)
         case .artist:
             var buckets: [String: [Event]] = [:]
             for event in events { buckets[event.artist, default: []].append(event) }

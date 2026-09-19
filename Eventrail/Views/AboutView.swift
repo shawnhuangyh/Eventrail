@@ -99,11 +99,7 @@ struct AboutView: View {
     }
 
     private var footnote: some View {
-        Text("Eventrail is open source under the MIT licence. It is not affiliated with or endorsed by Eventernote; event details come from that site's publicly accessible pages and are never written back. Venues are placed by Apple Maps, and where Maps has no such place, by the address search of the Geospatial Information Authority of Japan (国土地理院) and, for the building at that address, by OpenStreetMap — © OpenStreetMap contributors, ODbL.")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Footnote(Text("Eventrail is open source under the MIT licence. It is not affiliated with or endorsed by Eventernote; event details come from that site's publicly accessible pages and are never written back. Venues are placed by Apple Maps, and where Maps has no such place, by the address search of the Geospatial Information Authority of Japan (国土地理院) and, for the building at that address, by OpenStreetMap — © OpenStreetMap contributors, ODbL."))
             .padding(.horizontal, 8)
             .padding(.top, 6)
     }

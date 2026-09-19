@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// The four cards Eventrail opens with the first time it is launched.
 ///
@@ -52,8 +51,6 @@ struct WelcomeView: View {
     // Step three: where the reader's own records live.
     @State private var wantsCloud = false
     @State private var isChoosingBackup = false
-    /// The file they picked, handed to ``BackupRestore`` to read.
-    @State private var pickedBackup: URL?
 
     /// Step four's answer. Both switches are seeded from the store so a second
     /// visit shows them where the reader left them rather than where they start.
@@ -76,15 +73,7 @@ struct WelcomeView: View {
             wantsCloud = store.iCloudSyncEnabled
             wantsCalendar = store.calendarSyncEnabled
         }
-        // JSON beside the app's own type for the reason Settings gives: a
-        // `library.json` lifted off a device is still readable here.
-        .fileImporter(isPresented: $isChoosingBackup,
-                      allowedContentTypes: [.eventrailBackup, .json]) { result in
-            pickedBackup = try? result.get()
-        }
-        // No second question: they picked this out of a picker they opened
-        // from a row that says Restore.
-        .restoringBackup($pickedBackup, asking: false)
+        .choosingBackup($isChoosingBackup)
         .animation(.snappy(duration: 0.28), value: step)
     }
 
@@ -170,8 +159,8 @@ struct WelcomeView: View {
     /// question in two frames.
     private var account: some View {
         VStack(alignment: .leading, spacing: 18) {
-            heading("Find your account",
-                    "Name your Eventernote account to bring in the events you have already been to. Read only — no password, and nothing is written back.")
+            ScreenHeading(title: "Find your account",
+                          detail: "Name your Eventernote account to bring in the events you have already been to. Read only — no password, and nothing is written back.")
 
             AccountFinder(chosen: $chosen)
         }
@@ -188,8 +177,8 @@ struct WelcomeView: View {
     /// it on the day they have the least to lose by not finding it.
     private var records: some View {
         VStack(alignment: .leading, spacing: 18) {
-            heading("Pick up where you left off",
-                    "If you have used Eventrail before, this is how what you kept gets here — from your other devices, or from a file you saved.")
+            ScreenHeading(title: "Pick up where you left off",
+                          detail: "If you have used Eventrail before, this is how what you kept gets here — from your other devices, or from a file you saved.")
 
             Toggle(isOn: $wantsCloud) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -269,8 +258,8 @@ struct WelcomeView: View {
 
     private var calendar: some View {
         VStack(alignment: .leading, spacing: 18) {
-            heading("Keep it in your calendar",
-                    "Every event in your library can be mirrored into your own calendar, with doors and start time. Your call — and reversible in Settings.")
+            ScreenHeading(title: "Keep it in your calendar",
+                          detail: "Every event in your library can be mirrored into your own calendar, with doors and start time. Your call — and reversible in Settings.")
 
             VStack(spacing: 0) {
                 Toggle(isOn: $wantsCalendar) {
@@ -328,19 +317,6 @@ struct WelcomeView: View {
     }
 
     // MARK: - Shared furniture
-
-    private func heading(_ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 28, weight: .bold))
-                .kerning(-0.84)
-            Text(detail)
-                .font(.system(size: 13.5))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 6)
-    }
 
     // MARK: - What carries on
 

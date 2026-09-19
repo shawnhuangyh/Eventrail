@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Where the library is kept, and how to empty it.
 ///
@@ -27,8 +26,6 @@ struct SettingsView: View {
 
     @State private var isConfirmingDeleteAll = false
     @State private var isChoosingBackup = false
-    /// The file the reader picked, handed to ``BackupRestore`` to read.
-    @State private var picked: URL?
     /// The backup file waiting for the share sheet, rewritten on every change.
     @State private var exported: URL?
     /// The welcome, asked for again. Its own state rather than the flag
@@ -48,18 +45,18 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    sectionHeader("Calendar")
+                    SectionLabel(label: "Calendar")
                     calendarCard(store: $store)
 
-                    sectionHeader("Location")
+                    SectionLabel(label: "Location")
                         .padding(.top, 6)
                     locationCard(store: $store)
 
-                    sectionHeader("Data")
+                    SectionLabel(label: "Data")
                         .padding(.top, 6)
                     dataCard(store: $store)
 
-                    sectionHeader("About")
+                    SectionLabel(label: "About")
                         .padding(.top, 6)
                     aboutCard
                     deleteAllButton
@@ -81,15 +78,6 @@ struct SettingsView: View {
                 WelcomeView()
             }
         }
-    }
-
-    private func sectionHeader(_ label: LocalizedStringKey) -> some View {
-        Text(label)
-            .font(.system(size: 11.5, weight: .semibold))
-            .kerning(0.35)
-            .textCase(.uppercase)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 6)
     }
 
     // MARK: - One row's face
@@ -285,15 +273,7 @@ struct SettingsView: View {
         // and its icon — where a `Transferable` leaves that to this screen,
         // which has no business drawing a file.
         .task(id: self.store.revision) { await prepareExport() }
-        // JSON is allowed beside our own type only so that the app's own
-        // `library.json` can be rescued — see ``LibraryBackup/read(at:)``.
-        .fileImporter(isPresented: $isChoosingBackup,
-                      allowedContentTypes: [.eventrailBackup, .json]) { result in
-            picked = try? result.get()
-        }
-        // No second question: the reader picked this file out of a picker they
-        // opened from a button that says Restore.
-        .restoringBackup($picked, asking: false)
+        .choosingBackup($isChoosingBackup)
     }
 
     private func iCloudRow(store: Bindable<EventStore>) -> some View {
@@ -421,8 +401,7 @@ struct SettingsView: View {
         Button {
             isReplayingWelcome = true
         } label: {
-            rowLabel("hand.wave", "Welcome Screen",
-                     Text("The four cards Eventrail opens with the first time")) {
+            rowLabel("hand.wave", "Welcome Screen", nil) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.tertiary)
@@ -503,11 +482,7 @@ struct SettingsView: View {
     }
 
     private var footnote: some View {
-        Text("What you write on an event — a note, a seat, what it cost — belongs to you. It stays on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. A backup you export goes only where you send it. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote.")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Footnote(Text("What you write on an event — a note, a seat, what it cost — belongs to you. It stays on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. A backup you export goes only where you send it. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote."))
             .padding(.horizontal, 8)
             .padding(.top, 6)
     }
