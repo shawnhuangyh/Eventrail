@@ -143,38 +143,56 @@ struct StatTile: View {
     }
 }
 
-/// The section header pill that stands over a month of events.
+/// The section header pills that stand over a month of events.
 ///
 /// It reads the same wherever it is used, which takes saying twice: a `List`
 /// section header arrives with the system's own uppercased, secondary styling,
 /// and a header pinned over a scrolling list has the rows passing behind it.
 /// Both are answered here rather than at each call site, so the Events tab and
 /// the Following tab cannot drift apart again.
+///
+/// Two pills rather than one and a bare line of text. The count used to sit
+/// loose beside the month in tertiary grey, which is legible over the wash and
+/// not over a flyer — and a pinned header has flyers going past under it all
+/// day. So it wears the month's own backing, and is kept the smaller of the
+/// two by its size and its weight instead.
 struct GroupHeader: View {
     /// A formatted month, an imported artist name, or the filter's own name.
     let label: Text
     let count: Int
 
     var body: some View {
-        HStack(spacing: 9) {
-            label
-                .font(.system(size: 12, weight: .bold))
-                .kerning(0.24)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .glassCapsule()
-                // Under the glass rather than over it: the pill refracts an
-                // opaque slice of the wash, so a flyer scrolling behind a
-                // pinned header cannot darken the month it is covering.
-                .background(Color.washBase, in: .capsule)
-            Text("^[\(count) event](inflect: true)")
-                .font(.system(size: 11, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(.tertiary)
+        HStack(spacing: 7) {
+            pill {
+                label
+                    .font(.system(size: 12, weight: .bold))
+                    .kerning(0.24)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+            }
+            pill {
+                Text("^[\(count) event](inflect: true)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+            }
         }
         .textCase(nil)
         .foregroundStyle(.primary)
         .padding(.vertical, 2)
+    }
+
+    /// The glass both halves are set in.
+    ///
+    /// The wash goes *under* the glass rather than over it: the pill refracts
+    /// an opaque slice of it, so a flyer scrolling behind a pinned header
+    /// cannot darken what it is covering.
+    private func pill<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .glassCapsule()
+            .background(Color.washBase, in: .capsule)
     }
 }
 
