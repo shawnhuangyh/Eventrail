@@ -143,6 +143,74 @@ struct StatTile: View {
     }
 }
 
+/// One ticket tier as a bar: what the reader called it, how many nights it got
+/// them in, and how much of what they have written down that is.
+///
+/// The name is the reader's own and is shown verbatim — a promoter's tier is
+/// not app wording, and translating S席 would be inventing a ticket nobody was
+/// sold.
+///
+/// The bar is drawn against the top tier rather than against the total, so the
+/// longest is always full width and the rest are read against it. A library
+/// where every tier has been used once reads as equal bars instead of a row of
+/// slivers, and the count beside each one is always there to be read on its
+/// own — the bar is never the only way to tell two rows apart.
+struct TicketCategoryBar: View {
+    let category: TicketCategoryCount
+    /// How many nights the most used tier got the reader in: a full bar.
+    let leader: Int
+    /// How many nights have a tier written down at all — what the share is out
+    /// of. Nights nobody filled in are not part of the question.
+    let recorded: Int
+
+    private var share: Double {
+        recorded > 0 ? Double(category.count) / Double(recorded) : 0
+    }
+
+    private var fill: Double {
+        leader > 0 ? Double(category.count) / Double(leader) : 0
+    }
+
+    private var percentage: String {
+        share.formatted(.percent.precision(.fractionLength(0)))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(verbatim: category.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                Text(category.count.formatted())
+                    .font(.system(size: 13, weight: .semibold))
+                    .monospacedDigit()
+                Text(verbatim: percentage)
+                    .font(.system(size: 11.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+            }
+
+            Capsule()
+                .fill(.quaternary)
+                .frame(height: 6)
+                .overlay(alignment: .leading) {
+                    GeometryReader { proxy in
+                        Capsule()
+                            .fill(Color.trackTicket)
+                            // Never nothing: a tier the reader has used once
+                            // beside a tier they have used forty times is still
+                            // a tier they have used.
+                            .frame(width: max(proxy.size.width * fill, 6))
+                    }
+                }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: category.name))
+        .accessibilityValue(Text("^[\(category.count) event](inflect: true), \(percentage)"))
+    }
+}
+
 /// The section header pills that stand over a month of events.
 ///
 /// It reads the same wherever it is used, which takes saying twice: a `List`

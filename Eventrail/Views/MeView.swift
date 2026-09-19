@@ -31,6 +31,7 @@ struct MeView: View {
                 VStack(spacing: 14) {
                     accountCard
                     statistics
+                    ticketCategoriesCard
                     favoritesCard
                     followingCard
                 }
@@ -275,15 +276,89 @@ struct MeView: View {
 
     // MARK: - What the library adds up to
 
+    /// What the library adds up to, in two rows: what the reader went to, and
+    /// what they wrote down about getting in.
+    ///
+    /// The second row is theirs rather than Eventernote's, and is only ever
+    /// part-filled, so both of its tiles carry the count of nights they were
+    /// read from. A blank is not a zero — see ``Tracking/lotteryEntries``.
     private var statistics: some View {
-        HStack(spacing: 11) {
-            StatTile(tint: .trackInterest, value: store.eventsThisYear.formatted(),
-                     label: "Events this year")
-            StatTile(tint: .trackTicket, value: store.venuesVisited.formatted(),
-                     label: "Venues visited")
-            StatTile(tint: .trackAttended, value: store.performersSeen.formatted(),
-                     label: "Performers seen")
+        VStack(spacing: 11) {
+            HStack(spacing: 11) {
+                StatTile(tint: .trackInterest, value: store.eventsThisYear.formatted(),
+                         label: "Events this year")
+                StatTile(tint: .trackTicket, value: store.venuesVisited.formatted(),
+                         label: "Venues visited")
+                StatTile(tint: .trackAttended, value: store.performersSeen.formatted(),
+                         label: "Performers seen")
+            }
+            HStack(spacing: 11) {
+                StatTile(tint: .brandTint, value: store.lotteryEntries.formatted(),
+                         sub: coverage(store.lotteryEntriesRecorded),
+                         label: "Lottery entries")
+                StatTile(tint: .favorite, value: store.ticketCategories.count.formatted(),
+                         sub: coverage(store.ticketCategoriesRecorded),
+                         label: "Ticket categories")
+            }
         }
+    }
+
+    /// How much of the number above it was actually filled in. Nothing at all
+    /// for a library with no past in it yet: "0 of 0" is not a coverage.
+    private func coverage(_ recorded: Int) -> Text? {
+        guard store.eventsAttended > 0 else { return nil }
+        return Text("\(recorded) of \(store.eventsAttended) recorded")
+    }
+
+    // MARK: - Which tickets got the reader in
+
+    /// The tiers the reader has been to events on, most used first.
+    ///
+    /// Counted by nights rather than by tickets: one event gives its tier one
+    /// mark, whatever it took to get the seat. The bars are drawn against the
+    /// top tier rather than against the total, so a library where every tier
+    /// has been used once still reads as a row of equal bars instead of nine
+    /// slivers.
+    private var ticketCategoriesCard: some View {
+        let categories = store.ticketCategories
+        return VStack(alignment: .leading, spacing: 0) {
+            CardHeader(title: "Ticket Categories",
+                       count: categories.isEmpty ? nil : categories.count,
+                       caption: categories.isEmpty ? nil : coverage(store.ticketCategoriesRecorded))
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, categories.isEmpty ? 6 : 14)
+
+            if categories.isEmpty {
+                Text("Record the seat you were sold on an event to see which tickets get you in.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            } else {
+                let shown = Array(categories.prefix(Self.cardLimit))
+                VStack(spacing: 12) {
+                    ForEach(shown) { category in
+                        TicketCategoryBar(category: category,
+                                          leader: categories[0].count,
+                                          recorded: store.ticketCategoriesRecorded)
+                    }
+                }
+                .padding(.horizontal, 16)
+
+                if categories.count > shown.count {
+                    Text("^[\(categories.count - shown.count) more category](inflect: true)")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                }
+            }
+        }
+        .padding(.bottom, categories.isEmpty ? 0 : 16)
+        .glassPanel()
     }
 
     // MARK: - Favorites

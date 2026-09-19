@@ -29,8 +29,11 @@ nonisolated enum TicketStatus: String, CaseIterable, Identifiable, Hashable, Cod
 ///
 /// Dropping the two needed no migration: a record written before this still
 /// carries `interest` and `attendance`, and a decoder ignores keys it has no
-/// property for. Adding these two needs none either, for the mirror image of
-/// the reason — an older record simply has no seat and no cost.
+/// property for. Adding one needs none either, but only because the decoder
+/// below reads every key as optional — a synthesized one treats a key an older
+/// record does not carry as a corrupt file, and takes the whole library with
+/// it. So an older record simply has no seat, no cost, no lottery count and no
+/// ticket tier: nothing written down.
 nonisolated struct Tracking: Hashable, Codable {
     var ticket: TicketStatus = .none
     /// Where the reader sat, as the ticket prints it.
@@ -46,10 +49,96 @@ nonisolated struct Tracking: Hashable, Codable {
     /// seat or an invite really does cost nothing, and it is worth being able
     /// to record that.
     var cost: Int?
+    /// How many entries the reader put into the lottery for this night.
+    ///
+    /// Nil is "not written down". Zero is an answer somebody gave — a seat
+    /// bought the moment it went on sale, or an invite — so clearing the field
+    /// goes back to nil rather than settling on 0, and a night nobody filled in
+    /// is never counted as a night with no applications.
+    var lotteryEntries: Int?
+    /// Which ticket this turned out to be, as whoever sold it named it: S席,
+    /// 一般, 通し券.
+    ///
+    /// One free line with a menu of the usual answers in front of it rather
+    /// than a list to pick from: every promoter names its own tiers, and
+    /// anything closed would be wrong for the next event announced. Kept as the
+    /// reader typed it — the statistics match spellings on their own, in
+    /// ``TicketCategory/key(for:)``, rather than correcting what is shown here.
+    ///
+    /// Empty is "not written down", which is never 一般: that is a tier
+    /// somebody chose.
+    var ticketCategory: String = ""
     var note: String = ""
 
     var isEmpty: Bool {
-        ticket == .none && seat.isEmpty && cost == nil && note.isEmpty
+        ticket == .none && seat.isEmpty && cost == nil
+            && lotteryEntries == nil && ticketCategory.isEmpty && note.isEmpty
+    }
+}
+
+nonisolated extension Tracking {
+    /// Read one key at a time, so a record written before a field existed
+    /// arrives with that field's default instead of failing.
+    ///
+    /// The synthesized decoder does not fall back to a property's default: a
+    /// key it cannot find is an error, and an error thrown here is not one
+    /// record lost but the whole archive — ``LibraryFile`` has nothing left to
+    /// read and the library comes up empty. Every field added to this struct
+    /// since the first release would have taken the reader's library with it,
+    /// which is what the lottery count and the ticket tier did until this was
+    /// written. The archive says the same thing about its own new keys, and
+    /// answers it the same way: nothing here may insist on being present.
+    ///
+    /// Encoding stays synthesized — a record is always written whole — and so
+    /// do `CodingKeys`, which is why this is an extension rather than a second
+    /// init in the body: declared there it would take the memberwise init with
+    /// it.
+    init(from decoder: any Decoder) throws {
+        let record = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            ticket: try record.decodeIfPresent(TicketStatus.self, forKey: .ticket) ?? .none,
+            seat: try record.decodeIfPresent(String.self, forKey: .seat) ?? "",
+            cost: try record.decodeIfPresent(Int.self, forKey: .cost),
+            lotteryEntries: try record.decodeIfPresent(Int.self, forKey: .lotteryEntries),
+            ticketCategory: try record.decodeIfPresent(String.self, forKey: .ticketCategory) ?? "",
+            note: try record.decodeIfPresent(String.self, forKey: .note) ?? "")
+    }
+}
+
+/// The ticket tiers common enough to be worth a tap.
+///
+/// A menu rather than the whole of the answer: ``Tracking/ticketCategory`` takes
+/// anything, and these are only what saves typing the same eight words for the
+/// eighth time. They are names printed on tickets, not app wording, so they are
+/// shown verbatim in every language.
+nonisolated enum TicketCategory: String, CaseIterable, Identifiable {
+    case sSeat = "S席"
+    case aSeat = "A席"
+    case bSeat = "B席"
+    case general = "一般"
+    case reserved = "指定席"
+    case unreserved = "自由席"
+    case vip = "VIP"
+    case pass = "通し券"
+    case invited = "招待"
+
+    var id: String { rawValue }
+}
+
+nonisolated extension TicketCategory {
+    /// The key two spellings of one tier are counted under.
+    ///
+    /// Ｓ席 typed on a Japanese keyboard and S席 typed on an English one are the
+    /// same seat, and so are "vip" and "VIP" — so the ends are trimmed, the
+    /// runs of spaces inside collapsed, full width folded to half, and letters
+    /// raised. Nothing beyond that: S席 and A席 are different seats, and a
+    /// promoter's own 先行SS席 is its own tier rather than something to be
+    /// guessed into one of these by the letters it happens to contain.
+    static func key(for name: String) -> String {
+        let folded = name.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? name
+        return folded.uppercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
     }
 }
 
@@ -85,6 +174,34 @@ nonisolated struct YenAmount: ParseableFormatStyle {
 
 nonisolated extension FormatStyle where Self == YenAmount {
     static var yen: YenAmount { YenAmount() }
+}
+
+/// Writes a count of lottery entries into a text field, and reads one back out.
+///
+/// The same shape as ``YenAmount`` and for the same two reasons: no built-in
+/// style takes an optional, and an empty field has to read back as nil rather
+/// than as zero, which here is the difference between a night nobody filled in
+/// and a night the reader went to without applying for anything.
+nonisolated struct EntryCount: ParseableFormatStyle {
+    var parseStrategy: Strategy { Strategy() }
+
+    func format(_ value: Int?) -> String {
+        value.map { $0.formatted(.number) } ?? ""
+    }
+
+    nonisolated struct Strategy: ParseStrategy {
+        /// Four digits is 9,999 applications for one night. Past that the
+        /// reader is leaning on a key rather than recording a lottery.
+        func parse(_ value: String) -> Int? {
+            let digits = value.compactMap(\.wholeNumberValue).prefix(4)
+            guard !digits.isEmpty else { return nil }
+            return digits.reduce(0) { $0 * 10 + $1 }
+        }
+    }
+}
+
+nonisolated extension FormatStyle where Self == EntryCount {
+    static var entries: EntryCount { EntryCount() }
 }
 
 /// The single badge shown on a row.

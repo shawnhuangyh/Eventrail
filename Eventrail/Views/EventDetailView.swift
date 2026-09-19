@@ -326,6 +326,8 @@ struct EventDetailView: View {
                 segment("Ticket", selection: tracking.ticket, options: TicketStatus.allCases)
             }
 
+            lotteryField
+
             if hasTicket { ticketCard }
 
             VStack(alignment: .leading, spacing: 7) {
@@ -354,11 +356,42 @@ struct EventDetailView: View {
         !event.isUpcoming || store.tracking(for: event).ticket == .purchased
     }
 
-    /// What the ticket turned out to be: the seat it named, and what it cost.
+    /// How many entries the reader put into the lottery for this night.
     ///
-    /// Side by side because neither is more than a line, and asking for them
-    /// one under the other would push the notes off the bottom of the card.
+    /// Asked whether or not there is a ticket, and before the ticket is asked
+    /// about: the applications went in long before anybody knew, and a night
+    /// applied for six times and lost is worth having written down by a reader
+    /// who keeps the event anyway.
+    ///
+    /// An empty field is "not written down" and 0 is an answer — a seat bought
+    /// the moment it went on sale, or an invite — so clearing it leaves nothing
+    /// rather than settling on zero. See ``Tracking/lotteryEntries``.
+    private var lotteryField: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            fieldLabel("Lottery entries")
+            writing {
+                TextField("Lottery entries", value: tracking.lotteryEntries,
+                          format: .entries, prompt: Text(verbatim: "—"))
+                    .keyboardType(.numberPad)
+            }
+        }
+    }
+
+    /// What the ticket turned out to be: the seat it named, what it cost, and
+    /// which tier it was sold as.
+    ///
+    /// The first two side by side because neither is more than a line, and
+    /// asking for them one under the other would push the notes off the bottom
+    /// of the card. The tier takes the width under them, because a promoter's
+    /// own name for it runs longer than either.
     private var ticketCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            ticketFacts
+            categoryField
+        }
+    }
+
+    private var ticketFacts: some View {
         HStack(alignment: .top, spacing: 11) {
             VStack(alignment: .leading, spacing: 7) {
                 fieldLabel("Seat")
@@ -385,8 +418,43 @@ struct EventDetailView: View {
         }
     }
 
-    /// The glass a field the reader writes in sits in. One helper so the three
-    /// of them are the same field asked three questions.
+    /// Which ticket it was: S席, 一般, 通し券.
+    ///
+    /// A menu of the usual answers over a field that takes anything. A closed
+    /// list would be wrong for the next event announced — promoters name their
+    /// own tiers, and 先行SS席 is a real one — so the menu only saves the
+    /// typing, and what the reader writes is kept as they wrote it.
+    private var categoryField: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            fieldLabel("Ticket category")
+            writing {
+                HStack(spacing: 8) {
+                    TextField("Ticket category", text: tracking.ticketCategory,
+                              prompt: Text(verbatim: "S席 · 一般 · 通し券"))
+                        .autocorrectionDisabled()
+                    Menu {
+                        ForEach(TicketCategory.allCases) { category in
+                            Button {
+                                tracking.ticketCategory.wrappedValue = category.rawValue
+                            } label: {
+                                Text(verbatim: category.rawValue)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.brandTint)
+                            .frame(width: 24, height: 24)
+                            .contentShape(.rect)
+                    }
+                    .accessibilityLabel("Common ticket categories")
+                }
+            }
+        }
+    }
+
+    /// The glass a field the reader writes in sits in. One helper so the five
+    /// of them are the same field asked five questions.
     private func writing<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .textFieldStyle(.plain)
