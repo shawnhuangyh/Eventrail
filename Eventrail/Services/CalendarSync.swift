@@ -13,6 +13,13 @@ import SwiftUI
 /// Past events belong here as much as upcoming ones — a calendar is a diary as
 /// well as a plan. Which events qualify is ``EventStore/calendarEvents``; this
 /// type mirrors whatever it is handed.
+///
+/// Every entry also carries one alert, set for the moment the doors open,
+/// wherever Eventernote has published a door time — past nights included, so
+/// the diary records the hour the reader had to be there. No switch governs it:
+/// the door time is the event's own fact rather than a preference, and a
+/// reader who has asked for their events in their calendar has asked to be
+/// somewhere on time. Calendar's own per-entry alert remains theirs to change.
 final class CalendarSync {
     static let shared = CalendarSync()
 
@@ -216,6 +223,12 @@ final class CalendarSync {
             entry.timeZone = event.timeZone
             changed = true
         }
+        // An alert when the doors open — see ``doorOffset(of:)``.
+        let doors = Self.doorOffset(of: event)
+        if doorOffset(of: entry) != doors {
+            entry.alarms = doors.map { [EKAlarm(relativeOffset: $0)] }
+            changed = true
+        }
         // The URL is how the next mirror recognises this entry again, so it is
         // written whether or not anything else moved.
         if entry.url != event.sourceURL {
@@ -223,6 +236,47 @@ final class CalendarSync {
             changed = true
         }
         return changed
+    }
+
+    // MARK: - When to set off
+
+    /// How far before the performance the doors open, as the offset an alert
+    /// is hung on — negative, because it fires before the entry starts.
+    ///
+    /// Doors rather than the curtain because doors are the time the reader has
+    /// to act on: a queue forms, goods sell out, and an alert that waits for
+    /// the performance to start is an alert about something already missed.
+    /// The Calendar app's own travel time would be the other half of this, but
+    /// EventKit publishes no way to write it, so the alert is the whole answer
+    /// rather than a second one beside it.
+    ///
+    /// Written for past events as much as upcoming ones, so an entry carries
+    /// the door time whether the night is ahead or behind — a diary that
+    /// records when the reader had to be at the hall reads the same either
+    /// way, and an alert that appears on this year's entries but not last
+    /// year's is a difference the reader would have to explain to themselves.
+    /// The alert on a past entry is a note rather than a notification: its
+    /// moment is gone, so there is nothing left for the calendar to deliver.
+    ///
+    /// Nil only where the site published one of the two times without the
+    /// other — an event announced before its schedule was — or has them the
+    /// wrong way round.
+    private static func doorOffset(of event: Event) -> TimeInterval? {
+        guard let doors = event.doorsOpen, let start = event.startsAt, doors < start else { return nil }
+        return doors.timeIntervalSince(start)
+    }
+
+    /// The offset of the alert already on the entry, so an entry that is right
+    /// is left alone and the diary stays quiet.
+    ///
+    /// One alarm and no absolute date, which is what this mirror writes.
+    /// Anything else reads as nil, so an entry the reader has hung their own
+    /// alerts on is corrected only when a door alert is owed — where none is,
+    /// what they added is left where they put it.
+    private func doorOffset(of entry: EKEvent) -> TimeInterval? {
+        guard let alarms = entry.alarms, alarms.count == 1,
+              let alarm = alarms.first, alarm.absoluteDate == nil else { return nil }
+        return alarm.relativeOffset
     }
 
     // MARK: - Where the event is
