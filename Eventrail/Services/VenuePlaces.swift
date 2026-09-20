@@ -197,7 +197,12 @@ final class VenuePlaces {
     /// Maps had nothing for is asked of the register before being given up on.
     /// That last one is why every "no such place" already written down has to
     /// be asked again: most of them were never about the hall.
-    private static let ruleset = 7
+    ///
+    /// Raised again now that a hall the site places in Japan is only ever
+    /// answered with somewhere in Japan. What that reading turns down is
+    /// already written down on the phones it was wrong on, and a pin on the
+    /// mainland for a hall in 此花区 does not correct itself.
+    private static let ruleset = 8
 
     /// How long "Maps has never heard of this hall" is believed for.
     ///
@@ -478,14 +483,25 @@ final class VenuePlaces {
     /// the right block rather than the hall's own listing. That is the whole
     /// of what a map under the venue and a place on a calendar entry need.
     ///
-    /// Both questions are asked twice: once pointed at Japan, where nearly
-    /// every hall is, and then with no hint at all. The hint is strong enough
-    /// to be a filter in practice — a search pointed at Japan will not offer
-    /// Shanghai whatever it is asked — and dropping it is the whole of what a
-    /// hall abroad needs. There is no switching maps to be done: the phone's
-    /// own Maps has 梅赛德斯-奔驰文化中心 and answers with it as soon as it is
-    /// not being told to look in Japan. The second pass costs a request only
-    /// on a hall the first one missed.
+    /// A hall abroad is asked for twice: once pointed at Japan, where nearly
+    /// every hall is, and then with no hint at all. Dropping the hint is the
+    /// whole of what such a hall needs — there is no switching maps to be
+    /// done: the phone's own Maps has 梅赛德斯-奔驰文化中心 and answers with it
+    /// as soon as it is not being told to look in Japan. The second pass costs
+    /// a request only on a hall the first one missed.
+    ///
+    /// **A hall whose address opens with a Japanese prefecture is asked for
+    /// once, and only ever answered with somewhere in Japan.** The hint is a
+    /// bias and not a filter, which only shows on a phone served by the map
+    /// provider for mainland China: that provider has no Japanese venue to
+    /// offer, so it answers a Japanese hall with whichever of its own places
+    /// happens to share a number with the address — Zepp Osaka Bayside, whose
+    /// 桜島1丁目1-61 needs a 1 or a 61 from anywhere to match, came back
+    /// pinned on the mainland. So the answer is held against the country the
+    /// address names as well as against the address itself, and a hall in
+    /// Japan that Maps cannot place in Japan is left to the register below,
+    /// which answers the same on every phone. A hall abroad keeps both passes
+    /// and both maps, and is unaffected.
     ///
     /// Nothing is placed without an address to check it against. An event
     /// opened straight from a search row has only the name until its own page
@@ -494,15 +510,22 @@ final class VenuePlaces {
     private func search(_ venue: Venue, upgrading: Bool) async throws -> (item: MKMapItem, source: Source)? {
         guard let address = venue.address, !address.isEmpty else { return nil }
 
-        for region in [Self.japan, nil] {
+        // The country the site itself published, read the way every other
+        // screen reads it. A hall it places in Japan is asked for with the
+        // hint on and nowhere else; a hall it places nowhere — abroad, or an
+        // address too odd to name a prefecture — is asked for both ways.
+        let inJapan = Region.containing(address: address) != nil
+        let regions: [MKCoordinateRegion?] = inJapan ? [Self.japan] : [Self.japan, nil]
+
+        for region in regions {
             if !venue.plainName.isEmpty {
                 let halls = try await results(for: venue.plainName, kinds: [.pointOfInterest], in: region)
-                if let hall = halls.first(where: { Self.stands($0, at: address) }) {
+                if let hall = halls.first(where: { Self.answers($0, for: address, inJapan: inJapan) }) {
                     return (hall, .maps)
                 }
             }
             let places = try await results(for: address, kinds: [.pointOfInterest, .address], in: region)
-            if let place = places.first(where: { Self.stands($0, at: address) }) {
+            if let place = places.first(where: { Self.answers($0, for: address, inJapan: inJapan) }) {
                 return (place, .maps)
             }
         }
@@ -573,6 +596,20 @@ final class VenuePlaces {
         } catch let error as MKError where error.code == .placemarkNotFound {
             return []
         }
+    }
+
+    /// Whether Maps' answer is one this app may keep for `address`.
+    ///
+    /// Two questions rather than one. The address settles which place it is,
+    /// and the country settles whether it can be a place at all: a hall
+    /// Eventernote files in Japan is not on the mainland, however many numbers
+    /// the two addresses turn out to share. The second question only ever has
+    /// anything to say on a phone whose Maps cannot see Japan — see
+    /// ``search(_:upgrading:)`` — and a hall it turns down is not left
+    /// unplaced but handed to the register, which can.
+    private static func answers(_ item: MKMapItem, for address: String, inJapan: Bool) -> Bool {
+        guard stands(item, at: address) else { return false }
+        return !inJapan || JapanAddresses.isInJapan(item.location.coordinate)
     }
 
     /// Whether Maps files this place at the address Eventernote published.

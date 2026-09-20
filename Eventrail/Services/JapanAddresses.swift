@@ -78,6 +78,20 @@ nonisolated struct JapanAddresses: Sendable {
     private static let latitudes = 20.0...46.0
     private static let longitudes = 122.0...154.0
 
+    /// Whether a coordinate is in Japan at all.
+    ///
+    /// The box above, offered because ``VenuePlaces`` holds Maps' answers to
+    /// the same last guard this holds the register's: a hall the site places
+    /// in Japan and a map places across the sea is the map answering about
+    /// somewhere else. A box rather than a border — it is a sanity check on
+    /// an answer that has already been matched against the published address,
+    /// not a claim about where the coastline runs.
+    static func isInJapan(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        CLLocationCoordinate2DIsValid(coordinate)
+            && latitudes.contains(coordinate.latitude)
+            && longitudes.contains(coordinate.longitude)
+    }
+
     var session: URLSession = .shared
 
     /// The block the address names, or nil where the register has nothing
@@ -96,6 +110,23 @@ nonisolated struct JapanAddresses: Sendable {
         // exactly what `Region` already reads addresses for.
         guard !address.isEmpty, Region.containing(address: address) != nil else { return nil }
 
+        if let place = try await asking(address) { return place }
+
+        // The one spelling the register will not forgive. A town the register
+        // writes 小松原通 is written 小松原通り by everyone who lives there,
+        // Eventernote included, and the extra り costs the whole of the match:
+        // the answer drops from the block (7) to the town (5), which is below
+        // ``block`` and so is no answer at all. 和歌山県民文化会館 and every
+        // hall on 札幌大通 went unplaced for exactly that. Asked again without
+        // it — one more request, and only for an address that has already
+        // failed once.
+        let plain = address.replacingOccurrences(of: "通り", with: "通")
+        guard plain != address else { return nil }
+        return try await asking(plain)
+    }
+
+    /// One question put to the register, exactly as asked.
+    private func asking(_ address: String) async throws -> Place? {
         var components = URLComponents(url: Self.endpoint, resolvingAgainstBaseURL: false)
         components?.queryItems = (Self.parameters.map { URLQueryItem(name: $0.key, value: $0.value) })
             + [URLQueryItem(name: "q", value: address)]
@@ -128,10 +159,7 @@ nonisolated struct JapanAddresses: Sendable {
                 else { return nil }
                 // GeoJSON order: longitude first.
                 let coordinate = CLLocationCoordinate2D(latitude: coordinates[1], longitude: coordinates[0])
-                guard CLLocationCoordinate2DIsValid(coordinate),
-                      latitudes.contains(coordinate.latitude),
-                      longitudes.contains(coordinate.longitude)
-                else { return nil }
+                guard isInJapan(coordinate) else { return nil }
                 return (grade, Place(title: title, coordinate: coordinate))
             }
             .max { $0.grade < $1.grade }
