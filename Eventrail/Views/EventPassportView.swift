@@ -1172,7 +1172,10 @@ private struct PassportLotterySheet: View {
         let most = max(1, rows.first?.entries ?? 1)
 
         VStack(alignment: .leading, spacing: 0) {
-            PassportSheetHeader(eyebrow: Text("^[\(rows.count) night](inflect: true) recorded"),
+            // "event" rather than the "night" this file calls one everywhere
+            // else: the reader's word for what they applied for, and the word
+            // the other two drawers head their own counts with.
+            PassportSheetHeader(eyebrow: Text("^[\(rows.count) event](inflect: true) recorded"),
                                 title: "Top Lottery Entries")
             ScrollView {
                 VStack(spacing: 13) {
