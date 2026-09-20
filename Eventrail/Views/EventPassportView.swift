@@ -93,6 +93,8 @@ struct EventPassportView: View {
     @State private var openRanking: PassportRanking?
     /// Whether every recorded night is open, rather than the top five.
     @State private var isShowingLotteries = false
+    /// The night whose own sheet is open, if the reader tapped one.
+    @State private var openEvent: Event?
 
     /// How much of each ranked list a card shows before sending the rest to a
     /// screen of its own — the same five the Me tab's cards show, for the same
@@ -147,6 +149,9 @@ struct EventPassportView: View {
         .sheet(isPresented: $isShowingLotteries) {
             PassportLotterySheet(rows: stats.topLotteries)
         }
+        // A night named on this screen is still an event, and the way to an
+        // event is the same sheet every list in the app ends in.
+        .eventSheet($openEvent)
     }
 
     // MARK: - The year the screen is read over
@@ -511,7 +516,10 @@ struct EventPassportView: View {
                             .buttonStyle(.plain)
                     }
                 }
-                PassportSpanRow(span: first)
+                // The row itself is the target, with no chevron on it, the
+                // way a ranked row is: the whole line is the night.
+                Button { openEvent = first.event } label: { PassportSpanRow(span: first) }
+                    .buttonStyle(.plain)
             }
             .padding(.top, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -917,6 +925,12 @@ private struct PassportExtremesSheet: View {
     let extreme: PassportExtreme
     let spans: [PassportStats.Span]
 
+    /// A row here opens the night it names, exactly as the row on the card
+    /// does — a drawer over a drawer rather than a push, because an event's
+    /// own sheet is what every list in the app opens, and the reader closes it
+    /// back onto the list they tapped it from.
+    @State private var openEvent: Event?
+
     /// Tall enough for the rows it has and no taller. Five is the ceiling and
     /// a short library gets fewer, so a fixed detent would leave a drawer
     /// mostly empty under two rows.
@@ -931,8 +945,11 @@ private struct PassportExtremesSheet: View {
                 VStack(spacing: 0) {
                     ForEach(Array(spans.enumerated()), id: \.element.id) { index, span in
                         if index > 0 { Divider() }
-                        PassportSpanRow(span: span)
-                            .padding(.vertical, 12)
+                        Button { openEvent = span.event } label: {
+                            PassportSpanRow(span: span)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -943,6 +960,7 @@ private struct PassportExtremesSheet: View {
         // The measured height first, with .large behind it for the accessibility
         // text sizes that wrap a row onto a second line.
         .presentationDetents([.height(height), .large])
+        .eventSheet($openEvent)
     }
 
     private var header: some View {
