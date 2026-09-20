@@ -1248,7 +1248,7 @@ final class EventStore {
     /// library once its date has passed is one they went to. Nothing else is
     /// recorded, and nothing else needs to be — an event they did not go to is
     /// one they take out.
-    private var attendedEvents: [Event] {
+    var attendedEvents: [Event] {
         library.filter { !$0.isUpcoming }
     }
 

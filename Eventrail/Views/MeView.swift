@@ -30,7 +30,7 @@ struct MeView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     accountCard
-                    statistics
+                    passportCard
                     favoritesCard
                     followingCard
                 }
@@ -40,6 +40,7 @@ struct MeView: View {
             .washBackground()
             .navigationTitle("Me")
             .performerDestination()
+            .navigationDestination(for: PassportLink.self) { _ in EventPassportView() }
             .navigationDestination(for: MeList.self) { list in
                 switch list {
                 case .favorites: FavoriteEventsView()
@@ -273,37 +274,80 @@ struct MeView: View {
         }
     }
 
-    // MARK: - What the library adds up to
+    // MARK: - The Passport
 
-    /// What the library adds up to: three counts read off the library itself,
-    /// and under them the one thing the reader writes down by hand.
+    /// The way into the reader's own record of where they have been, over the
+    /// three counts that summarise it.
     ///
-    /// The lottery count takes the width rather than standing as a fourth cell
-    /// in the row above. It is a different kind of number — theirs rather than
-    /// Eventernote's, and only ever part-filled — so it is named beside its
-    /// value and says what it was counted out of, which is more than a
-    /// hundred-point cell has room for.
-    private var statistics: some View {
-        VStack(spacing: 11) {
-            HStack(spacing: 11) {
-                StatTile(tint: .trackInterest, value: store.eventsThisYear.formatted(),
-                         label: "Events this year")
-                StatTile(tint: .trackTicket, value: store.venuesVisited.formatted(),
-                         label: "Venues visited")
-                StatTile(tint: .trackAttended, value: store.performersSeen.formatted(),
-                         label: "Performers seen")
+    /// One card, built the way the two cards under it are: a ``CardHeader``
+    /// with the way into the rest on its right, and the contents laid directly
+    /// on the glass beneath it. The whole card is the way in, so the counts
+    /// push as readily as the See All does.
+    private var passportCard: some View {
+        NavigationLink(value: PassportLink.passport) {
+            VStack(alignment: .leading, spacing: 14) {
+                CardHeader(title: "Event Passport") { SeeAllLabel() }
+
+                HStack(spacing: 0) {
+                    passportTile(store.eventsThisYear, tint: .trackInterest,
+                                 label: "Events this year", isFirst: true)
+                    passportTile(store.venuesVisited, tint: .trackTicket,
+                                 label: "Venues visited", isFirst: false)
+                    passportTile(store.performersSeen, tint: .trackAttended,
+                                 label: "Performers seen", isFirst: false)
+                }
             }
-            StatTile(tint: .brandTint, value: store.lotteryEntries.formatted(),
-                     sub: coverage(store.lotteryEntriesRecorded),
-                     label: "Lottery entries", layout: .field)
+            .padding(16)
+            .contentShape(.rect)
         }
+        .buttonStyle(.plain)
+        .glassPanel(cornerRadius: 28, interactive: true)
     }
 
-    /// How much of the number beside it was actually filled in. Nothing at all
-    /// for a library with no past in it yet: "0 of 0" is not a coverage.
-    private func coverage(_ recorded: Int) -> Text? {
-        guard store.eventsAttended > 0 else { return nil }
-        return Text("\(recorded) of \(store.eventsAttended) recorded")
+    /// One of the three counts, drawn on the card rather than in a
+    /// ``StatTile`` of its own.
+    ///
+    /// The tints are the ones this screen has always given these three numbers;
+    /// the panel is gone, because these sit *inside* one now and glass set in
+    /// glass reads as a smudge. What separates them instead is a hairline, the
+    /// same one the Passport's own Time at Events strip uses — three counts
+    /// standing loose in a row read as three things that happen to be near each
+    /// other rather than as one reading of a library.
+    ///
+    /// The dot leads the value on its own line rather than floating above it:
+    /// a mark with a number beside it is a key, and a mark with a gap under it
+    /// is a stray.
+    private func passportTile(
+        _ value: Int, tint: Color, label: LocalizedStringKey, isFirst: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                    .fill(tint)
+                    .frame(width: 8, height: 8)
+                Text(value.formatted())
+                    .font(.system(size: 22, weight: .bold))
+                    .monospacedDigit()
+            }
+            Text(label)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, isFirst ? 0 : 14)
+        .overlay(alignment: .leading) {
+            // A drawn hairline rather than a `Divider`: a divider left to work
+            // out its own orientation inside an overlay takes the height of
+            // the tallest line instead of the cell, and stops short above the
+            // caption.
+            if !isFirst {
+                Rectangle()
+                    .fill(.separator)
+                    .frame(width: 0.5)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Favorites

@@ -67,7 +67,10 @@ enum Region: String, CaseIterable, Identifiable, Hashable {
     /// spells them — which is also how they are spelled at the head of every
     /// address it publishes, and why ``containing(address:)`` can match on them
     /// without a table of its own.
-    var prefectures: [String] {
+    /// `nonisolated` because it is a table rather than a fact about the screen:
+    /// ``PassportStats`` reads the whole 47 off it from outside the main actor,
+    /// and a key path to a main-actor property is an error in Swift 6.
+    nonisolated var prefectures: [String] {
         switch self {
         case .kanto:
             ["茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県"]
