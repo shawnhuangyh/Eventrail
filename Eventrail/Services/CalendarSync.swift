@@ -42,6 +42,11 @@ final class CalendarSync {
     /// The calendar Eventrail made, remembered per device: a calendar
     /// identifier belongs to this device's calendar database and means nothing
     /// on another one, so it is deliberately not part of the synced archive.
+    ///
+    /// It is a cache rather than the answer. The calendar itself usually lives
+    /// on the reader's iCloud account and so *is* shared between their devices
+    /// — see ``adoptableCalendar()`` for what happens when this says nothing
+    /// and one is already there.
     private static let calendarKey = "calendarSyncIdentifier"
 
     private var savedCalendarID: String? {
@@ -57,6 +62,20 @@ final class CalendarSync {
     /// EventKit refuses a search window longer than four years, so a wider
     /// range is read in chunks of this size.
     private static let window: TimeInterval = 4 * 365 * 24 * 60 * 60
+
+    /// How far either side of today the app's own calendar is swept for
+    /// entries to correct or remove.
+    ///
+    /// Deliberately not measured from the library. An entry whose event has
+    /// left the library is not in the library to be measured, so a range that
+    /// began at the earliest night still held could never reach it: a reader
+    /// who removes the oldest night of a ten-year history — or empties the
+    /// whole library — would leave everything before the cut-off sitting in
+    /// their diary with nothing left that would ever remove it. A fixed sweep
+    /// costs ten predicates against one calendar this app owns, and finds
+    /// them.
+    private static let sweepBack: TimeInterval = 30 * 365 * 24 * 60 * 60
+    private static let sweepAhead: TimeInterval = 10 * 365 * 24 * 60 * 60
 
     // MARK: - Mirroring
 
@@ -112,6 +131,13 @@ final class CalendarSync {
     /// Deleting the calendar rather than emptying it is what makes "off" mean
     /// off: nothing of Eventrail's is left in the reader's diary, not even an
     /// empty calendar they would have to tidy up themselves.
+    ///
+    /// A calendar on an iCloud account is one object rather than one per
+    /// device, so switching the mirror off on the phone takes it off the iPad
+    /// too — until the iPad's next mirror, which makes it again, because that
+    /// device's switch is still on and per-device. A momentary flap that
+    /// settles itself is the price of the alternative being two calendars of
+    /// one name, each holding the whole library; see ``adoptableCalendar()``.
     func stop() async {
         guard savedCalendarID != nil, await requestAccess() else { return }
         defer { savedCalendarID = nil }
@@ -138,19 +164,46 @@ final class CalendarSync {
     // MARK: - The app's own calendar
 
     private func calendar() throws -> EKCalendar {
+        let kept: EKCalendar
         if let id = savedCalendarID, let existing = store.calendar(withIdentifier: id) {
-            return existing
+            kept = existing
+        } else if let adopted = adoptableCalendar() {
+            savedCalendarID = adopted.calendarIdentifier
+            kept = adopted
+        } else {
+            let calendar = EKCalendar(for: .event, eventStore: store)
+            calendar.title = String(localized: "Eventrail")
+            calendar.cgColor = UIColor(Color.brandTint).cgColor
+            guard let source = preferredSource() else {
+                throw CalendarSyncError.noCalendarSource
+            }
+            calendar.source = source
+            try store.saveCalendar(calendar, commit: true)
+            savedCalendarID = calendar.calendarIdentifier
+            // Nothing to tidy behind a calendar that did not exist a moment ago.
+            return calendar
         }
-        let calendar = EKCalendar(for: .event, eventStore: store)
-        calendar.title = String(localized: "Eventrail")
-        calendar.cgColor = UIColor(Color.brandTint).cgColor
-        guard let source = preferredSource() else {
-            throw CalendarSyncError.noCalendarSource
+        discardDuplicates(of: kept)
+        return kept
+    }
+
+    /// Takes out any second calendar of this app's own.
+    ///
+    /// Adopting stops another one from being made; it does not clear up the
+    /// ones already made, and a reader whose phone and iPad each wrote their
+    /// own has two of everything until something does. Only a calendar that
+    /// passes the same test adoption uses is removed — this app's name, and
+    /// nothing in it but entries pointing back at Eventernote — so what goes
+    /// is a copy of what is being kept, never a diary of the reader's own.
+    ///
+    /// The other device notices in the ordinary way: its saved identifier
+    /// stops resolving, so its next mirror adopts the survivor, and the two
+    /// converge on one calendar without either having to be told.
+    private func discardDuplicates(of kept: EKCalendar) {
+        for calendar in store.calendars(for: .event)
+        where calendar.calendarIdentifier != kept.calendarIdentifier && isAdoptable(calendar) {
+            try? store.removeCalendar(calendar, commit: true)
         }
-        calendar.source = source
-        try store.saveCalendar(calendar, commit: true)
-        savedCalendarID = calendar.calendarIdentifier
-        return calendar
     }
 
     /// Wherever the reader's own new events go, so Eventrail's calendar lands
@@ -162,14 +215,67 @@ final class CalendarSync {
             ?? store.sources.first
     }
 
-    /// Everything already in the app's calendar across the span the library
-    /// covers, widened around today so entries for events that have since been
-    /// dropped are still found and removed.
+    /// The calendar this app made and then lost track of.
+    ///
+    /// Going by ``savedCalendarID`` alone is right about where it is kept and
+    /// wrong about what it proves. The identifier is this device's, but the
+    /// calendar it names is usually the reader's iCloud account's, and that
+    /// syncs: an iPad with nothing in `UserDefaults` would make a second
+    /// "Eventrail" beside the one the phone had already sent it, each device
+    /// mirroring the whole library into its own, and the reader would see
+    /// every night twice under one name. The same gap opens on a single
+    /// device whenever the identifier stops resolving — a restore, or iCloud
+    /// handing the calendar back under a new one — and there the entries
+    /// already written are not even reachable to be corrected, since every
+    /// search here is scoped to the calendar it was handed.
+    ///
+    /// So a calendar is adopted rather than remade when it is one this app
+    /// could have written: named as this app names its own, writable, and
+    /// holding nothing but entries that point back at Eventernote. **The last
+    /// test is the one that matters.** This mirror removes whatever it finds
+    /// that no longer answers to an event in the library, so adopting a
+    /// calendar of the reader's own that happened to share the name would
+    /// empty it.
+    private func adoptableCalendar() -> EKCalendar? {
+        store.calendars(for: .event).first(where: isAdoptable)
+    }
+
+    /// Whether this is a calendar this app could have written: named as this
+    /// app names its own, writable, and holding nothing but entries pointing
+    /// back at Eventernote. An empty one passes — that is a calendar made on
+    /// another device and synced here before it had anything in it.
+    private func isAdoptable(_ calendar: EKCalendar) -> Bool {
+        Self.ownTitles.contains(calendar.title)
+            && calendar.allowsContentModifications
+            && entries(in: calendar, covering: []).allSatisfy(Self.isOurs)
+    }
+
+    /// What this app calls its own calendar. The title is localized, so the
+    /// English name is kept beside whatever this device would write: a
+    /// calendar made on a device in another language is still ours, and so is
+    /// one made before a translation existed.
+    private static var ownTitles: Set<String> {
+        [String(localized: "Eventrail"), "Eventrail"]
+    }
+
+    /// An entry only this mirror would have written: one pointing back at the
+    /// Eventernote page it was made from. The reader may have moved it, renamed
+    /// it or hung their own alerts on it — none of that changes whose it is.
+    private nonisolated static func isOurs(_ entry: EKEvent) -> Bool {
+        entry.url?.host() == EventernoteClient.site.host()
+    }
+
+    /// Everything already in the app's calendar: the fixed sweep either side of
+    /// today, widened to anything the library holds outside it.
+    ///
+    /// Wide on purpose — the entries worth finding are the ones whose events
+    /// have *left* the library, and nothing in `events` can point at those. See
+    /// ``sweepBack``.
     private func entries(in calendar: EKCalendar, covering events: [Event]) -> [EKEvent] {
         let now = Date.now
         let dates = events.map(\.sortDate)
-        var start = min(dates.min() ?? now, now.addingTimeInterval(-Self.window))
-        let end = max(dates.max() ?? now, now.addingTimeInterval(Self.window))
+        var start = min(dates.min() ?? now, now.addingTimeInterval(-Self.sweepBack))
+        let end = max(dates.max() ?? now, now.addingTimeInterval(Self.sweepAhead))
 
         var found: [EKEvent] = []
         while start < end {
