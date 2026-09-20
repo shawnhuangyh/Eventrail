@@ -222,19 +222,26 @@ struct EventPassportView: View {
         return VStack(alignment: .leading, spacing: 0) {
             map(pins)
                 .aspectRatio(1 / 0.98, contentMode: .fit)
-                .overlay(alignment: .bottomLeading) {
-                    // Only once the dots differ. "1 → 1" is a key to a scale
-                    // that has one value on it.
-                    if let most = pins.map(\.count).max(), most > 1 {
-                        legend(most: most).padding(12)
-                    }
-                }
                 .overlay(alignment: .bottomTrailing) {
-                    // On the map rather than under it: it is a reading of the
-                    // map, and the figures below are readings of the library.
-                    if stats.prefectures > 0 {
-                        prefectures(stats).padding(12)
+                    // Both in the one corner, on the map rather than under it:
+                    // they are readings of the map, and the figures below are
+                    // readings of the library. The corner is the right-hand
+                    // one because the left is Apple's — the Maps logo sits
+                    // there and is not ours to cover.
+                    //
+                    // The key to the dots first, then what they add up to:
+                    // how to read the map, and then its reading.
+                    VStack(alignment: .trailing, spacing: 6) {
+                        // Only once the dots differ. "1 → 1" is a key to a
+                        // scale that has one value on it.
+                        if let most = pins.map(\.count).max(), most > 1 {
+                            legend(most: most)
+                        }
+                        if stats.prefectures > 0 {
+                            prefectures(stats)
+                        }
                     }
+                    .padding(12)
                 }
 
             figures(stats)
