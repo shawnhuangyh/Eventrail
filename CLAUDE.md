@@ -81,9 +81,10 @@ xcodebuild -scheme Eventrail clean
 Create ML, FileMerge and the rest moved up to `Xcode.app/Contents/Applications/`.
 So `open -a Simulator` fails with "Unable to find application named 'Simulator'";
 launch the UI as `open -b com.apple.dt.Devices` instead. Any tool that hardcodes
-the old name breaks here — SweetPad's "Launch" task is the one this repo hit,
-which is why [.vscode/run-simulator.sh](.vscode/run-simulator.sh) exists to build,
-install and launch on a simulator itself.
+the old name breaks here — SweetPad's "Launch" task was the one this repo hit, and
+a shell script under `.vscode/` stood in for it until SweetPad was fixed. SweetPad's
+own build and launch tasks work now, so [.vscode/](.vscode/) holds nothing but its
+settings; don't re-add a launch task or a runner script without a reason.
 
 `xcrun simctl` is **unchanged** — boot, install, launch and `--console-pty` all
 still work exactly as before. Only the app that draws the window was renamed, so
