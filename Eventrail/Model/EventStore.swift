@@ -243,6 +243,10 @@ final class EventStore {
     private var pendingMirror: Task<Void, Never>?
     /// The halls an import brought in, being placed behind it.
     private var venuePlacement: Task<Void, Never>?
+    /// Events the reader has just added by hand, waiting for their hall to be
+    /// looked up — see ``placeAdded(_:)``.
+    private var arrivals: [Event.ID] = []
+    private var arrivalPlacement: Task<Void, Never>?
 
     /// The default store reads the reader's own library from disk and, if they
     /// have sync on, merges whatever iCloud holds. Previews and the playground
@@ -395,6 +399,7 @@ final class EventStore {
             // reader means to go, which is what a tracking record used to be
             // opened to say for it.
             keep(event)
+            placeAdded(event)
         }
         persist()
     }
@@ -601,6 +606,68 @@ final class EventStore {
             // The one mirror the whole run gets, for the reason a refresh from
             // Settings mirrors once at the end rather than per hall.
             await mirrorCalendar()
+        }
+    }
+
+    /// Finds the hall of an event the reader has just put in their library,
+    /// without being asked and without holding anything up.
+    ///
+    /// An import places the halls it brings in — ``placeArrivedVenues()`` —
+    /// and an event added by hand from Search was the one way into the library
+    /// that placed nothing. It sat there unplaced: no dot on the Passport's
+    /// map, and a calendar entry carrying the hall's name and no place, until
+    /// the reader happened to open its sheet or asked Settings to go over
+    /// every hall they hold. Adding an event is the reader saying they mean to
+    /// go, which is the same standing an import's arrival has, so it is placed
+    /// on the same terms.
+    ///
+    /// Two requests rather than one, because a search row carries no address:
+    /// Eventernote publishes that on the event's own page, and nothing is
+    /// placed without one. So the page is read first wherever the row never
+    /// carried it — which is also what fills in the times the Passport adds
+    /// up, and the billing its sheet lists.
+    ///
+    /// Queued and taken one at a time, because a reader can add a screenful of
+    /// rows faster than either site answers and a burst of searches is exactly
+    /// what gets this app throttled. Never upgraded from the block to the
+    /// building, for the reason an import's run never is: that one is the
+    /// sheet's to ask, for the hall in front of the reader.
+    private func placeAdded(_ event: Event) {
+        guard venues != nil, !arrivals.contains(event.id) else { return }
+        arrivals.append(event.id)
+        // One runner, whatever it is handed. A second would be two bursts
+        // rather than one queue.
+        guard arrivalPlacement == nil else { return }
+        arrivalPlacement = Task { [weak self] in
+            while let next = self?.arrivals.first {
+                self?.arrivals.removeFirst()
+                await self?.placeArrival(next)
+            }
+            self?.arrivalPlacement = nil
+        }
+    }
+
+    /// One arrival: its own page wherever the row it came from carried no
+    /// address, and then its hall.
+    ///
+    /// Read afresh rather than taken as handed in, because the reader may have
+    /// taken it back out again while the queue was working — and an event no
+    /// longer theirs is not one to go asking about.
+    private func placeArrival(_ id: Event.ID) async {
+        guard var event = event(id: id), isInLibrary(event) else { return }
+        if event.publishedAddress == nil {
+            event = await loadDetail(for: event)
+        }
+        guard event.publishedAddress != nil else { return }
+
+        let outcome = await venues?.placeUnplaced([event]) { _ in }
+        // `placeUnplaced` deliberately says nothing on ``VenuePlaces/placings``
+        // — a run of hundreds would ask for hundreds of mirrors — so the entry
+        // this has just given a place to is mirrored from here. Only where
+        // something was actually placed: a hall already known is no news, and
+        // neither is a hall nobody can find.
+        if case .refreshed(let found, _) = outcome, found > 0 {
+            mirrorSoon()
         }
     }
 
