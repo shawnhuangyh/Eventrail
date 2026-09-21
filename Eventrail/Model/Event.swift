@@ -169,9 +169,24 @@ nonisolated extension Event {
         return date.formatted(style)
     }
 
-    /// "Sat, Oct 3" in US English, formatted for the reader's locale elsewhere.
+    /// "Sun, Oct 12, 2025" in US English, "2025年10月12日(日)" in Japanese —
+    /// formatted for the reader's locale, and always carrying the year.
+    ///
+    /// The year on every row rather than only on the rows that need one. Most
+    /// of what these rows are is history: the Passport is nothing else, My
+    /// Events keeps every night that has been alongside the ones ahead, a
+    /// performer's listing runs from next spring back to whenever the site
+    /// first carried them, and the Following tab is as likely to be showing
+    /// next year as this one. A row that printed only a day and a month left
+    /// the reader to work the year out from whatever card or header the row
+    /// happened to sit under, and the cards that group nothing by month —
+    /// every one on the Passport — gave them nothing to work it out from.
+    ///
+    /// Printing it only where it differs from this year would be the tidier
+    /// rule and the worse one: a bare row would then mean something, and the
+    /// reader would have to know it did.
     var dayLine: String {
-        formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+        formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
     }
 
     /// Nil whenever Eventernote has not published the time yet.
