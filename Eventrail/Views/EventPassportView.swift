@@ -549,19 +549,16 @@ struct EventPassportView: View {
     /// seat bought the moment it went on sale — and is shown as the answer it
     /// is.
     ///
-    /// Headed like the two ranked cards under it, and behind the same See All:
-    /// three cards that sample a list should not each announce themselves
-    /// differently.
+    /// Laid out the way the time card is: the card is named for the
+    /// measurement rather than for the list, the readings of it sit under
+    /// that name, and the ranked nights are ruled off below them under a
+    /// heading of their own. The See All belongs to that heading, because it
+    /// opens the list rather than the card.
     private func lotteryCard(_ stats: PassportStats) -> some View {
         let rows = Array(stats.topLotteries.prefix(Self.cardLimit))
         let most = max(1, rows.first?.entries ?? 1)
-        return VStack(alignment: .leading, spacing: 13) {
-            CardHeader(title: "Top Lottery Entries") {
-                if stats.topLotteries.count > Self.cardLimit {
-                    Button { isShowingLotteries = true } label: { SeeAllLabel() }
-                        .buttonStyle(.plain)
-                }
-            }
+        return VStack(alignment: .leading, spacing: 14) {
+            CardHeader(title: "Lottery Entries")
             // The three readings of the count, drawn as the time card draws
             // its own: the hardest night, what an average one took, and how
             // many nights either was counted over — because the total on the
@@ -576,15 +573,30 @@ struct EventPassportView: View {
                 cell(Text(stats.lotteryEvents.formatted()),
                      label: "Recorded", isFirst: false)
             }
-            .padding(.bottom, 1)
-            ForEach(rows) { row in
-                // A row is the night it names, the way the extremes above and
-                // the ranked cards below are: the whole line is the target.
-                Button { openEvent = row.event } label: {
-                    PassportLotteryRow(row: row, most: most)
+
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Top Lottery Entries")
+                        .font(.system(size: 15.5, weight: .bold))
+                    Spacer(minLength: 8)
+                    if stats.topLotteries.count > Self.cardLimit {
+                        Button { isShowingLotteries = true } label: { SeeAllLabel() }
+                            .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
+                ForEach(rows) { row in
+                    // A row is the night it names, the way the extremes in the
+                    // time card and the ranked cards below are: the whole line
+                    // is the target.
+                    Button { openEvent = row.event } label: {
+                        PassportLotteryRow(row: row, most: most)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
+            .padding(.top, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .top) { Divider() }
         }
         .padding(16)
         .glassPanel(cornerRadius: 28)
