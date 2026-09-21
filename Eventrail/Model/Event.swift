@@ -153,6 +153,26 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     var isUpcoming: Bool {
         (calendar.date(byAdding: .day, value: 1, to: date) ?? date) > .now
     }
+
+    /// How many whole days from today to the night itself — 0 on the day, 1
+    /// for tomorrow — and nil once it has been.
+    ///
+    /// Counted as *written dates* rather than as an interval, for the reason
+    /// ``localDay`` gives: the hall publishes a day and the reader reads it on
+    /// their own calendar, so a night that opens at 18:00 tomorrow is one day
+    /// away all through today rather than turning into two some time this
+    /// evening. A hall abroad is counted on the day its own clock calls it,
+    /// which is the day printed on the row beside this.
+    var daysAway: Int? {
+        let reader = Calendar.current
+        let days = reader.dateComponents(
+            [.day],
+            from: reader.startOfDay(for: .now),
+            to: reader.startOfDay(for: localDay)
+        ).day
+        guard let days, days >= 0 else { return nil }
+        return days
+    }
 }
 
 nonisolated extension Event {

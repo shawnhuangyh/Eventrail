@@ -55,6 +55,48 @@ struct StatusBadge: View {
     }
 }
 
+/// How long until a night, as a count of days over the word for them.
+///
+/// The one thing a row about the future can say that a row about the past
+/// cannot, and the thing a reader with a ticket actually wants off a list: not
+/// which day it is — the row says that already — but how far off it is. Read
+/// as a number rather than as a phrase, because a column of them is scanned
+/// rather than read.
+struct DaysAway: View {
+    /// Whole days, as ``Event/daysAway`` counts them.
+    let days: Int
+
+    /// The last week reads in the app's own colour and everything further out
+    /// in grey. Nothing is filtered or sorted by it; it is the row telling the
+    /// eye where to stop.
+    private var isSoon: Bool { days <= 7 }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: -1) {
+            if days == 0 {
+                // The day itself has no number worth printing, and "0" would
+                // be the wrong answer to how far off it is.
+                Text("Today")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(Color.brandTint)
+            } else {
+                Text(days, format: .number)
+                    .font(.system(size: 21, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(isSoon ? AnyShapeStyle(Color.brandTint) : AnyShapeStyle(.primary))
+                Text(days == 1 ? "Day" : "Days")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(isSoon ? AnyShapeStyle(Color.brandTint.opacity(0.85)) : AnyShapeStyle(.tertiary))
+            }
+        }
+        // Set in caps here rather than in the string, so a language that has
+        // no cases is handed its own word untouched.
+        .textCase(.uppercase)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(days == 0 ? Text("Today") : Text("^[In \(days) day](inflect: true)"))
+    }
+}
+
 /// One cell of a three-up statistics row.
 struct StatTile: View {
     /// The two arrangements the design draws this tile in.

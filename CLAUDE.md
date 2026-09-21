@@ -14,7 +14,7 @@ Source is grouped as:
 
 Where each screen hangs off those four tabs:
 
-- **My Events** (`EventsView`) is the library, filtered ahead/past and grouped by month or by the billed artist, with a selection mode for removing several at once.
+- **My Events** (`EventsView`) is the library, filtered ahead/past and grouped by month or by the billed artist, with a selection mode for removing several at once. A row whose night is still ahead counts itself down beside the chevron (`DaysAway`, off `Event.daysAway`) — whole days between written dates, so a night stays "1 day" all through the day before it rather than turning into two some time that evening, and the last week reads in the app's own tint. Only here: `LibraryRow` is the one row the reader keeps because they mean to be there, and counting down to a date nobody has kept would be the app deciding it mattered.
 - **Following** (`FollowingView`) is every upcoming date of every followed performer, read from their listings rather than from the library, filterable by date range, area and person.
 - **Me** (`MeView`) is four cards — the linked account, the Event Passport, favourites and followed performers — each sampling five rows and sending the rest to a screen of its own (`FavoriteEventsView`, `FollowedPerformersView`). Everything that *configures* the app is behind the gear: `SettingsView`, whose four sections are Calendar, Location, Data and About, with `AboutView` pushed from the last.
 - **Search** (`SearchView`) runs Eventernote's two searches, events and performers.

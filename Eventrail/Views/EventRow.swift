@@ -105,9 +105,18 @@ struct LibraryRow: View {
                 VStack(alignment: .trailing, spacing: 0) {
                     StatusBadge(status: store.status(for: event))
                     Spacer(minLength: 7)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 7) {
+                        // Only on the nights still ahead, and so only in this
+                        // row: the library is the one list the reader keeps
+                        // because they mean to be there. Every other list on
+                        // the app is somebody else's or somewhere else's, and
+                        // counting down to a date nobody has kept would be the
+                        // app deciding it mattered.
+                        if let days = event.daysAway { DaysAway(days: days) }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 .frame(maxHeight: .infinity)
                 .padding(.top, 2)
