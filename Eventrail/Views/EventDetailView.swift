@@ -376,16 +376,28 @@ struct EventDetailView: View {
 
     private var trackingCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 9) {
+            HStack(spacing: 0) {
                 Text("My tracking")
-                    .font(.system(size: 17, weight: .bold))
-                Text("Private to you")
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .glassCapsule()
+                    .font(.system(size: 19, weight: .bold))
+
+                Spacer(minLength: 12)
+
+                // The promise the card makes, said once at the top of it and
+                // set apart from it: on its own line under the title it read
+                // as the card's subtitle — as if what followed were a section
+                // about privacy — where a pill at the other end of the title
+                // reads as a stamp on the card. The closed lock says it before
+                // the words are read.
+                HStack(spacing: 5) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10.5, weight: .semibold))
+                    Text("Private to you")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .glassCapsule()
             }
 
             // The one question the library does not already answer, and only
@@ -398,12 +410,27 @@ struct EventDetailView: View {
                 segment("Ticket", selection: tracking.ticket, options: TicketStatus.allCases)
             }
 
-            lotteryField
+            // A count is asked on one line — see ``lotteryRow``.
+            lotteryRow
 
-            if hasTicket { ticketCard }
+            // What the ticket turned out to be, ruled off from the question
+            // that was asked before anybody had one. The two are written
+            // answers rather than a count, so they are asked the way the note
+            // is, with the label above the field; side by side because neither
+            // is more than a line and stacking them would push the note off
+            // the bottom of the card.
+            if hasTicket {
+                Divider()
 
-            VStack(alignment: .leading, spacing: 7) {
-                fieldLabel("Notes")
+                HStack(alignment: .top, spacing: 12) {
+                    writtenAnswer("Seat") { seatField }
+                    writtenAnswer("Cost") { costField }
+                }
+            }
+
+            // The one answer that is not a line at all, so it is given the
+            // card's whole width and room to grow into.
+            writtenAnswer("Notes") {
                 writing {
                     TextField(
                         "Notes",
@@ -428,6 +455,63 @@ struct EventDetailView: View {
         !event.isUpcoming || store.tracking(for: event).ticket == .purchased
     }
 
+    /// An answer written out: what is being asked, and under it the field it
+    /// is written in.
+    ///
+    /// The label goes above rather than beside because what is written can run
+    /// to the width of the card — a seat as a Japanese hall prints it, a price,
+    /// a note — and a question sitting beside it would be taking that room
+    /// away from the answer.
+    private func writtenAnswer<Content: View>(
+        _ label: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            fieldLabel(label)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// How many entries the reader put into the lottery for this night, asked
+    /// on one line.
+    ///
+    /// The only answer here that is a count rather than something written, and
+    /// the only one asked with the question at the left: a number needs a
+    /// fixed and narrow field, so the room a label above it would take is room
+    /// nothing would ever use.
+    private var lotteryRow: some View {
+        HStack(spacing: 0) {
+            fieldLabel("Lottery entries")
+            Spacer(minLength: 12)
+            lotteryStepper
+                .frame(width: Self.countWidth)
+        }
+    }
+
+    /// How wide the count's field is.
+    ///
+    /// Two ends to press and, between them, room for the four digits
+    /// ``EntryCount`` will take and no more. It was sized as a written answer
+    /// before, which left a single digit sitting in the middle of a field with
+    /// nothing else in it — a count is a narrow thing, and a field that says
+    /// otherwise is asking for something bigger than it wants.
+    private static let countWidth: CGFloat = 108
+
+    /// The height every one-line field on the card stands at: the count, the
+    /// seat, the price.
+    ///
+    /// A floor rather than a fixed height — a field is as tall as the text
+    /// inside it, which grows with the reader's type size — but one floor for
+    /// all three. They are stacked down one card rather than set beside one
+    /// another, which is exactly when a difference of a few points reads as a
+    /// mistake rather than as a distinction.
+    ///
+    /// The written fields carry less padding than a field of this height would
+    /// give them on its own, so that the floor is what decides all three
+    /// rather than the text inside two of them.
+    private static let fieldHeight: CGFloat = 32
+
     /// How many entries the reader put into the lottery for this night.
     ///
     /// Asked whether or not there is a ticket, and before the ticket is asked
@@ -438,45 +522,96 @@ struct EventDetailView: View {
     /// An empty field is "not written down" and 0 is an answer — a seat bought
     /// the moment it went on sale, or an invite — so clearing it leaves nothing
     /// rather than settling on zero. See ``Tracking/lotteryEntries``.
-    private var lotteryField: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            fieldLabel("Lottery entries")
-            writing {
-                TextField("Lottery entries", value: tracking.lotteryEntries,
-                          format: .entries, prompt: Text(verbatim: "—"))
-                    .keyboardType(.numberPad)
-            }
+    ///
+    /// Stepped rather than typed, because the answer is nearly always one of
+    /// the first few numbers and a keyboard for those is three taps of
+    /// overhead. The field between the buttons still takes a typed number for
+    /// the reader who applied eleven times, and clearing it is still how the
+    /// answer goes back to nothing — which is why the minus stops at 0 rather
+    /// than emptying the field: 0 is an answer somebody gave.
+    private var lotteryStepper: some View {
+        HStack(spacing: 0) {
+            lotteryStep(by: -1, symbol: "minus")
+
+            stepperRule
+
+            TextField("Lottery entries", value: tracking.lotteryEntries,
+                      format: .entries, prompt: Text(verbatim: "—"))
+                .textFieldStyle(.plain)
+                .font(.system(size: 15, weight: .semibold))
+                .labelsHidden()
+                .multilineTextAlignment(.center)
+                .keyboardType(.numberPad)
+                .frame(maxWidth: .infinity)
+
+            stepperRule
+
+            lotteryStep(by: 1, symbol: "plus")
+        }
+        .frame(height: Self.fieldHeight)
+        .background(.quaternary.opacity(0.5), in: Self.fieldShape)
+        .overlay { Self.fieldShape.strokeBorder(.quaternary, lineWidth: 0.5) }
+        .sensoryFeedback(.selection, trigger: tracking.wrappedValue.lotteryEntries)
+    }
+
+    /// One end of the lottery stepper.
+    ///
+    /// Counting up from nothing written down means 1 rather than 0 — the reader
+    /// who reaches for plus is recording an application they made. Counting
+    /// *down* from it is nothing at all, so minus is dead until there is a
+    /// number to take one off: an empty field is the absence of an answer, not
+    /// a zero waiting to be stepped through. The ceiling is ``EntryCount``'s
+    /// own four digits, so the two ways in agree on what a number is.
+    private func lotteryStep(by delta: Int, symbol: String) -> some View {
+        let current = tracking.wrappedValue.lotteryEntries
+        let next = min(max((current ?? 0) + delta, 0), 9999)
+        let enabled = current == nil ? delta > 0 : next != current
+
+        return Button {
+            tracking.lotteryEntries.wrappedValue = next
+        } label: {
+            // The whole end of the field is the target, not the glyph in the
+            // middle of it: the three parts are one control, and each of them
+            // gets a third of it.
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(enabled ? Color.brandTint : Color.secondary.opacity(0.4))
+                .frame(width: 33)
+                .frame(maxHeight: .infinity)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+
+    /// What separates the count from the two ends that step it. Inset from the
+    /// field's own edges, so it divides the control rather than cutting it.
+    private var stepperRule: some View {
+        Rectangle()
+            .fill(.quaternary)
+            .frame(width: 0.5)
+            .padding(.vertical, 6)
+    }
+
+    /// Where the reader sat, as the ticket printed it.
+    private var seatField: some View {
+        writing(minHeight: Self.fieldHeight) {
+            // A block, a row and a number in three languages worth of
+            // conventions: nothing the keyboard would correct here is a
+            // correction.
+            TextField("Seat", text: tracking.seat, prompt: Text("Row and number"))
+                .autocorrectionDisabled()
         }
     }
 
-    /// What the ticket turned out to be: the seat it named, and what it cost.
-    ///
-    /// Side by side because neither is more than a line, and asking for them
-    /// one under the other would push the notes off the bottom of the card.
-    private var ticketCard: some View {
-        HStack(alignment: .top, spacing: 11) {
-            VStack(alignment: .leading, spacing: 7) {
-                fieldLabel("Seat")
-                writing {
-                    // A block, a row and a number in three languages worth of
-                    // conventions: nothing the keyboard would correct here is
-                    // a correction.
-                    TextField("Seat", text: tracking.seat, prompt: Text("Row and number"))
-                        .autocorrectionDisabled()
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 7) {
-                fieldLabel("Cost")
-                writing {
-                    // The em dash the imported tiles use for a fact nobody
-                    // published, for the same thing here: nobody wrote it down.
-                    TextField("Cost", value: tracking.cost, format: .yen,
-                              prompt: Text(verbatim: "¥—"))
-                        .keyboardType(.numberPad)
-                }
-            }
-            .frame(width: 112)
+    /// What the night cost.
+    private var costField: some View {
+        writing(minHeight: Self.fieldHeight) {
+            // The em dash the imported tiles use for a fact nobody published,
+            // for the same thing here: nobody wrote it down.
+            TextField("Cost", value: tracking.cost, format: .yen,
+                      prompt: Text(verbatim: "¥—"))
+                .keyboardType(.numberPad)
         }
     }
 
@@ -495,13 +630,17 @@ struct EventDetailView: View {
     /// the two sets of corners run parallel instead of bulging inside one
     /// another. The 20 they had was nearly half the field's own height, which
     /// is what made them look like capsules that had been squashed.
-    private func writing<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func writing<Content: View>(
+        minHeight: CGFloat? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         content()
             .textFieldStyle(.plain)
-            .font(.system(size: 13))
+            .font(.system(size: 15))
             .labelsHidden()
             .padding(.horizontal, 12)
-            .padding(.vertical, 11)
+            .padding(.vertical, 6)
+            .frame(minHeight: minHeight)
             .background(.quaternary.opacity(0.5), in: Self.fieldShape)
             .overlay { Self.fieldShape.strokeBorder(.quaternary, lineWidth: 0.5) }
     }
@@ -517,8 +656,7 @@ struct EventDetailView: View {
         selection: Binding<TicketStatus>,
         options: [TicketStatus]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            fieldLabel(label)
+        writtenAnswer(label) {
             Picker(label, selection: selection) {
                 ForEach(options) { option in
                     Text(option.label).tag(option)
@@ -529,12 +667,19 @@ struct EventDetailView: View {
         }
     }
 
+    /// What one answer is being asked for.
+    ///
+    /// Written the way a question is written rather than set as a heading:
+    /// small caps and letter-spacing are how a *section* is labelled, and these
+    /// label neither a section nor anything the reader is meant to read past.
+    /// Beside its own answer at the reader's own text size, a label is part of
+    /// the sentence the row makes — "Lottery entries: 8".
     private func fieldLabel(_ label: LocalizedStringKey) -> some View {
         Text(label)
-            .font(.system(size: 11, weight: .semibold))
-            .kerning(0.44)
-            .textCase(.uppercase)
-            .foregroundStyle(.tertiary)
+            .font(.system(size: 15))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
     }
 
     // MARK: - What the page says the event is
