@@ -550,8 +550,28 @@ struct EventPassportView: View {
                         .buttonStyle(.plain)
                 }
             }
+            // The three readings of the count, drawn as the time card draws
+            // its own: the hardest night, what an average one took, and how
+            // many nights either was counted over — because the total on the
+            // summary above is over the nights the reader answered for rather
+            // than over the slice.
+            HStack(spacing: 0) {
+                cell(Text(stats.mostLotteryEntries.formatted()),
+                     label: "Most in One", isFirst: true)
+                cell(Text(stats.averageLotteryEntries
+                        .formatted(.number.precision(.fractionLength(1)))),
+                     label: "Avg. Entries", isFirst: false)
+                cell(Text(stats.lotteryEvents.formatted()),
+                     label: "Recorded", isFirst: false)
+            }
+            .padding(.bottom, 1)
             ForEach(rows) { row in
-                PassportLotteryRow(row: row, most: most)
+                // A row is the night it names, the way the extremes above and
+                // the ranked cards below are: the whole line is the target.
+                Button { openEvent = row.event } label: {
+                    PassportLotteryRow(row: row, most: most)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(16)
@@ -1156,6 +1176,9 @@ private struct PassportLotteryRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
+        // The gaps between the three lines are part of the row, so a tap
+        // between the bar and the date opens the night rather than nothing.
+        .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
 }
@@ -1167,6 +1190,12 @@ private struct PassportLotteryRow: View {
 /// either.
 private struct PassportLotterySheet: View {
     let rows: [PassportStats.Lottery]
+
+    /// A row here opens the night it names, exactly as the row on the card
+    /// does — a drawer over a drawer, the way ``PassportExtremesSheet`` opens
+    /// one, so the reader closes the event back onto the list they tapped it
+    /// from.
+    @State private var openEvent: Event?
 
     var body: some View {
         let most = max(1, rows.first?.entries ?? 1)
@@ -1180,7 +1209,10 @@ private struct PassportLotterySheet: View {
             ScrollView {
                 VStack(spacing: 13) {
                     ForEach(rows) { row in
-                        PassportLotteryRow(row: row, most: most)
+                        Button { openEvent = row.event } label: {
+                            PassportLotteryRow(row: row, most: most)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(16)
@@ -1191,6 +1223,7 @@ private struct PassportLotterySheet: View {
         }
         .washBackground()
         .presentationDetents([.medium, .large])
+        .eventSheet($openEvent)
     }
 }
 

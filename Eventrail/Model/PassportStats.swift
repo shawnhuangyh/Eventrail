@@ -149,6 +149,31 @@ nonisolated struct PassportStats {
     let firstEvent: Date?
     let lastEvent: Date?
 
+    // MARK: - Reading the lottery count back
+
+    /// How many nights the reader wrote a lottery count on.
+    ///
+    /// What every other lottery figure is counted over: ``lotteryEntries`` is
+    /// a total over the nights they answered for, not over the slice, and the
+    /// screen says so rather than letting a part-filled column read as a whole.
+    var lotteryEvents: Int { topLotteries.count }
+
+    /// The most entries the reader put into any one night.
+    ///
+    /// Read off the front of ``topLotteries``, which is already sorted by
+    /// entries: the hardest they ever tried for a seat is the first row of the
+    /// list, and counting it a second way is how the two drift apart.
+    var mostLotteryEntries: Int { topLotteries.first?.entries ?? 0 }
+
+    /// How many entries an average recorded night took.
+    ///
+    /// Over ``lotteryEvents`` rather than over the slice, for the reason
+    /// `Avg. Time` is over the timed nights: a night they never wrote a count
+    /// on is not a night they entered nothing for.
+    var averageLotteryEntries: Double {
+        lotteryEvents > 0 ? Double(lotteryEntries) / Double(lotteryEvents) : 0
+    }
+
     // MARK: - Reading the library
 
     /// Reads one slice of the reader's past.
