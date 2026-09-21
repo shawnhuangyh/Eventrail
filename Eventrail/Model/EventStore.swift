@@ -288,18 +288,25 @@ final class EventStore {
         }
         archive = loaded
 
-        // Before the guard below, which returns: a hall being placed is owed a
-        // mirror whether or not this device syncs to iCloud.
+        // Before the merge below, which returns on a device that does not sync:
+        // a hall being placed is owed a mirror whether or not this one does.
         observeVenuePlacings()
 
-        guard iCloudSyncEnabled, let cloud else { return }
-        // Whatever another device wrote while this one was closed is merged
-        // before the first screen reads anything.
-        if let remote = cloud.load() {
-            archive = archive.merging(remote)
+        if iCloudSyncEnabled, let cloud {
+            // Whatever another device wrote while this one was closed is merged
+            // before the first screen reads anything.
+            if let remote = cloud.load() {
+                archive = archive.merging(remote)
+            }
+            observeCloudChanges()
+            cloud.pull()
         }
-        observeCloudChanges()
-        cloud.pull()
+
+        // Last, so that a merge's arrivals are read on their halls' clocks too.
+        // Written back rather than only held: what this corrects is a night
+        // abroad imported before its hall was placed, and correcting it once a
+        // launch would be correcting it forever.
+        if retimeEvents() { persist() }
     }
 
     deinit {
@@ -595,6 +602,10 @@ final class EventStore {
             let outcome = await venues?.placeUnplaced(placeableEvents) { progress in
                 self.venueStatus = progress
             }
+            // Before the report and its early return: a run that placed
+            // nothing new may still have settled which clock a hall abroad
+            // keeps, and the events there are owed that.
+            if retimeEvents() { persist() }
             // Nothing to ask about is nothing to report: a status here would
             // put "Placed 0 of 0 venues" under a Settings row that had done
             // no work, where nil correctly leaves it saying what it would do.
@@ -667,6 +678,7 @@ final class EventStore {
         // something was actually placed: a hall already known is no news, and
         // neither is a hall nobody can find.
         if case .refreshed(let found, _) = outcome, found > 0 {
+            if retimeEvents() { persist() }
             mirrorSoon()
         }
     }
@@ -959,6 +971,9 @@ final class EventStore {
         if let remote = cloud.load() {
             archive = archive.merging(remote)
         }
+        // This device's halls have the say over this device's clocks, and a
+        // merge is exactly where a copy read on another one arrives.
+        retimeEvents()
         archive = archive.pruned()
         let outcome = cloud.save(archive)
         syncStatus = outcome
@@ -1043,7 +1058,48 @@ final class EventStore {
         venueStatus = await venues.refresh(placeableEvents) { progress in
             self.venueStatus = progress
         }
+        if retimeEvents() { persist() }
         await mirrorCalendar()
+    }
+
+    /// Reads every event held here on its hall's own clock, and says whether
+    /// any of them moved.
+    ///
+    /// The other half of ``Event/published(in:)``. An import reads every page
+    /// on Tokyo time because that is all the page says — Eventernote prints a
+    /// clock and never a zone — and a night in Taipei or Shanghai is published
+    /// in the hall's clock like every other. So the correction waits on the one
+    /// thing that knows where the hall stands, which is the placing, and is
+    /// applied here whenever a placing lands.
+    ///
+    /// Reads what ``VenuePlaces`` has already written down and asks nothing: a
+    /// pass over the whole archive must not become a run of searches, which is
+    /// the rule the calendar mirror is built on as well.
+    ///
+    /// Written into the archive rather than worked out where the times are
+    /// read, because it is the instant that is wrong rather than the way it is
+    /// shown — the library's order, whether a night has passed, the calendar
+    /// entry and its alert are all made of it, and none of them should have to
+    /// know about zones.
+    @discardableResult
+    private func retimeEvents() -> Bool {
+        guard let venues else { return false }
+        var moved = false
+        let zones = venues.timeZones(for: Array(archive.events.values) + Array(seen.values))
+        for (id, zone) in zones {
+            if let event = archive.events[id], event.timeZone != zone {
+                archive.events[id] = event.published(in: zone)
+                moved = true
+            }
+            // An event met in Search and not kept is held here and nowhere
+            // else, and its sheet is the one place the hall was looked up
+            // from. Nothing to persist — it is not the reader's yet — so this
+            // deliberately does not count as a move.
+            if let event = seen[id], event.timeZone != zone {
+                seen[id] = event.published(in: zone)
+            }
+        }
+        return moved
     }
 
     /// A hall has been placed that was not placed before, so whatever was
@@ -1060,6 +1116,10 @@ final class EventStore {
         guard let venues, calendar != nil else { return }
         venuePlacings = Task { [weak self] in
             for await _ in venues.placings {
+                // A hall that has just been placed is also a hall whose clock
+                // has just been settled, and an event at it may owe its
+                // calendar entry a different hour as well as a map.
+                if self?.retimeEvents() == true { self?.persist() }
                 self?.mirrorSoon()
             }
         }
@@ -1092,6 +1152,7 @@ final class EventStore {
             for await _ in changes {
                 guard let self, self.iCloudSyncEnabled, let remote = self.cloud?.load() else { continue }
                 self.archive = self.archive.merging(remote)
+                self.retimeEvents()
                 self.lastSynced = .now
                 self.syncStatus = .synced
                 self.file?.save(self.archive)
@@ -1208,6 +1269,7 @@ final class EventStore {
         let backup = try LibraryBackup.read(at: url)
         let before = archive
         archive = archive.restoring(backup.archive)
+        retimeEvents()
         persist()
         let held = Self.held(in: archive)
         let was = Self.held(in: before)

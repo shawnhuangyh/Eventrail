@@ -58,13 +58,21 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     let placeID: Int?
     /// Midnight in the venue's zone on the day of the event. Eventernote always
     /// publishes the day; it often has no times yet for an announced event.
-    let date: Date
-    let doorsOpen: Date?
-    let startsAt: Date?
-    let endsAt: Date?
+    ///
+    /// Kept as an instant, and so re-readable: what the site printed is a wall
+    /// clock, and ``published(in:)`` is how these four are read again once the
+    /// hall turns out to keep a different one.
+    var date: Date
+    var doorsOpen: Date?
+    var startsAt: Date?
+    var endsAt: Date?
     /// The venue's time zone. Door and start times are shown in it: an event at
     /// 17:00 in Tokyo reads 17:00 wherever the reader happens to be.
-    let timeZone: TimeZone
+    ///
+    /// ``publishedZone`` until something says otherwise, because the page
+    /// prints a clock and never a zone; the hall's own once ``VenuePlaces`` has
+    /// placed it outside Japan — see ``published(in:)``.
+    var timeZone: TimeZone
     /// How many people list this event on Eventernote — imported, never edited here.
     let listedAttendees: Int?
     let performers: [Performer]
@@ -106,7 +114,15 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     /// before the app numbered them.
     var detailFormat: Int? = nil
 
-    /// Events are published in Japan Standard Time.
+    /// The zone an event's times are read in until its hall says otherwise.
+    ///
+    /// Eventernote is a Japanese site and nearly every night it publishes is in
+    /// Japan, which is one zone from 与那国 to 稚内. It carries the odd night
+    /// abroad as well — a dome in Taipei, a hall in Shanghai — and its members
+    /// write those in the hall's own clock, with nothing on the page to say so.
+    /// So this is where every import starts, and ``published(in:)`` is what
+    /// reads it again once ``VenuePlaces`` has placed the hall somewhere that
+    /// keeps a different one.
     static let publishedZone = TimeZone(identifier: "Asia/Tokyo") ?? .gmt
 
     /// How much of an event's own page an import reads, as a number that goes
@@ -169,6 +185,25 @@ nonisolated extension Event {
         return date.formatted(style)
     }
 
+    /// "GMT+9" — what `zone` is set to on the night of this event.
+    ///
+    /// The offset and no place beside it, though Foundation will gladly name
+    /// one. **A zone identifier is the map provider's reading of where the
+    /// hall stands, and the provider is chosen by where the *reader* stands:**
+    /// a phone served from mainland China files a hall in Taipei under
+    /// `Asia/Shanghai`, which Foundation then names "China mainland Time"
+    /// under a Taipei address on the same screen. Seoul reads GMT+9 and is not
+    /// "Japan Time" either. The offset is the part this app is actually sure
+    /// of, and it is the part that moves the times.
+    ///
+    /// Read at the night itself rather than at today, so a summer date abroad
+    /// says the offset that night keeps rather than the one it keeps now.
+    func offsetLine(in zone: TimeZone) -> String {
+        var style = Date.FormatStyle(date: .omitted, time: .omitted)
+        style.timeZone = zone
+        return sortDate.formatted(style.timeZone(.localizedGMT(.short)))
+    }
+
     /// "Saturday, October 3, 2026" — the detail sheet's fuller form.
     var longDateLine: String {
         formatted(.dateTime.weekday(.wide).day().month(.wide).year())
@@ -206,11 +241,60 @@ nonisolated extension Event {
 }
 
 nonisolated extension Event {
+    /// The same published day and times, read on `zone`'s clock instead of on
+    /// the one this copy carries.
+    ///
+    /// An Eventernote page prints a wall clock and no zone: 開演 18:00 is
+    /// 18:00 at the hall, and a hall in Taipei means 18:00 in Taipei. The
+    /// instants here are that clock read in a zone, so a night abroad is not a
+    /// different fact to import but the same one read again — which is all
+    /// this does, once ``VenuePlaces`` has said which clock the hall keeps.
+    ///
+    /// Nothing the reader sees moves: every line on a screen is formatted in
+    /// the event's own zone, so the sheet goes on saying 18:00. What moves is
+    /// the instant behind it, which is what the calendar entry, its alert and
+    /// the ordering of the library are all made of.
+    func published(in zone: TimeZone) -> Event {
+        guard zone != timeZone else { return self }
+
+        var printed = Calendar(identifier: .gregorian)
+        printed.timeZone = timeZone
+        var there = printed
+        there.timeZone = zone
+
+        /// The clock this instant reads on the page, read again at the hall.
+        func reread(_ instant: Date?) -> Date? {
+            guard let instant else { return nil }
+            let clock = printed.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second], from: instant)
+            // A clock the zone does not have — the hour a country skips going
+            // into summer time — leaves the instant where it was rather than
+            // dropping a time the site did publish.
+            return there.date(from: clock) ?? instant
+        }
+
+        var event = self
+        event.timeZone = zone
+        event.date = reread(date) ?? date
+        event.doorsOpen = reread(doorsOpen)
+        event.startsAt = reread(startsAt)
+        event.endsAt = reread(endsAt)
+        return event
+    }
+
     /// Replaces the imported fields with a freshly imported copy, keeping this
     /// event's identity. The reader's ``Tracking`` lives outside the event and
     /// is untouched by any import.
     func merging(_ imported: Event) -> Event {
-        Event(
+        // Which zone the clock on the page is read in is this device's answer
+        // rather than the site's — every import reads ``publishedZone`` and
+        // knows no better — so a re-import must not quietly put a hall abroad
+        // back on Tokyo time between one placing and the next.
+        let imported = imported.timeZone == Event.publishedZone && timeZone != Event.publishedZone
+            ? imported.published(in: timeZone)
+            : imported
+
+        return Event(
             id: id,
             title: imported.title,
             artist: imported.artist,

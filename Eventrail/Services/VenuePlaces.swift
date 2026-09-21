@@ -100,8 +100,44 @@ final class VenuePlaces {
         /// Kept as a string so a source added later reads back as an unknown
         /// one rather than taking the whole cache down with it.
         var source: String?
+        /// Which clock the hall keeps, as Maps files it. An identifier rather
+        /// than a `TimeZone` for the reason the source is a string: a zone the
+        /// system later drops reads back as nothing rather than as an error.
+        ///
+        /// Nil where nobody was asked, and nil where Maps had no zone to give
+        /// — ``askedZone`` is what tells those two apart.
+        var timeZone: String?
+        /// Whether anything ever asked which clock this hall keeps. False on
+        /// every answer written before there was a question, which is what
+        /// sends a hall abroad back to Maps exactly once.
+        var askedZone: Bool?
 
         var wasFound: Bool { latitude != nil && longitude != nil }
+
+        /// Which clock the hall keeps, as far as this answer settles it.
+        ///
+        /// Japan is one zone, so a hall the answer places inside it is on Tokyo
+        /// time whatever Maps did or did not say — and that is nearly every
+        /// hall Eventernote publishes. Only a hall abroad needs Maps' own
+        /// answer, and only there can this be nil.
+        var zone: TimeZone? {
+            guard let latitude, let longitude else { return nil }
+            if JapanAddresses.isInJapan(CLLocationCoordinate2D(latitude: latitude, longitude: longitude)) {
+                return Event.publishedZone
+            }
+            return timeZone.flatMap(TimeZone.init(identifier:))
+        }
+
+        /// Whether this hall is worth one more search for the sake of its
+        /// clock: found, found outside Japan, and never asked.
+        ///
+        /// The narrowest question that can be asked here. Every hall in Japan
+        /// answers itself, so the halls this sends back to Maps are the handful
+        /// a reader has abroad — where a whole-cache re-reading would be
+        /// hundreds of searches for an answer only these few need.
+        var needsZone: Bool {
+            askedZone != true && wasFound && zone == nil
+        }
 
         var placing: Placing? {
             guard let latitude, let longitude else { return nil }
@@ -114,7 +150,7 @@ final class VenuePlaces {
             // one, which is the safe way round: it widens a frame that did not
             // need widening, rather than claiming a precision it may not have.
             let source = self.source.flatMap(Source.init(rawValue:)) ?? .register
-            return Placing(item: item, uncertainty: source.uncertainty)
+            return Placing(item: item, uncertainty: source.uncertainty, timeZone: zone)
         }
 
         init(_ found: MKMapItem?, from source: Source?) {
@@ -125,6 +161,11 @@ final class VenuePlaces {
             asked = .now
             ruleset = VenuePlaces.ruleset
             self.source = source?.rawValue
+            // Maps carries the zone with the place, so a hall abroad is placed
+            // and dated in one search. The register and OpenStreetMap answer
+            // only about Japan, where ``zone`` needs nobody's help.
+            timeZone = found?.timeZone?.identifier
+            askedZone = true
         }
     }
 
@@ -162,6 +203,11 @@ final class VenuePlaces {
     struct Placing: Sendable {
         let item: MKMapItem
         let uncertainty: CLLocationDistance
+        /// Which clock the hall keeps — see ``Answer/zone``. Carried because a
+        /// placing is the only thing that establishes it, and a screen showing
+        /// the hall's times has to be able to tell a clock it knows from the
+        /// one an import assumed.
+        let timeZone: TimeZone?
     }
 
     /// Whether this device may ask OpenStreetMap which building at the block
@@ -316,6 +362,26 @@ final class VenuePlaces {
         }
     }
 
+    /// Which clock each of `events` is kept on, as far as anything has already
+    /// found out — the venue's own, wherever the hall has been placed.
+    ///
+    /// Read from what the placings already wrote down rather than asked for,
+    /// exactly as ``mapItems(for:)`` is, and for the same reason: this is
+    /// handed the whole library at once. An event at a hall nothing has looked
+    /// up yet is simply absent, and goes on being read on Tokyo time — which
+    /// is right for every hall in Japan and is where an import starts every
+    /// hall off. See ``Event/published(in:)``.
+    func timeZones(for events: [Event]) -> [Event.ID: TimeZone] {
+        let cache = cache
+        return events.reduce(into: [:]) { zones, event in
+            guard let venue = Venue(event),
+                  let answer = cache[venue.key], !Self.isWorthAskingAgain(answer),
+                  let zone = answer.zone
+            else { return }
+            zones[event.id] = zone
+        }
+    }
+
     // MARK: - Asking
 
     /// Where one event is, for a screen showing it now — the first time the
@@ -340,7 +406,11 @@ final class VenuePlaces {
     }
 
     private func mapItem(for venue: Venue) async -> Placing? {
-        if let answer = cache[venue.key], !Self.isWorthAskingAgain(answer) {
+        // A hall abroad that nothing has asked the clock of is asked again,
+        // though it is placed perfectly well — see ``Answer/needsZone``. One
+        // search settles it for good, and until it is settled every event held
+        // there sits an hour or a day out in the reader's calendar.
+        if let answer = cache[venue.key], !Self.isWorthAskingAgain(answer), !answer.needsZone {
             return answer.placing
         }
         let known = cache[venue.key]
@@ -408,7 +478,7 @@ final class VenuePlaces {
         let cache = cache
         let venues = questions(in: events) { venue in
             guard let answer = cache[venue.key] else { return true }
-            return Self.isWorthAskingAgain(answer)
+            return Self.isWorthAskingAgain(answer) || answer.needsZone
         }
         Self.log.info("placing \(venues.count, privacy: .public) venues nothing had yet")
         return await ask(venues, onProgress: onProgress)

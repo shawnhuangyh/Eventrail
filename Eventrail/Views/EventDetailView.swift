@@ -154,6 +154,7 @@ struct EventDetailView: View {
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                zoneBadge
             }
             .padding(.horizontal, 22)
             .padding(.bottom, 14)
@@ -171,6 +172,77 @@ struct EventDetailView: View {
         // An already-formatted date, so it is shown as given rather than as a
         // localizable key.
         Text(verbatim: event.longDateLine)
+    }
+
+    /// Which clock this sheet's times are on, where the app has established it
+    /// rather than assumed it.
+    ///
+    /// Three answers, in order of how well they are known. The hall is placed
+    /// and the placing carries the clock. Or it was placed on an earlier
+    /// visit, and the store wrote that clock into the event itself — see
+    /// ``Event/published(in:)``. Or Eventernote's own address opens with a
+    /// Japanese prefecture, and Japan keeps one clock end to end, so no map
+    /// service needs asking at all.
+    ///
+    /// Nil is the fourth answer and an honest one: a hall abroad that nothing
+    /// has placed yet is on whatever clock its members wrote, and this app
+    /// does not know which. It reads those times on Tokyo time because that is
+    /// where every import starts, and printing GMT+9 under a Seoul date would
+    /// be claiming an answer rather than having one — Seoul is not on Japan's
+    /// clock because Eventernote is Japanese. The badge then says which clock
+    /// the times are on without saying what that clock is set to, which is
+    /// exactly what is known. The sheet asks for its own hall the moment it
+    /// opens, so this is usually a second rather than a state.
+    private var venueZone: TimeZone? {
+        if let placed = place?.timeZone { return placed }
+        if event.timeZone != Event.publishedZone { return event.timeZone }
+        if let address = event.publishedAddress, Region.containing(address: address) != nil {
+            return Event.publishedZone
+        }
+        return nil
+    }
+
+    /// Which clock every time on this sheet is on.
+    ///
+    /// On every sheet rather than only on the nights abroad. The times here
+    /// are the hall's, as Eventernote's members wrote them — 18:00 is 18:00 at
+    /// the door rather than 18:00 wherever the reader is standing — and that
+    /// is as true of a Tokyo date as of a Taipei one. A reader in Shanghai
+    /// reading Tokyo is owed the same sentence as a reader in Tokyo reading
+    /// Taipei, and a badge that appeared only on the rare night abroad would
+    /// leave every other sheet quietly implying whichever clock the reader
+    /// happens to be on.
+    ///
+    /// Under the date, because it qualifies the date as much as the times: a
+    /// night falls on the day its hall says it does.
+    ///
+    /// The venue's clock rather than a place name, for the reason
+    /// ``Event/offsetLine(in:)`` gives: the name would be the map provider's
+    /// and the provider is the reader's, so a Taipei hall comes back named for
+    /// the mainland. The hall is named on this same sheet; what the badge adds
+    /// is which clock it keeps.
+    private var zoneBadge: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "globe")
+                .font(.system(size: 10, weight: .semibold))
+            // The offset only where there is one to give — see ``venueZone``.
+            if let zone = venueZone {
+                Text("Venue time · \(event.offsetLine(in: zone))")
+                    .font(.system(size: 10.5, weight: .semibold))
+            } else {
+                Text("Venue time")
+                    .font(.system(size: 10.5, weight: .semibold))
+            }
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .glassCapsule()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            venueZone.map { Text("Times shown in the venue's own time, \(event.offsetLine(in: $0))") }
+                ?? Text("Times shown in the venue's own time")
+        )
     }
 
     /// The way out of the sheet.
