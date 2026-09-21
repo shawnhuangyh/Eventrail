@@ -135,6 +135,18 @@ struct EventPassportView: View {
         .safeAreaInset(edge: .top) { yearBar }
         .refreshable { await placeVenues() }
         .task(id: store.revision) { readPlacings() }
+        // A year is only ever offered while the reader has something in it, so
+        // a removal here or a merge from another device can take the chosen one
+        // away underneath the screen — leaving nine cards filtered to a year
+        // with no chip lit to say which, or none at all once the bar drops to a
+        // single year and hides itself. Either way the filter has outlived the
+        // control that sets it, and the screen falls back to what it opens on.
+        .onChange(of: years) { _, available in
+            guard case .year(let year) = scope else { return }
+            if available.count <= 1 || !available.contains(year) {
+                withAnimation(.snappy) { scope = .allTime }
+            }
+        }
         .navigationDestination(for: VenueLink.self) { VenueView(link: $0) }
         // Both See Alls open a drawer rather than pushing a screen: every one
         // of these lists is the card it sits under, read to the end, and the
