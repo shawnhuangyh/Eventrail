@@ -381,7 +381,14 @@ final class EventStore {
     // MARK: - Writing
 
     func setTracking(_ tracking: Tracking, for event: Event) {
-        archive.tracking[event.id] = Stamped(tracking)
+        // Written against the record as it stands, so that a merge can tell
+        // which of the five answers this device actually changed — see
+        // ``Stamped/edited(to:at:)``. A record this device has never held is
+        // as old as a record can be: every answer in it is one the reader has
+        // not given here, so the other device's copy of any of them outranks
+        // it.
+        let held = archive.tracking[event.id] ?? Stamped(Tracking(), at: .distantPast)
+        archive.tracking[event.id] = held.edited(to: tracking)
         keep(event)
         persist()
     }

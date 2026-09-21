@@ -142,7 +142,10 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         }
 
         merged.membership = Self.merge(membership, other.membership)
-        merged.tracking = Self.merge(tracking, other.tracking)
+        // Alone among the reader's records, a tracking record holds five
+        // answers rather than one, so it is settled answer by answer — see
+        // ``Stamped/merging(_:)``.
+        merged.tracking = tracking.merging(other.tracking) { $0.merging($1) }
         merged.favorites = Self.merge(favorites, other.favorites)
         merged.follows = Self.merge(follows ?? [:], other.follows ?? [:])
         // Both sides read the same public page, so either is true; this device's
@@ -189,7 +192,7 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         if !follows.isEmpty { raised.follows = follows }
         for (id, record) in backup.tracking
         where !record.value.isEmpty && (tracking[id]?.value.isEmpty ?? true) {
-            raised.tracking[id] = Stamped(record.value, at: now)
+            raised.tracking[id] = record.restamped(at: now)
         }
 
         return merging(raised)

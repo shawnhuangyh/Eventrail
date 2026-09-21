@@ -47,7 +47,13 @@ nonisolated struct LibraryBackup: Sendable {
     /// in. The reader's own, like the seat and the cost at 2 — nothing can
     /// import it back — so a build that has never heard of it is told to refuse
     /// the file rather than drop it.
-    static let currentFormat: UInt8 = 4
+    /// 5: a tracking record carries when each of its five answers was last
+    /// written, which is what lets two devices edit different answers between
+    /// syncs and keep both. A build that has never heard of those dates would
+    /// drop them and go back to settling the whole record at once, so the note
+    /// typed on the other device goes missing the next time anything else on
+    /// that record is touched.
+    static let currentFormat: UInt8 = 5
 
     var app: String
     var created: Date

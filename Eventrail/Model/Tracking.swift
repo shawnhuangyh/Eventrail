@@ -57,10 +57,131 @@ nonisolated struct Tracking: Hashable, Codable {
     /// is never counted as a night with no applications.
     var lotteryEntries: Int?
     var note: String = ""
+    /// When each answer above was last written, where that is older than the
+    /// record holding it.
+    ///
+    /// Not one of the reader's answers but the app's note about them, and it
+    /// is what lets a merge settle this record an answer at a time — see
+    /// ``Stamped/merging(_:)``. A record carries one stamp for five answers,
+    /// so a cost typed on the iPad after a note was typed on the phone would
+    /// otherwise carry the iPad's whole record — its older copy of the note
+    /// included — over the newer note. That is the erasure ``Stamped`` exists
+    /// to stop, one level down.
+    ///
+    /// A field missing from here is exactly as old as its record. That is what
+    /// an archive written before this existed says about all five, and what an
+    /// answer written in the same breath as its record says about itself, so
+    /// only an answer *older* than the record around it is written down and a
+    /// record edited once carries nothing here at all.
+    var edits: [Field: Date] = [:]
 
+    /// The five answers a record holds, named so that a merge can take them
+    /// one at a time.
+    ///
+    /// A field added to this struct belongs here too, and the switches in
+    /// ``sameAnswer(for:as:)`` and ``take(_:from:)`` will not compile until it
+    /// is — which is the point of naming them rather than reaching for a
+    /// key path.
+    nonisolated enum Field: String, CaseIterable, Codable, CodingKeyRepresentable, Hashable, Sendable {
+        case ticket, seat, cost, lotteryEntries, note
+    }
+
+    /// Whether the reader has written anything down here.
+    ///
+    /// Read off the answers alone: ``edits`` says when they were written, and
+    /// a record whose every answer has since been cleared is empty however
+    /// recently that happened.
     var isEmpty: Bool {
         ticket == .none && seat.isEmpty && cost == nil
             && lotteryEntries == nil && note.isEmpty
+    }
+}
+
+nonisolated extension Tracking {
+    /// Whether two records give the same answer to one question.
+    fileprivate func sameAnswer(for field: Field, as other: Tracking) -> Bool {
+        switch field {
+        case .ticket: ticket == other.ticket
+        case .seat: seat == other.seat
+        case .cost: cost == other.cost
+        case .lotteryEntries: lotteryEntries == other.lotteryEntries
+        case .note: note == other.note
+        }
+    }
+
+    /// Takes one answer from another record and leaves the other four alone.
+    fileprivate mutating func take(_ field: Field, from other: Tracking) {
+        switch field {
+        case .ticket: ticket = other.ticket
+        case .seat: seat = other.seat
+        case .cost: cost = other.cost
+        case .lotteryEntries: lotteryEntries = other.lotteryEntries
+        case .note: note = other.note
+        }
+    }
+}
+
+/// The reader's record, settled one answer at a time.
+///
+/// ``Stamped`` settles everything else record by record, which is right where
+/// a record holds one answer: a membership, a favourite, a follow. This one
+/// holds five, and the device that wrote last had almost certainly written
+/// about one of them — so taking its whole record hands back its stale copy of
+/// the other four. Two devices editing different answers between syncs now
+/// keep both.
+///
+/// Two devices editing the *same* answer between syncs is still the later
+/// write, because nothing here can know which of them the reader meant. That
+/// is the one case a merge cannot settle without asking, and it is not worth a
+/// second copy of a note the reader would then have to reconcile by hand.
+nonisolated extension Stamped where Value == Tracking {
+    /// This record as it stands after the reader edited it on this device.
+    ///
+    /// The answers they changed are as new as the record itself and need no
+    /// date of their own; the answers they left alone keep the age they came
+    /// in with, so an untouched note does not arrive at the other device
+    /// wearing the timestamp of the cost typed beside it.
+    func edited(to new: Tracking, at date: Date = .now) -> Stamped<Tracking> {
+        var edited = new
+        edited.edits = [:]
+        for field in Tracking.Field.allCases where new.sameAnswer(for: field, as: value) {
+            let age = value.edits[field] ?? modified
+            if age < date { edited.edits[field] = age }
+        }
+        return Stamped(edited, at: date)
+    }
+
+    /// This record and the other device's, answer by answer.
+    ///
+    /// Ties keep this device's answer, so a merge stays stable when two
+    /// devices happen to write in the same instant — the same way
+    /// ``Stamped/newer(_:)`` settles a record.
+    func merging(_ other: Stamped<Tracking>) -> Stamped<Tracking> {
+        let when = max(modified, other.modified)
+        var merged = Tracking()
+        for field in Tracking.Field.allCases {
+            let mine = value.edits[field] ?? modified
+            let theirs = other.value.edits[field] ?? other.modified
+            merged.take(field, from: theirs > mine ? other.value : value)
+            // Written down only where it is older than the record it lands in.
+            // Left out, it would be read as of the merged record's own stamp —
+            // which here is the newer of two devices, and would age this answer
+            // up past an edit a third device made in between.
+            let written = max(mine, theirs)
+            if written < when { merged.edits[field] = written }
+        }
+        return Stamped(merged, at: when)
+    }
+
+    /// The same answers, every one of them as new as the record.
+    ///
+    /// What a restore raises a backup's record by: the dates in the file are
+    /// the ages the answers had when it was written, and a restore is asking
+    /// for them back *now* — see ``LibraryArchive/restoring(_:)``.
+    func restamped(at date: Date = .now) -> Stamped<Tracking> {
+        var raised = value
+        raised.edits = [:]
+        return Stamped(raised, at: date)
     }
 }
 
@@ -88,7 +209,8 @@ nonisolated extension Tracking {
             seat: try record.decodeIfPresent(String.self, forKey: .seat) ?? "",
             cost: try record.decodeIfPresent(Int.self, forKey: .cost),
             lotteryEntries: try record.decodeIfPresent(Int.self, forKey: .lotteryEntries),
-            note: try record.decodeIfPresent(String.self, forKey: .note) ?? "")
+            note: try record.decodeIfPresent(String.self, forKey: .note) ?? "",
+            edits: try record.decodeIfPresent([Field: Date].self, forKey: .edits) ?? [:])
     }
 }
 
