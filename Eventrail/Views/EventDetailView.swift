@@ -78,7 +78,14 @@ struct EventDetailView: View {
                     header
                     actions
                     statistics
-                    trackingCard
+                    // Only for an event the reader keeps. Tracking answers
+                    // questions about a night they mean to be at — the ticket,
+                    // the seat, what it cost — so on an event that is not in
+                    // the library there is nothing for it to be about, and a
+                    // date opened from Following or Search shows the facts
+                    // alone until it is added. A removal keeps whatever was
+                    // written, so re-adding brings the card back as it was.
+                    if store.isInLibrary(event) { trackingCard }
                     summaryCard
                     if !event.performers.isEmpty { performersCard }
                     venueCard
