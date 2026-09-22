@@ -224,9 +224,10 @@ nonisolated struct PassportStats {
         topVenues = Self.ranked(venueCounts) { venuePrefectures[$0] }
 
         let lotteries = events.compactMap { event -> Lottery? in
-            // Nil is "not written down" and zero is an answer somebody gave —
-            // a seat bought the moment it went on sale, or an invite. Only the
-            // first is left out.
+            // A count written down at all is a night the reader applied for:
+            // zero is "not written down" too, and never reaches this — see
+            // ``Tracking/lotteryEntries``. So these are the nights every
+            // figure below is counted over.
             guard let entries = tracking(event).lotteryEntries else { return nil }
             return Lottery(event: event, entries: entries)
         }

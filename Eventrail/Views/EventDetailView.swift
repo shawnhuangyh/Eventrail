@@ -519,16 +519,15 @@ struct EventDetailView: View {
     /// applied for six times and lost is worth having written down by a reader
     /// who keeps the event anyway.
     ///
-    /// An empty field is "not written down" and 0 is an answer — a seat bought
-    /// the moment it went on sale, or an invite — so clearing it leaves nothing
-    /// rather than settling on zero. See ``Tracking/lotteryEntries``.
+    /// An empty field is "not written down", and so is 0 — see
+    /// ``Tracking/lotteryEntries``. There is one way to say "no lottery here"
+    /// rather than two that mean the same thing and count differently.
     ///
     /// Stepped rather than typed, because the answer is nearly always one of
     /// the first few numbers and a keyboard for those is three taps of
     /// overhead. The field between the buttons still takes a typed number for
-    /// the reader who applied eleven times, and clearing it is still how the
-    /// answer goes back to nothing — which is why the minus stops at 0 rather
-    /// than emptying the field: 0 is an answer somebody gave.
+    /// the reader who applied eleven times, and either way down — stepping off
+    /// 1 or clearing what was typed — leaves it empty.
     private var lotteryStepper: some View {
         HStack(spacing: 0) {
             lotteryStep(by: -1, symbol: "minus")
@@ -557,15 +556,20 @@ struct EventDetailView: View {
     /// One end of the lottery stepper.
     ///
     /// Counting up from nothing written down means 1 rather than 0 — the reader
-    /// who reaches for plus is recording an application they made. Counting
-    /// *down* from it is nothing at all, so minus is dead until there is a
-    /// number to take one off: an empty field is the absence of an answer, not
-    /// a zero waiting to be stepped through. The ceiling is ``EntryCount``'s
-    /// own four digits, so the two ways in agree on what a number is.
+    /// who reaches for plus is recording an application they made — and
+    /// counting down off 1 empties the field again, because 0 is that same
+    /// nothing rather than a step below it. So minus is dead on an empty
+    /// field: there is no answer there to take one off. The ceiling is
+    /// ``EntryCount``'s own four digits, so the two ways in agree on what a
+    /// number is.
+    ///
+    /// Both ends fall out of one comparison: a step that would leave the field
+    /// saying exactly what it says now is a step there is no point offering.
     private func lotteryStep(by delta: Int, symbol: String) -> some View {
         let current = tracking.wrappedValue.lotteryEntries
-        let next = min(max((current ?? 0) + delta, 0), 9999)
-        let enabled = current == nil ? delta > 0 : next != current
+        let stepped = min(max((current ?? 0) + delta, 0), 9999)
+        let next: Int? = stepped == 0 ? nil : stepped
+        let enabled = next != current
 
         return Button {
             tracking.lotteryEntries.wrappedValue = next

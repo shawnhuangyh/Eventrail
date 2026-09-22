@@ -51,11 +51,26 @@ nonisolated struct Tracking: Hashable, Codable {
     var cost: Int?
     /// How many entries the reader put into the lottery for this night.
     ///
-    /// Nil is "not written down". Zero is an answer somebody gave — a seat
-    /// bought the moment it went on sale, or an invite — so clearing the field
-    /// goes back to nil rather than settling on 0, and a night nobody filled in
-    /// is never counted as a night with no applications.
-    var lotteryEntries: Int?
+    /// Nil is "not written down", and so is zero: a night the reader applied
+    /// for nothing is a night with no lottery on it rather than a lottery they
+    /// entered no times. Unlike ``cost``, where zero is a real answer — a seat
+    /// that was won or given really did cost nothing — there is nothing a 0
+    /// here says that an empty field does not.
+    ///
+    /// So a count taken back down to nothing empties the field. It used to
+    /// settle on 0 and go on counting as a night the reader had answered for,
+    /// which is what the Passport's `Recorded` and its averages are counted
+    /// over: one taken down to zero read there as a night applied for and
+    /// nothing gained.
+    var lotteryEntries: Int? {
+        // The one place the rule holds, so that nothing which reads this
+        // record has to know it: a sheet writing through a binding, a merge
+        // taking the answer from another device, the Passport counting up the
+        // nights it was written on. Assigning inside `didSet` does not run it
+        // again, and an observer does not run during init at all — which is
+        // what the decoder below handles for records already written.
+        didSet { if lotteryEntries == 0 { lotteryEntries = nil } }
+    }
     var note: String = ""
     /// When each answer above was last written, where that is older than the
     /// record holding it.
@@ -208,7 +223,13 @@ nonisolated extension Tracking {
             ticket: try record.decodeIfPresent(TicketStatus.self, forKey: .ticket) ?? .none,
             seat: try record.decodeIfPresent(String.self, forKey: .seat) ?? "",
             cost: try record.decodeIfPresent(Int.self, forKey: .cost),
-            lotteryEntries: try record.decodeIfPresent(Int.self, forKey: .lotteryEntries),
+            // Zeroes written before that became "not written down" are read
+            // as nothing, because a property observer does not run here. A
+            // record is always written whole, so the key goes on the next
+            // save of its own accord.
+            lotteryEntries: try record
+                .decodeIfPresent(Int.self, forKey: .lotteryEntries)
+                .flatMap { entries -> Int? in entries == 0 ? nil : entries },
             note: try record.decodeIfPresent(String.self, forKey: .note) ?? "",
             edits: try record.decodeIfPresent([Field: Date].self, forKey: .edits) ?? [:])
     }
@@ -250,10 +271,10 @@ nonisolated extension FormatStyle where Self == YenAmount {
 
 /// Writes a count of lottery entries into a text field, and reads one back out.
 ///
-/// The same shape as ``YenAmount`` and for the same two reasons: no built-in
-/// style takes an optional, and an empty field has to read back as nil rather
-/// than as zero, which here is the difference between a night nobody filled in
-/// and a night the reader went to without applying for anything.
+/// The same shape as ``YenAmount`` and for one of the same two reasons: no
+/// built-in style takes an optional, and the field has to be able to hold
+/// nothing. Where the two part company is zero — ``YenAmount`` keeps it,
+/// because a free ticket is an answer, and this one does not.
 nonisolated struct EntryCount: ParseableFormatStyle {
     var parseStrategy: Strategy { Strategy() }
 
@@ -264,10 +285,14 @@ nonisolated struct EntryCount: ParseableFormatStyle {
     nonisolated struct Strategy: ParseStrategy {
         /// Four digits is 9,999 applications for one night. Past that the
         /// reader is leaning on a key rather than recording a lottery.
+        ///
+        /// A field left empty and a field holding 0 read back the same, for
+        /// the reason ``Tracking/lotteryEntries`` gives.
         func parse(_ value: String) -> Int? {
             let digits = value.compactMap(\.wholeNumberValue).prefix(4)
             guard !digits.isEmpty else { return nil }
-            return digits.reduce(0) { $0 * 10 + $1 }
+            let count = digits.reduce(0) { $0 * 10 + $1 }
+            return count == 0 ? nil : count
         }
     }
 }

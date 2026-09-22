@@ -1191,7 +1191,7 @@ private struct PassportLotteryRow: View {
                 Text(row.entries.formatted())
                     .font(.system(size: 13, weight: .bold))
                     .monospacedDigit()
-                    .foregroundStyle(row.entries > 0 ? Color.trackTicket : .secondary)
+                    .foregroundStyle(Color.trackTicket)
             }
             PassportBar(fraction: Double(row.entries) / Double(most), tint: .trackTicket)
             Text(verbatim: "\(row.event.dayLine) · \(row.event.venue)")
@@ -1264,8 +1264,8 @@ private struct PassportBar: View {
         GeometryReader { proxy in
             Capsule()
                 .fill(tint.gradient)
-                // Never nothing: a row that is in the list has a bar, and a
-                // lottery recorded as zero entries still names an event.
+                // Never nothing: a row that is in the list has a bar, however
+                // far down the ranking it sits.
                 .frame(width: max(4, proxy.size.width * min(1, max(0, fraction))))
         }
         .frame(height: 8)
