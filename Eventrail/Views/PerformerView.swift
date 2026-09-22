@@ -361,8 +361,10 @@ struct PerformerView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 17)
             } else {
-                ForEach(events.prefix(Self.sectionLimit)) { event in
-                    Divider().opacity(0.45).padding(.leading, 12)
+                ForEach(
+                    Array(events.prefix(Self.sectionLimit).enumerated()), id: \.element.id
+                ) { index, event in
+                    if index > 0 { Divider().opacity(0.45).padding(.leading, 12) }
                     AppearanceRow(event: event, subject: subject) { openEvent = event }
                         .task { await store.pageOn(feed, after: event) }
                 }
