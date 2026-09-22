@@ -22,7 +22,7 @@ nonisolated struct CloudSync: Sendable {
     /// margin leaves room for the store's own bookkeeping.
     static let quota = 900_000
 
-    private static let log = Logger(subsystem: "com.shawnhuang.Eventrail", category: "sync")
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "sync")
 
     /// What a push to iCloud did, in terms the Me screen can state plainly.
     enum Outcome: Sendable, Equatable {

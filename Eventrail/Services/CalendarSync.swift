@@ -37,7 +37,7 @@ final class CalendarSync {
 
     /// What the last mirror wrote, in enough detail to tell an entry that
     /// carries a place from one that carries only a line of text.
-    private static let log = Logger(subsystem: "com.shawnhuang.Eventrail", category: "calendar")
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "calendar")
 
     /// The calendar Eventrail made, remembered per device: a calendar
     /// identifier belongs to this device's calendar database and means nothing

@@ -6,7 +6,7 @@ nonisolated extension UTType {
     /// Eventrail's own backup file, declared in [Info.plist](Info.plist) so the
     /// system knows the extension belongs to this app: the document picker can
     /// filter for it, and Files names it rather than calling it a document.
-    static let eventrailBackup = UTType(exportedAs: "com.shawnhuang.Eventrail.backup")
+    static let eventrailBackup = UTType(exportedAs: "moe.shawn.Eventrail.backup")
 }
 
 /// A copy of the library the reader keeps themselves, as a file.
@@ -59,7 +59,7 @@ nonisolated struct LibraryBackup: Sendable {
     var created: Date
     var archive: LibraryArchive
 
-    private static let log = Logger(subsystem: "com.shawnhuang.Eventrail", category: "backup")
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "backup")
 
     init(archive: LibraryArchive, created: Date = .now) {
         self.app = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"

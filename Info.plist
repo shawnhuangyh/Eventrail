@@ -13,7 +13,7 @@
 			<string>Owner</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>com.shawnhuang.Eventrail.backup</string>
+				<string>moe.shawn.Eventrail.backup</string>
 			</array>
 		</dict>
 	</array>
@@ -27,7 +27,7 @@
 			<key>UTTypeDescription</key>
 			<string>Eventrail Backup</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.shawnhuang.Eventrail.backup</string>
+			<string>moe.shawn.Eventrail.backup</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

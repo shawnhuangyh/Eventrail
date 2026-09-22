@@ -258,7 +258,7 @@ nonisolated struct LibraryArchive: Codable, Sendable {
 nonisolated struct LibraryFile: Sendable {
     static let shared = LibraryFile()
 
-    private static let log = Logger(subsystem: "com.shawnhuang.Eventrail", category: "library")
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "library")
 
     var url: URL = {
         let directory = URL.applicationSupportDirectory.appending(path: "Eventrail", directoryHint: .isDirectory)

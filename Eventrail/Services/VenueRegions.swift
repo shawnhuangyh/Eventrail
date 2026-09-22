@@ -25,7 +25,7 @@ import os
 final class VenueRegions {
     /// The same category ``VenuePlaces`` logs under: both answer "where is
     /// this hall", and reading one without the other tells half the story.
-    private static let log = Logger(subsystem: "com.shawnhuang.Eventrail", category: "venues")
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "venues")
 
     /// Whether halls are being looked up at this moment.
     private(set) var isPlacing = false

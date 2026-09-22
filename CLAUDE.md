@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Eventrail is an iPhone/iPad SwiftUI app (single target `Eventrail`, bundle id `com.shawnhuang.Eventrail`). [MyApp.swift](Eventrail/MyApp.swift) declares the `@main` `App` and shows [RootView.swift](Eventrail/Views/RootView.swift), a four-tab `TabView` (My Events / Following / Me / Search, the last with `role: .search`, which iOS 26 detaches into its own button beside the bar). There is no test target, no package manifest, and no dependencies.
+Eventrail is an iPhone/iPad SwiftUI app (single target `Eventrail`, bundle id `moe.shawn.Eventrail`). [MyApp.swift](Eventrail/MyApp.swift) declares the `@main` `App` and shows [RootView.swift](Eventrail/Views/RootView.swift), a four-tab `TabView` (My Events / Following / Me / Search, the last with `role: .search`, which iOS 26 detaches into its own button beside the bar). There is no test target, no package manifest, and no dependencies.
 
 Source is grouped as:
 

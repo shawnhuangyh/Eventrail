@@ -46,7 +46,7 @@ final class VenuePlaces {
     /// Says what happened to each lookup. A silent fallback to plain text is
     /// indistinguishable from a broken search, and this is the only place that
     /// can tell the difference.
-    private static let log = Logger(subsystem: "com.shawnhuang.Eventrail", category: "venues")
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "venues")
 
     /// What Eventernote knows about where an event is. Two events at the same
     /// hall ask the same question and are looked up once, which is why this and
