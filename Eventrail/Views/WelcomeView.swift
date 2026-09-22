@@ -249,7 +249,7 @@ struct WelcomeView: View {
 
     private var cloudNeedsAttention: Bool {
         switch store.syncStatus {
-        case .notConfigured, .signedOut, .failed: true
+        case .notConfigured, .signedOut, .accountChanged, .failed: true
         default: false
         }
     }

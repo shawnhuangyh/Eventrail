@@ -108,6 +108,20 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         membership.compactMap { $0.value.value ? events[$0.key] : nil }
     }
 
+    /// Whether the reader has put nothing in here at all.
+    ///
+    /// Not "the library is empty": a library emptied on purpose still holds the
+    /// tombstones that say so, and those are worth syncing. This is the state a
+    /// fresh install is in before anything has been read into it — nothing to
+    /// hand another device, and so nothing worth writing over what iCloud may
+    /// still be in the middle of handing *this* one. See
+    /// ``EventStore/mayPushToCloud``.
+    var holdsNothing: Bool {
+        membership.isEmpty && tracking.isEmpty && favorites.isEmpty
+            && (follows?.isEmpty ?? true) && eventernoteAccount == nil
+            && recentSearches.value.isEmpty
+    }
+
     func isInLibrary(_ id: Event.ID) -> Bool { membership[id]?.value == true }
     func isFavorite(_ id: Event.ID) -> Bool { favorites[id]?.value == true }
     func isFollowing(_ actorID: Int) -> Bool { follows?[String(actorID)]?.value == true }

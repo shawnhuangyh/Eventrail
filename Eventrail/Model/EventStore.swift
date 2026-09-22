@@ -162,6 +162,11 @@ final class EventStore {
     /// Whether this device mirrors the library to iCloud. A per-device choice,
     /// so it deliberately does not sync: turning sync off on a phone should not
     /// turn it off on the iPad.
+    ///
+    /// Off until the reader turns it on, like ``calendarSyncEnabled``. Copying
+    /// what they have written into their iCloud is theirs to say yes to — the
+    /// Welcome screen asks, and Settings carries the same row — and a switch
+    /// found already on is not an answer anybody gave.
     var iCloudSyncEnabled: Bool {
         didSet {
             guard iCloudSyncEnabled != oldValue else { return }
@@ -239,6 +244,13 @@ final class EventStore {
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var cloudChanges: Task<Void, Never>?
+    /// The wait for iCloud's own copy to arrive — see ``mayPushToCloud``.
+    private var cloudWait: Task<Void, Never>?
+    /// Whether this launch knows what iCloud holds: either it was read, or the
+    /// wait for it ran out.
+    private var cloudCopyIsSettled = false
+    /// A push held back while that was still open, to be made once it closes.
+    private var owesCloudPush = false
     private var venuePlacings: Task<Void, Never>?
     private var pendingMirror: Task<Void, Never>?
     /// The halls an import brought in, being placed behind it.
@@ -268,10 +280,10 @@ final class EventStore {
         self.venues = venues
         self.client = client
 
-        // On by default: a reader with more than one device expects their own
-        // records to follow them. A preview has no file and never syncs.
+        // Off until the reader says otherwise, the same as the calendar. A
+        // preview has no file and never syncs.
         iCloudSyncEnabled = file != nil
-            && (UserDefaults.standard.object(forKey: Self.syncPreferenceKey) as? Bool ?? true)
+            && UserDefaults.standard.bool(forKey: Self.syncPreferenceKey)
         calendarSyncEnabled = calendar != nil
             && UserDefaults.standard.bool(forKey: Self.calendarPreferenceKey)
         preciseVenuesEnabled = venues?.usesOpenStreetMap ?? false
@@ -292,25 +304,36 @@ final class EventStore {
         // a hall being placed is owed a mirror whether or not this one does.
         observeVenuePlacings()
 
+        var merged = false
+
         if iCloudSyncEnabled, let cloud {
             // Whatever another device wrote while this one was closed is merged
-            // before the first screen reads anything.
-            if let remote = cloud.load() {
+            // before the first screen reads anything. On a device that has not
+            // synced before there is nothing there yet — the store downloads
+            // asynchronously, and this read is what starts it — so what comes
+            // back also says whether this device may write yet.
+            let remote = cloud.load()
+            if let remote {
                 archive = archive.merging(remote)
+                merged = true
             }
             observeCloudChanges()
+            noteCloudCopy(seen: remote != nil)
             cloud.pull()
         }
 
         // Last, so that a merge's arrivals are read on their halls' clocks too.
         // Written back rather than only held: what this corrects is a night
         // abroad imported before its hall was placed, and correcting it once a
-        // launch would be correcting it forever.
-        if retimeEvents() { persist() }
+        // launch would be correcting it forever. A merge is written back for a
+        // plainer reason — it is only in memory until something saves it, and
+        // this is also where what *this* device holds goes back to iCloud.
+        if retimeEvents() || merged { persist() }
     }
 
     deinit {
         cloudChanges?.cancel()
+        cloudWait?.cancel()
         venuePlacings?.cancel()
         pendingMirror?.cancel()
         pendingSave?.cancel()
@@ -975,18 +998,109 @@ final class EventStore {
             syncStatus = .signedOut
             return
         }
-        if let remote = cloud.load() {
+        let remote = cloud.load()
+        if let remote {
             archive = archive.merging(remote)
+            revision += 1
         }
+        noteCloudCopy(seen: remote != nil)
         // This device's halls have the say over this device's clocks, and a
         // merge is exactly where a copy read on another one arrives.
         retimeEvents()
         archive = archive.pruned()
-        let outcome = cloud.save(archive)
-        syncStatus = outcome
-        if outcome == .synced { lastSynced = .now }
+        pushToCloud()
         file?.save(archive)
         if cloudChanges == nil { observeCloudChanges() }
+    }
+
+    /// Hands iCloud the library as it stands, or notes that it is owed one.
+    private func pushToCloud() {
+        guard let cloud = cloudForPush() else { return }
+        record(cloud.save(archive))
+    }
+
+    /// The cloud a write may go to, or nil when this device does not sync or
+    /// the push is being held — see ``mayPushToCloud``.
+    ///
+    /// Every push asks here, so the hold is in one place rather than at each of
+    /// the callers, and a push it refuses is remembered rather than dropped:
+    /// what is being held back is the reader's library, not a retry.
+    private func cloudForPush() -> CloudSync? {
+        guard iCloudSyncEnabled, let cloud else { return nil }
+        guard mayPushToCloud else {
+            owesCloudPush = !archive.holdsNothing
+            return nil
+        }
+        owesCloudPush = false
+        return cloud
+    }
+
+    /// What the last push did, as the screens state it.
+    private func record(_ outcome: CloudSync.Outcome) {
+        syncStatus = outcome
+        if outcome == .synced { lastSynced = .now }
+    }
+
+    /// Whether this device may write the whole library into iCloud yet.
+    ///
+    /// The key-value store holds the library under one key, and a write
+    /// replaces it: whoever writes last is what every other device then reads.
+    /// That is safe between devices that have both read it, and it is not safe
+    /// before — a device downloads the store *after* launch, so an install that
+    /// wrote in the gap would hand iCloud its own empty archive and take the
+    /// reader's library off every device that had not yet merged it back.
+    ///
+    /// Two rules close that gap. A write waits until this launch knows what
+    /// iCloud holds, which is either having read it or having waited
+    /// ``cloudFirstReadWait`` for it; and an archive holding nothing is never
+    /// written at all, because it can only overwrite and has nothing to add.
+    /// A push refused by either is remembered and made as soon as it may be.
+    private var mayPushToCloud: Bool {
+        cloudCopyIsSettled && !archive.holdsNothing
+    }
+
+    /// How long a first push waits for iCloud's copy before going without it.
+    /// Long enough for a download on a slow connection, short enough that a
+    /// reader who edits something in their first half-minute still syncs it.
+    private static let cloudFirstReadWait = Duration.seconds(20)
+
+    /// Notes whether iCloud's own copy has been seen, and starts — or ends —
+    /// the wait for it.
+    private func noteCloudCopy(seen: Bool) {
+        if seen {
+            cloudCopyIsSettled = true
+            cloudWait?.cancel()
+            cloudWait = nil
+            if owesCloudPush { pushToCloud() }
+        } else if !cloudCopyIsSettled, cloudWait == nil {
+            cloudWait = Task { [weak self] in
+                try? await Task.sleep(for: Self.cloudFirstReadWait)
+                guard !Task.isCancelled, let self else { return }
+                self.cloudWait = nil
+                self.cloudCopyIsSettled = true
+                if self.owesCloudPush { self.pushToCloud() }
+            }
+        }
+    }
+
+    /// This device was signed in to a different iCloud account.
+    ///
+    /// Syncing stops rather than carrying on quietly. The library on this
+    /// device was gathered under the account that just left, and the store now
+    /// standing in front of it belongs to somebody else's — merging the two
+    /// would put one reader's records in the other's iCloud, and neither a
+    /// tombstone nor a timestamp has anything to say about that. Turning the
+    /// switch off is the honest answer, and turning it back on is the reader
+    /// saying the new account is theirs too.
+    private func cloudAccountChanged() {
+        cloudWait?.cancel()
+        cloudWait = nil
+        cloudCopyIsSettled = false
+        owesCloudPush = false
+        // The switch clears the status on its way down, so the reason is
+        // written after it rather than before.
+        iCloudSyncEnabled = false
+        syncStatus = .accountChanged
     }
 
     /// Flushes a pending write immediately.
@@ -998,15 +1112,24 @@ final class EventStore {
         pendingSave = nil
         archive = archive.pruned()
         file?.save(archive)
-        guard iCloudSyncEnabled, let cloud, cloud.isConfigured, cloud.isAvailable else { return }
-        let outcome = cloud.save(archive)
-        syncStatus = outcome
-        if outcome == .synced { lastSynced = .now }
+        pushToCloud()
     }
 
+    @ObservationIgnored private var usageCache: (revision: Int, share: Double)?
+
     /// How much of iCloud's quota the library takes up, 0...1.
+    ///
+    /// Answering means packing the whole library, which is far too much to do
+    /// once a frame — and a screen asks for this inside its body, several times
+    /// over, whenever it redraws. So the answer is kept until the next write:
+    /// ``revision`` counts those, including the ones a merge from another
+    /// device makes.
     var cloudUsage: Double {
-        cloud?.usage(of: archive) ?? 0
+        guard let cloud else { return 0 }
+        if let cached = usageCache, cached.revision == revision { return cached.share }
+        let share = cloud.usage(of: archive)
+        usageCache = (revision, share)
+        return share
     }
 
     /// The events a calendar entry is owed: everything in the library, upcoming
@@ -1151,20 +1274,45 @@ final class EventStore {
 
     /// Another device wrote. Merge rather than adopt: this device may have
     /// edits of its own that have not been pushed yet.
+    ///
+    /// The store says why it changed, and not every reason is another device:
+    /// a sign-in to a different iCloud account and a store that has run out of
+    /// room both arrive here too, and both would otherwise be read as a sync
+    /// that went well.
     private func observeCloudChanges() {
         cloudChanges = Task { [weak self] in
-            let changes = NotificationCenter.default.notifications(
+            let reasons = NotificationCenter.default.notifications(
                 named: NSUbiquitousKeyValueStore.didChangeExternallyNotification
-            )
-            for await _ in changes {
-                guard let self, self.iCloudSyncEnabled, let remote = self.cloud?.load() else { continue }
-                self.archive = self.archive.merging(remote)
-                self.retimeEvents()
-                self.lastSynced = .now
-                self.syncStatus = .synced
-                self.file?.save(self.archive)
+            ).map { $0.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int }
+            for await reason in reasons {
+                guard let self, self.iCloudSyncEnabled else { continue }
+                switch reason {
+                case NSUbiquitousKeyValueStoreAccountChange:
+                    self.cloudAccountChanged()
+                case NSUbiquitousKeyValueStoreQuotaViolationChange:
+                    // The library it refused is the one in hand, so its size is
+                    // measured here rather than guessed at on the screen.
+                    self.syncStatus = self.cloud.flatMap { $0.size(of: self.archive) }
+                        .map { CloudSync.Outcome.tooLarge(bytes: $0) } ?? .rejected
+                default:
+                    self.mergeCloudCopy()
+                }
             }
         }
+    }
+
+    /// Folds in what iCloud now holds, after a change that was another device's.
+    private func mergeCloudCopy() {
+        guard let remote = cloud?.load() else { return }
+        archive = archive.merging(remote)
+        revision += 1
+        retimeEvents()
+        // Reading the copy is what the first push was waiting on, and this
+        // device's own records are owed back to iCloud once it has.
+        noteCloudCopy(seen: true)
+        lastSynced = .now
+        syncStatus = .synced
+        file?.save(archive)
     }
 
     // MARK: - Persisting
@@ -1179,21 +1327,24 @@ final class EventStore {
         revision += 1
         let archive = archive
         let file = file
-        let cloud = iCloudSyncEnabled ? cloud : nil
-        guard file != nil || cloud != nil else { return }
+        guard file != nil || (iCloudSyncEnabled && cloud != nil) else { return }
 
         pendingSave = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled else { return }
-            let outcome = await Task.detached(priority: .utility) { () -> CloudSync.Outcome? in
-                file?.save(archive)
-                return cloud?.save(archive)
-            }.value
             guard !Task.isCancelled, let self else { return }
-            if let outcome {
-                self.syncStatus = outcome
-                if outcome == .synced { self.lastSynced = .now }
-            }
+            // Whether iCloud is owed this write is settled here, after the
+            // pause rather than before it, so a hold lifted meanwhile counts.
+            let cloud = self.cloudForPush()
+            // Only the encode and the compression go off the main actor. The
+            // write itself stays on it: two paths handing the same key-value
+            // store different payloads from different threads is a race the
+            // store makes no promise about.
+            let payload = await Task.detached(priority: .utility) { () -> CloudSync.Payload? in
+                file?.save(archive)
+                return cloud?.payload(for: archive)
+            }.value
+            guard !Task.isCancelled else { return }
+            if let cloud, let payload { self.record(cloud.save(payload)) }
             // The calendar follows the same pause as the disk write: a ticket
             // toggled twice while deciding should reach EventKit once.
             await self.mirrorCalendar()

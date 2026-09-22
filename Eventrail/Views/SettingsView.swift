@@ -309,6 +309,10 @@ struct SettingsView: View {
             return Text("This build cannot use iCloud yet — it needs the iCloud capability enabled for the app")
         case .signedOut:
             return Text("Sign in to iCloud in Settings to sync this library")
+        case .accountChanged:
+            return Text("This device signed in to a different iCloud account — turn sync on again to use it")
+        case .rejected:
+            return Text("iCloud would not take this library just now — it will be tried again")
         case .tooLarge(let bytes):
             return Text("Library is too large to sync (\(bytes.formatted(.byteCount(style: .file))))")
         case .failed(let reason):
