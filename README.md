@@ -6,7 +6,7 @@
 
 A native SwiftUI companion app for browsing [Eventernote](https://www.eventernote.com/) events and keeping your own record of the nights you are going to and the ones you have been to — your ticket, your seat, what it cost, and whatever you want to write down — stored on your device and synchronized through your private iCloud account.
 
-> **Status: early development.** Built today: search over Eventernote's public event and performer pages; your own library, with what you paid, where you sat and how many times you entered the lottery; favorites; following performers and a tab of every date they have coming, filterable by when and where; pages for a performer and for a hall, each with everything Eventernote publishes about it and a map of where it stands; the Event Passport, which reads your own past back to you; linking a public Eventernote profile and importing its attendance history and favorites; mirroring the library into your calendar, with an alert when the doors open; a backup file you export and keep; and iCloud sync of everything you own. The library lives in a local JSON file mirrored to your private iCloud key-value storage; persistence has not been moved to SwiftData/CloudKit, background refresh is not built, and the interface ships in English only for now. Not affiliated with or endorsed by Eventernote.
+> **Status: in beta testing.** Work lands on `main`; test builds are cut by Xcode Cloud from the `release` branch, which a pull request advances when a build is meant to go out — see [Development](#development). Built today: search over Eventernote's public event and performer pages; your own library, with what you paid, where you sat and how many times you entered the lottery; favorites; following performers and a tab of every date they have coming, filterable by when and where; pages for a performer and for a hall, each with everything Eventernote publishes about it and a map of where it stands; the Event Passport, which reads your own past back to you; linking a public Eventernote profile and importing its attendance history and favorites; mirroring the library into your calendar, with an alert when the doors open; a backup file you export and keep; and iCloud sync of everything you own. The library lives in a local JSON file mirrored to your private iCloud key-value storage; persistence has not been moved to SwiftData/CloudKit, background refresh is not built, and the interface ships in English only for now. Not affiliated with or endorsed by Eventernote.
 
 ## What it does
 
@@ -112,6 +112,30 @@ Deliberately deferred: background refresh, exact-time scheduling, an app-operate
 ## A note on the integration
 
 Eventernote publishes no documented API, access tokens, or OAuth registration that this project has found. Public data retrieval is therefore isolated behind an adapter so that website changes break imports without endangering your stored records or the native screens. The reviewed terms of service do not expressly address third-party clients but do contain broader prohibitions; this repository does not assert permission or offer a legal conclusion, and a public release would need to account for the current terms and any guidance from the operator.
+
+## Development
+
+The app is in beta testing. Every change lands on `main`, which is committed to directly; `release` is the branch testers' builds come from. Xcode Cloud starts on branch changes to `release`, and `release` is advanced only by a pull request opened when a build is meant to go out — so a commit on `main` reaches no one until then:
+
+```bash
+# ordinary work
+git switch main
+# edit, build, commit
+git push
+
+# when a build should go out
+gh pr create --base release --head main --title "release: <what is in this build>"
+```
+
+That pull request is where the whole of a build is read before it ships. A hotfix branches off `release` when `main` is carrying unfinished work, and is merged into both. A pull request into `main` is welcome for anything worth reviewing, but is not required for ordinary work; where one is opened, the branch takes the commit type as its prefix (`feat/`, `fix/`, `docs/`, `test/`, `refactor/`, `chore/`).
+
+Commit subjects follow `<type>: <concise imperative summary>`. Build for the simulator with:
+
+```bash
+xcodebuild -scheme Eventrail -destination 'platform=iOS Simulator,name=iPhone 18 Pro' build
+```
+
+There is no package manifest and no dependency to fetch; opening [`Eventrail.xcodeproj`](Eventrail.xcodeproj) in Xcode is enough.
 
 ## Icon
 

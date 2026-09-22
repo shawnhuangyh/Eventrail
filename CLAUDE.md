@@ -169,6 +169,28 @@ back to another device.
 `xcodebuild test` will fail until a test target exists; add one in Xcode (File > New > Target > Unit Testing Bundle) before writing tests, then run a single test with
 `xcodebuild test -scheme Eventrail -destination '<dest>' -only-testing:EventrailTests/SomeTests/testSomething`.
 
+## Branches and releases
+
+**Every change goes on `main`. `release` is what testers run, and it is only ever advanced by a pull request, on Shawn's word.** Work and commit on `main` directly — a fix does not need a branch of its own. Xcode Cloud starts on branch changes to **`release`**, so nothing reaches TestFlight until that pull request is merged:
+
+```bash
+# ordinary work — this is all of it
+git switch main
+# edit, build, commit
+git push
+
+# only when Shawn says a build should go out
+gh pr create --base release --head main --title "release: <what is in this build>"
+# merged on his word; Xcode Cloud builds and distributes from release
+```
+
+**Don't open that pull request unasked, and never push to `release` directly.** Deciding that a batch of work is ready for testers is his call, not something to infer from the work looking finished; the PR is where he sees what the build would contain before it goes.
+
+- **Keep `main` buildable anyway.** Nothing else watches it, so a broken `main` is only found when a release PR is opened. Build before pushing.
+- **A hotfix branches off `release`**, not `main`, whenever `main` is carrying unfinished work: `git switch -c fix/<summary> release`, open its PR against `release` to ship, and merge it into `main` too so the fix is not lost at the next release.
+- **A pull request into `main` is still welcome for anything worth reviewing** — a large feature, or a change whose diff wants reading. It is not required for ordinary work. Where one is opened, name the branch for the commit type it carries (`feat/`, `fix/`, `docs/`, `test/`, `refactor/`, `chore/`).
+- **Xcode Cloud builds what the repository holds**, so a change that only exists in local Xcode state — a scheme, a build setting, a file Xcode has not written into the project — fails there while it builds here. Its own record of what to build is `Eventrail.xcodeproj/xcshareddata/xcodecloud/manifest.json`, and `xcshareddata/` is tracked for that reason; `xcuserdata/` is the ignored one.
+
 ## Commit messages
 
 Every commit message subject must follow:
