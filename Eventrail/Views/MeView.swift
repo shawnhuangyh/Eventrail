@@ -283,14 +283,19 @@ struct MeView: View {
     /// with the way into the rest on its right, and the contents laid directly
     /// on the glass beneath it. The whole card is the way in, so the counts
     /// push as readily as the See All does.
+    ///
+    /// The three are the Passport's own numbers rather than the library's:
+    /// every one is counted over the nights already stood at, so a date still
+    /// ahead moves nothing here until it has passed, and the card says what
+    /// the screen behind it says.
     private var passportCard: some View {
         NavigationLink(value: PassportLink.passport) {
             VStack(alignment: .leading, spacing: 14) {
                 CardHeader(title: "Event Passport") { SeeAllLabel() }
 
                 HStack(spacing: 0) {
-                    passportTile(store.eventsThisYear, tint: .trackInterest,
-                                 label: "Events this year", isFirst: true)
+                    passportTile(store.eventsAttended, tint: .trackInterest,
+                                 label: "Events attended", isFirst: true)
                     passportTile(store.venuesVisited, tint: .trackTicket,
                                  label: "Venues visited", isFirst: false)
                     passportTile(store.performersSeen, tint: .trackAttended,

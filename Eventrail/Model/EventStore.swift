@@ -1388,11 +1388,6 @@ final class EventStore {
         library.filter { !$0.isUpcoming }
     }
 
-    var eventsThisYear: Int {
-        let year = Calendar.current.component(.year, from: .now)
-        return library.filter { Calendar.current.component(.year, from: $0.date) == year }.count
-    }
-
     var venuesVisited: Int {
         Set(attendedEvents.map(\.venue)).count
     }
@@ -1401,11 +1396,18 @@ final class EventStore {
         Set(attendedEvents.flatMap { $0.performers.map(\.name) }).count
     }
 
-    /// How many nights the count below is out of.
+    /// How many nights the reader has stood at: the whole of the library's
+    /// past, and what the lottery count below is out of.
     ///
     /// The one thing the reader fills in by hand is only ever part-filled, so
     /// it says what it is counted out of. A total over records nobody wrote is
     /// not a total.
+    ///
+    /// It is also the first of the three figures on the Me tab's Passport
+    /// card. All three are read over ``attendedEvents`` and none of them is cut
+    /// to a year: three counts side by side are read as one reading of a
+    /// library, so one of them answering for this year alone while the other
+    /// two answer for all of it is a figure nobody can compare.
     var eventsAttended: Int {
         attendedEvents.count
     }
