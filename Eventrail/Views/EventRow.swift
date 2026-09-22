@@ -122,6 +122,11 @@ struct LibraryRow: View {
                 .padding(.top, 2)
                 .padding(.bottom, 4)
             }
+            // The row is only as tappable as it is drawn: a title that fits on
+            // one line leaves the gap between it and the badge column hittable
+            // by nothing, which on an iPad is half the row. The panel behind it
+            // is the row, so the whole rectangle opens the event.
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .glassPanel(interactive: true)
@@ -160,6 +165,8 @@ struct AppearanceRow: View {
                 }
             }
             .padding(.horizontal, 5)
+            // The whole row, not just the words on it — see `LibraryRow`.
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens the event")
