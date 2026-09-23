@@ -174,7 +174,9 @@ final class FollowedDates {
         let task = Task { await self.read(performers) }
         running = task
         let outcome = await task.value
-        running = nil
+        // Only this run's own marker: a clear in the meantime lets the next
+        // run start at once, and that one's is not this one's to drop.
+        if running == task { running = nil }
         return outcome
     }
 
@@ -189,7 +191,12 @@ final class FollowedDates {
         // A read still going would write what it finds back into the cache
         // just emptied. Cancelled, it reports nothing, so no notice claims a
         // refresh the reader has just thrown away.
+        // And let go of at once rather than when it winds down: the screens
+        // go back for what they lost the moment ``generation`` moves, and
+        // a marker still held would turn every one of them away.
         running?.cancel()
+        running = nil
+        isLoading = false
         dates = [:]
         readAt = [:]
         failure = nil
@@ -227,13 +234,18 @@ final class FollowedDates {
 
     private func read(_ performers: [PerformerProfile]) async -> Outcome? {
         var landed = 0
+        // A run the cache was cleared under writes nothing more, and leaves
+        // the state alone for whichever run replaced it.
+        let generation = generation
         isLoading = true
         failure = nil
         // Whatever the run got through is worth keeping, including when it was
         // cancelled partway or the site stopped answering.
         defer {
-            isLoading = false
-            save()
+            if generation == self.generation {
+                isLoading = false
+                save()
+            }
         }
 
         // One performer at a time, and each one published as it arrives: the
@@ -245,13 +257,15 @@ final class FollowedDates {
                 guard (try? await Task.sleep(for: Self.pace)) != nil else { return nil }
             }
             do {
-                dates[performer.id] = try await upcoming(for: performer)
+                let upcoming = try await upcoming(for: performer)
+                guard generation == self.generation else { return nil }
+                dates[performer.id] = upcoming
                 readAt[performer.id] = .now
                 landed += 1
             } catch is CancellationError {
                 return nil
             } catch {
-                guard !Task.isCancelled else { return nil }
+                guard !Task.isCancelled, generation == self.generation else { return nil }
                 // Refused for asking too often: the rest of the list would be
                 // refused too, and asking anyway only lengthens the refusal.
                 // Everybody not reached keeps what was cached for them.

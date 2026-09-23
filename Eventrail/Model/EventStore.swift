@@ -262,6 +262,10 @@ final class EventStore {
     /// looked up — see ``placeAdded(_:)``.
     private var arrivals: [Event.ID] = []
     private var arrivalPlacement: Task<Void, Never>?
+    /// The page read going on now for each event, so a pull that lands while
+    /// the sheet's own read is running — or a return to the foreground in the
+    /// middle of one — waits for it rather than asking for the page again.
+    private var detailReads: [Event.ID: Task<PageRead, Never>] = [:]
 
     /// The default store reads the reader's own library from disk and, if they
     /// have sync on, merges whatever iCloud holds. Previews and the playground
@@ -606,20 +610,28 @@ final class EventStore {
     /// for its own reasons, which is why its pull never went quiet. A read
     /// that outlives its sheet still lands in the library and is still
     /// reported, which is true either way.
+    ///
+    /// One read per event at a time: a second caller joins the one running and
+    /// is told what it came to, the way a pull on Following joins
+    /// ``FollowedDates``' read — two answers landing over each other would be
+    /// two requests for one page and a race over which copy is kept.
     func reloadDetail(for event: Event) async -> PageRead {
+        if let running = detailReads[event.id] { return await running.value }
         let client = client
-        let read = await Task { () -> Result<Event, any Error> in
-            do { return .success(try await client.detail(for: event)) }
-            catch { return .failure(error) }
-        }.value
-        switch read {
-        case .success(let imported):
-            apply(imported)
-            persist()
-            return .updated
-        case .failure(let error):
-            return .failed(error.localizedDescription)
+        let task = Task { () -> PageRead in
+            do {
+                let imported = try await client.detail(for: event)
+                apply(imported)
+                persist()
+                return .updated
+            } catch {
+                return .failed(error.localizedDescription)
+            }
         }
+        detailReads[event.id] = task
+        let read = await task.value
+        detailReads[event.id] = nil
+        return read
     }
 
     /// Brings the library up to date — the one thing this screen asks for.

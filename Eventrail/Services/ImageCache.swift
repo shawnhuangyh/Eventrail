@@ -47,6 +47,14 @@ actor ImageCache {
     private let session: URLSession
     /// One download per image, however many rows ask for it at once.
     private var inFlight: [URL: Task<UIImage?, Never>] = [:]
+    /// When the host last vouched for each image held in memory, so a copy
+    /// kept decoded past ``Freshness/window`` is asked about again rather
+    /// than drawn for the rest of the launch. Only what this launch settled
+    /// is here; anything missing goes to the disk to find out.
+    private var validated: [URL: Date] = [:]
+    /// Bumped by ``clear()``, so a download that was already on its way when
+    /// the cache was emptied does not write itself straight back into it.
+    private var epoch = 0
 
     /// What the host said about a copy when it was last asked.
     private struct Validation: Codable {
@@ -83,12 +91,19 @@ actor ImageCache {
     /// which is how a pull resets the six hours on the flyers as well as the
     /// rows — and one asked since is drawn as it is.
     func image(for url: URL, checkedSince: Date? = nil) async -> UIImage? {
-        if checkedSince == nil, let image = memory.object(forKey: url as NSURL) { return image }
+        if let image = memory.object(forKey: url as NSURL), let checked = validated[url],
+           checked > Self.deadline(checkedSince) {
+            return image
+        }
         return await join(url) { await self.load(url, checkedSince: checkedSince) }
     }
 
     /// Throws every copy away, from memory and from this device.
     func clear() {
+        epoch += 1
+        for task in inFlight.values { task.cancel() }
+        inFlight = [:]
+        validated = [:]
         memory.removeAllObjects()
         try? FileManager.default.removeItem(at: directory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -105,13 +120,22 @@ actor ImageCache {
         let task = Task { await work() }
         inFlight[url] = task
         let image = await task.value
-        inFlight[url] = nil
+        // Only this download's own entry: a clear in the meantime may have
+        // let a new one start under the same address.
+        if inFlight[url] == task { inFlight[url] = nil }
         return image
     }
 
     // MARK: - Reading, asking, writing
 
+    /// Asked about within the window, and since any refresh by hand: drawn
+    /// as it is.
+    private static func deadline(_ checkedSince: Date?) -> Date {
+        max(Date.now.addingTimeInterval(-Freshness.window), checkedSince ?? .distantPast)
+    }
+
     private func load(_ url: URL, checkedSince: Date?) async -> UIImage? {
+        let epoch = epoch
         let (file, sidecar) = paths(for: url)
         let stored = try? Data(contentsOf: file)
         let validation = (try? Data(contentsOf: sidecar))
@@ -120,11 +144,8 @@ actor ImageCache {
         if let stored {
             // Drawn now, so it is the last to go when room is short.
             try? FileManager.default.setAttributes([.modificationDate: Date.now], ofItemAtPath: file.path)
-            // Asked about within the window, and since any refresh by hand:
-            // drawn as it is.
-            let deadline = max(Date.now.addingTimeInterval(-Freshness.window),
-                               checkedSince ?? .distantPast)
-            if let validation, validation.checked > deadline {
+            if let validation, validation.checked > Self.deadline(checkedSince) {
+                validated[url] = validation.checked
                 return memory.object(forKey: url as NSURL) ?? remember(stored, for: url)
             }
         }
@@ -135,9 +156,13 @@ actor ImageCache {
         }
         do {
             let (data, response) = try await session.data(for: request)
+            // Cleared while this was on its way: what it brought is drawn for
+            // whoever asked, and kept nowhere.
+            guard epoch == self.epoch else { return UIImage(data: data) }
             let http = response as? HTTPURLResponse
             if http?.statusCode == 304, let stored {
                 write(Validation(etag: validation?.etag, checked: .now), to: sidecar)
+                validated[url] = .now
                 return remember(stored, for: url)
             }
             guard http?.statusCode == 200, let image = remember(data, for: url) else {
@@ -147,9 +172,11 @@ actor ImageCache {
             }
             try? data.write(to: file, options: .atomic)
             write(Validation(etag: http?.value(forHTTPHeaderField: "ETag"), checked: .now), to: sidecar)
+            validated[url] = .now
             return image
         } catch {
             // Offline: the copy held is the best there is.
+            guard epoch == self.epoch else { return nil }
             return stored.flatMap { remember($0, for: url) }
         }
     }
