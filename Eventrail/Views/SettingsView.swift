@@ -452,7 +452,7 @@ struct SettingsView: View {
         guard let first = parts.first else {
             return Text("Nothing is kept — pages are read from Eventernote as they are needed")
         }
-        let held = parts.dropFirst().reduce(first) { $0 + Text(", ") + $1 }
+        let held = parts.dropFirst().reduce(first) { Text("\($0), \($1)") }
         return Text("Holding \(held). Each is read again by itself once it is more than six hours old.")
     }
 
