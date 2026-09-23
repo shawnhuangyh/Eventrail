@@ -305,7 +305,7 @@ struct AccountAvatar: View {
         Circle()
             .fill(.quaternary)
             .overlay {
-                AsyncImage(url: url) { image in
+                CachedImage(url: url) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     Image(systemName: "person.fill")

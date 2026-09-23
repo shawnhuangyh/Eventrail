@@ -9,12 +9,16 @@ struct EventDetailView: View {
     @Environment(EventStore.self) private var store
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     private let source: Event
     @State private var isImporting = false
     /// Why the page could not be read again just now, if it could not. The
     /// sheet goes on showing the copy it had, with this under it.
     @State private var importFailure: String?
+    /// When this sheet last read its page, so the flyer is asked about again
+    /// with it — see ``readPage()``.
+    @State private var imagesCheckedSince: Date?
     /// Whether the description is shown whole. Collapsed to begin with, for the
     /// reason ``summaryCard`` gives.
     @State private var isSummaryExpanded = false
@@ -118,6 +122,12 @@ struct EventDetailView: View {
         }
         .washBackground()
         .task { await importPage() }
+        // A sheet left open while the reader was away is owed the same check
+        // it made as it opened: past the window, it reads its page again.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await importPage() } }
+        }
+        .environment(\.imagesCheckedSince, imagesCheckedSince)
         // The first time an event at a hall nothing has looked up yet is
         // opened, this is what goes and finds it — whether or not the reader
         // mirrors anything to their calendar.
@@ -163,6 +173,10 @@ struct EventDetailView: View {
         case .failed(let reason): importFailure = reason
         }
         notices?.post(.event(read))
+        // The flyer is filed under the event's id, so a new one arrives under
+        // the same address as the old — see ``ImageCache``. Asked about
+        // whenever the page is, so the artwork never lags the page under it.
+        imagesCheckedSince = .now
     }
 
     // MARK: - Header
@@ -172,7 +186,7 @@ struct EventDetailView: View {
             Rectangle()
                 .fill(.quaternary)
                 .overlay {
-                    AsyncImage(url: event.imageURL) { image in
+                    CachedImage(url: event.imageURL) { image in
                         image.resizable().scaledToFill()
                     } placeholder: {
                         Image(systemName: "music.microphone")

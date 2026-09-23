@@ -18,7 +18,7 @@ struct FlyerThumbnail: View {
             .overlay {
                 // Flyers are listed as squares and printed 5:7, so the artwork
                 // fills the frame and is cropped rather than letterboxed.
-                AsyncImage(url: url) { image in
+                CachedImage(url: url) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     Image(systemName: "music.microphone")

@@ -37,6 +37,7 @@ nonisolated enum PerformerLink: Hashable {
 struct PerformerView: View {
     @Environment(EventStore.self) private var store
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
+    @Environment(\.scenePhase) private var scenePhase
 
     let link: PerformerLink
 
@@ -52,6 +53,12 @@ struct PerformerView: View {
     @State private var refreshFailure: String?
     /// The read going on now, so a pull can wait for it — see ``refresh()``.
     @State private var running: Task<Void, Never>?
+    /// When what is on screen was read, so coming back to the app can tell
+    /// whether it has gone stale meanwhile.
+    @State private var readAt: Date?
+    /// When the page was last pulled down, so the flyers on it are asked about
+    /// again with the rows — see ``EnvironmentValues/imagesCheckedSince``.
+    @State private var imagesCheckedSince: Date?
 
     /// Finding the page behind a billed name fails in two ways that read very
     /// differently to the reader, so they are kept apart.
@@ -102,7 +109,18 @@ struct PerformerView: View {
         // The page's own, so a performer reached from the Following tab does
         // not answer a pull by re-reading every followed listing — the tab's
         // `.refreshable` is carried down the stack otherwise.
-        .refreshable { await refresh() }
+        .refreshable {
+            imagesCheckedSince = .now
+            await refresh()
+        }
+        // A page left open while the reader was away is owed the check it
+        // made as it opened: past the window, it reads again.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, let readAt,
+                  readAt.timeIntervalSinceNow < -Freshness.window else { return }
+            Task { await refresh() }
+        }
+        .environment(\.imagesCheckedSince, imagesCheckedSince)
         // Pages the reader scrolls on to are kept too, so the next visit opens
         // on them rather than on the front alone.
         .onChange(of: feed.page) {
@@ -181,6 +199,7 @@ struct PerformerView: View {
             try await EventernoteClient.shared.events(forPerformer: profile, page: page)
         }
         hasReadListing = true
+        readAt = entry.readAt
         store.remember(feed.items)
     }
 

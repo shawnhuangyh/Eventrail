@@ -14,6 +14,7 @@ struct MeView: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var openEvent: Event?
     @State private var isLinking = false
@@ -63,10 +64,9 @@ struct MeView: View {
             // The same read the Following tab does, and the same object holds
             // it — whichever screen the reader opens first pays for it, and
             // only when what it holds is stale.
-            .task(id: followed.loadKey(for: store.followedPerformers)) {
-                if let outcome = await followed.load(for: store.followedPerformers) {
-                    notices?.post(.following(outcome))
-                }
+            .task(id: followed.loadKey(for: store.followedPerformers)) { await loadFollowed() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await loadFollowed() } }
             }
         }
     }
@@ -189,6 +189,13 @@ struct MeView: View {
 
     /// The honest wording: the app reports when it last *succeeded*, never that
     /// the data is current.
+    /// Whatever followed listings have gone stale, and nothing else.
+    private func loadFollowed() async {
+        if let outcome = await followed.load(for: store.followedPerformers) {
+            notices?.post(.following(outcome))
+        }
+    }
+
     /// Refresh, and then say how it went — over the top of the screen, as well
     /// as on the card's own line, since the reader may have scrolled on.
     private func refreshLibrary() async {

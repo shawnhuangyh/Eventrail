@@ -44,7 +44,7 @@ final class ListingCache {
 
     /// How old a page may be before opening it reads it again by itself — the
     /// window ``FollowedDates/freshness`` and ``PageReads/freshness`` keep too.
-    nonisolated static let freshness: TimeInterval = 6 * 60 * 60
+    nonisolated static let freshness = Freshness.window
 
     /// How long a page nobody has opened is kept at all. A performer looked at
     /// once from a search and never again stops taking up room.

@@ -84,7 +84,7 @@ final class FollowedDates {
     /// enough that a date announced this morning is on the screen by this
     /// evening without the reader doing anything. Pulling the list down is
     /// never held to it.
-    static let freshness: TimeInterval = 6 * 60 * 60
+    static let freshness = Freshness.window
 
     /// How long between one performer's listing and the next.
     ///

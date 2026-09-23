@@ -1,0 +1,208 @@
+import CryptoKit
+import UIKit
+
+/// Event flyers and the linked account's picture, kept on this device once
+/// downloaded.
+///
+/// `AsyncImage` goes through the shared URL cache and nothing else, and the
+/// flyer host sends no `Cache-Control` at all — so a flyer scrolled past twice
+/// was, often enough, a flyer downloaded twice, and a library of a few hundred
+/// rows was a few hundred images fetched again on every visit. So the bytes
+/// are written down here the first time, and drawn from here after that.
+///
+/// **A flyer's address does not change when the flyer does.** The host files
+/// each event's artwork under the event's id (`images/events/493541_s.jpg`),
+/// so a flyer replaced once the lineup is announced arrives under the same URL
+/// as the placeholder it replaces, and a copy kept forever would be the old
+/// one forever. What the host does send is an `ETag`. So a copy is drawn with
+/// no request at all for ``Freshness/window`` — the six hours everything read
+/// from the site keeps — and after that the host is asked whether it has
+/// changed: a conditional request whose "no" is no bytes at all rather than
+/// the image. A screen refreshed by hand asks again about every flyer on it,
+/// however recently — see ``image(for:checkedSince:)``.
+///
+/// Not the Eventernote site: this host is where the site keeps its images,
+/// and is not the one that refuses an app that asks too fast. Everything here
+/// is still asked once per image, however many rows want it at once.
+actor ImageCache {
+    static let shared = ImageCache()
+
+    /// How long a copy nothing has drawn is kept, and how much room all of
+    /// them may take between them. Past either, the least recently drawn go
+    /// first.
+    private static let keep: TimeInterval = 90 * 24 * 60 * 60
+    private static let diskLimit = 300 * 1024 * 1024
+
+    /// Decoded and ready to draw, for the rows scrolling past now. Readable
+    /// from the main actor without a hop, which is what lets a row that has
+    /// been drawn before appear already filled in rather than flashing its
+    /// placeholder for a frame. `NSCache` is safe to use from any thread.
+    nonisolated(unsafe) private let memory: NSCache<NSURL, UIImage> = {
+        let cache = NSCache<NSURL, UIImage>()
+        cache.totalCostLimit = 60 * 1024 * 1024
+        return cache
+    }()
+
+    private let directory: URL
+    private let session: URLSession
+    /// One download per image, however many rows ask for it at once.
+    private var inFlight: [URL: Task<UIImage?, Never>] = [:]
+
+    /// What the host said about a copy when it was last asked.
+    private struct Validation: Codable {
+        var etag: String?
+        var checked: Date
+    }
+
+    private init() {
+        directory = URL.cachesDirectory.appending(path: "Eventrail/Images", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // The copies are this cache's own; the shared URL cache would only
+        // hold every one of them a second time.
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        session = URLSession(configuration: configuration)
+        let directory = directory
+        Task.detached(priority: .background) { Self.prune(directory) }
+    }
+
+    // MARK: - Asking for an image
+
+    /// An image already decoded and in memory, or nil — asked synchronously as
+    /// a view is built, so a row drawn before draws filled in.
+    nonisolated func memoryImage(for url: URL) -> UIImage? {
+        memory.object(forKey: url as NSURL)
+    }
+
+    /// The image at `url`: from memory, from this device, or downloaded — in
+    /// that order, and each downloaded once however many ask.
+    ///
+    /// `checkedSince` is when the screen around it was last refreshed by hand.
+    /// A copy whose host was last asked before then is asked about again —
+    /// which is how a pull resets the six hours on the flyers as well as the
+    /// rows — and one asked since is drawn as it is.
+    func image(for url: URL, checkedSince: Date? = nil) async -> UIImage? {
+        if checkedSince == nil, let image = memory.object(forKey: url as NSURL) { return image }
+        return await join(url) { await self.load(url, checkedSince: checkedSince) }
+    }
+
+    /// Throws every copy away, from memory and from this device.
+    func clear() {
+        memory.removeAllObjects()
+        try? FileManager.default.removeItem(at: directory)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    /// How many images are kept on this device — what Settings counts.
+    func count() -> Int {
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return files.filter { !$0.hasSuffix(".json") }.count
+    }
+
+    private func join(_ url: URL, _ work: @escaping @Sendable () async -> UIImage?) async -> UIImage? {
+        if let running = inFlight[url] { return await running.value }
+        let task = Task { await work() }
+        inFlight[url] = task
+        let image = await task.value
+        inFlight[url] = nil
+        return image
+    }
+
+    // MARK: - Reading, asking, writing
+
+    private func load(_ url: URL, checkedSince: Date?) async -> UIImage? {
+        let (file, sidecar) = paths(for: url)
+        let stored = try? Data(contentsOf: file)
+        let validation = (try? Data(contentsOf: sidecar))
+            .flatMap { try? JSONDecoder().decode(Validation.self, from: $0) }
+
+        if let stored {
+            // Drawn now, so it is the last to go when room is short.
+            try? FileManager.default.setAttributes([.modificationDate: Date.now], ofItemAtPath: file.path)
+            // Asked about within the window, and since any refresh by hand:
+            // drawn as it is.
+            let deadline = max(Date.now.addingTimeInterval(-Freshness.window),
+                               checkedSince ?? .distantPast)
+            if let validation, validation.checked > deadline {
+                return memory.object(forKey: url as NSURL) ?? remember(stored, for: url)
+            }
+        }
+
+        var request = URLRequest(url: url)
+        if stored != nil, let etag = validation?.etag {
+            request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+        }
+        do {
+            let (data, response) = try await session.data(for: request)
+            let http = response as? HTTPURLResponse
+            if http?.statusCode == 304, let stored {
+                write(Validation(etag: validation?.etag, checked: .now), to: sidecar)
+                return remember(stored, for: url)
+            }
+            guard http?.statusCode == 200, let image = remember(data, for: url) else {
+                // Anything else — a missing flyer, a host having a bad moment —
+                // leaves the copy already held, if there is one.
+                return stored.flatMap { remember($0, for: url) }
+            }
+            try? data.write(to: file, options: .atomic)
+            write(Validation(etag: http?.value(forHTTPHeaderField: "ETag"), checked: .now), to: sidecar)
+            return image
+        } catch {
+            // Offline: the copy held is the best there is.
+            return stored.flatMap { remember($0, for: url) }
+        }
+    }
+
+    /// Decodes the bytes once, ready to draw, and keeps the result in memory.
+    /// Decoded here rather than as the row draws, which is what keeps a list
+    /// of flyers from stuttering as it scrolls.
+    private func remember(_ data: Data, for url: URL) -> UIImage? {
+        guard let image = UIImage(data: data)?.preparingForDisplay() ?? UIImage(data: data) else { return nil }
+        let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? data.count
+        memory.setObject(image, forKey: url as NSURL, cost: cost)
+        return image
+    }
+
+    private func write(_ validation: Validation, to sidecar: URL) {
+        try? JSONEncoder().encode(validation).write(to: sidecar, options: .atomic)
+    }
+
+    /// Named by a digest of the address, with what the host said about it
+    /// beside it.
+    private func paths(for url: URL) -> (image: URL, sidecar: URL) {
+        let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        return (directory.appending(path: digest), directory.appending(path: "\(digest).json"))
+    }
+
+    /// Drops what nothing has drawn in ``keep``, then the least recently drawn
+    /// until everything fits in ``diskLimit``.
+    private static func prune(_ directory: URL) {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+        let files = ((try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: keys)) ?? [])
+            .filter { $0.pathExtension != "json" }
+        var kept: [(file: URL, used: Date, size: Int)] = []
+        let settled = Date.now.addingTimeInterval(-keep)
+        for file in files {
+            let values = try? file.resourceValues(forKeys: Set(keys))
+            let used = values?.contentModificationDate ?? .distantPast
+            if used < settled {
+                remove(file)
+            } else {
+                kept.append((file, used, values?.fileSize ?? 0))
+            }
+        }
+        var total = kept.reduce(0) { $0 + $1.size }
+        for entry in kept.sorted(by: { $0.used < $1.used }) where total > diskLimit {
+            remove(entry.file)
+            total -= entry.size
+        }
+    }
+
+    private static func remove(_ file: URL) {
+        try? FileManager.default.removeItem(at: file)
+        try? FileManager.default.removeItem(at: file.appendingPathExtension("json"))
+    }
+}

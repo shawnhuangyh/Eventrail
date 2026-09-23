@@ -10,6 +10,7 @@ struct FollowingView: View {
     @Environment(FollowedDates.self) private var followed
     @Environment(VenueRegions.self) private var venues
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Which followed performer the list is narrowed to, or nil for all of
     /// them. Held as an id rather than a profile so unfollowing someone while
@@ -21,6 +22,9 @@ struct FollowingView: View {
     @State private var filter = FollowingFilter()
     @State private var isFiltering = false
     @State private var openEvent: Event?
+    /// When the list was last pulled down, so the flyers on it are asked about
+    /// again with the rows — see ``EnvironmentValues/imagesCheckedSince``.
+    @State private var imagesCheckedSince: Date?
 
     private var performers: [PerformerProfile] { store.followedPerformers }
 
@@ -105,6 +109,12 @@ struct FollowingView: View {
             // so clearing it from Settings reads the dates again rather than
             // leaving this tab looking as though nobody has any.
             .task(id: followed.loadKey(for: performers)) { await load() }
+            // Coming back to the app is the other moment a listing may have
+            // gone stale under a screen already open; only those are read.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await load() } }
+            }
+            .environment(\.imagesCheckedSince, imagesCheckedSince)
         }
     }
 
@@ -168,6 +178,7 @@ struct FollowingView: View {
     }
 
     private func reload() async {
+        imagesCheckedSince = .now
         if let outcome = await followed.reload(for: performers) {
             notices?.post(.following(outcome))
         }

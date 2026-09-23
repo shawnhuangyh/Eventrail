@@ -38,6 +38,10 @@ struct SettingsView: View {
     /// ``RootView`` watches: replaying it is not un-launching the app, and a
     /// device that has seen it has still seen it.
     @State private var isReplayingWelcome = false
+    /// How many flyers and pictures are kept on this device. Counted when the
+    /// screen opens rather than watched: ``ImageCache`` is an actor, and a
+    /// count that is a second out of date on a Settings row is no loss.
+    @State private var imageCount = 0
 
     /// Shown beside About, from the bundle rather than written down here, so a
     /// released build cannot claim a version it is not.
@@ -395,8 +399,8 @@ struct SettingsView: View {
 
     /// Empties what this device has read and kept: the dates published for the
     /// performers the reader follows, which of their event pages have already
-    /// been read, every performer's and hall's page opened, and which part of
-    /// the country each hall is in.
+    /// been read, every performer's and hall's page opened, every flyer
+    /// downloaded, and which part of the country each hall is in.
     ///
     /// None of it is the reader's — every one of them is a fact this device
     /// went and read, written down so opening a screen does not read it again
@@ -414,6 +418,8 @@ struct SettingsView: View {
             venues.clear()
             store.forgetReadPages()
             ListingCache.shared.clear()
+            imageCount = 0
+            Task { await ImageCache.shared.clear() }
         } label: {
             rowLabel("clock.arrow.circlepath", "Clear Cache", cacheDetail)
                 .padding(.horizontal, 16)
@@ -422,6 +428,7 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .disabled(cachedItems == 0)
+        .task { imageCount = await ImageCache.shared.count() }
     }
 
     /// How much is being held, item by item rather than as a size on disk: a
@@ -429,7 +436,7 @@ struct SettingsView: View {
     /// "1.2 MB" does not say.
     private var cachedItems: Int {
         followed.performerCount + store.readPageCount + ListingCache.shared.count
-            + venues.placedCount
+            + imageCount + venues.placedCount
     }
 
     /// Named one by one, and only the ones there are any of: a device that has
@@ -445,6 +452,9 @@ struct SettingsView: View {
         }
         if ListingCache.shared.count > 0 {
             parts.append(Text("^[\(ListingCache.shared.count) performer or venue page](inflect: true)"))
+        }
+        if imageCount > 0 {
+            parts.append(Text("^[\(imageCount) image](inflect: true)"))
         }
         if venues.placedCount > 0 {
             parts.append(Text("^[\(venues.placedCount) venue area](inflect: true)"))

@@ -27,7 +27,7 @@ final class PageReads {
     ///
     /// The same window ``FollowedDates/freshness`` gives a performer's
     /// listing, and for the same reason.
-    static let freshness: TimeInterval = 6 * 60 * 60
+    static let freshness = Freshness.window
 
     /// How long a stamp is kept at all.
     ///
