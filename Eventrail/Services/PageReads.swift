@@ -41,6 +41,10 @@ final class PageReads {
     private static let cacheKey = "eventPageReads"
 
     private var reads: [Event.ID: Date]
+    /// When the stamps were last thrown away. A read already on its way then
+    /// — a Refresh on the Me card is hundreds of them — lands afterwards, and
+    /// stamping it would leave that page fresh straight through the clear.
+    @ObservationIgnored private var clearedAt = Date.distantPast
 
     /// Previews and the playground pass `persists: false`, so nothing they do
     /// reaches this device's cache.
@@ -64,8 +68,10 @@ final class PageReads {
         return read.timeIntervalSinceNow > -Self.freshness
     }
 
-    /// Writes down that this event's page has just been read.
-    func record(_ id: Event.ID) {
+    /// Writes down that this event's page has just been read — unless the
+    /// stamps were cleared after it was asked for, `asked` being when.
+    func record(_ id: Event.ID, asked: Date) {
+        guard asked >= clearedAt else { return }
         reads[id] = .now
         save()
     }
@@ -73,6 +79,7 @@ final class PageReads {
     /// Forgets every page this device has read, so every sheet opened next
     /// reads its page again.
     func clear() {
+        clearedAt = .now
         guard !reads.isEmpty else { return }
         reads = [:]
         pendingSave?.cancel()

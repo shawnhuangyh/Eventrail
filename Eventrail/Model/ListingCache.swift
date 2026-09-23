@@ -15,8 +15,10 @@ nonisolated struct CachedListing<Subject: Codable & Sendable>: Codable, Sendable
     var total: Int
     var pagesRead: Int
     var hasMore: Bool
-    /// When the front of the listing was read. Pages scrolled on to later do
-    /// not move it: the front is the part that goes stale.
+    /// When the read of the front of the listing began. Pages scrolled on to
+    /// later do not move it: the front is the part that goes stale. The start
+    /// rather than the finish, so a read the cache was cleared under can be
+    /// told apart — see ``ListingCache/store(_:for:)``.
     var readAt: Date
 
     /// Whether opening the page may show this and ask nothing.
@@ -54,6 +56,10 @@ final class ListingCache {
     private(set) var count = 0
 
     @ObservationIgnored private let directory: URL
+    /// When every page was last thrown away. A read runs out of reach of the
+    /// screen that started it, so one still going in another tab lands after
+    /// the clear, and would put its page straight back.
+    @ObservationIgnored private var clearedAt = Date.distantPast
 
     private init() {
         directory = URL.cachesDirectory.appending(path: "Eventrail/Listings", directoryHint: .isDirectory)
@@ -74,6 +80,7 @@ final class ListingCache {
     /// read lands or the reader scrolls a page further, both rare, and a
     /// listing is small enough to encode between frames.
     func store<Subject: Codable & Sendable>(_ entry: CachedListing<Subject>, for key: String) {
+        guard entry.readAt >= clearedAt else { return }
         let url = url(for: key)
         let isNew = !FileManager.default.fileExists(atPath: url.path)
         guard (try? JSONEncoder().encode(entry).write(to: url, options: .atomic)) != nil else { return }
@@ -93,6 +100,7 @@ final class ListingCache {
 
     /// Throws every page away, so each is read afresh the next time it opens.
     func clear() {
+        clearedAt = .now
         try? FileManager.default.removeItem(at: directory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         count = 0
@@ -153,6 +161,7 @@ extension ListingCache {
         listing: @escaping @Sendable (Subject, Int) async throws -> EventernotePage<Event>
     ) async -> Read<Subject> {
         await Task { () -> Read<Subject> in
+            let started = Date.now
             do {
                 guard let subject = try await resolve() else { return .unlisted }
                 var items: [Event] = []
@@ -172,7 +181,7 @@ extension ListingCache {
                     if arrived.isEmpty || items.contains(where: { !$0.isUpcoming }) { break }
                 }
                 return .read(CachedListing(subject: subject, items: items, total: total,
-                                           pagesRead: page, hasMore: hasMore, readAt: .now))
+                                           pagesRead: page, hasMore: hasMore, readAt: started))
             } catch {
                 return .failed(error.localizedDescription)
             }

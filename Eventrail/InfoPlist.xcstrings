@@ -43,7 +43,33 @@
       }
     },
     "Eventrail Backup" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail Backup"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrailバックアップ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 備份"
+          }
+        }
+      }
     },
     "NSCalendarsFullAccessUsageDescription" : {
       "extractionState" : "manual",

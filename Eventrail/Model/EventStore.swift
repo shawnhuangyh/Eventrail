@@ -554,8 +554,10 @@ final class EventStore {
     ///
     /// Every read of an event's own page arrives here, so this is also where
     /// the read is written down — see ``isStale(_:)`` for what that decides.
-    private func apply(_ imported: Event) {
-        pageReads?.record(imported.id)
+    /// `asked` is when the page was asked for, so a read the cache was
+    /// cleared under is not stamped fresh on its way in.
+    private func apply(_ imported: Event, asked: Date) {
+        pageReads?.record(imported.id, asked: asked)
         if archive.events[imported.id] != nil {
             archive.events[imported.id] = imported
         } else {
@@ -570,8 +572,9 @@ final class EventStore {
     /// reached, so the sheet still shows what the row already knew.
     @discardableResult
     func loadDetail(for event: Event) async -> Event {
+        let asked = Date.now
         guard let imported = try? await client.detail(for: event) else { return event }
-        apply(imported)
+        apply(imported, asked: asked)
         persist()
         return imported
     }
@@ -620,8 +623,9 @@ final class EventStore {
         let client = client
         let task = Task { () -> PageRead in
             do {
+                let asked = Date.now
                 let imported = try await client.detail(for: event)
-                apply(imported)
+                apply(imported, asked: asked)
                 persist()
                 return .updated
             } catch {
@@ -903,6 +907,7 @@ final class EventStore {
         refreshStage = .reimporting(read: 0, total: events.count)
 
         let client = client
+        let asked = Date.now
         let inFlight = 4
         var read = 0
         var landed = 0
@@ -927,7 +932,7 @@ final class EventStore {
             for await result in group {
                 read += 1
                 if let event = result.event {
-                    apply(event)
+                    apply(event, asked: asked)
                     landed += 1
                 }
                 if result.throttled { throttled = true }
