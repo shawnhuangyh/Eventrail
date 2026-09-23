@@ -73,7 +73,7 @@ nonisolated struct PlaceListing: Hashable, Sendable {
 /// template publishes a map canvas and no photograph of the hall. The map on
 /// ``VenueView`` is drawn from the address by ``VenuePlaces``, which is a
 /// likeness of the place rather than a stand-in for one.
-nonisolated struct VenueProfile: Identifiable, Hashable, Sendable {
+nonisolated struct VenueProfile: Identifiable, Hashable, Codable, Sendable {
     /// Eventernote's place id, as it appears in the page's path.
     let id: Int
     let name: String

@@ -37,6 +37,7 @@ nonisolated enum VenueLink: Hashable {
 /// for a picture of it.
 struct VenueView: View {
     @Environment(EventStore.self) private var store
+    @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.openURL) private var openURL
 
     let link: VenueLink
@@ -52,6 +53,10 @@ struct VenueView: View {
     /// Where Maps says the hall is. Nil until the lookup comes back, and for a
     /// hall Maps has never heard of.
     @State private var place: VenuePlaces.Placing?
+    /// Why the last read did not replace what is on screen, if it did not.
+    @State private var refreshFailure: String?
+    /// The read going on now, so a pull can wait for it — see ``refresh()``.
+    @State private var running: Task<Void, Never>?
 
     /// Finding the page behind a hall's name fails in two ways that read very
     /// differently to the reader, so they are kept apart.
@@ -100,7 +105,16 @@ struct VenueView: View {
         .navigationTitle(Text(verbatim: link.name))
         .navigationBarTitleDisplayMode(.inline)
         .eventSheet($openEvent)
-        .task { await load() }
+        .task { await open() }
+        // The page's own, so a hall reached from the Following tab does not
+        // answer a pull by re-reading every followed listing — the tab's
+        // `.refreshable` is carried down the stack otherwise.
+        .refreshable { await refresh() }
+        // Pages the reader scrolls on to are kept too, so the next visit opens
+        // on them rather than on the front alone.
+        .onChange(of: feed.page) {
+            ListingCache.shared.extend(link.cacheKey, as: VenueProfile.self, with: feed)
+        }
         // Asked once the hall's own page has come back, because the address on
         // it is what places a hall — and asked again if either half of the
         // question ever changes.
@@ -109,68 +123,97 @@ struct VenueView: View {
 
     // MARK: - Loading
 
-    private func load() async {
-        // Already resolved on a retry of the listing alone; resolved again when
-        // it was the name lookup that failed.
-        var resolved = profile
-        if resolved == nil { resolved = await resolve() }
-        guard let profile = resolved else { return }
-
-        await feed.load { page in
-            try await EventernoteClient.shared.events(atVenue: profile.id, page: page)
+    /// Shows what this device last read of the page, and reads it again only
+    /// when that is stale or there is none — see ``ListingCache``.
+    private func open() async {
+        if let cached = ListingCache.shared.entry(for: link.cacheKey, as: VenueProfile.self) {
+            show(cached)
+            guard !cached.isFresh else { return }
         }
-        hasReadListing = true
-        store.remember(feed.items)
-        await readRemainingUpcoming()
+        await refresh()
+    }
+
+    /// Reads the page again, whatever is held — what pulling it down asks for,
+    /// and what opening a stale one does by itself.
+    ///
+    /// A pull that lands while a read is already going waits for that one and
+    /// ends with it, rather than returning at once with nothing to say.
+    private func refresh() async {
+        if let running {
+            await running.value
+            return
+        }
+        let task = Task { await read() }
+        running = task
+        await task.value
+        running = nil
+    }
+
+    private func read() async {
+        let known = profile
+        let link = link
+        let read = await ListingCache.read(
+            subject: { try await Self.resolve(link, known: known) },
+            listing: { venue, page in
+                try await EventernoteClient.shared.events(atVenue: venue.id, page: page)
+            })
+        switch read {
+        case .read(let entry):
+            ListingCache.shared.store(entry, for: link.cacheKey)
+            show(entry)
+            refreshFailure = nil
+            notices?.post(.updated)
+        case .unlisted:
+            lookup = .unlisted
+        case .failed(let reason):
+            // What was on screen stays, with the reason under it; only a page
+            // with nothing to fall back on gives the whole screen to the
+            // failure.
+            if hasReadListing { refreshFailure = reason } else { lookup = .failed(reason) }
+            notices?.post(.failed(reason))
+        }
     }
 
     private func retry() async {
         lookup = .looking
-        await load()
+        await refresh()
     }
 
-    /// Turns whatever the page was opened with into the hall's own page.
+    /// Puts a read — from the cache or just now — on screen, pointed at the
+    /// listing it came from so scrolling pages on from where it stopped.
+    private func show(_ entry: CachedListing<VenueProfile>) {
+        lookup = .found(entry.subject)
+        let id = entry.subject.id
+        feed.restore(entry.items, total: entry.total, pagesRead: entry.pagesRead,
+                     hasMore: entry.hasMore) { page in
+            try await EventernoteClient.shared.events(atVenue: id, page: page)
+        }
+        hasReadListing = true
+        store.remember(feed.items)
+    }
+
+    /// Reads the hall's own page: nil where the site files no hall under the
+    /// name the page was opened with.
     ///
-    /// Both entry points end in a fetch, which is where this differs from a
-    /// performer: a place id addresses the page but says nothing about the
-    /// hall, and the address, the capacity and the walk from the station are
-    /// all on the page itself.
-    private func resolve() async -> VenueProfile? {
-        do {
-            let id: Int
+    /// Read again on every refresh rather than kept from the first, which is
+    /// where this differs from a performer: the address, the capacity and the
+    /// walk from the station are all on the hall's page, and members edit
+    /// them. Only the search that turned a name into an id is not repeated —
+    /// a hall a page has already found stays found.
+    nonisolated private static func resolve(_ link: VenueLink, known: VenueProfile?) async throws -> VenueProfile? {
+        let id: Int
+        if let known {
+            id = known.id
+        } else {
             switch link {
             case .place(let listing):
                 id = listing.id
             case .named(let name):
-                guard let found = try await EventernoteClient.shared.venue(named: name) else {
-                    lookup = .unlisted
-                    return nil
-                }
+                guard let found = try await EventernoteClient.shared.venue(named: name) else { return nil }
                 id = found.id
             }
-            let profile = try await EventernoteClient.shared.venue(id: id)
-            lookup = .found(profile)
-            return profile
-        } catch {
-            lookup = .failed(error.localizedDescription)
-            return nil
         }
-    }
-
-    /// Reads pages until the first past event shows up.
-    ///
-    /// The listing runs from the furthest published date backwards, so one past
-    /// row proves every upcoming one is already in hand. Without this, Upcoming
-    /// would show however many happened to fall on the first page and the count
-    /// over it would be wrong.
-    private func readRemainingUpcoming() async {
-        while feed.hasMore, !feed.items.contains(where: { !$0.isUpcoming }) {
-            let read = feed.items.count
-            await feed.loadMore()
-            // A page that adds nothing would otherwise spin here forever.
-            guard feed.items.count > read else { break }
-        }
-        store.remember(feed.items)
+        return try await EventernoteClient.shared.venue(id: id)
     }
 
     /// What a lookup is actually asking about, and nil while there is nothing
@@ -395,7 +438,7 @@ struct VenueView: View {
         if feed.isLoading || !hasReadListing {
             SearchProgress()
         } else if let failure = feed.failure {
-            SearchFailure(message: failure) { await load() }
+            SearchFailure(message: failure) { await refresh() }
         } else if feed.isEmptyResult {
             ContentUnavailableView {
                 Label("No Events Listed", systemImage: "calendar")
@@ -414,6 +457,10 @@ struct VenueView: View {
                     events: past, hasMore: hasMorePast)
             if feed.isLoadingMore { SearchProgress(compact: true) }
             if !regulars.isEmpty { regularsCard }
+            if let refreshFailure {
+                RefreshFailureNote(message: refreshFailure)
+                    .padding(.horizontal, 18)
+            }
             openInEventernote
             footnote
         }

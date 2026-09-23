@@ -395,7 +395,8 @@ struct SettingsView: View {
 
     /// Empties what this device has read and kept: the dates published for the
     /// performers the reader follows, which of their event pages have already
-    /// been read, and which part of the country each hall is in.
+    /// been read, every performer's and hall's page opened, and which part of
+    /// the country each hall is in.
     ///
     /// None of it is the reader's — every one of them is a fact this device
     /// went and read, written down so opening a screen does not read it again
@@ -412,6 +413,7 @@ struct SettingsView: View {
             followed.clear()
             venues.clear()
             store.forgetReadPages()
+            ListingCache.shared.clear()
         } label: {
             rowLabel("clock.arrow.circlepath", "Clear Cache", cacheDetail)
                 .padding(.horizontal, 16)
@@ -426,7 +428,8 @@ struct SettingsView: View {
     /// reader deciding whether to clear this wants to know what it is, and
     /// "1.2 MB" does not say.
     private var cachedItems: Int {
-        followed.performerCount + store.readPageCount + venues.placedCount
+        followed.performerCount + store.readPageCount + ListingCache.shared.count
+            + venues.placedCount
     }
 
     /// Named one by one, and only the ones there are any of: a device that has
@@ -439,6 +442,9 @@ struct SettingsView: View {
         }
         if store.readPageCount > 0 {
             parts.append(Text("^[\(store.readPageCount) event page](inflect: true)"))
+        }
+        if ListingCache.shared.count > 0 {
+            parts.append(Text("^[\(ListingCache.shared.count) performer or venue page](inflect: true)"))
         }
         if venues.placedCount > 0 {
             parts.append(Text("^[\(venues.placedCount) venue area](inflect: true)"))

@@ -14,7 +14,9 @@ final class Feed<Item: Identifiable & Sendable> {
     /// Why the last load stopped, in words the reader can act on.
     private(set) var failure: String?
 
-    private var page = 0
+    /// How many pages have been read — what a cached copy records, so a
+    /// restored listing pages on from where the read it came from stopped.
+    private(set) var page = 0
     /// Whether the site says there are pages after the ones already read.
     /// Read by a screen that has to keep paging until it has the whole of
     /// something, rather than only until the reader scrolls.
@@ -52,6 +54,21 @@ final class Feed<Item: Identifiable & Sendable> {
             page = 1
             failure = error.localizedDescription
         }
+    }
+
+    /// Puts a listing read earlier back on screen, pointed at the listing it
+    /// came from so scrolling pages on from where that read stopped.
+    ///
+    /// What ``ListingCache`` hands a performer's or a hall's page as it opens:
+    /// the copy is shown at once, whether or not it is then read again.
+    func restore(_ items: [Item], total: Int, pagesRead: Int, hasMore: Bool,
+                 from source: @escaping Source) {
+        self.source = source
+        self.items = items
+        self.total = total
+        page = pagesRead
+        self.hasMore = hasMore
+        failure = nil
     }
 
     /// Loads the page after the one on screen. Safe to call from a row that

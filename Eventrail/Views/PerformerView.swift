@@ -36,6 +36,7 @@ nonisolated enum PerformerLink: Hashable {
 /// the name instead of dressing one up as the other.
 struct PerformerView: View {
     @Environment(EventStore.self) private var store
+    @Environment(RefreshNotices.self) private var notices: RefreshNotices?
 
     let link: PerformerLink
 
@@ -47,6 +48,10 @@ struct PerformerView: View {
     /// sections the reader should never see.
     @State private var hasReadListing = false
     @State private var openEvent: Event?
+    /// Why the last read did not replace what is on screen, if it did not.
+    @State private var refreshFailure: String?
+    /// The read going on now, so a pull can wait for it — see ``refresh()``.
+    @State private var running: Task<Void, Never>?
 
     /// Finding the page behind a billed name fails in two ways that read very
     /// differently to the reader, so they are kept apart.
@@ -93,66 +98,99 @@ struct PerformerView: View {
         .navigationTitle(Text(verbatim: link.name))
         .navigationBarTitleDisplayMode(.inline)
         .eventSheet($openEvent)
-        .task { await load() }
+        .task { await open() }
+        // The page's own, so a performer reached from the Following tab does
+        // not answer a pull by re-reading every followed listing — the tab's
+        // `.refreshable` is carried down the stack otherwise.
+        .refreshable { await refresh() }
+        // Pages the reader scrolls on to are kept too, so the next visit opens
+        // on them rather than on the front alone.
+        .onChange(of: feed.page) {
+            ListingCache.shared.extend(link.cacheKey, as: PerformerProfile.self, with: feed)
+        }
     }
 
     // MARK: - Loading
 
-    private func load() async {
-        // Already resolved on a retry of the listing alone; resolved again when
-        // it was the name lookup that failed.
-        var resolved = profile
-        if resolved == nil { resolved = await resolve() }
-        guard let profile = resolved else { return }
-
-        await feed.load { page in
-            try await EventernoteClient.shared.events(forPerformer: profile, page: page)
+    /// Shows what this device last read of the page, and reads it again only
+    /// when that is stale or there is none — see ``ListingCache``.
+    private func open() async {
+        if let cached = ListingCache.shared.entry(for: link.cacheKey, as: PerformerProfile.self) {
+            show(cached)
+            guard !cached.isFresh else { return }
         }
-        hasReadListing = true
-        store.remember(feed.items)
-        await readRemainingUpcoming()
+        await refresh()
+    }
+
+    /// Reads the page again, whatever is held — what pulling it down asks for,
+    /// and what opening a stale one does by itself.
+    ///
+    /// A pull that lands while a read is already going waits for that one and
+    /// ends with it, rather than returning at once with nothing to say.
+    private func refresh() async {
+        if let running {
+            await running.value
+            return
+        }
+        let task = Task { await read() }
+        running = task
+        await task.value
+        running = nil
+    }
+
+    private func read() async {
+        let known = profile
+        let link = link
+        let read = await ListingCache.read(
+            subject: {
+                if let known { return known }
+                return try await Self.resolve(link)
+            },
+            listing: { profile, page in
+                try await EventernoteClient.shared.events(forPerformer: profile, page: page)
+            })
+        switch read {
+        case .read(let entry):
+            ListingCache.shared.store(entry, for: link.cacheKey)
+            show(entry)
+            refreshFailure = nil
+            notices?.post(.updated)
+        case .unlisted:
+            lookup = .unlisted
+        case .failed(let reason):
+            // What was on screen stays, with the reason under it; only a page
+            // with nothing to fall back on gives the whole screen to the
+            // failure.
+            if hasReadListing { refreshFailure = reason } else { lookup = .failed(reason) }
+            notices?.post(.failed(reason))
+        }
     }
 
     private func retry() async {
         lookup = .looking
-        await load()
+        await refresh()
     }
 
-    /// Turns whatever the page was opened with into a profile.
-    private func resolve() async -> PerformerProfile? {
-        switch link {
-        case .profile(let profile):
-            lookup = .found(profile)
-            return profile
-        case .billed(let name):
-            do {
-                guard let found = try await EventernoteClient.shared.performer(named: name) else {
-                    lookup = .unlisted
-                    return nil
-                }
-                lookup = .found(found)
-                return found
-            } catch {
-                lookup = .failed(error.localizedDescription)
-                return nil
-            }
+    /// Puts a read — from the cache or just now — on screen, pointed at the
+    /// listing it came from so scrolling pages on from where it stopped.
+    private func show(_ entry: CachedListing<PerformerProfile>) {
+        lookup = .found(entry.subject)
+        let profile = entry.subject
+        feed.restore(entry.items, total: entry.total, pagesRead: entry.pagesRead,
+                     hasMore: entry.hasMore) { page in
+            try await EventernoteClient.shared.events(forPerformer: profile, page: page)
         }
-    }
-
-    /// Reads pages until the first past appearance shows up.
-    ///
-    /// The listing runs from the furthest published date backwards, so one past
-    /// row proves every upcoming one is already in hand. Without this, Upcoming
-    /// would show however many happened to fall on the first page and the count
-    /// over it would be wrong.
-    private func readRemainingUpcoming() async {
-        while feed.hasMore, !feed.items.contains(where: { !$0.isUpcoming }) {
-            let read = feed.items.count
-            await feed.loadMore()
-            // A page that adds nothing would otherwise spin here forever.
-            guard feed.items.count > read else { break }
-        }
+        hasReadListing = true
         store.remember(feed.items)
+    }
+
+    /// Turns whatever the page was opened with into a profile: nil where the
+    /// site lists nobody under exactly the billed name.
+    nonisolated private static func resolve(_ link: PerformerLink) async throws -> PerformerProfile? {
+        switch link {
+        case .profile(let profile): profile
+        case .billed(let name): try await EventernoteClient.shared.performer(named: name)
+        }
     }
 
     // MARK: - Who they are
@@ -301,7 +339,7 @@ struct PerformerView: View {
         if feed.isLoading || !hasReadListing {
             SearchProgress()
         } else if let failure = feed.failure {
-            SearchFailure(message: failure) { await load() }
+            SearchFailure(message: failure) { await refresh() }
         } else if feed.isEmptyResult {
             ContentUnavailableView {
                 Label("No Events Listed", systemImage: "calendar")
@@ -320,6 +358,10 @@ struct PerformerView: View {
                     events: past, hasMore: hasMorePast)
             if feed.isLoadingMore { SearchProgress(compact: true) }
             if !sameBill.isEmpty { sameBillCard }
+            if let refreshFailure {
+                RefreshFailureNote(message: refreshFailure)
+                    .padding(.horizontal, 18)
+            }
             openInEventernote
             footnote
         }
