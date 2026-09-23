@@ -224,7 +224,9 @@ struct SettingsView: View {
             Task {
                 guard !store.isRefreshingVenues else { return }
                 await store.refreshVenues()
-                if let notice = RefreshNotice.venues(store.venueStatus) { notices?.post(notice) }
+                if let notice = RefreshNotice.venues(store.venueStatus) {
+                    notices?.report(notice, byHand: true)
+                }
             }
         } label: {
             rowLabel("mappin.and.ellipse", "Refresh Venue Locations", venueDetail,

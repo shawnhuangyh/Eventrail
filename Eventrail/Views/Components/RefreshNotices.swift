@@ -3,12 +3,15 @@ import SwiftUI
 /// What one refresh says when it is done: that it worked, or that it did not
 /// and why.
 ///
-/// Every refresh in the app ends in one of these — the Following tab's, an
-/// event sheet's, the library's, and Settings' venue refresh — so the reader
-/// never has to work out from a list that did not visibly change whether the
-/// pull they just made did anything. Only a refresh that reached the network
-/// says anything: opening a screen whose copy is still fresh reads nothing and
-/// posts nothing, because "nothing happened" is not news.
+/// **A refresh the reader asked for always says how it went; one the app
+/// started by itself speaks only when it failed.** A pull, the Me card's
+/// Refresh, Settings' venue refresh and a Try Again are the reader asking, and
+/// a pull that visibly changed nothing needs "Updated" to say it worked. Opening
+/// a page for the first time, opening one that has gone stale, and coming back
+/// to the app are the app keeping itself current — an "Updated" there would be
+/// on every other page opened, saying nothing the page does not already show.
+/// A failure is worth saying either way: it is why the page is older than it
+/// looks. See ``RefreshNotices/report(_:byHand:)``.
 ///
 /// Deliberately two words and a reason. What a refresh brought in is on the
 /// screen behind the notice already; the notice only has to say whether to
@@ -57,6 +60,13 @@ final class RefreshNotices {
             guard !Task.isCancelled else { return }
             self?.dismiss(notice)
         }
+    }
+
+    /// Posts what a refresh came to — all of it for one the reader asked for,
+    /// and only a failure for one the app started by itself.
+    func report(_ notice: RefreshNotice, byHand: Bool) {
+        guard byHand || !notice.succeeded else { return }
+        post(notice)
     }
 
     func dismiss(_ notice: RefreshNotice) {

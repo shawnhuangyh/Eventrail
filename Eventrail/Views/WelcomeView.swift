@@ -397,7 +397,9 @@ struct WelcomeView: View {
                 let notices = notices
                 Task {
                     guard await store.refresh() else { return }
-                    notices?.post(.library(failure: store.refreshFailure))
+                    // The reader linked an account; the import behind it is
+                    // the app's own doing, so only a failure is said.
+                    notices?.report(.library(failure: store.refreshFailure), byHand: false)
                 }
             }
         }

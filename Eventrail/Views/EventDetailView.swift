@@ -148,23 +148,26 @@ struct EventDetailView: View {
     ///
     /// Whatever was held stays on screen while the page is read, and stays if
     /// it cannot be — the reason goes under it rather than over it.
+    ///
+    /// The app's own doing, so it says only a failure: an "Updated" over every
+    /// event opened for the first time would be noise.
     private func importPage() async {
         guard !event.isFullyDetailed || store.isStale(event) else { return }
-        await readPage()
+        await readPage(byHand: false)
     }
 
     /// Reads the event's own page again because the reader pulled for it —
     /// however recently it was read, since that is the reader asking. What is
     /// on screen stays if the page cannot be had, with the reason under it.
     private func refreshPage() async {
-        await readPage()
+        await readPage(byHand: true)
     }
 
     /// The one read both of those make, and what it says when it is done: a
-    /// notice across the top either way, and on failure a line under the copy
-    /// that stayed — which outlasts the notice, since the reader is still
-    /// looking at that copy after it has gone.
-    private func readPage() async {
+    /// notice — either way for a pull, only on failure otherwise — and on
+    /// failure a line under the copy that stayed, which outlasts the notice
+    /// since the reader is still looking at that copy after it has gone.
+    private func readPage(byHand: Bool) async {
         isImporting = true
         defer { isImporting = false }
         let read = await store.reloadDetail(for: event)
@@ -172,7 +175,7 @@ struct EventDetailView: View {
         case .updated: importFailure = nil
         case .failed(let reason): importFailure = reason
         }
-        notices?.post(.event(read))
+        notices?.report(.event(read), byHand: byHand)
         // The flyer is filed under the event's id, so a new one arrives under
         // the same address as the old — see ``ImageCache``. Asked about
         // whenever the page is, so the artwork never lags the page under it.

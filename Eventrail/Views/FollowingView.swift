@@ -166,9 +166,10 @@ struct FollowingView: View {
 
     private func load() async {
         // Only when something was stale enough to read: opening the tab on a
-        // fresh copy reads nothing, and says nothing.
+        // fresh copy reads nothing, and says nothing. The app started this
+        // one, so only a failure is worth a notice.
         if let outcome = await followed.load(for: performers) {
-            notices?.post(.following(outcome))
+            notices?.report(.following(outcome), byHand: false)
         }
         let dates = followed.events(for: performers)
         store.remember(dates)
@@ -180,7 +181,7 @@ struct FollowingView: View {
     private func reload() async {
         imagesCheckedSince = .now
         if let outcome = await followed.reload(for: performers) {
-            notices?.post(.following(outcome))
+            notices?.report(.following(outcome), byHand: true)
         }
         store.remember(followed.events(for: performers))
     }

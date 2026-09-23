@@ -51,8 +51,10 @@ struct PerformerView: View {
     @State private var openEvent: Event?
     /// Why the last read did not replace what is on screen, if it did not.
     @State private var refreshFailure: String?
-    /// The read going on now, so a pull can wait for it — see ``refresh()``.
-    @State private var running: Task<Void, Never>?
+    /// The read going on now, so a pull can wait for it — see
+    /// ``refresh(byHand:)``. It ends in what its notice would say, and each
+    /// caller decides whether to say it.
+    @State private var running: Task<RefreshNotice?, Never>?
     /// When what is on screen was read, so coming back to the app can tell
     /// whether it has gone stale meanwhile.
     @State private var readAt: Date?
@@ -111,14 +113,14 @@ struct PerformerView: View {
         // `.refreshable` is carried down the stack otherwise.
         .refreshable {
             imagesCheckedSince = .now
-            await refresh()
+            await refresh(byHand: true)
         }
         // A page left open while the reader was away is owed the check it
         // made as it opened: past the window, it reads again.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, let readAt,
                   readAt.timeIntervalSinceNow < -Freshness.window else { return }
-            Task { await refresh() }
+            Task { await refresh(byHand: false) }
         }
         .environment(\.imagesCheckedSince, imagesCheckedSince)
         // Pages the reader scrolls on to are kept too, so the next visit opens
@@ -137,26 +139,34 @@ struct PerformerView: View {
             show(cached)
             guard !cached.isFresh else { return }
         }
-        await refresh()
+        // First visit or a stale copy: the app's own doing, so only a failure
+        // is said.
+        await refresh(byHand: false)
     }
 
     /// Reads the page again, whatever is held — what pulling it down asks for,
     /// and what opening a stale one does by itself.
     ///
     /// A pull that lands while a read is already going waits for that one and
-    /// ends with it, rather than returning at once with nothing to say.
-    private func refresh() async {
+    /// ends with it, rather than returning at once with nothing to say — and
+    /// says it as a pull would, since the reader asked.
+    private func refresh(byHand: Bool) async {
+        let task: Task<RefreshNotice?, Never>
         if let running {
-            await running.value
-            return
+            task = running
+        } else {
+            task = Task { await read() }
+            running = task
         }
-        let task = Task { await read() }
-        running = task
-        await task.value
-        running = nil
+        let notice = await task.value
+        if running == task { running = nil }
+        if let notice { notices?.report(notice, byHand: byHand) }
     }
 
-    private func read() async {
+    /// Reads the page and puts what arrived on screen, answering what its
+    /// notice would say — nil for a name the site files nothing under, which
+    /// is said on the page itself.
+    private func read() async -> RefreshNotice? {
         let known = profile
         let link = link
         let read = await ListingCache.read(
@@ -172,21 +182,22 @@ struct PerformerView: View {
             ListingCache.shared.store(entry, for: link.cacheKey)
             show(entry)
             refreshFailure = nil
-            notices?.post(.updated)
+            return .updated
         case .unlisted:
             lookup = .unlisted
+            return nil
         case .failed(let reason):
             // What was on screen stays, with the reason under it; only a page
             // with nothing to fall back on gives the whole screen to the
             // failure.
             if hasReadListing { refreshFailure = reason } else { lookup = .failed(reason) }
-            notices?.post(.failed(reason))
+            return .failed(reason)
         }
     }
 
     private func retry() async {
         lookup = .looking
-        await refresh()
+        await refresh(byHand: true)
     }
 
     /// Puts a read — from the cache or just now — on screen, pointed at the
@@ -358,7 +369,7 @@ struct PerformerView: View {
         if feed.isLoading || !hasReadListing {
             SearchProgress()
         } else if let failure = feed.failure {
-            SearchFailure(message: failure) { await refresh() }
+            SearchFailure(message: failure) { await refresh(byHand: true) }
         } else if feed.isEmptyResult {
             ContentUnavailableView {
                 Label("No Events Listed", systemImage: "calendar")

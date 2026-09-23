@@ -192,7 +192,7 @@ struct MeView: View {
     /// Whatever followed listings have gone stale, and nothing else.
     private func loadFollowed() async {
         if let outcome = await followed.load(for: store.followedPerformers) {
-            notices?.post(.following(outcome))
+            notices?.report(.following(outcome), byHand: false)
         }
     }
 
@@ -200,7 +200,7 @@ struct MeView: View {
     /// as on the card's own line, since the reader may have scrolled on.
     private func refreshLibrary() async {
         guard await store.refresh() else { return }
-        notices?.post(.library(failure: store.refreshFailure))
+        notices?.report(.library(failure: store.refreshFailure), byHand: true)
     }
 
     private var refreshDetail: Text {
