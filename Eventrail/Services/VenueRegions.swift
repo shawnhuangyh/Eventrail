@@ -102,6 +102,10 @@ final class VenueRegions {
     /// whether waiting would change anything.
     func pendingCount(_ events: [Event]) -> Int { pending(in: events).count }
 
+    /// How many halls this device has an answer written down for — what
+    /// Settings counts when it says what the cache has in it.
+    var placedCount: Int { answers.count }
+
     /// Takes the addresses a library already holds as answers about the halls
     /// in it.
     ///
@@ -179,6 +183,19 @@ final class VenueRegions {
     /// makes an exact match the right test.
     private static func key(_ event: Event) -> String {
         event.venue.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Throws away every answer this device has written down, so each hall is
+    /// looked up again the next time a screen asks which area it is in.
+    ///
+    /// Two requests a hall to rebuild and twenty halls a run — see
+    /// ``place(_:)`` — so this is the reader asking rather than anything the
+    /// app ever does on its own.
+    func clear() {
+        guard !answers.isEmpty else { return }
+        answers = [:]
+        guard persists else { return }
+        UserDefaults.standard.removeObject(forKey: Self.cacheKey)
     }
 
     // MARK: - Where the answers are kept

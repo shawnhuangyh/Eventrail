@@ -32,9 +32,23 @@ nonisolated struct EventernoteClient: Sendable {
         case http(Int)
         case unreadable
 
+        /// Whether the site is refusing because it has been asked too often,
+        /// rather than because something is wrong with the page.
+        ///
+        /// 429 is the honest answer and 503 is the one a site behind a busy
+        /// front end tends to give instead; either way, asking for the next
+        /// page straight away only extends the refusal. So a run that meets
+        /// one stops there and keeps what it already has.
+        var isRateLimited: Bool {
+            if case .http(let status) = self { return status == 429 || status == 503 }
+            return false
+        }
+
         var errorDescription: String? {
             switch self {
             case .http(404): String(localized: "That Eventernote page is no longer there.")
+            case .http(429), .http(503):
+                String(localized: "Eventernote is asking the app to slow down. Try again in a few minutes.")
             case .http: String(localized: "Eventernote did not answer. Try again in a moment.")
             case .unreadable: String(localized: "Eventernote's page could not be read.")
             }

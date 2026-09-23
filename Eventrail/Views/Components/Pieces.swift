@@ -577,3 +577,36 @@ struct VenueMap: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
+/// A read from Eventernote that did not land, said underneath what is still on
+/// screen rather than in place of it.
+///
+/// Two screens refresh on their own once what they hold is stale — the
+/// Following tab and an event's sheet — and either can be refused, most often
+/// for asking too often. Neither throws away what it had when that happens, so
+/// the reader is told two things: why nothing new arrived, and that what they
+/// are looking at is the last copy that did.
+struct RefreshFailureNote: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.favorite)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: message)
+                    .font(.system(size: 12.5, weight: .semibold))
+                Text("Showing what was read before.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .glassPanel()
+    }
+}

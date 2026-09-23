@@ -13,6 +13,7 @@ enum MeList: Hashable {
 struct MeView: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
+    @Environment(RefreshNotices.self) private var notices: RefreshNotices?
 
     @State private var openEvent: Event?
     @State private var isLinking = false
@@ -60,9 +61,12 @@ struct MeView: View {
                 SettingsView()
             }
             // The same read the Following tab does, and the same object holds
-            // it — whichever screen the reader opens first pays for it.
-            .task(id: store.followedPerformers.map(\.id)) {
-                await followed.load(for: store.followedPerformers)
+            // it — whichever screen the reader opens first pays for it, and
+            // only when what it holds is stale.
+            .task(id: followed.loadKey(for: store.followedPerformers)) {
+                if let outcome = await followed.load(for: store.followedPerformers) {
+                    notices?.post(.following(outcome))
+                }
             }
         }
     }
@@ -100,7 +104,7 @@ struct MeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button {
-                    Task { await store.refresh() }
+                    Task { await refreshLibrary() }
                 } label: {
                     Text(store.isRefreshing ? "Refreshing" : "Refresh")
                         .font(.system(size: 13, weight: .semibold))
@@ -185,6 +189,13 @@ struct MeView: View {
 
     /// The honest wording: the app reports when it last *succeeded*, never that
     /// the data is current.
+    /// Refresh, and then say how it went — over the top of the screen, as well
+    /// as on the card's own line, since the reader may have scrolled on.
+    private func refreshLibrary() async {
+        guard await store.refresh() else { return }
+        notices?.post(.library(failure: store.refreshFailure))
+    }
+
     private var refreshDetail: Text {
         // Said before anything else: with no account there is nothing to
         // refresh from, and a stale timestamp would only be confusing.

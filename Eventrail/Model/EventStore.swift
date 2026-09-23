@@ -241,6 +241,9 @@ final class EventStore {
     private let cloud: CloudSync?
     private let calendar: CalendarSync?
     private let venues: VenuePlaces?
+    /// Which event pages this device has already read, so a refresh does not
+    /// ask for them all again — see ``PageReads``.
+    private let pageReads: PageReads?
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var cloudChanges: Task<Void, Never>?
@@ -269,6 +272,7 @@ final class EventStore {
         cloud: CloudSync? = .shared,
         calendar: CalendarSync? = .shared,
         venues: VenuePlaces? = .shared,
+        pageReads: PageReads? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
         tracking: [Event.ID: Tracking] = [:],
@@ -278,6 +282,7 @@ final class EventStore {
         self.cloud = cloud
         self.calendar = calendar
         self.venues = venues
+        self.pageReads = pageReads
         self.client = client
 
         // Off until the reader says otherwise, the same as the calendar. A
@@ -542,7 +547,11 @@ final class EventStore {
     }
 
     /// Folds a freshly imported copy of an event back in, wherever it is held.
+    ///
+    /// Every read of an event's own page arrives here, so this is also where
+    /// the read is written down — see ``isStale(_:)`` for what that decides.
     private func apply(_ imported: Event) {
+        pageReads?.record(imported.id)
         if archive.events[imported.id] != nil {
             archive.events[imported.id] = imported
         } else {
@@ -563,6 +572,56 @@ final class EventStore {
         return imported
     }
 
+    /// Whether an event's own page is worth reading again by itself — which is
+    /// what an event's sheet asks as it opens.
+    ///
+    /// Stale once this device's last read of it is more than
+    /// ``PageReads/freshness`` old, or when there is no read written down at
+    /// all, which is every event imported before this build kept them. Only
+    /// the app's own reading asks this: a refresh the reader asked for reads
+    /// regardless.
+    func isStale(_ event: Event) -> Bool {
+        guard let pageReads else { return false }
+        return !pageReads.isFresh(event.id)
+    }
+
+    /// How one read of an event's page ended, for the sheet that asked.
+    enum PageRead {
+        case updated
+        case failed(String)
+    }
+
+    /// Reads one event's own page again for a sheet that is open on it.
+    ///
+    /// The copy already held stays whatever happens — the sheet goes on showing
+    /// it, with the reason underneath.
+    ///
+    /// **The request runs as a task of its own, out of reach of the caller's
+    /// cancellation.** A pull on the sheet runs inside `.refreshable`, and
+    /// SwiftUI cancels that action when the screen under it changes while it
+    /// is running — which this sheet does the moment a read starts, since its
+    /// footnote says so. The cancellation reached the request, URLSession
+    /// dropped it, and the pull ended in neither an answer nor an error: the
+    /// reader saw nothing happen at all. ``FollowedDates`` reads the same way,
+    /// for its own reasons, which is why its pull never went quiet. A read
+    /// that outlives its sheet still lands in the library and is still
+    /// reported, which is true either way.
+    func reloadDetail(for event: Event) async -> PageRead {
+        let client = client
+        let read = await Task { () -> Result<Event, any Error> in
+            do { return .success(try await client.detail(for: event)) }
+            catch { return .failure(error) }
+        }.value
+        switch read {
+        case .success(let imported):
+            apply(imported)
+            persist()
+            return .updated
+        case .failure(let error):
+            return .failed(error.localizedDescription)
+        }
+    }
+
     /// Brings the library up to date — the one thing this screen asks for.
     ///
     /// It takes two passes, in this order: the linked account's own list first,
@@ -577,8 +636,12 @@ final class EventStore {
     /// Only imported fields are replaced. On failure the previous snapshot and
     /// its timestamp are kept: the app reports when it last *succeeded*, never
     /// that what it holds is current.
-    func refresh() async {
-        guard !isRefreshing, eventernoteHandle != nil else { return }
+    ///
+    /// Answers whether it ran at all — a tap while one is already going, or
+    /// with no account to read, is not a refresh worth a notice.
+    @discardableResult
+    func refresh() async -> Bool {
+        guard !isRefreshing, eventernoteHandle != nil else { return false }
         isRefreshing = true
         refreshFailure = nil
         importSummary = nil
@@ -606,10 +669,11 @@ final class EventStore {
 
         // The timestamp moves only when something actually arrived, so a run
         // that reached nothing cannot pass itself off as a successful refresh.
-        guard landed else { return }
+        guard landed else { return true }
         archive.lastRefreshed = .now
         persist()
         placeArrivedVenues()
+        return true
     }
 
     /// Sends the import's new halls off to Maps, and does not wait for them.
@@ -805,12 +869,22 @@ final class EventStore {
     /// One never read is fetched whenever it falls, which is what fills in a
     /// freshly imported history; a page that fails stays undetailed and is
     /// picked up again by the next refresh.
+    ///
+    /// Not held to ``PageReads/freshness``, however recently a page was read:
+    /// this is the reader tapping Refresh, and a refresh they asked for reads
+    /// what they asked it to. The window governs only what the app reads by
+    /// itself — see ``isStale(_:)``.
     private var needsReading: [Event] {
         library.filter { $0.isUpcoming || !$0.isDetailed }
     }
 
     /// Reads those pages a few at a time, reporting whether the pass got
     /// through at all. An event whose page failed keeps the copy already held.
+    ///
+    /// Stops handing out pages the moment the site says it is being asked too
+    /// often. The four already in flight are let finish, and everything not
+    /// reached keeps what it had — the next refresh picks it up, and carrying
+    /// on would only have been refused for longer.
     private func reimportDetails() async -> Bool {
         let events = needsReading
         guard !events.isEmpty else { return true }
@@ -820,26 +894,38 @@ final class EventStore {
         let inFlight = 4
         var read = 0
         var landed = 0
+        var throttled = false
 
-        await withTaskGroup(of: Event?.self) { group in
+        await withTaskGroup(of: (event: Event?, throttled: Bool).self) { group in
             var next = events.startIndex
             func addTask() {
                 guard next < events.endIndex else { return }
                 let event = events[next]
                 next = events.index(after: next)
-                group.addTask { try? await client.detail(for: event) }
+                group.addTask {
+                    do {
+                        return (try await client.detail(for: event), false)
+                    } catch {
+                        return (nil, (error as? EventernoteClient.Failure)?.isRateLimited == true)
+                    }
+                }
             }
 
             for _ in 0 ..< min(inFlight, events.count) { addTask() }
             for await result in group {
                 read += 1
-                if let result {
-                    apply(result)
+                if let event = result.event {
+                    apply(event)
                     landed += 1
                 }
+                if result.throttled { throttled = true }
                 refreshStage = .reimporting(read: read, total: events.count)
-                addTask()
+                if !throttled { addTask() }
             }
+        }
+
+        if throttled, refreshFailure == nil {
+            refreshFailure = String(localized: "Eventernote is asking the app to slow down. What did arrive was kept; try again in a few minutes.")
         }
 
         guard landed > 0 else {
@@ -1190,6 +1276,22 @@ final class EventStore {
         }
         if retimeEvents() { persist() }
         await mirrorCalendar()
+    }
+
+    // MARK: - What this device has read
+
+    /// How many event pages this device is holding a read for — what Settings
+    /// counts when it says what is cached.
+    var readPageCount: Int { pageReads?.count ?? 0 }
+
+    /// Forgets which pages this device has read, so every sheet opened next
+    /// reads its page again.
+    ///
+    /// Nothing the reader owns goes with it: what was read from those pages is
+    /// in the library already, and this is only the note saying not to ask for
+    /// them again yet.
+    func forgetReadPages() {
+        pageReads?.clear()
     }
 
     /// Reads every event held here on its hall's own clock, and says whether

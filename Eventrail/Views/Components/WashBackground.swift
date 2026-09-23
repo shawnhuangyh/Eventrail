@@ -56,12 +56,17 @@ extension View {
     ///
     /// visionOS renders app content on its own glass substrate and does not
     /// offer `glassEffect`, so panels fall back to the system material there.
+    ///
+    /// `tint` colours the glass itself rather than laying a colour over it —
+    /// what a refresh notice that failed wears, so the glass says so before a
+    /// word of it is read.
     @ViewBuilder
-    func glassBackground(in shape: some Shape, interactive: Bool = false) -> some View {
+    func glassBackground(in shape: some Shape, interactive: Bool = false,
+                         tint: Color? = nil) -> some View {
         #if os(visionOS)
         background(.regularMaterial, in: shape)
         #else
-        glassEffect(interactive ? .regular.interactive() : .regular, in: shape)
+        glassEffect(Glass.regular.tint(tint).interactive(interactive), in: shape)
         #endif
     }
 }

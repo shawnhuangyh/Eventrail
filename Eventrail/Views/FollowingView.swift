@@ -9,6 +9,7 @@ struct FollowingView: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
     @Environment(VenueRegions.self) private var venues
+    @Environment(RefreshNotices.self) private var notices: RefreshNotices?
 
     /// Which followed performer the list is narrowed to, or nil for all of
     /// them. Held as an id rather than a profile so unfollowing someone while
@@ -60,7 +61,10 @@ struct FollowingView: View {
                         nobodyFollowed
                     } else {
                         filters
-                        if let failure = followed.failure, events.isEmpty {
+                        // The whole screen goes to the failure only when there
+                        // is nothing cached to fall back on. Otherwise the last
+                        // copy stays up and the failure goes under it.
+                        if let failure = followed.failure, !holdsAnything {
                             SearchFailure(message: failure) { await reload() }
                         } else if groups.isEmpty {
                             if followed.isLoading {
@@ -70,9 +74,11 @@ struct FollowingView: View {
                             } else {
                                 noDatesPublished
                             }
+                            failureNote
                         } else {
                             months
                             if followed.isLoading { SearchProgress(compact: true) }
+                            failureNote
                             footnote
                         }
                     }
@@ -95,8 +101,10 @@ struct FollowingView: View {
             .refreshable { await reload() }
             // Following someone on their page should show their dates here on
             // the way back, so this follows the list rather than only the first
-            // appearance of the screen.
-            .task(id: performers.map(\.id)) { await load() }
+            // appearance of the screen — and the cache's generation with it,
+            // so clearing it from Settings reads the dates again rather than
+            // leaving this tab looking as though nobody has any.
+            .task(id: followed.loadKey(for: performers)) { await load() }
         }
     }
 
@@ -129,10 +137,29 @@ struct FollowingView: View {
         .tint(filter.isNarrowing ? Color.brandTint : nil)
     }
 
+    /// Whether anything at all is cached for the people followed — the line
+    /// between a refresh that failed over a list the reader can still read and
+    /// one that left them with nothing.
+    private var holdsAnything: Bool {
+        performers.contains { followed.count(for: $0) != nil }
+    }
+
+    @ViewBuilder private var failureNote: some View {
+        if let failure = followed.failure, !followed.isLoading {
+            RefreshFailureNote(message: failure)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+        }
+    }
+
     // MARK: - Loading
 
     private func load() async {
-        await followed.load(for: performers)
+        // Only when something was stale enough to read: opening the tab on a
+        // fresh copy reads nothing, and says nothing.
+        if let outcome = await followed.load(for: performers) {
+            notices?.post(.following(outcome))
+        }
         let dates = followed.events(for: performers)
         store.remember(dates)
         // The library is full of halls whose pages have already been read, and
@@ -141,7 +168,9 @@ struct FollowingView: View {
     }
 
     private func reload() async {
-        await followed.reload(for: performers)
+        if let outcome = await followed.reload(for: performers) {
+            notices?.post(.following(outcome))
+        }
         store.remember(followed.events(for: performers))
     }
 

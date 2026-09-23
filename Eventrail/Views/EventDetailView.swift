@@ -7,10 +7,14 @@ import SwiftUI
 /// imports the event's own page for the rest.
 struct EventDetailView: View {
     @Environment(EventStore.self) private var store
+    @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.dismiss) private var dismiss
 
     private let source: Event
     @State private var isImporting = false
+    /// Why the page could not be read again just now, if it could not. The
+    /// sheet goes on showing the copy it had, with this under it.
+    @State private var importFailure: String?
     /// Whether the description is shown whole. Collapsed to begin with, for the
     /// reason ``summaryCard`` gives.
     @State private var isSummaryExpanded = false
@@ -91,11 +95,22 @@ struct EventDetailView: View {
                     venueCard
                     linksCard
                     openInEventernote
+                    if let importFailure {
+                        RefreshFailureNote(message: importFailure)
+                            .padding(.horizontal, 16)
+                    }
                     footnote
                 }
                 .padding(.bottom, 32)
             }
             .ignoresSafeArea(edges: .top)
+            // The sheet's own, and not only for the sheets that had none. A
+            // `.refreshable` is carried down the environment into whatever a
+            // screen presents, so a sheet opened from the Following tab used
+            // to answer a pull by re-reading every followed performer's
+            // listing — and one opened from My Events, whose list has no
+            // refresh, by doing nothing. Pulling on an event reads that event.
+            .refreshable { await refreshPage() }
 
             closeButton
                 .padding(.horizontal, 20)
@@ -110,16 +125,44 @@ struct EventDetailView: View {
     }
 
     /// Imports the event's own page for the times, billing, description and
-    /// head count a search row does not carry.
+    /// head count a search row does not carry — and reads it again when the
+    /// copy held is stale.
     ///
     /// Asked of ``Event/isFullyDetailed`` rather than of `isDetailed`, so an
     /// event imported by a build that read less of the page than this one does
-    /// is read again, once, the first time the reader opens it.
+    /// is read again, once, the first time the reader opens it. And asked of
+    /// ``EventStore/isStale(_:)``, so a sheet opened on a page this device read
+    /// more than a few hours ago picks up a start time or a venue announced
+    /// since, while one opened twice in an afternoon asks Eventernote nothing
+    /// the second time.
+    ///
+    /// Whatever was held stays on screen while the page is read, and stays if
+    /// it cannot be — the reason goes under it rather than over it.
     private func importPage() async {
-        guard !event.isFullyDetailed else { return }
+        guard !event.isFullyDetailed || store.isStale(event) else { return }
+        await readPage()
+    }
+
+    /// Reads the event's own page again because the reader pulled for it —
+    /// however recently it was read, since that is the reader asking. What is
+    /// on screen stays if the page cannot be had, with the reason under it.
+    private func refreshPage() async {
+        await readPage()
+    }
+
+    /// The one read both of those make, and what it says when it is done: a
+    /// notice across the top either way, and on failure a line under the copy
+    /// that stayed — which outlasts the notice, since the reader is still
+    /// looking at that copy after it has gone.
+    private func readPage() async {
         isImporting = true
         defer { isImporting = false }
-        await store.loadDetail(for: event)
+        let read = await store.reloadDetail(for: event)
+        switch read {
+        case .updated: importFailure = nil
+        case .failed(let reason): importFailure = reason
+        }
+        notices?.post(.event(read))
     }
 
     // MARK: - Header

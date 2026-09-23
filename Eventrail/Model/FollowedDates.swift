@@ -1,11 +1,34 @@
 import Foundation
+import os
 
 /// Every date Eventernote has published for the performers the reader follows.
 ///
 /// Following is only a name in the archive; the dates behind it live on the
-/// site and have to be read. This holds the result of that reading for as long
-/// as the app is open, so the Following tab and the Me card show the same
-/// numbers without asking for the same pages twice.
+/// site and have to be read. This holds the result of that reading — in memory
+/// while the app is open, so the Following tab and the Me card show the same
+/// numbers without asking for the same pages twice, and on this device between
+/// launches, so a reader who opens the app four times in an afternoon pays for
+/// one read rather than four.
+///
+/// **Opening a screen reads a listing again only once it is stale; the reader
+/// asking reads it regardless.** Every followed performer being read afresh on
+/// every launch is a request per person before a single row is drawn, and a
+/// reader following twenty people was asking Eventernote for twenty listings
+/// every time they opened the app — which is what gets a site that publishes
+/// no API to refuse this one. So an answer stands for ``freshness`` as far as
+/// the app's own reading goes, and pulling the list down asks about everybody
+/// on the spot, because that is the reader saying so.
+///
+/// **A read that fails never costs what was already held.** The cached dates
+/// stay on screen, ``failure`` says why they were not replaced, and the
+/// Following tab puts that under the list rather than instead of it.
+///
+/// Kept per device rather than in the archive, the choice ``VenuePlaces`` and
+/// ``VenueRegions`` make for the same reason: these are Eventernote's facts
+/// about who is playing where, not records the reader owns, so they have no
+/// business travelling to their other devices, into a merge, or into a backup.
+/// The file sits in Caches, where the system may throw it away when the device
+/// is short of room — which is exactly the right thing to do to it.
 ///
 /// Nothing here is written to the library. A followed performer's listing is
 /// Eventernote's, not the reader's — an event only joins the library when the
@@ -21,7 +44,31 @@ final class FollowedDates {
     /// stopped is kept: half a listing still tells the reader something.
     private(set) var failure: String?
 
+    /// When each performer's listing was last read, which is what decides
+    /// whether it is asked for again. Only a read that landed is written down:
+    /// a listing that failed is stale, and the next screen that asks for it
+    /// tries again.
+    private var readAt: [PerformerProfile.ID: Date] = [:]
+
+    /// Which generation of the cache the dates in hand were read under.
+    ///
+    /// Clearing the cache from Settings empties an object two live screens are
+    /// watching, and neither would go back for what it lost — a `.task(id:)`
+    /// keyed on who is followed has no reason to run again when nobody has
+    /// been followed or unfollowed. So the identity a screen loads under
+    /// carries this too: see ``loadKey(for:)``.
+    private(set) var generation = 0
+
     @ObservationIgnored private let client: EventernoteClient
+    /// Previews are handed their dates, and neither read this device's cache
+    /// nor write to it.
+    @ObservationIgnored private let persists: Bool
+    @ObservationIgnored private var pendingSave: Task<Void, Never>?
+    /// The read going on now, so a second caller can wait for it rather than
+    /// start another — see ``reload(for:)``.
+    @ObservationIgnored private var running: Task<Outcome?, Never>?
+
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "following")
 
     /// A performer's listing runs from the furthest published date backwards,
     /// so the upcoming half sits at the front and is almost always the first
@@ -29,56 +76,195 @@ final class FollowedDates {
     /// announced dates, not the usual path.
     private static let pageLimit = 10
 
+    /// How old a listing may be before opening a screen reads it again by
+    /// itself.
+    ///
+    /// Only the app's own reading is held to it. Long enough that switching to
+    /// the Following tab repeatedly in a day asks Eventernote nothing, short
+    /// enough that a date announced this morning is on the screen by this
+    /// evening without the reader doing anything. Pulling the list down is
+    /// never held to it.
+    static let freshness: TimeInterval = 6 * 60 * 60
+
+    /// How long between one performer's listing and the next.
+    ///
+    /// The listings are read one at a time already; this is the gap between
+    /// them. A first read of a long Following list is still a request per
+    /// person, and firing them off as fast as they answer is the shape of
+    /// traffic that gets refused — ``VenuePlaces`` paces its own run for the
+    /// same reason, learned against Maps. It costs a fifth of a second per
+    /// person on a read that only happens when something is actually stale.
+    private static let pace: Duration = .milliseconds(200)
+
     /// Previews pass the dates in, exactly as they pass a library to
     /// ``EventStore``, so a preview neither reaches Eventernote nor sits
-    /// spinning while it waits for something that will never answer.
-    init(client: EventernoteClient = .shared, dates: [PerformerProfile.ID: [Event]] = [:]) {
+    /// spinning while it waits for something that will never answer. The
+    /// default reads whatever this device already had.
+    init(client: EventernoteClient = .shared, dates: [PerformerProfile.ID: [Event]]? = nil) {
         self.client = client
-        self.dates = dates
+        if let dates {
+            self.dates = dates
+            persists = false
+        } else {
+            let cached = Self.stored
+            // A listing holds what was upcoming when it was read, and a date
+            // that has since passed is not a date the Following tab shows.
+            self.dates = cached.dates.mapValues { $0.filter(\.isUpcoming) }
+            readAt = cached.readAt
+            persists = true
+        }
     }
 
-    /// Reads whichever followed performers have not been read yet, and forgets
-    /// anyone no longer followed.
+    deinit { pendingSave?.cancel() }
+
+    /// How one read went: how many listings it asked for, how many came back,
+    /// and why it fell short if it did — what the notice after a refresh says.
+    struct Outcome {
+        let asked: Int
+        let read: Int
+        let failure: String?
+    }
+
+    /// Reads whichever followed performers have nothing in hand or nothing
+    /// recent, and forgets anyone no longer followed.
     ///
     /// Safe to call from more than one screen: the second caller returns while
     /// the first is still reading, and both are watching the same object, so
     /// the rows appear on both either way.
-    func load(for performers: [PerformerProfile]) async {
-        dates = dates.filter { id, _ in performers.contains { $0.id == id } }
-        let missing = performers.filter { dates[$0.id] == nil }
-        guard !missing.isEmpty, !isLoading else { return }
-        await read(missing)
+    ///
+    /// Nil when nothing was read — everybody was fresh, another screen was
+    /// already reading, or the screen went away first — so a notice is only
+    /// ever posted about a read that happened.
+    @discardableResult
+    func load(for performers: [PerformerProfile]) async -> Outcome? {
+        forget(everyoneBut: performers)
+        let stale = performers.filter { !isFresh($0.id) }
+        guard !stale.isEmpty, running == nil else { return nil }
+        return await run(stale)
     }
 
-    /// Re-reads every followed performer from scratch — what pulling the list
-    /// down asks for.
-    func reload(for performers: [PerformerProfile]) async {
-        guard !isLoading else { return }
+    /// Re-reads every followed performer, however recently — what pulling the
+    /// list down asks for.
+    ///
+    /// Over the top of what is held rather than after emptying it: each
+    /// listing is replaced as its fresh copy lands, and one the site will not
+    /// give back keeps the copy it had. A refresh that was refused should leave
+    /// the reader looking at yesterday's dates and a line saying why, not at a
+    /// blank tab.
+    ///
+    /// A pull that lands while a read is already going — the one opening the
+    /// tab started, most often, since a long list takes several seconds —
+    /// waits for that read and reports it, rather than returning at once with
+    /// nothing to say. That read is already asking for everybody who was
+    /// stale; starting a second beside it would ask the site for the same
+    /// pages twice.
+    @discardableResult
+    func reload(for performers: [PerformerProfile]) async -> Outcome? {
+        if let running { return await running.value }
+        forget(everyoneBut: performers)
+        return await run(performers)
+    }
+
+    /// Reads as a task of its own rather than as part of whichever screen
+    /// asked, so a second caller can wait on it — and so leaving the tab
+    /// halfway does not throw away a read the site has already been asked for.
+    /// What it reads is cached either way; the screen that comes back finds it
+    /// there.
+    private func run(_ performers: [PerformerProfile]) async -> Outcome? {
+        let task = Task { await self.read(performers) }
+        running = task
+        let outcome = await task.value
+        running = nil
+        return outcome
+    }
+
+    /// Throws away what this device has read and holds, so the next screen
+    /// that asks reads it from Eventernote again.
+    ///
+    /// The dates in memory go with the file. What is on screen is what was
+    /// cached; leaving it there would be a cleared cache that still showed its
+    /// contents, and the screens watching this go back for it themselves —
+    /// see ``generation``.
+    func clear() {
+        // A read still going would write what it finds back into the cache
+        // just emptied. Cancelled, it reports nothing, so no notice claims a
+        // refresh the reader has just thrown away.
+        running?.cancel()
         dates = [:]
-        await read(performers)
+        readAt = [:]
+        failure = nil
+        generation += 1
+        pendingSave?.cancel()
+        pendingSave = nil
+        guard persists else { return }
+        try? FileManager.default.removeItem(at: Self.cacheURL)
     }
 
-    private func read(_ performers: [PerformerProfile]) async {
+    /// What a screen's read of these performers is identified by: who they
+    /// are, and which generation of the cache they were read under.
+    ///
+    /// Handed to `.task(id:)`, so following somebody new re-reads — and so
+    /// does clearing the cache out from under a screen that is already open.
+    func loadKey(for performers: [PerformerProfile]) -> [String] {
+        performers.map { String($0.id) } + ["generation \(generation)"]
+    }
+
+    /// Whether this performer's dates are in hand and recent enough to stand.
+    private func isFresh(_ id: PerformerProfile.ID) -> Bool {
+        guard dates[id] != nil, let read = readAt[id] else { return false }
+        return read.timeIntervalSinceNow > -Self.freshness
+    }
+
+    /// Drops whoever is no longer followed, so their dates stop being counted
+    /// and stop being kept.
+    private func forget(everyoneBut performers: [PerformerProfile]) {
+        let followed = Set(performers.map(\.id))
+        guard dates.contains(where: { !followed.contains($0.key) }) else { return }
+        dates = dates.filter { followed.contains($0.key) }
+        readAt = readAt.filter { followed.contains($0.key) }
+        save()
+    }
+
+    private func read(_ performers: [PerformerProfile]) async -> Outcome? {
+        var landed = 0
         isLoading = true
         failure = nil
-        defer { isLoading = false }
+        // Whatever the run got through is worth keeping, including when it was
+        // cancelled partway or the site stopped answering.
+        defer {
+            isLoading = false
+            save()
+        }
 
         // One performer at a time, and each one published as it arrives: the
         // list fills from the top rather than staying blank until the slowest
         // listing answers, and the site is asked for one page at a time.
-        for performer in performers {
-            guard !Task.isCancelled else { return }
+        for (index, performer) in performers.enumerated() {
+            guard !Task.isCancelled else { return nil }
+            if index > 0 {
+                guard (try? await Task.sleep(for: Self.pace)) != nil else { return nil }
+            }
             do {
                 dates[performer.id] = try await upcoming(for: performer)
+                readAt[performer.id] = .now
+                landed += 1
             } catch is CancellationError {
-                return
+                return nil
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else { return nil }
+                // Refused for asking too often: the rest of the list would be
+                // refused too, and asking anyway only lengthens the refusal.
+                // Everybody not reached keeps what was cached for them.
+                if (error as? EventernoteClient.Failure)?.isRateLimited == true {
+                    failure = error.localizedDescription
+                    return Outcome(asked: performers.count, read: landed, failure: failure)
+                }
                 // Named, because "could not be reached" about a list of four
                 // people does not say which four are missing.
                 failure = "\(performer.name): \(error.localizedDescription)"
             }
         }
+        return Outcome(asked: performers.count, read: landed, failure: failure)
     }
 
     /// Pages one performer's listing until the first past date shows up.
@@ -112,6 +298,10 @@ final class FollowedDates {
         dates[performer.id]?.count
     }
 
+    /// How many performers' listings this device is holding — what Settings
+    /// counts when it says what the cache has in it.
+    var performerCount: Int { dates.count }
+
     /// Every date published for the given performers, soonest first and each
     /// event once however many of them share the bill.
     func events(for performers: [PerformerProfile]) -> [Event] {
@@ -131,6 +321,61 @@ final class FollowedDates {
     func billed(on event: Event, among performers: [PerformerProfile]) -> [PerformerProfile] {
         performers.filter { performer in
             dates[performer.id]?.contains { $0.id == event.id } ?? false
+        }
+    }
+
+    // MARK: - Where the answers are kept
+
+    /// One listing as it is written down: what was read, and when.
+    ///
+    /// `nonisolated`, because the encoding it is handed to happens off the
+    /// main actor — a conformance isolated to this class could not be used
+    /// there.
+    private nonisolated struct Cache: Codable, Sendable {
+        var dates: [PerformerProfile.ID: [Event]] = [:]
+        var readAt: [PerformerProfile.ID: Date] = [:]
+    }
+
+    /// In Caches rather than Application Support, and rather than
+    /// `UserDefaults` where the venue answers live: this is a few hundred
+    /// events rather than a line per hall, it is all re-readable, and a device
+    /// short of room is welcome to take it back.
+    private static let cacheURL: URL = {
+        let directory = URL.cachesDirectory.appending(path: "Eventrail", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appending(path: "followedDates.json")
+    }()
+
+    private static var stored: Cache {
+        guard let data = try? Data(contentsOf: cacheURL) else { return Cache() }
+        return (try? JSONDecoder().decode(Cache.self, from: data)) ?? Cache()
+    }
+
+    /// Writes after a pause, and off the main actor.
+    ///
+    /// A run publishes each listing as it lands, so writing on every one of
+    /// them would re-encode the whole cache once per performer. The pause
+    /// coalesces those into one write, the way ``EventStore/persist()``
+    /// coalesces a burst of edits.
+    private func save() {
+        guard persists else { return }
+        pendingSave?.cancel()
+        let cache = Cache(dates: dates, readAt: readAt)
+        let url = Self.cacheURL
+        pendingSave = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            let failure = await Task.detached(priority: .utility) { () -> String? in
+                do {
+                    try JSONEncoder().encode(cache).write(to: url, options: .atomic)
+                    return nil
+                } catch {
+                    return error.localizedDescription
+                }
+            }.value
+            if let failure {
+                Self.log.error("Followed dates could not be cached: \(failure, privacy: .public)")
+            }
         }
     }
 }

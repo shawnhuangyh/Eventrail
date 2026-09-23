@@ -21,6 +21,7 @@ import SwiftUI
 /// same two rows Settings and the Me tab already carry.
 struct WelcomeView: View {
     @Environment(EventStore.self) private var store
+    @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.dismiss) private var dismiss
 
     /// The key ``RootView`` reads to decide whether this has been seen.
@@ -391,7 +392,13 @@ struct WelcomeView: View {
             let isNewAccount = chosen.handle != store.eventernoteHandle
             store.link(chosen)
             if isNewAccount {
-                Task { await store.refresh() }
+                // Outlives this screen, which is gone long before a history
+                // has been read — so its notice goes to the root.
+                let notices = notices
+                Task {
+                    guard await store.refresh() else { return }
+                    notices?.post(.library(failure: store.refreshFailure))
+                }
             }
         }
         store.iCloudSyncEnabled = wantsCloud

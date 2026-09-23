@@ -133,7 +133,6 @@ struct EventPassportView: View {
         // content, where the year bar inset lands on top of it.
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top) { yearBar }
-        .refreshable { await placeVenues() }
         .task(id: store.revision) { readPlacings() }
         // A year is only ever offered while the reader has something in it, so
         // a removal here or a merge from another device can take the chosen one
@@ -703,21 +702,12 @@ struct EventPassportView: View {
     ///
     /// Asks the network nothing: this is the answers an event's sheet, a hall's
     /// page and the placement run behind an import have written down between
-    /// them. A hall none of those has reached is simply absent until the reader
-    /// pulls.
+    /// them. A hall none of those has reached is simply absent until one of
+    /// them does — or until Settings' Refresh Venue Locations, the one place
+    /// that asks about every hall. The Passport itself refreshes nothing: it
+    /// is the reader's record read back, not a view of the site.
     private func readPlacings() {
         placings = VenuePlaces.shared.mapItems(for: attended)
-    }
-
-    /// Asks Maps about the halls nothing has an answer for, and leaves the
-    /// halls it already knows alone.
-    ///
-    /// The same pass an import runs, and paced the same way — a hall a minute
-    /// is not a Passport that stalls, it is one that fills in while the reader
-    /// reads the rest of the page.
-    private func placeVenues() async {
-        _ = await VenuePlaces.shared.placeUnplaced(attended) { _ in }
-        readPlacings()
     }
 
 }

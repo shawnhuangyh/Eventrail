@@ -5,9 +5,10 @@ import SwiftUI
 /// Four headings, because the rows answer four different questions. Calendar
 /// decides what Eventrail writes into a diary the reader keeps elsewhere;
 /// Location is where its events are on the map, which the calendar wants and
-/// so does every event's own sheet; Data decides where the reader's own
-/// records live — on their devices through iCloud, and in a file they hold
-/// themselves; About is the app itself. Everything destructive is at the
+/// so does every event's own sheet; Data decides where what this app holds
+/// lives — the reader's own records on their devices through iCloud and in a
+/// file they hold themselves, and beneath those the pages it has read from
+/// Eventernote and kept; About is the app itself. Everything destructive is at the
 /// bottom, well away from the Refresh button on the screen behind.
 ///
 /// One card per heading, so the shape on the glass says the same thing the
@@ -22,6 +23,11 @@ import SwiftUI
 /// only "iCloud Sync" cannot tell the reader it has been failing for a week.
 struct SettingsView: View {
     @Environment(EventStore.self) private var store
+    /// The two things read from Eventernote and kept on this device rather
+    /// than in the library — what the cache row empties.
+    @Environment(FollowedDates.self) private var followed
+    @Environment(VenueRegions.self) private var venues
+    @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.dismiss) private var dismiss
 
     @State private var isConfirmingDeleteAll = false
@@ -78,6 +84,9 @@ struct SettingsView: View {
                 WelcomeView()
             }
         }
+        // A sheet over the root, so it draws its own — the venue refresh
+        // below would otherwise report behind it.
+        .refreshNotices()
     }
 
     // MARK: - One row's face
@@ -208,7 +217,11 @@ struct SettingsView: View {
 
     private var venueRefreshRow: some View {
         Button {
-            Task { await store.refreshVenues() }
+            Task {
+                guard !store.isRefreshingVenues else { return }
+                await store.refreshVenues()
+                if let notice = RefreshNotice.venues(store.venueStatus) { notices?.post(notice) }
+            }
         } label: {
             rowLabel("mappin.and.ellipse", "Refresh Venue Locations", venueDetail,
                      needsAttention: venueNeedsAttention) {
@@ -253,11 +266,17 @@ struct SettingsView: View {
 
     // MARK: - Where the reader's records go
 
-    /// One card, because the three rows answer one question — where the
-    /// reader's records live — in three places: on their other devices, in a
-    /// file they keep, and back off one. Sync keeps devices agreeing, which
-    /// means a removal travels too; a file is the one copy nothing done in the
-    /// app afterwards can reach.
+    /// One card, because the rows answer one question — where what this app
+    /// holds lives. The first three are the reader's own records, in three
+    /// places: on their other devices, in a file they keep, and back off one.
+    /// Sync keeps devices agreeing, which means a removal travels too; a file
+    /// is the one copy nothing done in the app afterwards can reach.
+    ///
+    /// The last is the other half of what is on the device and belongs to
+    /// nobody — pages read from Eventernote, kept only so they are not asked
+    /// for again. It sits under the same heading because it answers the same
+    /// question, and it is the one row here that takes something away without
+    /// the reader losing anything by it.
     private func dataCard(store: Bindable<EventStore>) -> some View {
         VStack(spacing: 0) {
             iCloudRow(store: store)
@@ -265,6 +284,8 @@ struct SettingsView: View {
             exportRow
             rowDivider
             restoreRow
+            rowDivider
+            cacheRow
         }
         .glassPanel(interactive: true)
         // Written before the share sheet is opened rather than when it asks for
@@ -368,6 +389,65 @@ struct SettingsView: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - What was read from Eventernote
+
+    /// Empties what this device has read and kept: the dates published for the
+    /// performers the reader follows, which of their event pages have already
+    /// been read, and which part of the country each hall is in.
+    ///
+    /// None of it is the reader's — every one of them is a fact this device
+    /// went and read, written down so opening a screen does not read it again
+    /// for a while. So
+    /// there is nothing to confirm and nothing to lose: the screens go back
+    /// for whatever they still need, which is the whole of what this changes.
+    ///
+    /// Where a hall *is* — its pin, its map, its clock — is deliberately not
+    /// in here. That one is answered by Maps and two donated services rather
+    /// than by Eventernote, a hall does not move, and rebuilding it is a run
+    /// of hundreds of searches. Its own row is above, under Location.
+    private var cacheRow: some View {
+        Button {
+            followed.clear()
+            venues.clear()
+            store.forgetReadPages()
+        } label: {
+            rowLabel("clock.arrow.circlepath", "Clear Cache", cacheDetail)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(cachedItems == 0)
+    }
+
+    /// How much is being held, item by item rather than as a size on disk: a
+    /// reader deciding whether to clear this wants to know what it is, and
+    /// "1.2 MB" does not say.
+    private var cachedItems: Int {
+        followed.performerCount + store.readPageCount + venues.placedCount
+    }
+
+    /// Named one by one, and only the ones there are any of: a device that has
+    /// refreshed but follows nobody would otherwise read "0 followed listings"
+    /// at the head of the line it is trying to explain.
+    private var cacheDetail: Text {
+        var parts: [Text] = []
+        if followed.performerCount > 0 {
+            parts.append(Text("^[\(followed.performerCount) followed listing](inflect: true)"))
+        }
+        if store.readPageCount > 0 {
+            parts.append(Text("^[\(store.readPageCount) event page](inflect: true)"))
+        }
+        if venues.placedCount > 0 {
+            parts.append(Text("^[\(venues.placedCount) venue area](inflect: true)"))
+        }
+        guard let first = parts.first else {
+            return Text("Nothing is kept — pages are read from Eventernote as they are needed")
+        }
+        let held = parts.dropFirst().reduce(first) { $0 + Text(", ") + $1 }
+        return Text("Holding \(held). Each is read again by itself once it is more than six hours old.")
     }
 
     /// Writes the file the share sheet will hand over.
@@ -495,4 +575,6 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .environment(EventStore.preview)
+        .environment(FollowedDates.preview)
+        .environment(VenueRegions.preview)
 }

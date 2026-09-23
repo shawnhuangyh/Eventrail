@@ -72,8 +72,11 @@ extension View {
     /// an event is presented — a different detent, a different transition — is
     /// made once rather than in seven places, six of which would be found and
     /// one of which would not.
+    ///
+    /// The sheet draws refresh notices of its own, because it covers the root
+    /// that draws everybody else's — see ``refreshNotices(underSheets:)``.
     func eventSheet(_ event: Binding<Event?>) -> some View {
-        sheet(item: event) { EventDetailView(event: $0) }
+        sheet(item: event) { EventDetailView(event: $0).refreshNotices() }
     }
 
     /// Registers a performer's page on this stack.

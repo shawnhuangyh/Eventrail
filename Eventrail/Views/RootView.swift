@@ -20,6 +20,9 @@ struct RootView: View {
     /// Where each hall is, read from Eventernote's own venue pages and kept for
     /// the life of the launch beside the dates it places.
     @State private var venues = VenueRegions()
+    /// What the last refresh said, wherever it was started from — see
+    /// ``RefreshNotices``.
+    @State private var notices = RefreshNotices()
     @State private var selection: AppTab = .events
     /// A backup the reader opened in Files and sent here. Received at the root
     /// rather than in Settings: the app can be opened from a file while any tab
@@ -39,19 +42,19 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $selection) {
             Tab("My Events", systemImage: "calendar", value: AppTab.events) {
-                EventsView()
+                EventsView().refreshNotices(underSheets: true)
             }
 
             Tab("Following", systemImage: "person.2", value: AppTab.following) {
-                FollowingView()
+                FollowingView().refreshNotices(underSheets: true)
             }
 
             Tab("Me", systemImage: "person.crop.circle", value: AppTab.me) {
-                MeView()
+                MeView().refreshNotices(underSheets: true)
             }
 
             Tab(value: AppTab.search, role: .search) {
-                SearchView()
+                SearchView().refreshNotices(underSheets: true)
             }
         }
         // Selecting the search tab opens the field straight away, rather than
@@ -75,6 +78,7 @@ struct RootView: View {
         .environment(store)
         .environment(followed)
         .environment(venues)
+        .environment(notices)
         .tint(.brandTint)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only
