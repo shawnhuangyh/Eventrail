@@ -291,8 +291,8 @@ extension EventernoteProfile {
             Text("^[\($0) event](inflect: true)")
         } ?? Text("Events")
         guard !favoritePerformers.isEmpty else { return events }
-        return events + Text(verbatim: " · ")
-            + Text("^[\(favoritePerformers.count) favorite performer](inflect: true)")
+        let performers = Text("^[\(favoritePerformers.count) favorite performer](inflect: true)")
+        return Text("\(events) · \(performers)")
     }
 }
 
