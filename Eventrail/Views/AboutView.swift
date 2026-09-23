@@ -16,9 +16,9 @@ struct AboutView: View {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         guard let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
               build != short else {
-            return Text(verbatim: "Version \(short)")
+            return Text("Version \(short)")
         }
-        return Text(verbatim: "Version \(short) (\(build))")
+        return Text("Version \(short) (\(build))")
     }
 
     var body: some View {

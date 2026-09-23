@@ -520,7 +520,7 @@ struct SettingsView: View {
             AboutView()
         } label: {
             rowLabel("info.circle", "About Eventrail", nil) {
-                Text(verbatim: "Version \(version)")
+                Text("Version \(version)")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.tertiary)
                 Image(systemName: "chevron.right")
