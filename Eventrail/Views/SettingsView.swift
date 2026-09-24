@@ -153,24 +153,24 @@ struct SettingsView: View {
         return Locale(identifier: code).localizedString(forIdentifier: code) ?? code
     }
 
-    /// System, Light or Dark, chosen from a menu on the row itself rather
-    /// than a screen of its own — three answers need no more room than that.
-    /// The whole row opens it, and the answer sits where Language's does, drawn
-    /// by the same ``SettingRowValue``.
+    /// System, Light or Dark, chosen on the row itself rather than on a
+    /// screen of its own — three answers need no more room than that.
+    ///
+    /// A segmented control rather than a menu: on iOS 26 a menu opened from
+    /// a row grows out of the glass card holding it, and the whole General
+    /// card vanished for as long as the menu was open.
     private var appearanceRow: some View {
-        Menu {
+        SettingRowLabel("circle.lefthalf.filled", "Appearance") {
             Picker("Appearance", selection: $appearance) {
                 ForEach(Appearance.allCases) { option in
                     Text(option.label).tag(option)
                 }
             }
-        } label: {
-            SettingRowLabel("circle.lefthalf.filled", "Appearance") {
-                SettingRowValue(Text(appearance.label), accessory: "chevron.up.chevron.down")
-            }
-            .settingRowPadding()
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
         }
-        .buttonStyle(.plain)
+        .settingRowPadding()
         // Here rather than in `MyApp`, where it would belong: an `onChange`
         // on the app's own `@AppStorage` fired for the first change and not
         // for the ones after it, and the window kept whichever came first.
