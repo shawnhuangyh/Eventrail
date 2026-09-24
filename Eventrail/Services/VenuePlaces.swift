@@ -454,7 +454,7 @@ final class VenuePlaces {
             // to its building here, the first time somebody opens it.
             let answer = await narrowed(known, for: venue)
             if answer.triedBuilding != known.triedBuilding {
-                remember(answer, for: venue.key)
+                settle(answer, for: venue.key)
             }
             if answer.latitude != known.latitude || answer.longitude != known.longitude {
                 placed.continuation.yield()
@@ -467,8 +467,8 @@ final class VenuePlaces {
             // The one caller that may upgrade a block to a building: somebody
             // is looking at this hall, and it is one hall. See ``VenueBuildings``.
             let answer = await narrowed(
-                Self.carrying(Answer(found?.item, from: found?.source), from: known), for: venue)
-            remember(answer, for: venue.key)
+                Self.carrying(Answer(found?.item, from: found?.source), from: cache[venue.key]), for: venue)
+            settle(answer, for: venue.key)
             // A hall that has just arrived somewhere it was not before. The
             // calendar entry written while it was nowhere is now wrong, and
             // this is what sends anything holding one back to correct it.
@@ -546,6 +546,18 @@ final class VenuePlaces {
         var fresh = fresh
         if known.triedBuilding == true { fresh.triedBuilding = true }
         return fresh
+    }
+
+    /// Writes down `answer` unless it would take a building back to a block.
+    ///
+    /// A sheet and a refresh can both be working on one hall, and asking
+    /// OpenStreetMap takes seconds: whichever writes second would otherwise
+    /// write over the first, and a request that failed on one side would put
+    /// the block back over the building the other side just found. So the
+    /// answer is held against what is written down *now*, by the same rule
+    /// ``carrying(_:from:)`` applies before asking.
+    private func settle(_ answer: Answer, for key: String) {
+        remember(Self.carrying(answer, from: cache[key]), for: key)
     }
 
     /// Asks Maps again about every hall in `events`, whatever is already
@@ -644,7 +656,6 @@ final class VenuePlaces {
         var found = 0
         var failures = 0
         var narrowing = narrowing
-        let cache = cache
         for (index, venue) in venues.enumerated() {
             if index > 0 {
                 try? await Task.sleep(for: Self.pace)
@@ -655,6 +666,8 @@ final class VenuePlaces {
             do {
                 let placed = try await search(venue)
                 Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(placed), privacy: .public)")
+                // Read now rather than when the run began: it takes minutes,
+                // and a sheet opened meanwhile may have narrowed this hall.
                 var answer = Self.carrying(Answer(placed?.item, from: placed?.source), from: cache[venue.key])
                 if narrowing {
                     do {
@@ -666,7 +679,7 @@ final class VenuePlaces {
                         Self.log.error("venue \(venue.key, privacy: .public) → building search failed, narrowing stopped: \(error, privacy: .public)")
                     }
                 }
-                remember(answer, for: venue.key)
+                settle(answer, for: venue.key)
                 if placed != nil { found += 1 }
                 failures = 0
             } catch {
