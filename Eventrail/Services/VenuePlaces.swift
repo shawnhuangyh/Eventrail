@@ -566,9 +566,22 @@ final class VenuePlaces {
     /// A hall the site published no address for is skipped rather than asked
     /// about: nothing here places a hall by name alone, so the answer would be
     /// "no such place" and it would not be true.
-    func refresh(_ events: [Event], onProgress: (Refresh) -> Void) async -> Refresh {
-        let venues = questions(in: events) { _ in true }
-        Self.log.info("refreshing \(venues.count, privacy: .public) venues")
+    ///
+    /// With `includingMaps` false, a hall Maps itself placed is left alone:
+    /// that answer is the building, checked against the published address,
+    /// and asking again is minutes of searches for the same pin. What is
+    /// left is the halls worth another try — a block, a building from
+    /// OpenStreetMap, nothing at all — which is what a reader in mainland
+    /// China refreshing for the sake of the switch above wants.
+    func refresh(_ events: [Event], includingMaps: Bool, onProgress: (Refresh) -> Void) async -> Refresh {
+        let cache = cache
+        let venues = questions(in: events) { venue in
+            guard !includingMaps, let answer = cache[venue.key],
+                  !Self.isWorthAskingAgain(answer), !answer.needsZone
+            else { return true }
+            return answer.source != Source.maps.rawValue
+        }
+        Self.log.info("refreshing \(venues.count, privacy: .public) venues\(includingMaps ? "" : " not placed by maps", privacy: .public)")
         return await ask(venues, narrowing: true, onProgress: onProgress)
     }
 

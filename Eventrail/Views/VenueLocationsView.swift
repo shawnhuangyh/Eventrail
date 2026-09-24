@@ -18,6 +18,10 @@ import SwiftUI
 struct VenueLocationsView: View {
     @Environment(EventStore.self) private var store
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
+    /// Whether a refresh asks about the halls Apple Maps already placed as
+    /// well. Per device and off by default: those answers are the building
+    /// already, and asking again is most of a refresh's minutes.
+    @AppStorage("venueRefreshIncludesMaps") private var refreshIncludesMaps = false
 
     var body: some View {
         @Bindable var store = store
@@ -38,6 +42,14 @@ struct VenueLocationsView: View {
                         SettingRowLabel("scope", "Refine with OpenStreetMap")
                     }
                     .settingRowPadding()
+
+                    SettingRowDivider()
+
+                    Toggle(isOn: $refreshIncludesMaps) {
+                        SettingRowLabel("map", "Include Apple Maps Venues")
+                    }
+                    .settingRowPadding()
+                    .disabled(store.isRefreshingVenues)
 
                     SettingRowDivider()
 
@@ -107,7 +119,7 @@ struct VenueLocationsView: View {
         Button {
             Task {
                 guard !store.isRefreshingVenues else { return }
-                await store.refreshVenues()
+                await store.refreshVenues(includingMaps: refreshIncludesMaps)
                 if let notice = RefreshNotice.venues(store.venueStatus) {
                     notices?.report(notice, byHand: true)
                 }

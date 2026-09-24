@@ -445,6 +445,28 @@
         }
       }
     },
+    "Include Apple Maps Venues" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple マップの会場も更新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时刷新 Apple 地图定位的场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同時重新整理 Apple 地圖定位的場館"
+          }
+        }
+      }
+    },
     "Used when Maps finds nothing. Places the block." : {
       "localizations" : {
         "ja" : {

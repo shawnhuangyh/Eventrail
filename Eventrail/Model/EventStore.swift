@@ -1289,12 +1289,15 @@ final class EventStore {
     /// seconds. The mirror afterwards is the point as much as the lookup is:
     /// entries written while a hall was still unplaced carry its name and no
     /// map, and nothing else goes back to correct them.
-    func refreshVenues() async {
+    ///
+    /// `includingMaps` is the switch beside the button: off, the halls Maps
+    /// already placed are left as they are — see ``VenuePlaces/refresh(_:includingMaps:onProgress:)``.
+    func refreshVenues(includingMaps: Bool) async {
         guard let venues, !isRefreshingVenues else { return }
         // Nothing counted yet: how many halls there are is the refresh's own
         // answer, once it has sorted the events into the halls they share.
         venueStatus = .asking(done: 0, of: 0)
-        venueStatus = await venues.refresh(placeableEvents) { progress in
+        venueStatus = await venues.refresh(placeableEvents, includingMaps: includingMaps) { progress in
             self.venueStatus = progress
         }
         if retimeEvents() { persist() }
