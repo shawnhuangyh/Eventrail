@@ -46,7 +46,7 @@ struct VenueLocationsView: View {
                     SettingRowDivider()
 
                     Toggle(isOn: $refreshIncludesMaps) {
-                        SettingRowLabel("map", "Include Apple Maps Venues")
+                        SettingRowLabel("map", "Refresh All Venues")
                     }
                     .settingRowPadding()
                     .disabled(store.isRefreshingVenues)
@@ -110,6 +110,11 @@ struct VenueLocationsView: View {
             PlacingStep(
                 "exclamationmark.triangle", "In Mainland China",
                 detail: "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block; turn on Refine with OpenStreetMap to narrow that to the building."
+            )
+            SettingRowDivider()
+            PlacingStep(
+                "airplane", "After Leaving Mainland China",
+                detail: "Halls placed while you were there keep the block or building they were given. Refresh Venue Locations once you are elsewhere, and Apple Maps is asked for them again."
             )
         }
         .glassPanel()
@@ -190,6 +195,7 @@ private struct PlacingStep: View {
         .padding(.vertical, 12)
     }
 }
+
 
 #Preview {
     NavigationStack {

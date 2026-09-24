@@ -423,6 +423,28 @@
         }
       }
     },
+    "After Leaving Mainland China" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国本土を離れた後"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离开中国大陆后"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離開中國大陸後"
+          }
+        }
+      }
+    },
     "Apple Maps is asked first and places nearly every hall. Nothing on this screen needs changing." : {
       "localizations" : {
         "ja" : {
@@ -445,24 +467,46 @@
         }
       }
     },
-    "Include Apple Maps Venues" : {
+    "Halls placed while you were there keep the block or building they were given. Refresh Venue Locations once you are elsewhere, and Apple Maps is asked for them again." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple マップの会場も更新"
+            "value" : "中国本土にいた間に決まった会場は、そのときの街区や建物の位置のままです。本土を出てから「会場の位置を更新」を行うと、Apple マップで改めて検索します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同时刷新 Apple 地图定位的场馆"
+            "value" : "在中国大陆期间定位的场馆，会保持当时得到的街区或建筑位置。离开大陆后点击「刷新场馆位置」，就会重新用 Apple 地图查询，得到准确定位。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同時重新整理 Apple 地圖定位的場館"
+            "value" : "在中國大陸期間定位的場館，會保持當時得到的街區或建築位置。離開大陸後點擊「重新整理場館位置」，就會重新用 Apple 地圖查詢，得到準確定位。"
+          }
+        }
+      }
+    },
+    "Refresh All Venues" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての会場を更新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新所有场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新整理所有場館"
           }
         }
       }
