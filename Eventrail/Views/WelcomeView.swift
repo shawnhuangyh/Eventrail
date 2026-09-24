@@ -179,79 +179,61 @@ struct WelcomeView: View {
     private var records: some View {
         VStack(alignment: .leading, spacing: 18) {
             ScreenHeading(title: "Pick up where you left off",
-                          detail: "If you have used Eventrail before, this is how what you kept gets here — from your other devices, or from a file you saved.")
+                          detail: "Used Eventrail before? Bring what you kept here — now, or later in Settings.")
 
-            Toggle(isOn: $wantsCloud) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("iCloud Sync")
-                        .font(.system(size: 14, weight: .semibold))
-                    cloudDetail
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(cloudNeedsAttention ? Color.favorite : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            featurePanel {
+                feature("icloud", "From your other devices",
+                        "Turn on iCloud Sync and your events, notes and tracking arrive privately through your own iCloud.")
+                feature("doc", "From a backup file",
+                        "Restore an .eventrail file you exported before.")
+                feature("plus.circle", "Nothing is overwritten",
+                        "A restore only ever adds. Everything already on this device stays as it is.")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 15)
-            // A switch that cannot do anything is worse than no switch: this
-            // build has no iCloud capability, and the line underneath says so.
-            .disabled(store.syncStatus == .notConfigured)
-            .glassPanel()
 
-            Button {
-                isChoosingBackup = true
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Restore from Backup")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Read an .eventrail file you exported before, or a library.json lifted off an old device")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+            // One card, drawn as Settings draws its Sync & Backup card, since
+            // these are the same two rows.
+            VStack(spacing: 0) {
+                Toggle(isOn: $wantsCloud) {
+                    SettingRowLabel("icloud", "iCloud Sync",
+                                    status: cloudStatus, needsAttention: true)
+                }
+                .settingRowPadding()
+                // A switch that cannot do anything is worse than no switch:
+                // this build has no iCloud capability, and the row says so.
+                .disabled(store.syncStatus == .notConfigured)
+
+                SettingRowDivider()
+
+                Button {
+                    isChoosingBackup = true
+                } label: {
+                    SettingRowLabel("square.and.arrow.down", "Restore from Backup") {
+                        SettingRowChevron()
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                    .settingRowPadding()
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 15)
-                .contentShape(.rect)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .glassPanel(interactive: true)
-
-            Text("A restore only ever adds: it puts back what the file holds and this device does not, and erases nothing you already have. Read it now or later — Settings keeps the same two rows.")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 8)
         }
     }
 
-    /// The same promise Settings makes, and the same refusal to make it when
-    /// iCloud cannot keep it: a build without the capability, or a device
-    /// signed out, says so rather than showing a switch that does nothing.
-    private var cloudDetail: Text {
+    /// Said only when iCloud cannot keep the promise — a build without the
+    /// capability, or a device signed out — in the words Settings uses, rather
+    /// than showing a switch that does nothing. What sync does is the
+    /// panel's to say.
+    private var cloudStatus: Text? {
         switch store.syncStatus {
         case .notConfigured:
-            Text("This build cannot use iCloud yet — it needs the iCloud capability enabled for the app")
+            Text("iCloud is not available in this build")
         case .signedOut:
-            Text("Sign in to iCloud in Settings to sync this library")
+            Text("Sign in to iCloud to sync")
+        case .accountChanged:
+            Text("iCloud account changed — turn on again to sync")
         case .failed(let reason):
             Text(verbatim: reason)
         default:
-            wantsCloud
-                ? Text("Your events, notes and tracking travel privately between your devices")
-                : Text("This device only — nothing leaves it")
-        }
-    }
-
-    private var cloudNeedsAttention: Bool {
-        switch store.syncStatus {
-        case .notConfigured, .signedOut, .accountChanged, .failed: true
-        default: false
+            nil
         }
     }
 
@@ -260,61 +242,57 @@ struct WelcomeView: View {
     private var calendar: some View {
         VStack(alignment: .leading, spacing: 18) {
             ScreenHeading(title: "Keep it in your calendar",
-                          detail: "Every event in your library can be mirrored into your own calendar, with doors and start time. Your call — and reversible in Settings.")
+                          detail: "Mirror your library into your own calendar. You can turn it off any time in Settings.")
 
-            VStack(spacing: 0) {
-                Toggle(isOn: $wantsCalendar) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Calendar Sync")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text(wantsCalendar
-                             ? "Events in your library are added to your calendar"
-                             : "Nothing is written to your calendar")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 15)
-
-                if wantsCalendar {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 10) {
-                        promise("Doors and start time, venue and floor, on the right day")
-                        promise("Edits and cancellations follow your library")
-                        promise("The events you have already been to are filled in too")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 13)
-                    .padding(.bottom, 15)
-                }
+            featurePanel {
+                feature("calendar.badge.clock", "Doors and start time",
+                        "Each event lands on the right day at its venue, with an alert when the doors open.")
+                feature("arrow.triangle.2.circlepath", "Always up to date",
+                        "Edits and cancellations follow your library, and the events you have been to are filled in too.")
+                feature("lock", "A calendar of its own",
+                        "Everything goes into a calendar named Eventrail. Nothing else in your calendar is touched.")
             }
-            .glassPanel()
 
-            Text("A calendar named Eventrail is created on this device. Nothing else in your calendar is touched.")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 8)
+            // Nothing here asks for calendar access on the way in. The
+            // system's permission sheet is the answer to the switch and to
+            // nothing else, so it is only reached once the reader has finished
+            // this screen.
+            Toggle(isOn: $wantsCalendar) {
+                SettingRowLabel("calendar", "Calendar Sync")
+            }
+            .settingRowPadding()
+            .glassPanel()
         }
-        // Nothing here asks for calendar access on the way in. The system's
-        // permission sheet is the answer to the switch and to nothing else,
-        // so it is only reached once the reader has finished this screen.
-        .animation(.snappy(duration: 0.24), value: wantsCalendar)
     }
 
-    private func promise(_ label: LocalizedStringKey) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 9) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.trackAttended)
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    /// What a step's switches buy, in the shape the system's own welcome
+    /// screens use — an icon, a name, one line each — on a panel of its own,
+    /// so the rows under it stay the same cards Settings carries.
+    private func featurePanel<Features: View>(@ViewBuilder _ features: () -> Features) -> some View {
+        VStack(alignment: .leading, spacing: 18, content: features)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .glassPanel()
+    }
+
+    private func feature(_ symbol: String, _ title: LocalizedStringKey,
+                         _ detail: LocalizedStringKey) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color.brandTint)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Shared furniture

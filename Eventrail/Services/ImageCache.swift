@@ -109,12 +109,6 @@ actor ImageCache {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
-    /// How many images are kept on this device — what Settings counts.
-    func count() -> Int {
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-        return files.filter { !$0.hasSuffix(".json") }.count
-    }
-
     private func join(_ url: URL, _ work: @escaping @Sendable () async -> UIImage?) async -> UIImage? {
         if let running = inFlight[url] { return await running.value }
         let task = Task { await work() }

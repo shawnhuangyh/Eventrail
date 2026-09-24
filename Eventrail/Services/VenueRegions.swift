@@ -102,10 +102,6 @@ final class VenueRegions {
     /// whether waiting would change anything.
     func pendingCount(_ events: [Event]) -> Int { pending(in: events).count }
 
-    /// How many halls this device has an answer written down for — what
-    /// Settings counts when it says what the cache has in it.
-    var placedCount: Int { answers.count }
-
     /// Takes the addresses a library already holds as answers about the halls
     /// in it.
     ///

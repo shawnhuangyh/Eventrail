@@ -7,6 +7,7 @@ import SwiftUI
 /// version number leaves with a back button rather than a second Done.
 struct AboutView: View {
     private static let repository = URL(string: "https://github.com/shawnhuangyh/Eventrail")!
+    private static let issues = URL(string: "https://github.com/shawnhuangyh/Eventrail/issues")!
 
     /// Read from the bundle rather than written down here, for the reason
     /// ``SettingsView`` gives: a released build cannot claim a version it is
@@ -65,27 +66,31 @@ struct AboutView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Where the source is
+    // MARK: - Where the source is, and where a problem goes
 
+    /// The repository and its issue tracker, one card because they are one
+    /// place. Both open outside the app like every other link — there is no
+    /// feedback service of our own.
     private var repositoryCard: some View {
-        Link(destination: Self.repository) {
+        VStack(spacing: 0) {
+            linkRow("chevron.left.forwardslash.chevron.right", "Source on GitHub",
+                    to: Self.repository)
+            SettingRowDivider()
+            linkRow("exclamationmark.bubble", "Report a Problem", to: Self.issues)
+        }
+        .glassPanel(interactive: true)
+    }
+
+    private func linkRow(_ symbol: String, _ title: LocalizedStringKey, to url: URL) -> some View {
+        Link(destination: url) {
             HStack(spacing: 12) {
-                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                Image(systemName: symbol)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 20)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Source on GitHub")
-                        .font(.system(size: 14, weight: .semibold))
-                    // The address itself, so the reader can see where the tap
-                    // goes before they take it.
-                    Text(verbatim: Self.repository.absoluteString.replacingOccurrences(of: "https://", with: ""))
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.tertiary)
@@ -95,13 +100,14 @@ struct AboutView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(interactive: true)
     }
 
     private var footnote: some View {
-        Footnote(Text("Eventrail is open source under the MIT licence. It is not affiliated with or endorsed by Eventernote; event details come from that site's publicly accessible pages and are never written back. Venues are placed by Apple Maps, and where Maps has no such place, by the address search of the Geospatial Information Authority of Japan (国土地理院) and, for the building at that address, by OpenStreetMap — © OpenStreetMap contributors, ODbL."))
-            .padding(.horizontal, 8)
-            .padding(.top, 6)
+        // One paragraph: whose the records are, where the facts come from, and
+        // the credits 国土地理院 and OpenStreetMap ask for as a condition of use.
+        Footnote(Text("Your notes, seats and costs stay on this device and, with iCloud Sync on, in your own iCloud — there is no Eventrail server. Event details are read from Eventernote's public pages and never written back; Eventrail is not affiliated with Eventernote. Venues are placed by Apple Maps, the address search of the Geospatial Information Authority of Japan (国土地理院) and OpenStreetMap — © OpenStreetMap contributors, ODbL."))
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
     }
 }
 

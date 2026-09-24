@@ -312,10 +312,6 @@ final class FollowedDates {
         dates[performer.id]?.count
     }
 
-    /// How many performers' listings this device is holding — what Settings
-    /// counts when it says what the cache has in it.
-    var performerCount: Int { dates.count }
-
     /// Every date published for the given performers, soonest first and each
     /// event once however many of them share the bill.
     func events(for performers: [PerformerProfile]) -> [Event] {

@@ -247,6 +247,7 @@
       }
     },
     "%@, %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -286,28 +287,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@、%@ 和 %@"
-          }
-        }
-      }
-    },
-    "%@, and wrote them to your calendar" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@、カレンダーにも書き込みました"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@，并已写入日历"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@，並已寫入日曆"
           }
         }
       }
@@ -352,6 +331,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld / %@"
+          }
+        }
+      }
+    },
+    "%lld of %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld/%lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %lld"
           }
         }
       }
@@ -422,28 +423,6 @@
         }
       }
     },
-    "%lld%% of the space iCloud allows for this library" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このライブラリに割り当てられたiCloud容量の%lld%%を使用中"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已使用 iCloud 为此资料库提供空间的 %lld%%"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已使用 iCloud 為此資料庫提供空間的 %lld%%"
-          }
-        }
-      }
-    },
     "^[%lld date](inflect: true) here" : {
       "localizations" : {
         "ja" : {
@@ -462,28 +441,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在此有 %lld 個日期"
-          }
-        }
-      }
-    },
-    "^[%lld event page](inflect: true)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld件のイベントページ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个活动页面"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 個活動頁面"
           }
         }
       }
@@ -642,72 +599,6 @@
         }
       }
     },
-    "^[%lld followed listing](inflect: true)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "フォロー中の掲載ページ%lld件"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个关注列表"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 個關注列表"
-          }
-        }
-      }
-    },
-    "^[%lld image](inflect: true)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画像%lld枚"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 张图片"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 張圖片"
-          }
-        }
-      }
-    },
-    "^[%lld performer or venue page](inflect: true)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "出演者または会場ページ%lld件"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个艺人或场馆页面"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 個藝人或場館頁面"
-          }
-        }
-      }
-    },
     "^[%lld performer](inflect: true)" : {
       "localizations" : {
         "ja" : {
@@ -858,28 +749,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 場即將到來的活動"
-          }
-        }
-      }
-    },
-    "^[%lld venue area](inflect: true)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "会場地域%lld件"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 个场馆地区"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld 個場館地區"
           }
         }
       }
@@ -1038,24 +907,24 @@
         }
       }
     },
-    "A calendar named Eventrail is created on this device. Nothing else in your calendar is touched." : {
+    "A calendar of its own" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このデバイスに「Eventrail」というカレンダーを作成します。ほかのカレンダーには一切触れません。"
+            "value" : "専用のカレンダー"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将在此设备上创建名为 Eventrail 的日历。不会改动你日历中的其他内容。"
+            "value" : "专用日历"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "將在此裝置上創建名為 Eventrail 的日曆。不會改動你日曆中的其他內容。"
+            "value" : "專用日曆"
           }
         }
       }
@@ -1082,24 +951,24 @@
         }
       }
     },
-    "A restore only ever adds: it puts back what the file holds and this device does not, and erases nothing you already have. Read it now or later — Settings keeps the same two rows." : {
+    "A restore only ever adds. Everything already on this device stays as it is." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "復元は追加だけを行います。ファイルにあり、このデバイスにない内容を戻し、既存の内容は消去しません。今すぐでも後からでも読み込めます。「設定」にも同じ項目があります。"
+            "value" : "復元は追加するだけです。このデバイスにある内容はそのまま残ります。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "恢复只会添加内容：将文件中有而此设备上没有的内容放回来，不会清除任何现有内容。你可以现在或以后读取——“设置”中也有相同的两个选项。"
+            "value" : "恢复只会添加内容，此设备上已有的一切都会保持不变。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "恢復只會新增內容：將檔案中有而此裝置上沒有的內容放回來，不會清除任何現有內容。你可以現在或以後讀取——“設定”中也有相同的兩個選項。"
+            "value" : "恢復只會新增內容，此裝置上已有的一切都會保持不變。"
           }
         }
       }
@@ -1236,6 +1105,28 @@
         }
       }
     },
+    "Advanced" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高级"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "進階"
+          }
+        }
+      }
+    },
     "All" : {
       "localizations" : {
         "ja" : {
@@ -1280,24 +1171,46 @@
         }
       }
     },
-    "Allow calendar access in Settings to add your events" : {
+    "Always up to date" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "イベントを追加するには「設定」でカレンダーへのアクセスを許可してください"
+            "value" : "常に最新"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在“设置”中允许访问日历，以添加你的活动"
+            "value" : "始终保持最新"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請在“設定”中允許存取日曆，以新增你的活動"
+            "value" : "始終保持最新"
+          }
+        }
+      }
+    },
+    "Appearance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外観"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外观"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外觀"
           }
         }
       }
@@ -1346,50 +1259,6 @@
         }
       }
     },
-    "Asking Maps — %lld of %lld venues" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マップで検索中 — %lld/%lld会場"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在查询地图——%lld / %lld 个场馆"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在查詢地圖——%lld / %lld 個場館"
-          }
-        }
-      }
-    },
-    "Asking Maps about your venues…" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マップで会場を検索中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在通过地图查询场馆…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在透過地圖查詢場館…"
-          }
-        }
-      }
-    },
     "Attended" : {
       "localizations" : {
         "ja" : {
@@ -1408,6 +1277,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已參加"
+          }
+        }
+      }
+    },
+    "Automatic" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動"
           }
         }
       }
@@ -1478,6 +1369,28 @@
         }
       }
     },
+    "Backup" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バックアップ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備份"
+          }
+        }
+      }
+    },
     "Backup Restored" : {
       "localizations" : {
         "ja" : {
@@ -1500,24 +1413,24 @@
         }
       }
     },
-    "Calendar" : {
+    "Calendar access is off in Settings" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "カレンダー"
+            "value" : "「設定」でカレンダーへのアクセスがオフになっています"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日历"
+            "value" : "已在“设置”中关闭日历访问权限"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日曆"
+            "value" : "已在「設定」中關閉日曆存取權限"
           }
         }
       }
@@ -1874,24 +1787,46 @@
         }
       }
     },
-    "Data" : {
+    "Danger Zone" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "データ"
+            "value" : "危険な操作"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "数据"
+            "value" : "危险操作"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "資料"
+            "value" : "危險操作"
+          }
+        }
+      }
+    },
+    "Dark" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダーク"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
           }
         }
       }
@@ -2160,24 +2095,24 @@
         }
       }
     },
-    "Doors and start time, venue and floor, on the right day" : {
+    "Doors and start time" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正しい日付に開場・開演時刻、会場、フロアを表示"
+            "value" : "開場・開演時間"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在正确的日期显示入场和开演时间、场馆及楼层"
+            "value" : "开场与开演时间"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在正確的日期顯示入場和開演時間、場館及樓層"
+            "value" : "開場與開演時間"
           }
         }
       }
@@ -2204,46 +2139,46 @@
         }
       }
     },
-    "Edits and cancellations follow your library" : {
+    "Each event lands on the right day at its venue, with an alert when the doors open." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "変更や中止もライブラリに反映"
+            "value" : "各イベントが正しい日付と会場で登録され、開場時刻に通知が届きます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "编辑和取消会随资料库同步"
+            "value" : "每个活动都会以正确的日期和场馆写入日历，并在开场时提醒你。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "編輯和取消會隨資料庫同步"
+            "value" : "每個活動都會以正確的日期和場館寫入日曆，並在開場時提醒你。"
           }
         }
       }
     },
-    "Empties this device and your other devices" : {
+    "Edits and cancellations follow your library, and the events you have been to are filled in too." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このデバイスとほかのデバイスを空にします"
+            "value" : "変更や取り消しはライブラリに合わせて反映され、参加済みのイベントも追加されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "清空此设备及你的其他设备"
+            "value" : "修改和取消会跟随你的资料库，已参加过的活动也会一并补上。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "清空此裝置及你的其他裝置"
+            "value" : "修改和取消會跟隨你的資料庫，已參加過的活動也會一併補上。"
           }
         }
       }
@@ -2666,28 +2601,6 @@
         }
       }
     },
-    "Eventrail is open source under the MIT licence. It is not affiliated with or endorsed by Eventernote; event details come from that site's publicly accessible pages and are never written back. Venues are placed by Apple Maps, and where Maps has no such place, by the address search of the Geospatial Information Authority of Japan (国土地理院) and, for the building at that address, by OpenStreetMap — © OpenStreetMap contributors, ODbL." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "EventrailはMITライセンスのオープンソースソフトウェアです。Eventernoteとの提携関係はなく、同サービスによる承認も受けていません。イベント情報は公開ページから取得し、書き戻すことはありません。会場の位置はAppleマップで特定し、見つからない場合は国土地理院の住所検索とOpenStreetMapを利用します — © OpenStreetMap contributors, ODbL。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventrail 是采用 MIT 许可证的开源软件，与 Eventernote 无关联且未获其认可；活动详情来自该网站公开可访问的页面，绝不会写回。场馆位置由 Apple 地图确定；当地图中没有相应地点时，则使用日本国土地理院（国土地理院）的地址搜索，并通过 OpenStreetMap 确定该地址的建筑——© OpenStreetMap 贡献者，ODbL。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventrail 是採用 MIT 許可證的開源軟體，與 Eventernote 無關聯且未獲其認可；活動詳情來自該網站公開可存取的頁面，絕不會寫回。場館位置由 Apple 地圖確定；當地圖中沒有相應地點時，則使用日本國土地理院（國土地理院）的地址搜尋，並透過 OpenStreetMap 確定該地址的建築——© OpenStreetMap 貢獻者，ODbL。"
-          }
-        }
-      }
-    },
     "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
       "localizations" : {
         "ja" : {
@@ -2750,28 +2663,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "參加過的活動"
-          }
-        }
-      }
-    },
-    "Events in your library are added to your calendar" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライブラリのイベントをカレンダーに追加"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "资料库中的活动会添加到日历"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "資料庫中的活動會新增到日曆"
           }
         }
       }
@@ -2842,72 +2733,6 @@
         }
       }
     },
-    "Events, notes and tracking synced %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イベント、メモ、記録を%@に同期しました"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "活动、备注和跟踪记录已同步于 %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "活動、備註和跟蹤記錄已同步於 %@"
-          }
-        }
-      }
-    },
-    "Every event in your library can be mirrored into your own calendar, with doors and start time. Your call — and reversible in Settings." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライブラリの各イベントを、開場・開演時刻とともに自分のカレンダーへ反映できます。使用するかは自由で、「設定」からいつでも元に戻せます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "资料库中的每场活动都可以同步到你的日历，并包含入场和开演时间。是否启用由你决定，也可随时在“设置”中撤销。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "資料庫中的每場活動都可以同步到你的日曆，並包含入場和開演時間。是否啟用由你決定，也可隨時在“設定”中撤銷。"
-          }
-        }
-      }
-    },
-    "Every event in your library is added to your calendar, past and upcoming" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "過去と今後を含む、ライブラリのすべてのイベントをカレンダーに追加します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "资料库中的所有活动都会添加到日历，包括过去和即将到来的活动"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "資料庫中的所有活動都會新增到日曆，包括過去和即將到來的活動"
-          }
-        }
-      }
-    },
     "Everything already imported stays in your library, whichever account you name. Only where Eventrail reads next changes." : {
       "localizations" : {
         "ja" : {
@@ -2926,6 +2751,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無論你指定哪個帳號，已匯入的內容都會保留在資料庫中。改變的只是 Eventrail 下次讀取的來源。"
+          }
+        }
+      }
+    },
+    "Everything goes into a calendar named Eventrail. Nothing else in your calendar is touched." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて「Eventrail」という名前のカレンダーに入ります。カレンダーのほかの内容には触れません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有内容都会写入名为“Eventrail”的日历，日历中的其他内容不会被改动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有內容都會寫入名為「Eventrail」的日曆，日曆中的其他內容不會被改動。"
           }
         }
       }
@@ -3194,6 +3041,72 @@
         }
       }
     },
+    "From a backup file" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バックアップファイルから"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自备份文件"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自備份檔案"
+          }
+        }
+      }
+    },
+    "From your other devices" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかのデバイスから"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自其他设备"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自其他裝置"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        }
+      }
+    },
     "Get Started" : {
       "localizations" : {
         "ja" : {
@@ -3260,24 +3173,90 @@
         }
       }
     },
-    "Holding %@. Each is read again by itself once it is more than six hours old." : {
+    "iCloud account changed — turn on again to sync" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@を保持しています。6時間以上経過したものは、必要になった時点で個別に読み直します。"
+            "value" : "iCloudアカウントが変わりました。同期するにはもう一度オンにしてください"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前保存了 %@。每项内容超过六小时后，会在需要时单独重新读取。"
+            "value" : "iCloud 账号已更改——重新开启以同步"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "當前儲存了 %@。每項內容超過六小時後，會在需要時單獨重新讀取。"
+            "value" : "iCloud 帳號已更改——重新開啟以同步"
+          }
+        }
+      }
+    },
+    "iCloud is not available in this build" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このビルドではiCloudを利用できません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本无法使用 iCloud"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本無法使用 iCloud"
+          }
+        }
+      }
+    },
+    "iCloud refused the library — will retry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudがライブラリを受け付けませんでした。後でもう一度試します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 拒绝了资料库——稍后会重试"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 拒絕了資料庫——稍後會重試"
+          }
+        }
+      }
+    },
+    "iCloud storage used" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudの使用容量"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已用 iCloud 空间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已用 iCloud 空間"
           }
         }
       }
@@ -3300,50 +3279,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud 同步"
-          }
-        }
-      }
-    },
-    "iCloud would not take this library just now — it will be tried again" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloudにこのライブラリを保存できませんでした。後でもう一度試します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 暂时无法接收此资料库——稍后会再次尝试"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 暫時無法接收此資料庫——稍後會再次嘗試"
-          }
-        }
-      }
-    },
-    "If you have used Eventrail before, this is how what you kept gets here — from your other devices, or from a file you saved." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "以前にEventrailを使っていた場合は、ほかのデバイスまたは保存したファイルから内容を戻せます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "如果你以前使用过 Eventrail，可通过其他设备或保存的文件，将保留的内容带到这里。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "如果你以前使用過 Eventrail，可透過其他裝置或儲存的檔案，將保留的內容帶到這裡。"
           }
         }
       }
@@ -3568,24 +3503,46 @@
         }
       }
     },
-    "Library is too large to sync (%@)" : {
+    "Language" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ライブラリが大きすぎるため同期できません（%@）"
+            "value" : "言語"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "资料库过大，无法同步（%@）"
+            "value" : "语言"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "資料庫過大，無法同步（%@）"
+            "value" : "語言"
+          }
+        }
+      }
+    },
+    "Light" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淺色"
           }
         }
       }
@@ -3722,28 +3679,6 @@
         }
       }
     },
-    "Location" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "位置情報"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "位置"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "位置"
-          }
-        }
-      }
-    },
     "Longest Event" : {
       "localizations" : {
         "ja" : {
@@ -3806,50 +3741,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在 Eventernote 上尋找此場館…"
-          }
-        }
-      }
-    },
-    "Looks up every venue again, and writes the ones it finds into your calendar. This takes a while." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "すべての会場を検索し直し、見つかった会場をカレンダーに書き込みます。しばらく時間がかかります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新查询每个场馆，并将找到的场馆写入日历。这需要一些时间。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新查詢每個場館，並將找到的場館寫入日曆。這需要一些時間。"
-          }
-        }
-      }
-    },
-    "Looks up every venue again, so each event's map is the one Maps has now. This takes a while." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "すべての会場を検索し直し、各イベントの地図を現在のマップ情報に更新します。しばらく時間がかかります。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新查询每个场馆，使每场活动的地图与当前地图数据一致。这需要一些时间。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新查詢每個場館，使每場活動的地圖與當前地圖資料一致。這需要一些時間。"
           }
         }
       }
@@ -3960,6 +3851,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我的"
+          }
+        }
+      }
+    },
+    "Mirror your library into your own calendar. You can turn it off any time in Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリを自分のカレンダーに反映します。「設定」でいつでもオフにできます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将资料库同步到你自己的日历。你随时可以在“设置”中关闭。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將資料庫同步到你自己的日曆。你隨時可以在「設定」中關閉。"
           }
         }
       }
@@ -4514,46 +4427,24 @@
         }
       }
     },
-    "Nothing is kept — pages are read from Eventernote as they are needed" : {
+    "Nothing is overwritten" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "キャッシュはありません。必要に応じてEventernoteからページを読み取ります"
+            "value" : "上書きされません"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未保留缓存——需要时会从 Eventernote 读取页面"
+            "value" : "不会覆盖任何内容"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未保留快取——需要時會從 Eventernote 讀取頁面"
-          }
-        }
-      }
-    },
-    "Nothing is written to your calendar" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "カレンダーには何も書き込みません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不会向你的日历写入任何内容"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不會向你的日曆寫入任何內容"
+            "value" : "不會覆蓋任何內容"
           }
         }
       }
@@ -4664,28 +4555,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你收藏的活動中沒有尚未舉行的。"
-          }
-        }
-      }
-    },
-    "Off — nothing is written to your calendar, and nothing asks for access to it" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オフ — カレンダーへの書き込みも、アクセスの要求も行いません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已关闭——不会向日历写入任何内容，也不会请求访问权限"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已關閉——不會向日曆寫入任何內容，也不會請求存取權限"
           }
         }
       }
@@ -4840,6 +4709,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Eventernote 中打開藝人"
+          }
+        }
+      }
+    },
+    "Open Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定を開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開設定"
           }
         }
       }
@@ -5196,28 +5087,6 @@
         }
       }
     },
-    "Placed %lld of %lld venues on the map" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld/%lld会場を地図に配置"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在地图上定位 %lld / %lld 个场馆"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在地圖上定位 %lld / %lld 個場館"
-          }
-        }
-      }
-    },
     "Planning" : {
       "localizations" : {
         "ja" : {
@@ -5328,28 +5197,6 @@
         }
       }
     },
-    "Puts back what a backup holds and this device no longer does. Nothing here is erased." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "バックアップにあり、このデバイスにはない内容を戻します。現在の内容は消去されません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "恢复备份中有而此设备上已没有的内容。不会清除这里的任何内容。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "恢復備份中有而此裝置上已沒有的內容。不會清除這裡的任何內容。"
-          }
-        }
-      }
-    },
     "Re-importing — %lld of ^[%lld event](inflect: true)" : {
       "localizations" : {
         "ja" : {
@@ -5368,28 +5215,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在重新匯入——%lld / %lld 場活動"
-          }
-        }
-      }
-    },
-    "Read an .eventrail file you exported before, or a library.json lifted off an old device" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "以前に書き出した.eventrailファイル、または古いデバイスから取り出したlibrary.jsonを読み込みます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "读取之前导出的 .eventrail 文件，或从旧设备取出的 library.json"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "讀取之前匯出的 .eventrail 檔案，或從舊裝置取出的 library.json"
           }
         }
       }
@@ -5768,6 +5593,28 @@
         }
       }
     },
+    "Report a Problem" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題を報告"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回報問題"
+          }
+        }
+      }
+    },
     "Restore" : {
       "localizations" : {
         "ja" : {
@@ -5786,6 +5633,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢復"
+          }
+        }
+      }
+    },
+    "Restore an .eventrail file you exported before." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前書き出した.eventrailファイルを復元できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复你之前导出的 .eventrail 文件。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢復你之前匯出的 .eventrail 檔案。"
           }
         }
       }
@@ -5874,28 +5743,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "排和座位號"
-          }
-        }
-      }
-    },
-    "Save your events, notes and tracking as a file you keep" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イベント、メモ、記録を自分で保管するファイルに保存"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将活动、备注和跟踪记录保存为由你保管的文件"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "將活動、備註和跟蹤記錄儲存為由你保管的檔案"
           }
         }
       }
@@ -6318,24 +6165,24 @@
         }
       }
     },
-    "Sign in to iCloud in Settings to sync this library" : {
+    "Sign in to iCloud to sync" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このライブラリを同期するには「設定」でiCloudにサインインしてください"
+            "value" : "同期するにはiCloudにサインインしてください"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在“设置”中登录 iCloud 以同步此资料库"
+            "value" : "登录 iCloud 以同步"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請在“設定”中登入 iCloud 以同步此資料庫"
+            "value" : "登入 iCloud 以同步"
           }
         }
       }
@@ -6538,6 +6385,28 @@
         }
       }
     },
+    "Synced %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に同期"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已同步于 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已同步於 %@"
+          }
+        }
+      }
+    },
     "Tap the heart on any event to keep it here." : {
       "localizations" : {
         "ja" : {
@@ -6670,28 +6539,6 @@
         }
       }
     },
-    "The events you have already been to are filled in too" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "参加済みのイベントも追加されます"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你参加过的活动也会一并填入"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你參加過的活動也會一並填入"
-          }
-        }
-      }
-    },
     "Their dates stop appearing in Following, on this device and on your other devices. Anyone your Eventernote account still favorites comes back on the next refresh." : {
       "localizations" : {
         "ja" : {
@@ -6714,28 +6561,6 @@
         }
       }
     },
-    "This build cannot use iCloud yet — it needs the iCloud capability enabled for the app" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このビルドではまだiCloudを使用できません。アプリのiCloud機能を有効にする必要があります"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此版本暂时无法使用 iCloud——需要为应用启用 iCloud 功能"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此版本暫時無法使用 iCloud——需要為應用程式啟用 iCloud 功能"
-          }
-        }
-      }
-    },
     "This device has no calendar account to add Eventrail's calendar to" : {
       "localizations" : {
         "ja" : {
@@ -6754,50 +6579,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此裝置上沒有可新增 Eventrail 日曆的日曆帳號"
-          }
-        }
-      }
-    },
-    "This device only — nothing leaves it" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このデバイスだけに保存 — 外部には送信しません"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅保存在此设备——不会离开设备"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "僅儲存在此裝置——不會離開裝置"
-          }
-        }
-      }
-    },
-    "This device signed in to a different iCloud account — turn sync on again to use it" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このデバイスでは別のiCloudアカウントにサインインしています。使用するには同期をもう一度オンにしてください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此设备已登录其他 iCloud 账号——请重新开启同步以继续使用"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此裝置已登入其他 iCloud 帳號——請重新開啟同步以繼續使用"
           }
         }
       }
@@ -6978,6 +6759,28 @@
         }
       }
     },
+    "Turn on iCloud Sync and your events, notes and tracking arrive privately through your own iCloud." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud同期をオンにすると、イベント、メモ、記録が自分のiCloudを通じてプライベートに届きます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启 iCloud 同步后，你的活动、备注和跟踪记录会通过你自己的 iCloud 私密地同步过来。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟 iCloud 同步後，你的活動、備註和跟蹤記錄會透過你自己的 iCloud 私密地同步過來。"
+          }
+        }
+      }
+    },
     "Tōkai" : {
       "localizations" : {
         "ja" : {
@@ -7018,6 +6821,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "東京及周邊六縣"
+          }
+        }
+      }
+    },
+    "Too large to sync (%@)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大きすぎるため同期できません（%@）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "过大，无法同步（%@）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "過大，無法同步（%@）"
           }
         }
       }
@@ -7352,6 +7177,28 @@
         }
       }
     },
+    "Used Eventrail before? Bring what you kept here — now, or later in Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前Eventrailを使っていましたか？保存した内容をここに戻せます。今でも、後で「設定」からでも構いません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前用过 Eventrail？可以把保留的内容带到这里——现在或以后在“设置”中都行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前用過 Eventrail？可以把保留的內容帶到這裡——現在或以後在「設定」中都行。"
+          }
+        }
+      }
+    },
     "Venue details and events come from publicly accessible Eventernote pages. The map is drawn from the published address — nothing is written back." : {
       "localizations" : {
         "ja" : {
@@ -7370,6 +7217,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "場館詳情和活動來自公開可存取的 Eventernote 頁面。地圖根據已發布的地址繪製——不會寫回任何內容。"
+          }
+        }
+      }
+    },
+    "Venue Locations" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場の位置"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场馆位置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場館位置"
           }
         }
       }
@@ -7660,28 +7529,6 @@
         }
       }
     },
-    "What you write on an event — a note, a seat, what it cost — belongs to you. It stays on this device and, with iCloud Sync on, in your own private iCloud — there is no app-operated backend. A backup you export goes only where you send it. Event details come from publicly accessible Eventernote pages and are never written back. Eventrail is not affiliated with Eventernote." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イベントに入力したメモ、座席、料金は自分のものです。このデバイスに保存され、iCloud同期をオンにすると自分のプライベートiCloudにも保存されます。アプリ運営者のバックエンドはありません。書き出したバックアップは自分が送った場所にだけ保存されます。イベント情報は公開されているEventernoteページから取得し、書き戻すことはありません。EventrailはEventernoteと提携していません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你为活动填写的内容——备注、座位和票价——都属于你。它们会保留在此设备上；开启 iCloud 同步后，也会存入你自己的私有 iCloud——本应用没有运营方后端。导出的备份只会发送到你选择的位置。活动详情来自公开可访问的 Eventernote 页面，绝不会写回。Eventrail 与 Eventernote 无关联。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你為活動填寫的內容——備註、座位和票價——都屬於你。它們會保留在此裝置上；開啟 iCloud 同步後，也會存入你自己的私有 iCloud——本應用程式沒有運營方後端。匯出的備份只會發送到你選擇的位置。活動詳情來自公開可存取的 Eventernote 頁面，絕不會寫回。Eventrail 與 Eventernote 無關聯。"
-          }
-        }
-      }
-    },
     "When" : {
       "localizations" : {
         "ja" : {
@@ -7722,28 +7569,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "地點"
-          }
-        }
-      }
-    },
-    "Where Apple Maps has no such hall, ask OpenStreetMap which building at the published address it is." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appleマップで会場が見つからない場合、公開住所のどの建物かをOpenStreetMapで検索します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当 Apple 地图中没有相应场馆时，通过 OpenStreetMap 查询已发布地址对应的建筑。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "當 Apple 地圖中沒有相應場館時，透過 OpenStreetMap 查詢已發布地址對應的建築。"
           }
         }
       }
@@ -7858,46 +7683,24 @@
         }
       }
     },
-    "Your events, notes and tracking sync privately" : {
+    "Your notes, seats and costs stay on this device and, with iCloud Sync on, in your own iCloud — there is no Eventrail server. Event details are read from Eventernote's public pages and never written back; Eventrail is not affiliated with Eventernote. Venues are placed by Apple Maps, the address search of the Geospatial Information Authority of Japan (国土地理院) and OpenStreetMap — © OpenStreetMap contributors, ODbL." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "イベント、メモ、記録をプライベートに同期"
+            "value" : "メモ、座席、料金はこのデバイスに保存され、iCloud同期をオンにすると自分のiCloudにも保存されます。Eventrailのサーバーはありません。イベント情報はEventernoteの公開ページから取得し、書き戻すことはありません。EventrailはEventernoteと提携していません。会場の位置はAppleマップ、国土地理院の住所検索、OpenStreetMapで特定しています — © OpenStreetMap contributors, ODbL。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的活动、备注和跟踪记录会以私密方式同步"
+            "value" : "你的备注、座位和票价保存在此设备上；开启 iCloud 同步后，也会存入你自己的 iCloud——Eventrail 没有服务器。活动详情读取自 Eventernote 的公开页面，绝不会写回；Eventrail 与 Eventernote 无关联。场馆位置由 Apple 地图、日本国土地理院（国土地理院）的地址搜索和 OpenStreetMap 确定——© OpenStreetMap 贡献者，ODbL。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的活動、備註和跟蹤記錄會以私密方式同步"
-          }
-        }
-      }
-    },
-    "Your events, notes and tracking travel privately between your devices" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イベント、メモ、記録をデバイス間でプライベートに同期"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的活动、备注和跟踪记录会在设备间以私密方式同步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的活動、備註和跟蹤記錄會在裝置間以私密方式同步"
+            "value" : "你的備註、座位和票價儲存在此裝置上；開啟 iCloud 同步後，也會存入你自己的 iCloud——Eventrail 沒有伺服器。活動詳情讀取自 Eventernote 的公開頁面，絕不會寫回；Eventrail 與 Eventernote 無關聯。場館位置由 Apple 地圖、日本國土地理院（國土地理院）的地址搜尋和 OpenStreetMap 確定——© OpenStreetMap 貢獻者，ODbL。"
           }
         }
       }

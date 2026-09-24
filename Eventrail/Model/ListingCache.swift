@@ -52,9 +52,6 @@ final class ListingCache {
     /// once from a search and never again stops taking up room.
     private static let keep: TimeInterval = 30 * 24 * 60 * 60
 
-    /// How many pages are held — what Settings counts.
-    private(set) var count = 0
-
     @ObservationIgnored private let directory: URL
     /// When every page was last thrown away. A read runs out of reach of the
     /// screen that started it, so one still going in another tab lands after
@@ -64,7 +61,7 @@ final class ListingCache {
     private init() {
         directory = URL.cachesDirectory.appending(path: "Eventrail/Listings", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        count = Self.prune(directory)
+        Self.prune(directory)
     }
 
     // MARK: - Reading and writing
@@ -82,9 +79,7 @@ final class ListingCache {
     func store<Subject: Codable & Sendable>(_ entry: CachedListing<Subject>, for key: String) {
         guard entry.readAt >= clearedAt else { return }
         let url = url(for: key)
-        let isNew = !FileManager.default.fileExists(atPath: url.path)
-        guard (try? JSONEncoder().encode(entry).write(to: url, options: .atomic)) != nil else { return }
-        if isNew { count += 1 }
+        try? JSONEncoder().encode(entry).write(to: url, options: .atomic)
     }
 
     /// Writes down the pages the reader has scrolled on to since the last read,
@@ -103,7 +98,6 @@ final class ListingCache {
         clearedAt = .now
         try? FileManager.default.removeItem(at: directory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        count = 0
     }
 
     /// Named by a digest of the key rather than the key itself: a key carries a
@@ -114,22 +108,18 @@ final class ListingCache {
         return directory.appending(path: "\(digest).json")
     }
 
-    /// Drops the pages nobody has opened in ``keep``, and says how many are left.
-    private static func prune(_ directory: URL) -> Int {
+    /// Drops the pages nobody has opened in ``keep``.
+    private static func prune(_ directory: URL) {
         let files = (try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
         let settled = Date.now.addingTimeInterval(-keep)
-        var kept = 0
         for file in files {
             let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
                 .contentModificationDate ?? .distantPast
             if modified < settled {
                 try? FileManager.default.removeItem(at: file)
-            } else {
-                kept += 1
             }
         }
-        return kept
     }
 }
 

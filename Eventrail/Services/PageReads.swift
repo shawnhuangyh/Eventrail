@@ -58,10 +58,6 @@ final class PageReads {
 
     deinit { pendingSave?.cancel() }
 
-    /// How many pages this device is holding a read for — what Settings counts
-    /// when it says what the cache has in it.
-    var count: Int { reads.count }
-
     /// Whether this event's page was read recently enough to be left alone.
     func isFresh(_ id: Event.ID) -> Bool {
         guard let read = reads[id] else { return false }

@@ -1297,10 +1297,6 @@ final class EventStore {
 
     // MARK: - What this device has read
 
-    /// How many event pages this device is holding a read for — what Settings
-    /// counts when it says what is cached.
-    var readPageCount: Int { pageReads?.count ?? 0 }
-
     /// Forgets which pages this device has read, so every sheet opened next
     /// reads its page again.
     ///
