@@ -38,7 +38,7 @@ struct SettingsView: View {
     /// only answer, since what it empties is not the reader's to count.
     @State private var cacheCleared = false
     /// Per-device — see ``Appearance``.
-    @AppStorage(Appearance.storageKey) private var appearance = Appearance.automatic
+    @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
 
     /// Shown beside About, from the bundle rather than written down here, so a
     /// released build cannot claim a version it is not.
@@ -103,9 +103,6 @@ struct SettingsView: View {
                 WelcomeView()
             }
         }
-        // Set again on the sheet so a change made here shows at once, on the
-        // screen it was made on as well as on the window behind it.
-        .preferredColorScheme(appearance.colorScheme)
         // A sheet over the root, so it draws its own — the venue refresh on
         // the screen pushed from Advanced would otherwise report behind it.
         .refreshNotices()
@@ -156,7 +153,7 @@ struct SettingsView: View {
         return Locale(identifier: code).localizedString(forIdentifier: code) ?? code
     }
 
-    /// Automatic, Light or Dark, chosen from a menu on the row itself rather
+    /// System, Light or Dark, chosen from a menu on the row itself rather
     /// than a screen of its own — three answers need no more room than that.
     /// The whole row opens it, and the answer sits where Language's does, drawn
     /// by the same ``SettingRowValue``.
@@ -174,6 +171,10 @@ struct SettingsView: View {
             .settingRowPadding()
         }
         .buttonStyle(.plain)
+        // Here rather than in `MyApp`, where it would belong: an `onChange`
+        // on the app's own `@AppStorage` fired for the first change and not
+        // for the ones after it, and the window kept whichever came first.
+        .onChange(of: appearance) { appearance.apply() }
     }
 
     private func iCloudRow(store: Bindable<EventStore>) -> some View {

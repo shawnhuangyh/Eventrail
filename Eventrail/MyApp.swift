@@ -1,14 +1,14 @@
 import SwiftUI
 
 @main struct MyApp: App {
-    /// Set here rather than on each screen, so every sheet and cover the app
-    /// presents inherits it from the window.
-    @AppStorage(Appearance.storageKey) private var appearance = Appearance.automatic
+    /// Applied to the window at launch; Settings applies a change as it is
+    /// made — see ``Appearance/apply()``.
+    @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .preferredColorScheme(appearance.colorScheme)
+                .onAppear { appearance.apply() }
         }
     }
 }
