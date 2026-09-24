@@ -21,6 +21,12 @@ import UIKit
 /// the image. A screen refreshed by hand asks again about every flyer on it,
 /// however recently — see ``image(for:checkedSince:)``.
 ///
+/// **A copy that has gone stale is still drawn at once.** Asking is done
+/// behind it, and the picture changes only if the host sends different
+/// bytes — see ``storedImage(for:)``. Waiting on the host first left every
+/// flyer a placeholder for as long as the request took each time the window
+/// ran out, and for as long as the request took to fail when offline.
+///
 /// Not the Eventernote site: this host is where the site keeps its images,
 /// and is not the one that refuses an app that asks too fast. Everything here
 /// is still asked once per image, however many rows want it at once.
@@ -83,8 +89,24 @@ actor ImageCache {
         memory.object(forKey: url as NSURL)
     }
 
+    /// A copy this device already holds, from memory or from disk, without
+    /// asking the host anything — however long ago it was last asked.
+    ///
+    /// What a view draws first, so a stale flyer is on screen while
+    /// ``image(for:checkedSince:)`` asks about it rather than a placeholder.
+    func storedImage(for url: URL) -> UIImage? {
+        if let image = memory.object(forKey: url as NSURL) { return image }
+        let (file, _) = paths(for: url)
+        guard let stored = try? Data(contentsOf: file) else { return nil }
+        return remember(stored, for: url)
+    }
+
     /// The image at `url`: from memory, from this device, or downloaded — in
     /// that order, and each downloaded once however many ask.
+    ///
+    /// A copy the host vouches for again comes back as the very object
+    /// already held in memory, so a view can tell "unchanged" from "new" by
+    /// identity and leave the picture alone.
     ///
     /// `checkedSince` is when the screen around it was last refreshed by hand.
     /// A copy whose host was last asked before then is asked about again —
@@ -154,15 +176,19 @@ actor ImageCache {
             // whoever asked, and kept nowhere.
             guard epoch == self.epoch else { return UIImage(data: data) }
             let http = response as? HTTPURLResponse
-            if http?.statusCode == 304, let stored {
-                write(Validation(etag: validation?.etag, checked: .now), to: sidecar)
+            // Unchanged, whether the host says so or sends the same bytes
+            // again: the copy already drawn stays, rather than being decoded
+            // a second time and swapped for an identical picture.
+            if let stored, http?.statusCode == 304 || (http?.statusCode == 200 && data == stored) {
+                let etag = http?.statusCode == 200 ? http?.value(forHTTPHeaderField: "ETag") : validation?.etag
+                write(Validation(etag: etag ?? validation?.etag, checked: .now), to: sidecar)
                 validated[url] = .now
-                return remember(stored, for: url)
+                return memory.object(forKey: url as NSURL) ?? remember(stored, for: url)
             }
             guard http?.statusCode == 200, let image = remember(data, for: url) else {
                 // Anything else — a missing flyer, a host having a bad moment —
                 // leaves the copy already held, if there is one.
-                return stored.flatMap { remember($0, for: url) }
+                return memory.object(forKey: url as NSURL) ?? stored.flatMap { remember($0, for: url) }
             }
             try? data.write(to: file, options: .atomic)
             write(Validation(etag: http?.value(forHTTPHeaderField: "ETag"), checked: .now), to: sidecar)
@@ -171,7 +197,7 @@ actor ImageCache {
         } catch {
             // Offline: the copy held is the best there is.
             guard epoch == self.epoch else { return nil }
-            return stored.flatMap { remember($0, for: url) }
+            return memory.object(forKey: url as NSURL) ?? stored.flatMap { remember($0, for: url) }
         }
     }
 
