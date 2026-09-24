@@ -1275,6 +1275,12 @@ final class EventStore {
         placeableEvents.contains { !$0.venue.isEmpty || $0.publishedAddress != nil }
     }
 
+    /// How the halls the reader holds were placed, and how many are not yet —
+    /// what Venue Locations counts beside each of the three answers.
+    var venueBreakdown: VenuePlaces.Breakdown {
+        venues?.breakdown(for: placeableEvents) ?? .init()
+    }
+
     /// Asks Maps again about every hall the reader holds, and then writes what
     /// comes back into their calendar.
     ///

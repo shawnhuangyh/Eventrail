@@ -19,13 +19,13 @@ import Foundation
 /// name — the 至誠ホール thirteen kilometres from 大阪城ホール, the bus stop
 /// called ぴあアリーナMM — and is refused.
 ///
-/// **Only ever asked for a hall somebody is waiting on.** OpenStreetMap's
-/// geocoder is a donated service whose usage policy allows one request a
-/// second across all of an app's users and asks that apps not geocode in bulk.
-/// A refresh of a whole library is exactly what that forbids, so a refresh
-/// stops at the block and this is never reached from it. The reader opening
-/// that event later is what upgrades it, one hall at a time, and the answer is
-/// kept like every other.
+/// **Only ever asked because the reader asked.** OpenStreetMap's geocoder is
+/// a donated service whose usage policy allows one request a second across
+/// all of an app's users, discourages bulk geocoding, and tolerates a small
+/// one-off run made one request at a time with the results kept. So it is
+/// reached from a sheet the reader has open, and from the refresh they start
+/// in Settings — paced here, asked once per hall for good, and stopped at the
+/// first refusal — and never from an import, which nobody asked for.
 ///
 /// Crediting OpenStreetMap is a condition of use, and is done in ``AboutView``.
 nonisolated struct VenueBuildings: Sendable {

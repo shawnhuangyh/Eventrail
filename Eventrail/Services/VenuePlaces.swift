@@ -111,6 +111,10 @@ final class VenuePlaces {
         /// every answer written before there was a question, which is what
         /// sends a hall abroad back to Maps exactly once.
         var askedZone: Bool?
+        /// Whether OpenStreetMap has already been asked which building at
+        /// this block is the hall, and had none to offer. A block it turned
+        /// down stays a block rather than being asked about on every sheet.
+        var triedBuilding: Bool?
 
         var wasFound: Bool { latitude != nil && longitude != nil }
 
@@ -382,6 +386,39 @@ final class VenuePlaces {
         }
     }
 
+    /// How many of the halls behind `events` each answer placed, for the
+    /// screen that explains the three of them.
+    ///
+    /// Counted per hall rather than per event, since that is what is asked
+    /// about, and only over halls with a published address — a hall without
+    /// one is never asked about at all. Read from what is written down, like
+    /// ``mapItems(for:)``, so it asks nothing of anyone.
+    func breakdown(for events: [Event]) -> Breakdown {
+        let cache = cache
+        var breakdown = Breakdown()
+        for venue in questions(in: events, include: { _ in true }) {
+            guard let answer = cache[venue.key], !Self.isWorthAskingAgain(answer), answer.wasFound else {
+                breakdown.unplaced += 1
+                continue
+            }
+            switch answer.source.flatMap(Source.init(rawValue:)) ?? .register {
+            case .maps: breakdown.maps += 1
+            case .register: breakdown.register += 1
+            case .openStreetMap: breakdown.openStreetMap += 1
+            }
+        }
+        return breakdown
+    }
+
+    /// Halls by who placed them — see ``breakdown(for:)``.
+    struct Breakdown: Equatable {
+        var maps = 0
+        var register = 0
+        var openStreetMap = 0
+        /// Not asked yet, or asked and not found.
+        var unplaced = 0
+    }
+
     // MARK: - Asking
 
     /// Where one event is, for a screen showing it now — the first time the
@@ -410,17 +447,28 @@ final class VenuePlaces {
         // though it is placed perfectly well — see ``Answer/needsZone``. One
         // search settles it for good, and until it is settled every event held
         // there sits an hour or a day out in the reader's calendar.
-        if let answer = cache[venue.key], !Self.isWorthAskingAgain(answer), !answer.needsZone {
+        let known = cache[venue.key]
+        if let known, !Self.isWorthAskingAgain(known), !known.needsZone {
+            // Settled already — but a block settled by an import, which may
+            // not ask OpenStreetMap, or while the switch was off, is narrowed
+            // to its building here, the first time somebody opens it.
+            let answer = await narrowed(known, for: venue)
+            if answer.triedBuilding != known.triedBuilding {
+                remember(answer, for: venue.key)
+            }
+            if answer.latitude != known.latitude || answer.longitude != known.longitude {
+                placed.continuation.yield()
+            }
             return answer.placing
         }
-        let known = cache[venue.key]
         do {
+            let found = try await search(venue)
+            Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(found), privacy: .public)")
             // The one caller that may upgrade a block to a building: somebody
             // is looking at this hall, and it is one hall. See ``VenueBuildings``.
-            let found = try await search(venue, upgrading: usesOpenStreetMap)
-            let answer = Answer(found?.item, from: found?.source)
+            let answer = await narrowed(
+                Self.carrying(Answer(found?.item, from: found?.source), from: known), for: venue)
             remember(answer, for: venue.key)
-            Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(found), privacy: .public)")
             // A hall that has just arrived somewhere it was not before. The
             // calendar entry written while it was nowhere is now wrong, and
             // this is what sends anything holding one back to correct it.
@@ -428,12 +476,76 @@ final class VenuePlaces {
                answer.latitude != known?.latitude || answer.longitude != known?.longitude {
                 placed.continuation.yield()
             }
-            return Answer(found?.item, from: found?.source).placing
+            return answer.placing
         } catch {
             // Not written down, so the next screen to ask tries again.
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
             return nil
         }
+    }
+
+    /// `answer`, narrowed from the block the register placed to the building
+    /// OpenStreetMap says carries the hall's name — where the reader allows
+    /// that, and where it has not been asked about this hall already.
+    ///
+    /// Apart from the search rather than inside it, because a block is not
+    /// always settled by a sheet: an import places halls by the hundred and
+    /// never asks OpenStreetMap, so a block it wrote down is narrowed only
+    /// when the reader later opens an event there. Kept inside the search,
+    /// that never happened — the sheet found the block already written down
+    /// and took it as it was.
+    ///
+    /// A throw is OpenStreetMap failing or refusing, and the answer is then
+    /// left as it was and unmarked, so the next ask tries again; only a
+    /// building OpenStreetMap does not have is written down as tried.
+    private func narrow(_ answer: Answer, for venue: Venue) async throws -> Answer {
+        guard usesOpenStreetMap, answer.source == Source.register.rawValue,
+              answer.triedBuilding != true, !venue.plainName.isEmpty,
+              let latitude = answer.latitude, let longitude = answer.longitude
+        else { return answer }
+        var narrowed = answer
+        if let building = try await VenueBuildings.shared.building(
+            named: venue.plainName,
+            near: CLLocationCoordinate2D(latitude: latitude, longitude: longitude)) {
+            narrowed.latitude = building.coordinate.latitude
+            narrowed.longitude = building.coordinate.longitude
+            narrowed.source = Source.openStreetMap.rawValue
+            Self.log.info("venue \(venue.key, privacy: .public) → narrowed to its building by osm")
+        }
+        narrowed.triedBuilding = true
+        return narrowed
+    }
+
+    /// ``narrow(_:for:)`` for a sheet, where a failure is the hall staying a
+    /// block this once rather than anything to report.
+    private func narrowed(_ answer: Answer, for venue: Venue) async -> Answer {
+        do {
+            return try await narrow(answer, for: venue)
+        } catch {
+            Self.log.error("venue \(venue.key, privacy: .public) → building search failed: \(error, privacy: .public)")
+            return answer
+        }
+    }
+
+    /// A fresh block from the register, carrying over what OpenStreetMap
+    /// already said about it.
+    ///
+    /// The key is the hall's name and address, so a hall asked about again
+    /// stands at the same block, and OpenStreetMap's answer about that block
+    /// still holds: the building it found is kept rather than asked for
+    /// again, and a building it did not have is not asked for again either.
+    /// Without this, every refresh would ask about every building afresh.
+    private static func carrying(_ fresh: Answer, from known: Answer?) -> Answer {
+        guard fresh.source == Source.register.rawValue, let known, known.ruleset == ruleset
+        else { return fresh }
+        if known.source == Source.openStreetMap.rawValue {
+            var kept = known
+            kept.asked = fresh.asked
+            return kept
+        }
+        var fresh = fresh
+        if known.triedBuilding == true { fresh.triedBuilding = true }
+        return fresh
     }
 
     /// Asks Maps again about every hall in `events`, whatever is already
@@ -457,7 +569,7 @@ final class VenuePlaces {
     func refresh(_ events: [Event], onProgress: (Refresh) -> Void) async -> Refresh {
         let venues = questions(in: events) { _ in true }
         Self.log.info("refreshing \(venues.count, privacy: .public) venues")
-        return await ask(venues, onProgress: onProgress)
+        return await ask(venues, narrowing: true, onProgress: onProgress)
     }
 
     /// Asks Maps about the halls nothing has an answer for yet, and leaves
@@ -471,8 +583,9 @@ final class VenuePlaces {
     /// the same way and for the same reason, which is why it runs on its own
     /// behind the import rather than holding it open.
     ///
-    /// Like a refresh and unlike a sheet, it never upgrades a block to a
-    /// building: that is OpenStreetMap's one forbidden use, and it stands
+    /// Unlike a refresh and a sheet, it never upgrades a block to a
+    /// building: nobody asked for this run, and OpenStreetMap asks that apps
+    /// not geocode in bulk on their own account. The block stands
     /// until the reader opens the event. See ``VenueBuildings``.
     func placeUnplaced(_ events: [Event], onProgress: (Refresh) -> Void) async -> Refresh {
         let cache = cache
@@ -481,7 +594,7 @@ final class VenuePlaces {
             return Self.isWorthAskingAgain(answer) || answer.needsZone
         }
         Self.log.info("placing \(venues.count, privacy: .public) venues nothing had yet")
-        return await ask(venues, onProgress: onProgress)
+        return await ask(venues, narrowing: false, onProgress: onProgress)
     }
 
     /// One question per hall, in the order the halls are first met, keeping
@@ -502,7 +615,14 @@ final class VenuePlaces {
     }
 
     /// The paced run itself, shared by the two ways of starting one.
-    private func ask(_ venues: [Venue], onProgress: (Refresh) -> Void) async -> Refresh {
+    ///
+    /// `narrowing` is whether a block may be narrowed to its building as the
+    /// run goes — true for a refresh the reader asked for, false for an
+    /// import. OpenStreetMap's policy tolerates a small one-off run from one
+    /// device, one request at a time and cached; the pace is kept by
+    /// ``VenueBuildings``, each hall is asked about once for good (see
+    /// ``carrying(_:from:)``), and the first refusal ends its part of the run.
+    private func ask(_ venues: [Venue], narrowing: Bool, onProgress: (Refresh) -> Void) async -> Refresh {
         guard !venues.isEmpty else { return .refreshed(found: 0, of: 0) }
         // The count before the first answer, so a screen watching this has
         // something truthful to show for the minutes that follow.
@@ -510,6 +630,8 @@ final class VenuePlaces {
 
         var found = 0
         var failures = 0
+        var narrowing = narrowing
+        let cache = cache
         for (index, venue) in venues.enumerated() {
             if index > 0 {
                 try? await Task.sleep(for: Self.pace)
@@ -518,14 +640,22 @@ final class VenuePlaces {
             // written so far is already kept.
             guard !Task.isCancelled else { return .refreshed(found: found, of: index) }
             do {
-                // Never upgraded here: a refresh is hundreds of halls at once,
-                // which is the one thing OpenStreetMap's policy forbids. The
-                // block stands until the reader opens the event.
-                let placed = try await search(venue, upgrading: false)
-                remember(Answer(placed?.item, from: placed?.source), for: venue.key)
+                let placed = try await search(venue)
+                Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(placed), privacy: .public)")
+                var answer = Self.carrying(Answer(placed?.item, from: placed?.source), from: cache[venue.key])
+                if narrowing {
+                    do {
+                        answer = try await narrow(answer, for: venue)
+                    } catch {
+                        // The block stands, and so does every block after it:
+                        // a service that refused once will refuse the next.
+                        narrowing = false
+                        Self.log.error("venue \(venue.key, privacy: .public) → building search failed, narrowing stopped: \(error, privacy: .public)")
+                    }
+                }
+                remember(answer, for: venue.key)
                 if placed != nil { found += 1 }
                 failures = 0
-                Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(placed), privacy: .public)")
             } catch {
                 // The hall keeps whatever answer it had; only a run of these
                 // ends the refresh.
@@ -577,7 +707,7 @@ final class VenuePlaces {
     /// opened straight from a search row has only the name until its own page
     /// is imported, and it is worth the wait: a name on its own is how a
     /// concert in Shanghai came to be pinned to a Mercedes showroom in Nara.
-    private func search(_ venue: Venue, upgrading: Bool) async throws -> (item: MKMapItem, source: Source)? {
+    private func search(_ venue: Venue) async throws -> (item: MKMapItem, source: Source)? {
         guard let address = venue.address, !address.isEmpty else { return nil }
 
         // The country the site itself published, read the way every other
@@ -607,23 +737,8 @@ final class VenuePlaces {
         // reader whose phone can see Japan never reaches this line.
         guard let block = try await JapanAddresses.shared.place(at: address) else { return nil }
 
-        // The block is the answer. Where somebody is waiting on this hall, it
-        // is also the thing that makes it safe to ask which building at that
-        // block carries the name — every candidate is held against a
-        // coordinate the register already vouched for.
-        if upgrading, !venue.plainName.isEmpty,
-           let building = try? await VenueBuildings.shared.building(
-               named: venue.plainName, near: block.coordinate) {
-            let item = MKMapItem(
-                location: CLLocation(latitude: building.coordinate.latitude,
-                                     longitude: building.coordinate.longitude),
-                address: MKAddress(fullAddress: block.title, shortAddress: nil)
-            )
-            // Eventernote's name, not the map's, for the reason the register's
-            // answer keeps it too — see ``item(at:called:)``.
-            item.name = venue.plainName
-            return (item, .openStreetMap)
-        }
+        // The block is the answer. Where somebody is waiting on this hall,
+        // ``narrowed(_:for:)`` may then ask which building at it is the hall.
         return (Self.item(at: block, called: venue.plainName), .register)
     }
 
@@ -675,7 +790,7 @@ final class VenuePlaces {
     /// Eventernote files in Japan is not on the mainland, however many numbers
     /// the two addresses turn out to share. The second question only ever has
     /// anything to say on a phone whose Maps cannot see Japan — see
-    /// ``search(_:upgrading:)`` — and a hall it turns down is not left
+    /// ``search(_:)`` — and a hall it turns down is not left
     /// unplaced but handed to the register, which can.
     private static func answers(_ item: MKMapItem, for address: String, inJapan: Bool) -> Bool {
         guard stands(item, at: address) else { return false }
