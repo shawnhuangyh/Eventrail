@@ -445,6 +445,28 @@
         }
       }
     },
+    "App Language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの言語"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 语言"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 語言"
+          }
+        }
+      }
+    },
     "Apple Maps is asked first and places nearly every hall. Nothing on this screen needs changing." : {
       "localizations" : {
         "ja" : {
@@ -533,6 +555,28 @@
         }
       }
     },
+    "Same as App Language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの言語と同じ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与 App 语言相同"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "與 App 語言相同"
+          }
+        }
+      }
+    },
     "Show Original" : {
       "localizations" : {
         "ja" : {
@@ -595,6 +639,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "翻譯"
+          }
+        }
+      }
+    },
+    "Translate Into" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳先"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译为"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻譯為"
           }
         }
       }

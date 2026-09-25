@@ -130,14 +130,15 @@ struct SettingsView: View {
     /// carry the library somewhere else of the reader's: their other devices,
     /// and their calendar.
 
-    /// iOS keeps an app's language on the app's own page in the Settings app,
-    /// beside its calendar access, so this row goes there rather than
-    /// building a second picker that would have to agree with the system's.
+    /// The app's language and the one descriptions are translated into, on a
+    /// screen of their own — see ``LanguageSettingsView``. Just a chevron:
+    /// with two answers behind it, naming one here would say only half.
     private var languageRow: some View {
-        Link(destination: Self.systemSettings) {
+        NavigationLink {
+            LanguageSettingsView()
+        } label: {
             SettingRowLabel("globe", "Language") {
-                // The arrow is the system's own sign for leaving the app.
-                SettingRowValue(Text(verbatim: appLanguage), accessory: "arrow.up.right")
+                SettingRowChevron()
             }
             .settingRowPadding()
         }
@@ -145,13 +146,6 @@ struct SettingsView: View {
     }
 
     private static let systemSettings = URL(string: UIApplication.openSettingsURLString)!
-
-    /// The language this launch is actually drawn in — which of the app's own
-    /// localizations iOS picked — named in that language.
-    private var appLanguage: String {
-        let code = Bundle.main.preferredLocalizations.first ?? "en"
-        return Locale(identifier: code).localizedString(forIdentifier: code) ?? code
-    }
 
     /// System, Light or Dark, chosen on the row itself rather than on a
     /// screen of its own — three answers need no more room than that.

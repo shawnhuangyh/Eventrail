@@ -39,6 +39,8 @@ struct EventDetailView: View {
     /// all. Settled as the card appears, so the button is never offered for a
     /// pair the system does not support.
     @State private var canTranslate = false
+    /// Per device — see ``TranslationTarget``.
+    @AppStorage(TranslationTarget.storageKey) private var translationTargetID = ""
 
     /// Where Maps says the hall is. Nil until the lookup comes back, and for a
     /// hall Maps has never heard of.
@@ -823,7 +825,7 @@ struct EventDetailView: View {
             .padding(18)
             .glassPanel(cornerRadius: 28)
             .padding(.horizontal, 18)
-            .task { await checkTranslation() }
+            .task(id: translationTargetID) { await checkTranslation() }
             .translationTask(translationRequest) { session in
                 await translate(summary, with: session)
             }
@@ -832,17 +834,9 @@ struct EventDetailView: View {
 
     // MARK: - Translating the description
 
-    /// The language the app is showing itself in — iOS's per-app setting, so
-    /// the bundle's answer rather than the system's. A reader who set the app
-    /// to Chinese on an English phone wants the description in Chinese.
-    private static var translationTarget: Locale.Language {
-        Locale.Language(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+    private var translationTarget: Locale.Language {
+        TranslationTarget.resolved(translationTargetID)
     }
-
-    /// What every 概要 is written in. Named rather than detected: a line of
-    /// kanji and a venue name reads as Chinese to a detector, and the site is
-    /// Japanese end to end.
-    private static let translationSource = Locale.Language(identifier: "ja")
 
     private func shownSummary(for summary: String) -> String {
         if showsTranslation, let translatedSummary, translatedSummary.source == summary {
@@ -870,7 +864,7 @@ struct EventDetailView: View {
             } else {
                 isTranslating = true
                 if translationRequest == nil {
-                    translationRequest = .init(source: Self.translationSource, target: Self.translationTarget)
+                    translationRequest = .init(source: TranslationTarget.source, target: translationTarget)
                 } else {
                     translationRequest?.invalidate()
                 }
@@ -893,17 +887,17 @@ struct EventDetailView: View {
         .disabled(isTranslating)
     }
 
-    /// Offers translation only where it means something: not to a reader
-    /// already reading the app in Japanese, and not for a pair the system has
+    /// Offers translation only where it means something: not into Japanese,
+    /// and not for a pair the system has
     /// no model for. A pair whose model is not downloaded yet is still offered
     /// — the system asks to download it on the first tap.
     private func checkTranslation() async {
-        let target = Self.translationTarget
-        guard target.languageCode != Self.translationSource.languageCode else {
+        let target = translationTarget
+        guard TranslationTarget.isWorthOffering(target) else {
             canTranslate = false
             return
         }
-        let status = await LanguageAvailability().status(from: Self.translationSource, to: target)
+        let status = await LanguageAvailability().status(from: TranslationTarget.source, to: target)
         canTranslate = status != .unsupported
     }
 
