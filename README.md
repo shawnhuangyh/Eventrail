@@ -67,6 +67,9 @@ xcodebuild -scheme Eventrail -showdestinations
 
 # Build for the simulator
 xcodebuild -scheme Eventrail -destination 'platform=iOS Simulator,name=iPhone 18 Pro' build
+
+# Run the unit tests
+xcodebuild test -scheme Eventrail -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 ```
 
 ## 🤝 Contributing

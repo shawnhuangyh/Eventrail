@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Eventrail is an iPhone/iPad SwiftUI app (single target `Eventrail`, bundle id `moe.shawn.Eventrail`). [MyApp.swift](Eventrail/MyApp.swift) declares the `@main` `App` and shows [RootView.swift](Eventrail/Views/RootView.swift), a four-tab `TabView` (My Events / Following / Me / Search, the last with `role: .search`, which iOS 26 detaches into its own button beside the bar). There is no test target, no package manifest, and no dependencies.
+Eventrail is an iPhone/iPad SwiftUI app (app target `Eventrail`, bundle id `moe.shawn.Eventrail`, plus the `EventrailTests` unit-test bundle). [MyApp.swift](Eventrail/MyApp.swift) declares the `@main` `App` and shows [RootView.swift](Eventrail/Views/RootView.swift), a four-tab `TabView` (My Events / Following / Me / Search, the last with `role: .search`, which iOS 26 detaches into its own button beside the bar). There is no package manifest and no dependencies.
 
 Source is grouped as:
 
@@ -168,8 +168,16 @@ are iPhone 18 Pro, iPhone Air and the iPads; the `iPhone 17` this file used to
 name no longer resolves, and a missing name fails the build rather than falling
 back to another device.
 
-`xcodebuild test` will fail until a test target exists; add one in Xcode (File > New > Target > Unit Testing Bundle) before writing tests, then run a single test with
-`xcodebuild test -scheme Eventrail -destination '<dest>' -only-testing:EventrailTests/SomeTests/testSomething`.
+```bash
+# Run the unit tests
+xcodebuild test -scheme Eventrail -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
+
+# Run one suite or one test
+xcodebuild test -scheme Eventrail -destination '<dest>' -only-testing:EventrailTests/TrackingTests
+xcodebuild test -scheme Eventrail -destination '<dest>' -only-testing:EventrailTests/TrackingTests/twoDevicesEditingDifferentAnswersKeepBoth
+```
+
+[EventrailTests/](EventrailTests/) is a Swift Testing bundle hosted by the app (`TEST_HOST`), so it reaches internals through `@testable import Eventrail`. Like the app's own folder it is a synchronized group: a new test file dropped in is picked up with no project-file edit. The shared `Eventrail` scheme in `xcshareddata/xcschemes/` is what puts it under the Test action. The tests cover the pure logic — the Eventernote page readers (against hand-written pages carrying the template's markers, never a fetched page), `HTMLCursor`, `Event`'s merge and re-timing, `Tracking`'s decoding and per-answer merge, `LibraryArchive`'s merge, prune and restore, the backup container, `Region` and `PassportStats` — and nothing that touches the network, iCloud, EventKit or MapKit. `Fixtures.event(...)` builds an `Event` naming only the fields a test is about. `#expect` cannot wrap a mutating call (an `HTMLCursor` advance, say); take the result into a `let` first.
 
 ## Branches and releases
 
