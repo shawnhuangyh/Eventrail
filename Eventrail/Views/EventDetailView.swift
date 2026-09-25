@@ -1,4 +1,5 @@
 import SwiftUI
+import Translation
 
 /// One event: what Eventernote publishes about it, and what the reader records
 /// about it. The two are kept visually distinct throughout.
@@ -22,6 +23,22 @@ struct EventDetailView: View {
     /// Whether the description is shown whole. Collapsed to begin with, for the
     /// reason ``summaryCard`` gives.
     @State private var isSummaryExpanded = false
+
+    /// The description in the app's own language, and the text it was made
+    /// from — so a page read again with a different description is not shown
+    /// under a translation of the old one. Held for this sheet only: a
+    /// translation is a way of reading the page, not something the reader owns.
+    @State private var translatedSummary: (source: String, text: String)?
+    /// Whether the card shows ``translatedSummary`` rather than the original.
+    @State private var showsTranslation = false
+    /// Handed to `translationTask`; setting or invalidating it starts a run.
+    @State private var translationRequest: TranslationSession.Configuration?
+    @State private var isTranslating = false
+    @State private var translationFailed = false
+    /// Whether this device can translate Japanese into ``translationTarget`` at
+    /// all. Settled as the card appears, so the button is never offered for a
+    /// pair the system does not support.
+    @State private var canTranslate = false
 
     /// Where Maps says the hall is. Nil until the lookup comes back, and for a
     /// hall Maps has never heard of.
@@ -767,13 +784,17 @@ struct EventDetailView: View {
     @ViewBuilder
     private var summaryCard: some View {
         if let summary = event.summary {
+            let shown = shownSummary(for: summary)
             VStack(alignment: .leading, spacing: 12) {
-                CardHeader(title: "Overview")
+                CardHeader(title: "Overview", caption: translationCaption(for: summary)) {
+                    if canTranslate { translateButton(for: summary) }
+                }
 
                 // Imported text, shown as Eventernote published it — with the
                 // addresses written into it made tappable, which is the one
-                // thing this app adds to it.
-                Text(summary.linkingURLs)
+                // thing this app adds to it. A translation is linked the same
+                // way, since the addresses are carried through it untouched.
+                Text(shown.linkingURLs)
                     .font(.system(size: 13))
                     .tint(Color.brandTint)
                     .foregroundStyle(.secondary)
@@ -782,7 +803,7 @@ struct EventDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                if isLong(summary) {
+                if isLong(shown) {
                     Button {
                         withAnimation(.snappy) { isSummaryExpanded.toggle() }
                     } label: {
@@ -802,7 +823,134 @@ struct EventDetailView: View {
             .padding(18)
             .glassPanel(cornerRadius: 28)
             .padding(.horizontal, 18)
+            .task { await checkTranslation() }
+            .translationTask(translationRequest) { session in
+                await translate(summary, with: session)
+            }
         }
+    }
+
+    // MARK: - Translating the description
+
+    /// The language the app is showing itself in — iOS's per-app setting, so
+    /// the bundle's answer rather than the system's. A reader who set the app
+    /// to Chinese on an English phone wants the description in Chinese.
+    private static var translationTarget: Locale.Language {
+        Locale.Language(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+    }
+
+    /// What every 概要 is written in. Named rather than detected: a line of
+    /// kanji and a venue name reads as Chinese to a detector, and the site is
+    /// Japanese end to end.
+    private static let translationSource = Locale.Language(identifier: "ja")
+
+    private func shownSummary(for summary: String) -> String {
+        if showsTranslation, let translatedSummary, translatedSummary.source == summary {
+            return translatedSummary.text
+        }
+        return summary
+    }
+
+    /// Says the card is machine-translated while it is, since the reader is
+    /// otherwise reading words nobody on the site wrote.
+    private func translationCaption(for summary: String) -> Text? {
+        if translationFailed { return Text("Couldn't translate") }
+        if showsTranslation, translatedSummary?.source == summary { return Text("Translated by iOS") }
+        return nil
+    }
+
+    private func translateButton(for summary: String) -> some View {
+        let isShowing = showsTranslation && translatedSummary?.source == summary
+        return Button {
+            translationFailed = false
+            if isShowing {
+                showsTranslation = false
+            } else if translatedSummary?.source == summary {
+                showsTranslation = true
+            } else {
+                isTranslating = true
+                if translationRequest == nil {
+                    translationRequest = .init(source: Self.translationSource, target: Self.translationTarget)
+                } else {
+                    translationRequest?.invalidate()
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if isTranslating {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: "translate")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(isShowing ? "Show Original" : "Translate")
+                    .font(.system(size: 12.5, weight: .semibold))
+            }
+            .foregroundStyle(Color.brandTint)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(isTranslating)
+    }
+
+    /// Offers translation only where it means something: not to a reader
+    /// already reading the app in Japanese, and not for a pair the system has
+    /// no model for. A pair whose model is not downloaded yet is still offered
+    /// — the system asks to download it on the first tap.
+    private func checkTranslation() async {
+        let target = Self.translationTarget
+        guard target.languageCode != Self.translationSource.languageCode else {
+            canTranslate = false
+            return
+        }
+        let status = await LanguageAvailability().status(from: Self.translationSource, to: target)
+        canTranslate = status != .unsupported
+    }
+
+    /// Translates line by line, so the description keeps its line breaks — the
+    /// ticket terms in it are laid out as lists — and a line that is only an
+    /// address is carried over as it stands rather than handed to a model that
+    /// may "translate" it into a link to nowhere.
+    private func translate(_ summary: String, with session: TranslationSession) async {
+        let lines = summary.components(separatedBy: "\n")
+        let requests = lines.indices.compactMap { index -> TranslationSession.Request? in
+            Self.needsTranslating(lines[index])
+                ? .init(sourceText: lines[index], clientIdentifier: String(index))
+                : nil
+        }
+        guard !requests.isEmpty else {
+            isTranslating = false
+            return
+        }
+        do {
+            var translated = lines
+            for response in try await session.translations(from: requests) {
+                if let id = response.clientIdentifier, let index = Int(id) {
+                    translated[index] = response.targetText
+                }
+            }
+            translatedSummary = (summary, translated.joined(separator: "\n"))
+            showsTranslation = true
+        } catch {
+            // Declining the model download lands here too, and is an answer
+            // rather than a failure — it says nothing.
+            switch error {
+            case is CancellationError, TranslationError.alreadyCancelled, TranslationError.notInstalled:
+                break
+            default:
+                translationFailed = true
+            }
+        }
+        isTranslating = false
+    }
+
+    /// Whether a line has words in it to translate — not blank, and not an
+    /// address standing alone.
+    private static func needsTranslating(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return false }
+        if let url = URL(string: trimmed), url.scheme?.hasPrefix("http") == true { return false }
+        return true
     }
 
     /// How much of a long description stands before the reader asks for the rest.
