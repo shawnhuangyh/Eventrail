@@ -24,11 +24,13 @@ struct EventDetailView: View {
     /// reason ``summaryCard`` gives.
     @State private var isSummaryExpanded = false
 
-    /// The description in the app's own language, and the text it was made
-    /// from — so a page read again with a different description is not shown
-    /// under a translation of the old one. Held for this sheet only: a
-    /// translation is a way of reading the page, not something the reader owns.
-    @State private var translatedSummary: (source: String, text: String)?
+    /// The description in the app's own language, the text it was made from
+    /// and the target it was made for — so a page read again with a different
+    /// description is not shown under a translation of the old one, and a
+    /// target changed in Settings (another window, on an iPad) is not shown in
+    /// the language it replaced. Held for this sheet only: a translation is a
+    /// way of reading the page, not something the reader owns.
+    @State private var translatedSummary: (source: String, target: String, text: String)?
     /// Whether the card shows ``translatedSummary`` rather than the original.
     @State private var showsTranslation = false
     /// Handed to `translationTask`; setting or invalidating it starts a run.
@@ -825,7 +827,10 @@ struct EventDetailView: View {
             .padding(18)
             .glassPanel(cornerRadius: 28)
             .padding(.horizontal, 18)
-            .task(id: translationTargetID) { await checkTranslation() }
+            .task(id: translationTargetID) {
+                dropTranslation(unlessFor: translationTargetID)
+                await checkTranslation()
+            }
             .translationTask(translationRequest) { session in
                 await translate(summary, with: session)
             }
@@ -838,28 +843,52 @@ struct EventDetailView: View {
         TranslationTarget.resolved(translationTargetID)
     }
 
+    /// Whether ``translatedSummary`` is this description, in the target the
+    /// reader has chosen now.
+    private func hasTranslation(of summary: String) -> Bool {
+        translatedSummary?.source == summary && translatedSummary?.target == translationTargetID
+    }
+
     private func shownSummary(for summary: String) -> String {
-        if showsTranslation, let translatedSummary, translatedSummary.source == summary {
+        if showsTranslation, hasTranslation(of: summary), let translatedSummary {
             return translatedSummary.text
         }
         return summary
+    }
+
+    /// Lets go of a translation made for another target, and of the request
+    /// that would make another one: a configuration keeps the target it was
+    /// created with, so invalidating it would translate into the old language
+    /// again. Kept when the target is unchanged, since this also runs every
+    /// time the card reappears — coming back from a performer's page should
+    /// not cost the reader the translation they were reading.
+    private func dropTranslation(unlessFor target: String) {
+        if let translatedSummary, translatedSummary.target != target {
+            self.translatedSummary = nil
+            showsTranslation = false
+            translationFailed = false
+        }
+        if let translationRequest, translationRequest.target != translationTarget {
+            self.translationRequest = nil
+            isTranslating = false
+        }
     }
 
     /// Says the card is machine-translated while it is, since the reader is
     /// otherwise reading words nobody on the site wrote.
     private func translationCaption(for summary: String) -> Text? {
         if translationFailed { return Text("Couldn't translate") }
-        if showsTranslation, translatedSummary?.source == summary { return Text("Translated by iOS") }
+        if showsTranslation, hasTranslation(of: summary) { return Text("Translated by iOS") }
         return nil
     }
 
     private func translateButton(for summary: String) -> some View {
-        let isShowing = showsTranslation && translatedSummary?.source == summary
+        let isShowing = showsTranslation && hasTranslation(of: summary)
         return Button {
             translationFailed = false
             if isShowing {
                 showsTranslation = false
-            } else if translatedSummary?.source == summary {
+            } else if hasTranslation(of: summary) {
                 showsTranslation = true
             } else {
                 isTranslating = true
@@ -906,6 +935,10 @@ struct EventDetailView: View {
     /// address is carried over as it stands rather than handed to a model that
     /// may "translate" it into a link to nowhere.
     private func translate(_ summary: String, with session: TranslationSession) async {
+        // The target this run was started for; a change while it runs leaves
+        // the result filed under the old one, which ``hasTranslation(of:)``
+        // then declines to show.
+        let target = translationTargetID
         let lines = summary.components(separatedBy: "\n")
         let requests = lines.indices.compactMap { index -> TranslationSession.Request? in
             Self.needsTranslating(lines[index])
@@ -923,7 +956,7 @@ struct EventDetailView: View {
                     translated[index] = response.targetText
                 }
             }
-            translatedSummary = (summary, translated.joined(separator: "\n"))
+            translatedSummary = (summary, target, translated.joined(separator: "\n"))
             showsTranslation = true
         } catch {
             // Declining the model download lands here too, and is an answer
