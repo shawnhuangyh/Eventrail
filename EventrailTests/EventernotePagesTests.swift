@@ -111,6 +111,37 @@ struct EventernotePagesTests {
         }
     }
 
+    /// The site's own footer, a count of what was found, and no list: the
+    /// list's markup changed, and nothing was really found empty.
+    @Test func aCountedListingWithoutItsListIsUnreadable() {
+        let html = #"<p class="t2">689件見つかりました。</p><ul class="gb_foot_menu"></ul>"#
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.events(in: html, page: 1, pageSize: 30)
+        }
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.performers(in: html, page: 1, pageSize: 20)
+        }
+    }
+
+    @Test func aListWhoseRowsAllFailToReadIsUnreadable() {
+        let events = """
+            <div class="gb_listevent"><ul>
+            <li class="clearfix"><a href="/events/300001"><div class="renamed">?</div></a></li>
+            </ul></div><ul class="gb_foot_menu"></ul>
+            """
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.events(in: events, page: 1, pageSize: 30)
+        }
+        let performers = """
+            <div class="gb_listview"><ul>
+            <li><a href="/actors/Lynn/9001"><span>88</span></a></li>
+            </ul></div><ul class="gb_foot_menu"></ul>
+            """
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.performers(in: performers, page: 1, pageSize: 20)
+        }
+    }
+
     @Test func readsPerformerSearch() throws {
         let html = """
             <p>2件見つかりました。</p>

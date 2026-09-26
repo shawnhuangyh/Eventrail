@@ -135,8 +135,10 @@ nonisolated enum EventernotePages {
         }
 
         let rows = HTMLCursor(list).slices(startingAt: #"<li class="#)
+        let events = rows.compactMap(event(inRow:))
+        try confirmsRowsRead(events.count, of: rows.count)
         return EventernotePage(
-            items: rows.compactMap(event(inRow:)),
+            items: events,
             total: totalCount(in: html) ?? rows.count,
             page: page,
             pageSize: pageSize
@@ -156,7 +158,9 @@ nonisolated enum EventernotePages {
 
         var rows = HTMLCursor(list)
         var profiles: [PerformerProfile] = []
+        var printed = 0
         while rows.advance(past: #"<a href="/actors/"#) {
+            printed += 1
             guard let path = rows.take(upTo: "\""), let id = Int(path.split(separator: "/").last ?? "")
             else { break }
             guard rows.advance(past: ">") else { break }
@@ -168,6 +172,7 @@ nonisolated enum EventernotePages {
                                              fanCount: count,
                                              slug: String(path.split(separator: "/").dropLast().joined(separator: "/"))))
         }
+        try confirmsRowsRead(profiles.count, of: printed)
 
         return EventernotePage(items: profiles, total: totalCount(in: html) ?? profiles.count,
                                page: page, pageSize: pageSize)
@@ -183,8 +188,25 @@ nonisolated enum EventernotePages {
     /// captcha or a proxy's error page carries neither. Reading any of those
     /// as "nothing found" would have the Following tab cache a performer as
     /// having no dates for the whole freshness window.
+    ///
+    /// The footer alone does not settle it where the page also counts what it
+    /// found: a list block renamed under an unchanged footer would otherwise
+    /// read "689件見つかりました。" over nothing, and a performer with dates
+    /// would be cached as having none.
     private static func confirmsNoRows(_ html: String) throws {
-        guard html.contains(#"class="gb_foot_menu""#) else {
+        guard html.contains(#"class="gb_foot_menu""#), (totalCount(in: html) ?? 0) == 0 else {
+            throw EventernoteClient.Failure.unreadable
+        }
+    }
+
+    /// Whether a list that printed rows gave up at least one of them.
+    ///
+    /// A dropped row is how a changed template is meant to degrade, one field
+    /// at a time. Every row dropped is not that: it is the row markup itself
+    /// gone, and an empty page from it would be cached as a performer or a
+    /// search with nothing in it.
+    private static func confirmsRowsRead(_ read: Int, of printed: Int) throws {
+        guard printed == 0 || read > 0 else {
             throw EventernoteClient.Failure.unreadable
         }
     }
