@@ -262,8 +262,11 @@ final class VenuePlaces {
         let timeZone: TimeZone?
     }
 
-    /// Whether this device may ask OpenStreetMap which building at the block
-    /// is the hall — see ``VenueBuildings``.
+    /// Whether this device may ask OpenStreetMap anything — which building at
+    /// the block is the hall, and, on a phone whose Maps is the mainland
+    /// provider, where a hall outside Japan and the mainland is. Off, a hall
+    /// in Japan stays at the register's block and one of those abroad stays
+    /// unplaced. See ``VenueBuildings``.
     ///
     /// Per-device, like every other preference here, and on by default: it is
     /// only ever reached for a hall Maps could not place at all, and without
@@ -596,6 +599,9 @@ final class VenuePlaces {
                 placed.continuation.yield()
             }
             return answer.placing
+        } catch is Deferred {
+            // Only OpenStreetMap could place it, and it may not be asked.
+            return nil
         } catch {
             // Not written down, so the next screen to ask tries again.
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
@@ -871,7 +877,7 @@ final class VenuePlaces {
             // never offered. On every provider, since Maps would be asked the
             // same unanchored question.
             guard let country = venue.countryHint, !venue.plainName.isEmpty else { return nil }
-            guard mayAskOpenStreetMap else { throw Deferred() }
+            guard mayAskOpenStreetMap, usesOpenStreetMap else { throw Deferred() }
             return try await openStreetMap(venue, at: nil, country: country)
         }
 
@@ -888,14 +894,15 @@ final class VenuePlaces {
         // number with the address — 안암로 145 came back pinned on the
         // mainland, dated GMT+8. So a hall in Japan goes straight to the
         // register, a hall on the mainland is asked of Maps with no hint, and
-        // every other hall abroad is asked of OpenStreetMap.
+        // every other hall abroad is asked of OpenStreetMap — while the
+        // reader's switch allows it, and otherwise left unplaced.
         if try await !mapsSeesJapan() {
             if inJapan {
                 regions = []
             } else if VenueCountries.isMainlandChina(address) {
                 regions = [nil]
             } else {
-                guard mayAskOpenStreetMap else { throw Deferred() }
+                guard mayAskOpenStreetMap, usesOpenStreetMap else { throw Deferred() }
                 return try await openStreetMap(venue, at: address,
                                                country: VenueCountries.country(of: address))
             }
@@ -950,10 +957,12 @@ final class VenuePlaces {
         return (item, place.isBuilding ? .openStreetMap : .openStreetMapAddress, place.country)
     }
 
-    /// A hall abroad an import met, on a phone that could place it only by
-    /// asking OpenStreetMap — which an import may not do. Not a failure and
-    /// not an answer: nothing is written down, and the hall is placed when the
-    /// reader opens an event there or refreshes by hand.
+    /// A hall that could be placed only by asking OpenStreetMap, met where it
+    /// may not be asked: by an import, which never may, or anywhere while the
+    /// reader has Refine with OpenStreetMap off. Not a failure and not an
+    /// answer: nothing is written down, so the hall stays unplaced and is
+    /// asked about again once a sheet or a refresh may ask — including the
+    /// first one after the switch is turned on.
     private struct Deferred: Error {}
 
     /// Whether this phone's Maps can see Japan at all — false where it is

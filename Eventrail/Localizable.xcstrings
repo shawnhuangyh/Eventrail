@@ -419,6 +419,50 @@
         }
       }
     },
+    "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block, and a hall elsewhere abroad is not placed at all. Turn on Refine with OpenStreetMap to narrow a block to its building and to place halls abroad." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple マップが現地の地図提供元から配信され、中国本土以外の会場はほとんど収録されていないため、日本の会場を検索しても見つからないことがよくあります。その場合は住所検索に回り、街区の位置までしか分かりません。日本・中国本土以外の会場は位置が特定されません。「OpenStreetMap で位置を絞り込む」をオンにすると、建物まで絞り込み、海外の会場の位置も特定します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地图由本地服务商提供，几乎不收录境外场馆，因此搜索日本的场馆常常一无所获。这类场馆会转由地址检索定位，但只能精确到街区；日本和中国大陆以外的场馆则不会被定位。开启「用 OpenStreetMap 细化位置」后，会定位到具体建筑，也会定位这些海外场馆。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；日本和中國大陸以外的場館則不會被定位。開啟「用 OpenStreetMap 細化位置」後，會定位到具體建築，也會定位這些海外場館。"
+          }
+        }
+      }
+    },
+    "Only while Refine with OpenStreetMap is on. Narrows a block to its building, and in mainland China places halls outside Japan and the mainland." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「OpenStreetMap で位置を絞り込む」がオンのときだけ使います。街区から建物まで絞り込み、中国本土では日本・中国本土以外の会場の位置も特定します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在开启「用 OpenStreetMap 细化位置」时使用。从街区细化到建筑；在中国大陆时，也用它定位日本和中国大陆以外的场馆。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅在開啟「用 OpenStreetMap 細化位置」時使用。從街區細化到建築；在中國大陸時，也用它定位日本和中國大陸以外的場館。"
+          }
+        }
+      }
+    },
     "Time Zone" : {
       "localizations" : {
         "ja" : {
@@ -1449,28 +1493,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "優先使用 Apple 地圖，幾乎所有場館都能由它定位，無需調整本頁的任何設定。"
-          }
-        }
-      }
-    },
-    "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block; turn on Refine with OpenStreetMap to narrow that to the building." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple マップが現地の地図提供元から配信され、中国本土以外の会場はほとんど収録されていないため、日本の会場を検索しても見つからないことがよくあります。その場合は住所検索に回り、街区の位置までしか分かりません。「OpenStreetMap で位置を絞り込む」をオンにすると、建物まで絞り込みます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地图由本地服务商提供，几乎不收录境外场馆，因此搜索日本的场馆常常一无所获。这类场馆会转由地址检索定位，但只能精确到街区；开启「用 OpenStreetMap 细化位置」后，会进一步定位到具体建筑。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；開啟「用 OpenStreetMap 細化位置」後，會進一步定位到具體建築。"
           }
         }
       }
@@ -4397,28 +4419,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "輸入你的 Eventernote 帳號，即可匯入已參加過的活動。僅限讀取——無需密碼，也不會寫回任何內容。"
-          }
-        }
-      }
-    },
-    "Narrows a block to its building, while Refine with OpenStreetMap is on. In mainland China it also places halls outside Japan and the mainland, whatever the switch says." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「OpenStreetMap で位置を絞り込む」がオンのとき、街区から建物まで絞り込みます。中国本土では、スイッチに関係なく日本・中国本土以外の会場の位置も特定します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开启「用 OpenStreetMap 细化位置」时，从街区细化到建筑。在中国大陆时，无论开关如何，也会用它定位日本和中国大陆以外的场馆。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開啟「用 OpenStreetMap 細化位置」時，從街區細化到建築。在中國大陸時，無論開關如何，也會用它定位日本和中國大陸以外的場館。"
           }
         }
       }

@@ -84,7 +84,7 @@ struct VenueLocationsView: View {
             SettingRowDivider()
             PlacingStep(
                 "scope", "OpenStreetMap", count: breakdown.openStreetMap,
-                detail: "Narrows a block to its building, while Refine with OpenStreetMap is on. In mainland China it also places halls outside Japan and the mainland, whatever the switch says."
+                detail: "Only while Refine with OpenStreetMap is on. Narrows a block to its building, and in mainland China places halls outside Japan and the mainland."
             )
             SettingRowDivider()
             PlacingStep(
@@ -109,7 +109,7 @@ struct VenueLocationsView: View {
             SettingRowDivider()
             PlacingStep(
                 "exclamationmark.triangle", "In Mainland China",
-                detail: "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block; turn on Refine with OpenStreetMap to narrow that to the building."
+                detail: "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block, and a hall elsewhere abroad is not placed at all. Turn on Refine with OpenStreetMap to narrow a block to its building and to place halls abroad."
             )
             SettingRowDivider()
             PlacingStep(
