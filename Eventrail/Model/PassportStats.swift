@@ -291,11 +291,7 @@ nonisolated struct PassportStats {
     /// app that prints a day prints it in that zone. Read in the reader's zone
     /// instead, a Tokyo Sunday becomes Saturday for anybody west of Japan —
     /// the chart would then say nobody goes out on Sundays while every row
-    /// under it says "Sun".
-    ///
-    /// The year is deliberately *not* read this way: ``year(of:)`` answers to
-    /// the reader's own calendar so that the chips over this screen and the Me
-    /// tab's "events this year" agree with each other.
+    /// under it says "Sun". The year is read the same way, in ``year(of:)``.
     private static func component(_ component: Calendar.Component, of event: Event) -> Int {
         var calendar = Calendar.current
         calendar.timeZone = event.timeZone
@@ -345,15 +341,14 @@ nonisolated struct PassportStats {
         return allPrefectures.first { address.hasPrefix($0) }
     }
 
-    /// The year a night falls in, read in the reader's own calendar.
+    /// The year a night falls in, read where it was held.
     ///
-    /// The reader's rather than the venue's, deliberately: the Me tab's "events
-    /// this year" is counted this way, and the Passport's year chips have to
-    /// agree with the card that opens it. A show on the 31st of December in
-    /// Tokyo is the same year on both screens or the two are simply wrong
-    /// about each other.
+    /// The venue's calendar rather than the reader's, for the reason
+    /// ``component(_:of:)`` gives: a New Year's Day show in Tokyo is still
+    /// the 31st of December for a reader in Shanghai, and would otherwise be
+    /// filed under the year before the one its row prints.
     static func year(of event: Event) -> Int {
-        Calendar.current.component(.year, from: event.date)
+        component(.year, of: event)
     }
 
     /// Which years the reader actually has something in, most recent first.

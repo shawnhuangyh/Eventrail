@@ -106,4 +106,16 @@ struct PassportStatsTests {
         #expect(PassportStats.events(Self.nights, in: .year(2025)).map(\.id) == ["b", "c", "d"])
         #expect(PassportStats.events(Self.nights, in: .allTime).count == 4)
     }
+
+    /// A zone as far east as the calendar goes, so its New Year's midnight is
+    /// still the 31st of December wherever the tests happen to run.
+    @Test func readsTheYearWhereTheNightWasHeld() {
+        let kiritimati = TimeZone(identifier: "Pacific/Kiritimati")!
+        let newYear = Fixtures.event(date: Fixtures.date(2026, 1, 1, in: kiritimati),
+                                     timeZone: kiritimati)
+        #expect(PassportStats.year(of: newYear) == 2026)
+        #expect(PassportStats.years(of: [newYear]) == [2026])
+        #expect(PassportStats(events: [newYear]) { _ in Tracking() }
+            .tally(by: .year).map(\.value) == [2026])
+    }
 }
