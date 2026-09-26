@@ -33,6 +33,8 @@ These fields belong to you and to this app. They live on your device, sync throu
 
 **Follow performers and see what they have coming.** Follow anyone from their page, and the Following tab reads each of their Eventernote listings and shows every upcoming date they are billed on, grouped by month. You can narrow it to one person, one stretch of dates, or one part of the country. Nothing there is in your library until you put it there. Following is your own record, kept beside your library. It is not the favorite list your Eventernote account holds, which this app only ever reads.
 
+**See what is new since you last looked.** The Following tab reads like a mailbox. A date you have not opened carries a **NEW** tag beside the performer's name, and a date you have already read comes back as **UPDATED** when Eventernote later changes its title, hall, day, times or billing. Opening a date marks it read; swiping a row from its left edge marks it read or unread; and the pencil lets you pick several and mark them at once. The envelope button at the top shows only what is unread. Which dates you have read is your own record, so it syncs to your other devices and goes into a backup. Clearing the cache leaves it alone; Delete All Events turns every date back to new.
+
 **Read an event's overview in your language.** An event's 概要 is usually written in Japanese. On your tap, Apple's on-device Translation framework translates it into the app's language, or into another language you pick under Settings › Language. The translation is shown on the sheet and never saved.
 
 **Read your own past back.** The Event Passport, on the Me tab, puts every hall you have stood in on a map of the country, with the numbers around it: how many nights, how long they ran, how many venues, performers and prefectures, who you have seen most, where you go most, your longest and shortest nights, and the nights you applied hardest for. Filter it to one year or read all of it. Everything on it comes from your own library, so there is no second record to keep, and nothing there asks Eventernote anything.
@@ -47,7 +49,7 @@ These fields belong to you and to this app. They live on your device, sync throu
 
 **Work offline.** Your library and everything you have written on it is kept in a local file and stays fully usable with no network and no iCloud connection. Search and importing need the network; what you have already saved does not.
 
-**Sync across your devices.** Your annotations, favorites, follows and the event details behind them move between your iPhone and iPad through your own private iCloud storage. There is no app-operated backend and no account to create.
+**Sync across your devices.** Your annotations, favorites, follows, which Following dates you have read, and the event details behind them move between your iPhone and iPad through your own private iCloud storage. There is no app-operated backend and no account to create.
 
 **Keep a copy nothing in the app can reach.** Export your library as a single `.eventrail` file and keep it wherever you keep your own files. Sync and a backup are different promises on purpose: sync keeps your devices agreeing, so a removal travels to all of them; the file is the copy that nothing you do in the app afterwards can undo. Restoring one only ever adds: it puts back what the file holds and this device no longer does, keeps whichever version of a note was typed later, and erases nothing. Tap the file in Files and Eventrail opens it, after asking.
 
