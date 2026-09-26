@@ -211,6 +211,9 @@ nonisolated struct PassportStats {
             for name in Set(event.performers.map(\.name)) {
                 performerCounts[name, default: 0] += 1
             }
+            // A night still counts when it was a stream or the room was never
+            // disclosed; it just adds no hall — see ``Event/isAtHall``.
+            guard event.isAtHall else { continue }
             venueCounts[event.venue, default: 0] += 1
             if venuePrefectures[event.venue] == nil, let prefecture = Self.prefecture(of: event) {
                 venuePrefectures[event.venue] = prefecture

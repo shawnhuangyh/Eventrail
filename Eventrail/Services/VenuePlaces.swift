@@ -56,9 +56,11 @@ final class VenuePlaces {
         let address: String?
 
         /// Nil where there is no hall to ask about — neither a name nor an
-        /// address is something Maps can be asked for.
+        /// address is something Maps can be asked for, and a placeholder the
+        /// site files streams and undisclosed rooms under (see
+        /// ``Event/isAtHall``) is not a place at all.
         init?(name: String, address: String?) {
-            guard !name.isEmpty || address != nil else { return nil }
+            guard !name.hasPrefix("!_"), !name.isEmpty || address != nil else { return nil }
             self.name = name
             self.address = address
         }

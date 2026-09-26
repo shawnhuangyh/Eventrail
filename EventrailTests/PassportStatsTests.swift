@@ -66,6 +66,21 @@ struct PassportStatsTests {
         #expect(stats.prefectures == 2)
     }
 
+    /// A stream, an undisclosed room and a row with no venue are nights the
+    /// reader went to, but none of them is a hall.
+    @Test func leavesPlaceholderVenuesOutOfTheHalls() {
+        let nights = Self.nights + [
+            Fixtures.event(id: "e", venue: "!_国内外各所 (ライブビューイング等)"),
+            Fixtures.event(id: "f", venue: "!_東京都内某所", venueAddress: "東京都"),
+            Fixtures.event(id: "g", venue: "  "),
+        ]
+        let stats = PassportStats(events: nights) { _ in Tracking() }
+        #expect(stats.totalEvents == 7)
+        #expect(stats.venues == 3)
+        #expect(stats.prefectures == 2)
+        #expect(!stats.topVenues.contains { $0.name.hasPrefix("!_") || $0.name.trimmingCharacters(in: .whitespaces).isEmpty })
+    }
+
     @Test func countsLotteriesOverTheNightsTheyWereWrittenOn() {
         #expect(stats.lotteryEvents == 2)
         #expect(stats.lotteryEntries == 7)

@@ -81,6 +81,7 @@ Eventernote publishes a hall's name and its address and no coordinate, and this 
 - Computed on the screen rather than stored, and cheap enough to be: a handful of passes over a few hundred events. Storing it would mean keeping it in step with every note, every import and every merge; a `let` cannot go stale.
 - `PassportScope` is all-time or one year, and a year the reader has nothing in is never offered. It is deliberately not remembered between visits — a filter left on from a fortnight ago would have somebody reading one year and believing it was all of them.
 - Every total says what it was counted over rather than implying it read every night: `timedEvents` beside `totalDuration`, because Eventernote publishes a finish time for a minority of dates, and the lottery total beside the count of nights it was written on.
+- **A night is not always at a hall.** Eventernote files streams, undisclosed rooms and "somewhere abroad" under placeholder venues whose names open with `!_` (`!_国内外各所 (ライブビューイング等)`, `!_東京都内某所`). `Event.isAtHall` is false for those and for an empty venue: the night still counts, but adds no hall, no prefecture and no pin, and `VenuePlaces.Venue` refuses to look one up.
 - `PassportStats` takes `tracking` as a closure rather than the store, which is what keeps the whole type `nonisolated` and testable with no `EventStore` behind it.
 
 ## Persistence and sync

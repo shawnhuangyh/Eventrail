@@ -358,3 +358,22 @@ nonisolated extension Event {
         )
     }
 }
+
+nonisolated extension Event {
+    /// Whether the venue names a hall rather than standing in for one.
+    ///
+    /// Eventernote files a night with no hall of its own under a placeholder
+    /// venue whose name opens with `!_`: `!_東京都内某所` for an undisclosed
+    /// room, `!_国内外各所 (ライブビューイング等)` for a stream or a screening,
+    /// `!_海外某所・各所` for somewhere abroad. None of them is a place anybody
+    /// stood in, so the Passport does not count them as halls and nothing asks
+    /// a map where they are. A row that prints no venue at all is the same.
+    var isAtHall: Bool {
+        Self.namesHall(venue)
+    }
+
+    static func namesHall(_ venue: String) -> Bool {
+        let name = venue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !name.isEmpty && !name.hasPrefix("!_")
+    }
+}
