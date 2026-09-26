@@ -160,7 +160,7 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     /// Upcoming until its day is over: an event announced without a start time
     /// should not drop into Past at the stroke of midnight.
     var isUpcoming: Bool {
-        (calendar.date(byAdding: .day, value: 1, to: date) ?? date) > .now
+        dayEnds > .now
     }
 
     /// Upcoming until its day is over everywhere on Earth — the last hour
@@ -173,13 +173,23 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     var isUpcomingAnywhere: Bool { isUpcomingAnywhere(asOf: .now) }
 
     func isUpcomingAnywhere(asOf now: Date) -> Bool {
+        guard let end = dayEndsEverywhere else { return isUpcoming }
+        return end > now
+    }
+
+    /// When ``isUpcoming`` turns false: the end of its day on its own clock.
+    var dayEnds: Date {
+        calendar.date(byAdding: .day, value: 1, to: date) ?? date
+    }
+
+    /// When ``isUpcomingAnywhere`` turns false: the end of its day twelve
+    /// hours behind Greenwich.
+    var dayEndsEverywhere: Date? {
         var westernmost = Calendar(identifier: .gregorian)
         westernmost.timeZone = TimeZone(secondsFromGMT: -12 * 60 * 60) ?? .gmt
         let day = calendar.dateComponents([.year, .month, .day], from: date)
-        guard let start = westernmost.date(from: day),
-              let end = westernmost.date(byAdding: .day, value: 1, to: start)
-        else { return isUpcoming }
-        return end > now
+        guard let start = westernmost.date(from: day) else { return nil }
+        return westernmost.date(byAdding: .day, value: 1, to: start)
     }
 
     /// Whether the page's published end time has already gone by. False where

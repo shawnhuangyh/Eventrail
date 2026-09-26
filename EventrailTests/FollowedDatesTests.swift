@@ -25,6 +25,29 @@ struct FollowedDatesTests {
         #expect(followed.dates[performer.id]?.map(\.id) == ["abroad"])
     }
 
+    /// Nothing else changes as a night ends, so the list has to be told to
+    /// redraw then, or it sits on screen until something unrelated moves.
+    @Test func aScreenReadingTheDatesRedrawsAsTheSoonestEnds() async throws {
+        let now = Date.now
+        let ending = Fixtures.event(id: "ending", date: now, startsAt: now.addingTimeInterval(-3600),
+                                    endsAt: now.addingTimeInterval(0.5))
+        let followed = dates([ending])
+        let redrawn = AsyncStream<Void>.makeStream()
+        withObservationTracking {
+            #expect(followed.events(for: [performer]).map(\.id) == ["ending"])
+        } onChange: {
+            redrawn.continuation.yield()
+        }
+        let timeout = Task {
+            try? await Task.sleep(for: .seconds(5))
+            redrawn.continuation.finish()
+        }
+        var iterator = redrawn.stream.makeAsyncIterator()
+        try #require(await iterator.next() != nil)
+        timeout.cancel()
+        #expect(followed.events(for: [performer]).isEmpty)
+    }
+
     @Test func aHallAbroadIsJudgedAndShownOnItsOwnClock() throws {
         let losAngeles = try #require(TimeZone(identifier: "America/Los_Angeles"))
         let now = Date.now

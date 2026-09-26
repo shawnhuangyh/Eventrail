@@ -275,6 +275,38 @@ final class FollowedDates {
         return !event.isUpcoming || event.hasEnded
     }
 
+    /// The moment ``isOver(_:)`` turns true for a row already re-read on its
+    /// hall's clock.
+    private func overAt(_ event: Event) -> Date? {
+        guard hallZone(event) != nil else { return event.dayEndsEverywhere }
+        let ends = Event.inOrder(event.doorsOpen, event.startsAt, event.endsAt).ends
+        return [event.dayEnds, ends].compactMap(\.self).min()
+    }
+
+    /// Bumped as the soonest date on screen goes over. Read by
+    /// ``events(for:)``, so every screen listing the dates redraws then and
+    /// the night leaves while the reader is looking at it — nothing else
+    /// changes at that moment to prompt a redraw.
+    private var clockTick = 0
+    @ObservationIgnored private var pendingTick: (at: Date, task: Task<Void, Never>)?
+
+    /// Wakes at the soonest of `events` to go over, unless a wake is already
+    /// set for sooner. One set too soon — its row unfollowed meanwhile — only
+    /// redraws early and sets the next.
+    private func tick(atSoonestEndOf events: [Event]) {
+        let now = Date.now
+        guard let soonest = events.compactMap(overAt).filter({ $0 > now }).min() else { return }
+        if let pendingTick, pendingTick.at > now, pendingTick.at <= soonest { return }
+        pendingTick?.task.cancel()
+        pendingTick = (soonest, Task { [weak self] in
+            // A second's margin: ``Event/hasEnded`` counts an end that is now.
+            try? await Task.sleep(for: .seconds(soonest.timeIntervalSinceNow + 1))
+            guard !Task.isCancelled, let self else { return }
+            self.pendingTick = nil
+            self.clockTick += 1
+        })
+    }
+
     /// Drops whoever is no longer followed, so their dates stop being counted
     /// and stop being kept.
     private func forget(everyoneBut performers: [PerformerProfile]) {
@@ -370,6 +402,7 @@ final class FollowedDates {
     /// Every date published for the given performers, soonest first and each
     /// event once however many of them share the bill.
     func events(for performers: [PerformerProfile]) -> [Event] {
+        _ = clockTick
         var merged: [Event] = []
         var known: Set<Event.ID> = []
         for performer in performers {
@@ -377,13 +410,15 @@ final class FollowedDates {
             // is not: kept in the cache until the day ends, like every other
             // date, and left out of what the tab shows once it finishes.
             // Checked as the tab reads rather than when the listing was read,
-            // so it goes at the tab's next redraw rather than its next read.
+            // so it goes at the tab's next redraw rather than its next read —
+            // and ``tick(atSoonestEndOf:)`` makes one at the moment it ends.
             for listed in dates[performer.id] ?? [] {
                 let event = onHallClock(listed)
                 guard !isOver(event), known.insert(event.id).inserted else { continue }
                 merged.append(event)
             }
         }
+        tick(atSoonestEndOf: merged)
         return merged.sorted { $0.sortDate < $1.sortDate }
     }
 
