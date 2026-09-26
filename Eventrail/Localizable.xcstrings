@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
     "%@ · %@" : {
       "localizations" : {
         "ja" : {
@@ -246,25 +243,24 @@
         }
       }
     },
-    "%@, %@" : {
-      "extractionState" : "stale",
+    "%@ · %@ · %lld unread" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@、%@"
+            "value" : "%1$@・%2$@・未読%3$lld件"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@、%@"
+            "value" : "%1$@ · %2$@ · %3$lld 条未读"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@、%@"
+            "value" : "%1$@ · %2$@ · %3$lld 則未讀"
           }
         }
       }
@@ -318,7 +314,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@中%lld件"
+            "value" : "%lld / %@"
           }
         },
         "zh-Hans" : {
@@ -419,600 +415,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 條跟蹤記錄"
-          }
-        }
-      }
-    },
-    "After Leaving Mainland China" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中国本土を離れた後"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "离开中国大陆后"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "離開中國大陸後"
-          }
-        }
-      }
-    },
-    "App Language" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリの言語"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App 语言"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App 語言"
-          }
-        }
-      }
-    },
-    "Apple Maps is asked first and places nearly every hall. Nothing on this screen needs changing." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple マップが最初に検索され、ほぼすべての会場の位置が決まります。この画面の設定を変える必要はありません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "优先使用 Apple 地图，几乎所有场馆都能由它定位，无需调整本页的任何设置。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "優先使用 Apple 地圖，幾乎所有場館都能由它定位，無需調整本頁的任何設定。"
-          }
-        }
-      }
-    },
-    "Couldn't translate" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻訳できませんでした"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法翻译"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法翻譯"
-          }
-        }
-      }
-    },
-    "Halls placed while you were there keep the block or building they were given. Refresh Venue Locations once you are elsewhere, and Apple Maps is asked for them again." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中国本土にいた間に決まった会場は、そのときの街区や建物の位置のままです。本土を出てから「会場の位置を更新」を行うと、Apple マップで改めて検索します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在中国大陆期间定位的场馆，会保持当时得到的街区或建筑位置。离开大陆后点击「刷新场馆位置」，就会重新用 Apple 地图查询，得到准确定位。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在中國大陸期間定位的場館，會保持當時得到的街區或建築位置。離開大陸後點擊「重新整理場館位置」，就會重新用 Apple 地圖查詢，得到準確定位。"
-          }
-        }
-      }
-    },
-    "Refresh All Venues" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "すべての会場を更新"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刷新所有场馆"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新整理所有場館"
-          }
-        }
-      }
-    },
-    "Same as App Language" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリの言語と同じ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "与 App 语言相同"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "與 App 語言相同"
-          }
-        }
-      }
-    },
-    "Show Original" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "原文を表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示原文"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "顯示原文"
-          }
-        }
-      }
-    },
-    "System" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "システム"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "跟随系统"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "跟隨系統"
-          }
-        }
-      }
-    },
-    "Translate" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻訳"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻译"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻譯"
-          }
-        }
-      }
-    },
-    "Translate Into" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻訳先"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻译为"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "翻譯為"
-          }
-        }
-      }
-    },
-    "Translated by iOS" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iOSによる翻訳"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由 iOS 翻译"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由 iOS 翻譯"
-          }
-        }
-      }
-    },
-    "Used when Maps finds nothing. Places the block." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マップで見つからない場合に使います。街区の位置を示します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地图找不到时使用，定位到街区。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地圖找不到時使用，定位到街區。"
-          }
-        }
-      }
-    },
-    "How Halls Are Placed" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "会場の位置の決め方"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "场馆位置的确定方式"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "場館位置的確定方式"
-          }
-        }
-      }
-    },
-    "Apple Maps" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple マップ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地圖"
-          }
-        }
-      }
-    },
-    "GSI Address Search" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "国土地理院 住所検索"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "国土地理院地址搜索"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "國土地理院地址搜尋"
-          }
-        }
-      }
-    },
-    "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block; turn on Refine with OpenStreetMap to narrow that to the building." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple マップが現地の地図提供元から配信され、中国本土以外の会場はほとんど収録されていないため、日本の会場を検索しても見つからないことがよくあります。その場合は住所検索に回り、街区の位置までしか分かりません。「OpenStreetMap で位置を絞り込む」をオンにすると、建物まで絞り込みます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地图由本地服务商提供，几乎不收录境外场馆，因此搜索日本的场馆常常一无所获。这类场馆会转由地址检索定位，但只能精确到街区；开启「用 OpenStreetMap 细化位置」后，会进一步定位到具体建筑。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；開啟「用 OpenStreetMap 細化位置」後，會進一步定位到具體建築。"
-          }
-        }
-      }
-    },
-    "In Mainland China" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中国本土"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中国大陆"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中國大陸"
-          }
-        }
-      }
-    },
-    "Narrows a block to its building, while Refine with OpenStreetMap is on." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「OpenStreetMap で位置を絞り込む」がオンのとき、街区から建物まで絞り込みます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开启「用 OpenStreetMap 细化位置」时，从街区细化到建筑。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開啟「用 OpenStreetMap 細化位置」時，從街區細化到建築。"
-          }
-        }
-      }
-    },
-    "OpenStreetMap" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenStreetMap"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenStreetMap"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenStreetMap"
-          }
-        }
-      }
-    },
-    "Not Placed Yet" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未確定"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尚未定位"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "尚未定位"
-          }
-        }
-      }
-    },
-    "Searched first, by the hall's name. Places the building." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "会場名で最初に検索します。建物の位置を示します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "首先按场馆名称搜索，定位到建筑。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "首先按場館名稱搜尋，定位到建築。"
-          }
-        }
-      }
-    },
-    "Shown by name until one of the three finds it." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "見つかるまで会場名のみを表示します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找到之前只显示场馆名称。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "找到之前只顯示場館名稱。"
-          }
-        }
-      }
-    },
-    "Options" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オプション"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选项"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選項"
-          }
-        }
-      }
-    },
-    "Outside Mainland China" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中国本土以外"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中国大陆以外"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中國大陸以外"
-          }
-        }
-      }
-    },
-    "Refine with OpenStreetMap" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OpenStreetMap で位置を絞り込む"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用 OpenStreetMap 细化位置"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用 OpenStreetMap 細化位置"
-          }
-        }
-      }
-    },
-    "Why This Setting" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この設定について"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "为什么需要这项设置"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "為什麼需要這項設定"
           }
         }
       }
@@ -1721,6 +1123,28 @@
         }
       }
     },
+    "After Leaving Mainland China" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国本土を離れた後"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离开中国大陆后"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離開中國大陸後"
+          }
+        }
+      }
+    },
     "All" : {
       "localizations" : {
         "ja" : {
@@ -1787,6 +1211,28 @@
         }
       }
     },
+    "App Language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの言語"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 语言"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 語言"
+          }
+        }
+      }
+    },
     "Appearance" : {
       "localizations" : {
         "ja" : {
@@ -1827,6 +1273,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "演出資訊來自公開可存取的 Eventernote 頁面。關注資訊儲存在你的資料庫中——不會寫回 Eventernote。"
+          }
+        }
+      }
+    },
+    "Apple Maps" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple マップ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地圖"
+          }
+        }
+      }
+    },
+    "Apple Maps is asked first and places nearly every hall. Nothing on this screen needs changing." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple マップが最初に検索され、ほぼすべての会場の位置が決まります。この画面の設定を変える必要はありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "优先使用 Apple 地图，几乎所有场馆都能由它定位，无需调整本页的任何设置。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "優先使用 Apple 地圖，幾乎所有場館都能由它定位，無需調整本頁的任何設定。"
+          }
+        }
+      }
+    },
+    "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block; turn on Refine with OpenStreetMap to narrow that to the building." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple マップが現地の地図提供元から配信され、中国本土以外の会場はほとんど収録されていないため、日本の会場を検索しても見つからないことがよくあります。その場合は住所検索に回り、街区の位置までしか分かりません。「OpenStreetMap で位置を絞り込む」をオンにすると、建物まで絞り込みます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地图由本地服务商提供，几乎不收录境外场馆，因此搜索日本的场馆常常一无所获。这类场馆会转由地址检索定位，但只能精确到街区；开启「用 OpenStreetMap 细化位置」后，会进一步定位到具体建筑。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；開啟「用 OpenStreetMap 細化位置」後，會進一步定位到具體建築。"
           }
         }
       }
@@ -2355,6 +1867,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法連接 Eventernote。請稍後重試。"
+          }
+        }
+      }
+    },
+    "Couldn't translate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法翻译"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法翻譯"
           }
         }
       }
@@ -3723,6 +3257,50 @@
         }
       }
     },
+    "GSI Address Search" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国土地理院 住所検索"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国土地理院地址搜索"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "國土地理院地址搜尋"
+          }
+        }
+      }
+    },
+    "Halls placed while you were there keep the block or building they were given. Refresh Venue Locations once you are elsewhere, and Apple Maps is asked for them again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国本土にいた間に決まった会場は、そのときの街区や建物の位置のままです。本土を出てから「会場の位置を更新」を行うと、Apple マップで改めて検索します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在中国大陆期间定位的场馆，会保持当时得到的街区或建筑位置。离开大陆后点击「刷新场馆位置」，就会重新用 Apple 地图查询，得到准确定位。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在中國大陸期間定位的場館，會保持當時得到的街區或建築位置。離開大陸後點擊「重新整理場館位置」，就會重新用 Apple 地圖查詢，得到準確定位。"
+          }
+        }
+      }
+    },
     "Hokkaidō, Tōhoku, Kōshin and Hokuriku" : {
       "localizations" : {
         "ja" : {
@@ -3741,6 +3319,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "北海道、東北、甲信和北陸"
+          }
+        }
+      }
+    },
+    "How Halls Are Placed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場の位置の決め方"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场馆位置的确定方式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場館位置的確定方式"
           }
         }
       }
@@ -3895,6 +3495,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在從公開的 Eventernote 頁面匯入此活動…"
+          }
+        }
+      }
+    },
+    "In Mainland China" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国本土"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国大陆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中國大陸"
           }
         }
       }
@@ -4383,6 +4005,50 @@
         }
       }
     },
+    "Mark as Read" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既読にする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標示為已讀"
+          }
+        }
+      }
+    },
+    "Mark as Unread" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未読にする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为未读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標示為未讀"
+          }
+        }
+      }
+    },
     "Match" : {
       "localizations" : {
         "ja" : {
@@ -4603,6 +4269,28 @@
         }
       }
     },
+    "Narrows a block to its building, while Refine with OpenStreetMap is on." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「OpenStreetMap で位置を絞り込む」がオンのとき、街区から建物まで絞り込みます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启「用 OpenStreetMap 细化位置」时，从街区细化到建筑。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟「用 OpenStreetMap 細化位置」時，從街區細化到建築。"
+          }
+        }
+      }
+    },
     "Never refreshed" : {
       "localizations" : {
         "ja" : {
@@ -4621,6 +4309,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "從未重新整理"
+          }
+        }
+      }
+    },
+    "NEW" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新"
           }
         }
       }
@@ -4801,6 +4511,28 @@
         }
       }
     },
+    "No Unread Events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未読のイベントなし"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有未读活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有未讀活動"
+          }
+        }
+      }
+    },
     "No Upcoming Events" : {
       "localizations" : {
         "ja" : {
@@ -4929,6 +4661,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未歸類"
+          }
+        }
+      }
+    },
+    "Not Placed Yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未確定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未定位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未定位"
           }
         }
       }
@@ -5395,6 +5149,50 @@
         }
       }
     },
+    "OpenStreetMap" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenStreetMap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenStreetMap"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenStreetMap"
+          }
+        }
+      }
+    },
+    "Options" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オプション"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选项"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選項"
+          }
+        }
+      }
+    },
     "Osaka, Kyoto, Kobe and around" : {
       "localizations" : {
         "ja" : {
@@ -5413,6 +5211,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "大阪、京都、神戶及周邊"
+          }
+        }
+      }
+    },
+    "Outside Mainland China" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国本土以外"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国大陆以外"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中國大陸以外"
           }
         }
       }
@@ -5769,6 +5589,28 @@
         }
       }
     },
+    "Read" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既読"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已讀"
+          }
+        }
+      }
+    },
     "Reading their events…" : {
       "localizations" : {
         "ja" : {
@@ -5901,6 +5743,28 @@
         }
       }
     },
+    "Refine with OpenStreetMap" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenStreetMap で位置を絞り込む"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 OpenStreetMap 细化位置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 OpenStreetMap 細化位置"
+          }
+        }
+      }
+    },
     "Refresh" : {
       "localizations" : {
         "ja" : {
@@ -5919,6 +5783,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新整理"
+          }
+        }
+      }
+    },
+    "Refresh All Venues" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての会場を更新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新所有场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新整理所有場館"
           }
         }
       }
@@ -6297,6 +6183,28 @@
         }
       }
     },
+    "Same as App Language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの言語と同じ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与 App 语言相同"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "與 App 語言相同"
+          }
+        }
+      }
+    },
     "Search" : {
       "localizations" : {
         "ja" : {
@@ -6359,6 +6267,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜尋不可用"
+          }
+        }
+      }
+    },
+    "Searched first, by the hall's name. Places the building." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場名で最初に検索します。建物の位置を示します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首先按场馆名称搜索，定位到建筑。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首先按場館名稱搜尋，定位到建築。"
           }
         }
       }
@@ -6491,6 +6421,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇活動"
+          }
+        }
+      }
+    },
+    "Select events to mark" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マークするイベントを選択"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要标记的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇要標示的活動"
           }
         }
       }
@@ -6649,6 +6601,28 @@
         }
       }
     },
+    "Show All Events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのイベントを表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示所有活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示所有活動"
+          }
+        }
+      }
+    },
     "Show less" : {
       "localizations" : {
         "ja" : {
@@ -6693,6 +6667,50 @@
         }
       }
     },
+    "Show Original" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原文を表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示原文"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示原文"
+          }
+        }
+      }
+    },
+    "Show Unread Only" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未読のみ表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅显示未读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅顯示未讀"
+          }
+        }
+      }
+    },
     "Showing what was read before." : {
       "localizations" : {
         "ja" : {
@@ -6711,6 +6729,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在顯示之前讀取的內容。"
+          }
+        }
+      }
+    },
+    "Shown by name until one of the three finds it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見つかるまで会場名のみを表示します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到之前只显示场馆名称。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找到之前只顯示場館名稱。"
           }
         }
       }
@@ -6953,6 +6993,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已同步於 %@"
+          }
+        }
+      }
+    },
+    "System" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随系统"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟隨系統"
           }
         }
       }
@@ -7309,28 +7371,6 @@
         }
       }
     },
-    "Turn on iCloud Sync and your events, notes and tracking arrive privately through your own iCloud." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud同期をオンにすると、イベント、メモ、記録が自分のiCloudを通じてプライベートに届きます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开启 iCloud 同步后，你的活动、备注和跟踪记录会通过你自己的 iCloud 私密地同步过来。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開啟 iCloud 同步後，你的活動、備註和跟蹤記錄會透過你自己的 iCloud 私密地同步過來。"
-          }
-        }
-      }
-    },
     "Tōkai" : {
       "localizations" : {
         "ja" : {
@@ -7507,6 +7547,72 @@
         }
       }
     },
+    "Translate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻譯"
+          }
+        }
+      }
+    },
+    "Translate Into" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳先"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译为"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻譯為"
+          }
+        }
+      }
+    },
+    "Translated by iOS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSによる翻訳"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 iOS 翻译"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 iOS 翻譯"
+          }
+        }
+      }
+    },
     "Try Again" : {
       "localizations" : {
         "ja" : {
@@ -7525,6 +7631,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重試"
+          }
+        }
+      }
+    },
+    "Turn on iCloud Sync and your events, notes and tracking arrive privately through your own iCloud." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud同期をオンにすると、イベント、メモ、記録が自分のiCloudを通じてプライベートに届きます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启 iCloud 同步后，你的活动、备注和跟踪记录会通过你自己的 iCloud 私密地同步过来。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟 iCloud 同步後，你的活動、備註和跟蹤記錄會透過你自己的 iCloud 私密地同步過來。"
           }
         }
       }
@@ -7613,6 +7741,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "解除與此 Eventernote 帳號的關聯？"
+          }
+        }
+      }
+    },
+    "Unread" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未読"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未讀"
           }
         }
       }
@@ -7727,6 +7877,28 @@
         }
       }
     },
+    "UPDATED" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
+      }
+    },
     "Used Eventrail before? Bring what you kept here — now, or later in Settings." : {
       "localizations" : {
         "ja" : {
@@ -7745,6 +7917,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "以前用過 Eventrail？可以把保留的內容帶到這裡——現在或以後在「設定」中都行。"
+          }
+        }
+      }
+    },
+    "Used when Maps finds nothing. Places the block." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マップで見つからない場合に使います。街区の位置を示します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地图找不到时使用，定位到街区。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地圖找不到時使用，定位到街區。"
           }
         }
       }
@@ -8123,6 +8317,28 @@
         }
       }
     },
+    "Why This Setting" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この設定について"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为什么需要这项设置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "為什麼需要這項設定"
+          }
+        }
+      }
+    },
     "Year" : {
       "localizations" : {
         "ja" : {
@@ -8185,6 +8401,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你已參加"
+          }
+        }
+      }
+    },
+    "You have looked at every date here. New dates, and dates Eventernote changes, show up as unread." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここにある日程はすべて確認済みです。新しい日程や、Eventernoteで内容が変わった日程は未読として表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这里的日程都已看过。新的日程，以及 Eventernote 上有变动的日程，会显示为未读。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這裡的日程都已看過。新的日程，以及 Eventernote 上有變動的日程，會顯示為未讀。"
           }
         }
       }

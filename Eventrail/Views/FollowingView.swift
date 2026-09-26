@@ -5,6 +5,11 @@ import SwiftUI
 /// The library tab is what the reader has decided about; this is what is coming
 /// that they have not decided about yet. Nothing here is in the library until
 /// they put it there, which is what the control on each row is for.
+///
+/// It is also read the way a mailbox is: a date the reader has not looked at
+/// carries a dot until they open it, swipe it, or mark it with others — and a
+/// date the listing has since changed carries one again. See
+/// ``FollowingRead``.
 struct FollowingView: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
@@ -25,6 +30,21 @@ struct FollowingView: View {
     /// When the list was last pulled down, so the flyers on it are asked about
     /// again with the rows — see ``EnvironmentValues/imagesCheckedSince``.
     @State private var imagesCheckedSince: Date?
+    /// Held here rather than left to `NavigationLink`: a link inside a `List`
+    /// row takes the whole row over, and the row's own tap opens the event.
+    @State private var path = NavigationPath()
+
+    /// Whether only the dates the reader has not looked at are shown.
+    @State private var unreadOnly = false
+    /// Dates marked read while ``unreadOnly`` is on. They stay on screen until
+    /// the filter is turned off, the way Mail keeps a message it has just
+    /// opened: a row vanishing under the thumb that swiped it reads as lost.
+    @State private var readWhileFiltering: Set<Event.ID> = []
+
+    /// Picking dates to mark. While this is on, a tap chooses a row rather
+    /// than opening it.
+    @State private var isSelecting = false
+    @State private var selection: Set<Event.ID> = []
 
     private var performers: [PerformerProfile] { store.followedPerformers }
 
@@ -43,9 +63,18 @@ struct FollowingView: View {
 
     private var events: [Event] { narrowed(published) }
 
-    /// Holds a list to the chosen dates and areas. An untouched filter narrows
-    /// nothing, so this is the identity until the reader asks for something.
+    /// Holds a list to the chosen dates and areas, then to the unread ones if
+    /// that is asked for. An untouched filter narrows nothing, so this is the
+    /// identity until the reader asks for something.
     private func narrowed(_ events: [Event]) -> [Event] {
+        let placed = filtered(events)
+        guard unreadOnly else { return placed }
+        return placed.filter { store.isUnread($0) || readWhileFiltering.contains($0.id) }
+    }
+
+    /// The dates and areas alone — what tells "nothing in that range" from
+    /// "nothing unread" when the list comes up empty.
+    private func filtered(_ events: [Event]) -> [Event] {
         guard filter.isNarrowing else { return events }
         return events.filter { filter.matches($0, in: venues.region(of: $0)) }
     }
@@ -57,46 +86,68 @@ struct FollowingView: View {
         EventGroup.byMonth(events)
     }
 
+    /// Selecting reaches what is on screen and no further, as it does in My
+    /// Events.
+    private var shownIDs: Set<Event.ID> { Set(events.map(\.id)) }
+
+    private var chosen: [Event] { events.filter { selection.contains($0.id) } }
+
+    private var unreadCount: Int {
+        followed.events(for: performers).count(where: store.isUnread)
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if performers.isEmpty {
-                        nobodyFollowed
-                    } else {
-                        filters
-                        // The whole screen goes to the failure only when there
-                        // is nothing cached to fall back on. Otherwise the last
-                        // copy stays up and the failure goes under it.
-                        if let failure = followed.failure, !holdsAnything {
-                            SearchFailure(message: failure) { await reload() }
-                        } else if groups.isEmpty {
+        NavigationStack(path: $path) {
+            List(selection: $selection) {
+                if performers.isEmpty {
+                    nobodyFollowed.bareRow()
+                } else {
+                    filters
+                        .disabled(isSelecting)
+                        .bareRow(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
+                    // The whole screen goes to the failure only when there is
+                    // nothing cached to fall back on. Otherwise the last copy
+                    // stays up and the failure goes under it.
+                    if let failure = followed.failure, !holdsAnything {
+                        SearchFailure(message: failure) { await reload() }.bareRow()
+                    } else if groups.isEmpty {
+                        Group {
                             if followed.isLoading {
                                 SearchProgress()
-                            } else if filter.isNarrowing {
+                            } else if filter.isNarrowing, filtered(published).isEmpty {
                                 nothingMatches
+                            } else if unreadOnly, !published.isEmpty {
+                                allRead
                             } else {
                                 noDatesPublished
                             }
-                            failureNote
-                        } else {
-                            months
-                            if followed.isLoading { SearchProgress(compact: true) }
-                            failureNote
-                            footnote
                         }
+                        .bareRow()
+                        failureNote
+                    } else {
+                        months
+                        if followed.isLoading { SearchProgress(compact: true).bareRow() }
+                        failureNote
+                        footnote
                     }
                 }
-                .padding(.vertical, 8)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            // A `List` pads every row, header and section out to its own
+            // minimums; the rows here are laid out to the spacing the
+            // scroll view of panels had before, so those are taken away.
+            .listSectionSpacing(0)
+            .environment(\.defaultMinListRowHeight, 0)
+            .environment(\.defaultMinListHeaderHeight, 0)
+            .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
             .washBackground()
             .navigationTitle("Following")
             .navigationSubtitle(subtitle)
-            .toolbar {
-                if !performers.isEmpty {
-                    ToolbarItem(placement: .primaryAction) { filterButton }
-                }
-            }
+            // Selecting takes the bottom of the screen over, as it does in My
+            // Events: the tab bar stands down for the actions on what is picked.
+            .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
+            .toolbar { toolbar }
             .performerDestination()
             .eventSheet($openEvent)
             .sheet(isPresented: $isFiltering) {
@@ -114,6 +165,12 @@ struct FollowingView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await load() } }
             }
+            // Turning the filter off lets go of what it was keeping, and
+            // turning it back on starts from what is unread now.
+            .onChange(of: unreadOnly) { readWhileFiltering.removeAll() }
+            .onChange(of: isSelecting) { selection.removeAll() }
+            // Nothing stays picked behind a filter that no longer shows it.
+            .onChange(of: shownIDs) { _, shown in selection.formIntersection(shown) }
             .environment(\.imagesCheckedSince, imagesCheckedSince)
         }
     }
@@ -124,13 +181,81 @@ struct FollowingView: View {
     /// having gone missing.
     private var subtitle: Text {
         guard !performers.isEmpty else { return Text("Nobody followed yet") }
+        if isSelecting {
+            return selection.isEmpty
+                ? Text("Select events to mark")
+                : Text("^[\(selection.count) event](inflect: true) selected")
+        }
         let people = Text("^[\(performers.count) performer](inflect: true)")
-        guard filter.isNarrowing else {
+        guard filter.isNarrowing || unreadOnly else {
             let dates = Text("^[\(followed.events(for: performers).count) event](inflect: true)")
-            return Text("\(people) · \(dates)")
+            let unread = unreadCount
+            guard unread > 0 else { return Text("\(people) · \(dates)") }
+            return Text("\(people) · \(dates) · \(unread) unread")
         }
         let shown = Text("\(events.count) of \(Text("^[\(published.count) event](inflect: true)"))")
         return Text("\(people) · \(shown)")
+    }
+
+    // MARK: - The bar
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        if !performers.isEmpty {
+            if isSelecting {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done", systemImage: "checkmark") { isSelecting = false }
+                }
+                // Where Mail keeps it: the pick-everything control opposite
+                // the way out.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(selection == shownIDs ? "Deselect All" : "Select All") {
+                        selection = selection == shownIDs ? [] : shownIDs
+                    }
+                }
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Spacer()
+                    markButton
+                }
+            } else {
+                // The two ways of narrowing the list share a capsule; picking
+                // rows is a different act, and stands apart from them.
+                ToolbarItem(placement: .primaryAction) { unreadButton }
+                ToolbarItem(placement: .primaryAction) { filterButton }
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Select Events", systemImage: "pencil") { isSelecting = true }
+                        .disabled(events.isEmpty)
+                }
+            }
+        }
+    }
+
+    /// One button rather than Mail's menu, doing whichever of the two the
+    /// picked rows call for: read if any of them is still unread, unread only
+    /// once every one of them has been read.
+    private var markButton: some View {
+        let picked = chosen
+        let marksRead = picked.isEmpty || picked.contains(where: store.isUnread)
+        return Button(marksRead ? "Mark as Read" : "Mark as Unread",
+                      systemImage: marksRead ? "envelope.open" : "envelope.badge") {
+            mark(picked, read: marksRead)
+        }
+        .labelStyle(.iconOnly)
+        .contentTransition(.symbolEffect(.replace))
+        .disabled(picked.isEmpty)
+    }
+
+    /// Only the dates not looked at yet. Filled in and tinted while it is on,
+    /// like the filter beside it.
+    private var unreadButton: some View {
+        Button {
+            withAnimation(.snappy) { unreadOnly.toggle() }
+        } label: {
+            Label(unreadOnly ? "Show All Events" : "Show Unread Only",
+                  systemImage: unreadOnly ? "envelope.badge.fill" : "envelope.badge")
+        }
+        .tint(unreadOnly ? Color.brandTint : nil)
     }
 
     /// The way into the dates and the areas. Filled in and tinted while it is
@@ -147,6 +272,21 @@ struct FollowingView: View {
         .tint(filter.isNarrowing ? Color.brandTint : nil)
     }
 
+    // MARK: - Read and unread
+
+    private func open(_ event: Event) {
+        mark([event], read: true)
+        openEvent = event
+    }
+
+    private func mark(_ events: [Event], read: Bool) {
+        withAnimation(.snappy) {
+            if read, unreadOnly { readWhileFiltering.formUnion(events.map(\.id)) }
+            store.markFollowing(events, read: read)
+        }
+        if isSelecting { isSelecting = false }
+    }
+
     /// Whether anything at all is cached for the people followed — the line
     /// between a refresh that failed over a list the reader can still read and
     /// one that left them with nothing.
@@ -157,8 +297,7 @@ struct FollowingView: View {
     @ViewBuilder private var failureNote: some View {
         if let failure = followed.failure, !followed.isLoading {
             RefreshFailureNote(message: failure)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
+                .bareRow(EdgeInsets(top: 4, leading: 16, bottom: 0, trailing: 16))
         }
     }
 
@@ -246,34 +385,50 @@ struct FollowingView: View {
 
     // MARK: - The dates themselves
 
-    /// Sectioned and pinned, the way the library tab's own months are: a long
-    /// list of published dates is read by month, so the month being read stays
-    /// on screen while it is being read.
-    private var months: some View {
-        LazyVStack(alignment: .leading, spacing: 9, pinnedViews: .sectionHeaders) {
-            ForEach(groups) { group in
-                Section {
-                    ForEach(group.events) { event in
-                        FollowedDateRow(event: event,
-                                        billing: followed.billed(on: event, among: performers)) {
-                            openEvent = event
+    /// Sectioned, and so pinned the way the library tab's own months are: a
+    /// long list of published dates is read by month, so the month being read
+    /// stays on screen while it is being read.
+    @ViewBuilder private var months: some View {
+        ForEach(groups) { group in
+            Section {
+                ForEach(group.events) { event in
+                    let unread = store.unread(event)
+                    let isUnread = unread != nil
+                    FollowedDateRow(event: event,
+                                    billing: followed.billed(on: event, among: performers),
+                                    unread: unread,
+                                    showPerformer: { path.append(PerformerLink.profile($0)) },
+                                    open: { open(event) })
+                        // In edit mode the row belongs to the selection, not to
+                        // the sheet or to the controls drawn on it.
+                        .allowsHitTesting(!isSelecting)
+                        .listRowInsets(EdgeInsets(top: 4.5, leading: 16, bottom: 4.5, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        // Toward the dot, as in Mail: a swipe from the leading
+                        // edge reads the row, or unreads it.
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                mark([event], read: isUnread)
+                            } label: {
+                                Label(isUnread ? "Read" : "Unread",
+                                      systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                            }
+                            .tint(Color.brandTint)
                         }
-                        .padding(.horizontal, 16)
-                    }
-                } header: {
-                    GroupHeader(label: Text(group.label), count: group.events.count)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            } header: {
+                GroupHeader(label: Text(group.label), count: group.events.count)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8.5, trailing: 20))
             }
         }
     }
 
     // MARK: - When there is nothing to show
 
-    /// Three different silences, told apart: nobody to follow dates for, nobody
-    /// who has any, and a filter that has left none of them on screen.
+    /// Four different silences, told apart: nobody to follow dates for, nobody
+    /// who has any, a filter that has left none of them on screen, and nothing
+    /// left unread.
     private var nobodyFollowed: some View {
         ContentUnavailableView {
             Label("Nobody Followed", systemImage: "person.2")
@@ -309,10 +464,35 @@ struct FollowingView: View {
         .padding(.top, 40)
     }
 
+    private var allRead: some View {
+        ContentUnavailableView {
+            Label("No Unread Events", systemImage: "envelope.open")
+        } description: {
+            Text("You have looked at every date here. New dates, and dates Eventernote changes, show up as unread.")
+        } actions: {
+            Button("Show All Events") {
+                withAnimation(.snappy) { unreadOnly = false }
+            }
+            .buttonStyle(.glass)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+    }
+
     private var footnote: some View {
         Footnote(Text("Dates come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back."))
-            .padding(.horizontal, 26)
-            .padding(.top, 6)
+            .bareRow(EdgeInsets(top: 6, leading: 26, bottom: 8, trailing: 26))
+    }
+}
+
+private extension View {
+    /// A row of the Following list that is not a date: no background, no
+    /// separator, and nothing to pick while dates are being picked.
+    func bareRow(_ insets: EdgeInsets = EdgeInsets()) -> some View {
+        listRowInsets(insets)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .selectionDisabled()
     }
 }
 
@@ -719,32 +899,58 @@ private struct RangeCalendar: View {
 
 /// One published date, captioned with whichever followed performers are billed
 /// on it. Tapping the caption opens that performer; the circular control adds
-/// the event to the library, or takes it out again.
+/// the event to the library, or takes it out again. The tag after the names says
+/// the reader has not looked at this copy of it yet — New, or Updated where the
+/// listing changed after they did. A tag rather than a dot, because the
+/// caption above already leads with one.
 private struct FollowedDateRow: View {
     let event: Event
     let billing: [PerformerProfile]
+    let unread: FollowingUnread?
+    let showPerformer: (PerformerProfile) -> Void
     let open: () -> Void
 
     var body: some View {
         EventRowContent(event: event, detail: event.timeDetail) {
-            if let first = billing.first {
-                // The whole caption leads to the first name on it. Two followed
-                // performers sharing a bill is the uncommon case, and a row is
-                // not the place to make the reader choose between them — their
-                // own page is one tap further on either way.
-                NavigationLink(value: PerformerLink.profile(first)) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color.brandTint)
-                            .frame(width: 6, height: 6)
-                        Text(verbatim: billing.map(\.name).joined(separator: " · "))
-                            .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(Color.brandTint)
-                            .lineLimit(1)
+            HStack(spacing: 6) {
+                if let first = billing.first {
+                    // The whole caption leads to the first name on it. Two
+                    // followed performers sharing a bill is the uncommon case,
+                    // and a row is not the place to make the reader choose
+                    // between them — their own page is one tap further on
+                    // either way.
+                    Button {
+                        showPerformer(first)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color.brandTint)
+                                .frame(width: 6, height: 6)
+                            Text(verbatim: billing.map(\.name).joined(separator: " · "))
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .foregroundStyle(Color.brandTint)
+                                .lineLimit(1)
+                        }
+                        .contentShape(.rect)
                     }
-                    .contentShape(.rect)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                // After the names, as the design has it, and held at its own
+                // size: a long bill is what gives way. Outside the button, so
+                // a tap on the tag opens the event rather than the performer.
+                if let tag {
+                    tag
+                        .textCase(.uppercase)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Color.brandTint)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.brandTint.opacity(0.13),
+                                    in: .rect(cornerRadius: 5, style: .continuous))
+                        .fixedSize()
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
         } trailing: {
             LibraryToggle(event: event)
@@ -752,6 +958,17 @@ private struct FollowedDateRow: View {
         .contentShape(.rect)
         .onTapGesture(perform: open)
         .glassPanel()
+        .accessibilityElement(children: .contain)
+    }
+
+    private var tag: Text? {
+        switch unread {
+        // Keyed in capitals as the design writes them, and apart from the
+        // refresh notice's "Updated", which is a sentence rather than a tag.
+        case .new: Text("NEW")
+        case .updated: Text("UPDATED")
+        case nil: nil
+        }
     }
 }
 

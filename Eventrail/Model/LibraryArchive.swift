@@ -78,6 +78,17 @@ nonisolated struct LibraryArchive: Codable, Sendable {
     /// Without this the Following tab would know only that some actor id
     /// matters and have no way to name it or ask the site for its dates.
     var followedPerformers: [String: PerformerProfile]?
+    /// Which dates on the Following tab the reader has looked at, keyed by
+    /// event id — see ``FollowingRead``.
+    ///
+    /// Keyed by events the archive otherwise knows nothing about: a followed
+    /// performer's date is not in ``events`` until the reader adds it. So each
+    /// record carries its own night, and is pruned by that rather than by
+    /// whether anything else points at it.
+    ///
+    /// Optional on the outside only so that an archive written before this
+    /// existed still decodes, exactly as ``follows`` is.
+    var followingReads: [Event.ID: Stamped<FollowingRead>]?
     var recentSearches: Stamped<[String]> = Stamped([], at: .distantPast)
     var lastRefreshed: Date?
     /// The Eventernote account the reader imports their history from.
@@ -118,13 +129,27 @@ nonisolated struct LibraryArchive: Codable, Sendable {
     /// ``EventStore/mayPushToCloud``.
     var holdsNothing: Bool {
         membership.isEmpty && tracking.isEmpty && favorites.isEmpty
-            && (follows?.isEmpty ?? true) && eventernoteAccount == nil
+            && (follows?.isEmpty ?? true) && (followingReads?.isEmpty ?? true)
+            && eventernoteAccount == nil
             && recentSearches.value.isEmpty
     }
 
     func isInLibrary(_ id: Event.ID) -> Bool { membership[id]?.value == true }
     func isFavorite(_ id: Event.ID) -> Bool { favorites[id]?.value == true }
     func isFollowing(_ actorID: Int) -> Bool { follows?[String(actorID)]?.value == true }
+
+    /// Whether this copy of a Following row is one the reader has not seen —
+    /// never marked, marked unread, or marked when the listing said something
+    /// else.
+    func isUnread(_ event: Event) -> Bool {
+        followingReads?[event.id]?.value.matches(event) != true
+    }
+
+    /// Why this copy of a Following row is unread, or nil where it is read.
+    func unread(_ event: Event) -> FollowingUnread? {
+        guard let read = followingReads?[event.id]?.value, read.fingerprint != nil else { return .new }
+        return read.matches(event) ? nil : .updated
+    }
 
     /// The performers the reader follows and the app can still name.
     ///
@@ -162,6 +187,7 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         merged.tracking = tracking.merging(other.tracking) { $0.merging($1) }
         merged.favorites = Self.merge(favorites, other.favorites)
         merged.follows = Self.merge(follows ?? [:], other.follows ?? [:])
+        merged.followingReads = Self.merge(followingReads ?? [:], other.followingReads ?? [:])
         // Both sides read the same public page, so either is true; this device's
         // copy is kept so the merge stays stable.
         merged.followedPerformers = (followedPerformers ?? [:])
@@ -204,6 +230,12 @@ nonisolated struct LibraryArchive: Codable, Sendable {
             follows[key] = Stamped(true, at: now)
         }
         if !follows.isEmpty { raised.follows = follows }
+        var reads = raised.followingReads ?? [:]
+        for (id, record) in backup.followingReads ?? [:]
+        where record.value.fingerprint != nil && followingReads?[id]?.value.fingerprint == nil {
+            reads[id] = Stamped(record.value, at: now)
+        }
+        if !reads.isEmpty { raised.followingReads = reads }
         for (id, record) in backup.tracking
         where !record.value.isEmpty && (tracking[id]?.value.isEmpty ?? true) {
             raised.tracking[id] = record.restamped(at: now)
@@ -255,6 +287,12 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         // Who someone is only matters while they are followed — the same reason
         // an event nothing points at any more is dropped below.
         pruned.followedPerformers = followedPerformers?.filter { pruned.follows?[$0.key]?.value == true }
+        // A night that has been is off the Following tab, and so is whether it
+        // was read. By the night rather than by the stamp, so both devices
+        // drop the same records and neither hands one back. A few days' grace
+        // covers a device whose clock or zone disagrees with the hall's.
+        let over = Date.now.addingTimeInterval(-3 * 24 * 60 * 60)
+        pruned.followingReads = followingReads?.filter { $0.value.value.day > over }
         pruned.events = events.filter { pruned.isInLibrary($0.key) || pruned.isFavorite($0.key) }
         pruned.tracking = tracking.filter {
             // A note survives its event leaving the library; an empty record does not.

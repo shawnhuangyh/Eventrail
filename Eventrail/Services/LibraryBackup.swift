@@ -53,7 +53,11 @@ nonisolated struct LibraryBackup: Sendable {
     /// drop them and go back to settling the whole record at once, so the note
     /// typed on the other device goes missing the next time anything else on
     /// that record is touched.
-    static let currentFormat: UInt8 = 5
+    ///
+    /// 6: the archive carries which Following dates the reader has looked at.
+    /// Their own record, and nothing imports it back, so a build that has
+    /// never heard of it is told to refuse the file rather than drop it.
+    static let currentFormat: UInt8 = 6
 
     var app: String
     var created: Date

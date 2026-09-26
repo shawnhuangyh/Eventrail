@@ -34,7 +34,11 @@ struct BackupRestore: ViewModifier {
                 // the last moment they can tell which one they tapped.
                 Text("\(Text(verbatim: file.deletingPathExtension().lastPathComponent)) will be added to your library. Nothing already on this device is erased.")
             }
-            .alert(report?.title ?? "", isPresented: isReporting, presenting: report) { _ in
+            // Verbatim for the moment there is no report, which is the moment
+            // the alert is not shown: a bare "" here is a localizable key of its
+            // own, and sits in the string catalog as a string to translate.
+            .alert(report.map { Text($0.title) } ?? Text(verbatim: ""),
+                   isPresented: isReporting, presenting: report) { _ in
                 Button("OK", role: .cancel) {}
             } message: { report in
                 report.message

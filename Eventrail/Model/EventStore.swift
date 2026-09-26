@@ -491,6 +491,41 @@ final class EventStore {
         for (id, record) in archive.tracking where !record.value.isEmpty {
             archive.tracking[id] = Stamped(Tracking(), at: now)
         }
+        // Every Following date back to unread, on every device: written as a
+        // record with no fingerprint rather than dropped, or the other
+        // device's copy of each read would come straight back in the merge.
+        for (id, record) in archive.followingReads ?? [:] where record.value.fingerprint != nil {
+            archive.followingReads?[id] = Stamped(FollowingRead(fingerprint: nil, day: record.value.day),
+                                                  at: now)
+        }
+        persist()
+    }
+
+    // MARK: - What the reader has looked at on Following
+
+    /// Whether this copy of a Following row is one the reader has not seen —
+    /// see ``FollowingRead``.
+    func isUnread(_ event: Event) -> Bool { archive.isUnread(event) }
+
+    /// Why a Following row is unread — new, or changed since it was read —
+    /// or nil where it is read.
+    func unread(_ event: Event) -> FollowingUnread? { archive.unread(event) }
+
+    /// Marks these rows read as the listing prints them now, or unread again.
+    /// One write for the lot, however many there are — Select All then Mark
+    /// is hundreds of them.
+    func markFollowing(_ events: some Sequence<Event>, read: Bool) {
+        let now = Date.now
+        var reads = archive.followingReads ?? [:]
+        var changed = false
+        for event in events where archive.isUnread(event) == read {
+            reads[event.id] = Stamped(
+                FollowingRead(fingerprint: read ? event.listingFingerprint : nil, day: event.date),
+                at: now)
+            changed = true
+        }
+        guard changed else { return }
+        archive.followingReads = reads
         persist()
     }
 
