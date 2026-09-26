@@ -97,6 +97,37 @@ struct DaysAway: View {
     }
 }
 
+/// What a row the reader has not looked at yet says about itself — New, or
+/// Updated where the page changed after they did. See ``FollowingRead``.
+/// Following and My Events both draw it, off the same record, so a date read
+/// in one is read in the other.
+struct UnreadTag: View {
+    let unread: FollowingUnread
+
+    var body: some View {
+        label
+            .textCase(.uppercase)
+            .font(.system(size: 9.5, weight: .bold))
+            .tracking(0.5)
+            .foregroundStyle(Color.brandTint)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(Color.brandTint.opacity(0.13),
+                        in: .rect(cornerRadius: 5, style: .continuous))
+            .fixedSize()
+            .transition(.scale.combined(with: .opacity))
+    }
+
+    private var label: Text {
+        switch unread {
+        // Keyed in capitals as the design writes them, and apart from the
+        // refresh notice's "Updated", which is a sentence rather than a tag.
+        case .new: Text("NEW")
+        case .updated: Text("UPDATED")
+        }
+    }
+}
+
 /// One cell of a three-up statistics row.
 struct StatTile: View {
     /// The two arrangements the design draws this tile in.

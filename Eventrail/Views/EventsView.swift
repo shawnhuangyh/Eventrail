@@ -87,14 +87,34 @@ struct EventsView: View {
             ForEach(groups) { group in
                 Section {
                     ForEach(group.events) { event in
-                        LibraryRow(event: event) {
+                        // Only a night still ahead is read or unread, as on
+                        // Following: a past one is history rather than news, and
+                        // its record has been pruned with the night anyway.
+                        let unread = event.isUpcoming ? store.unread(event) : nil
+                        LibraryRow(event: event, unread: unread) {
                             // In edit mode the row belongs to the selection, not
                             // to the sheet.
-                            if !isSelecting { openEvent = event }
+                            guard !isSelecting else { return }
+                            if event.isUpcoming { mark(event, read: true) }
+                            openEvent = event
                         }
                             .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
+                            // Toward the tag, as on Following: a swipe from the
+                            // leading edge reads the row, or unreads it.
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                if event.isUpcoming {
+                                    let isUnread = unread != nil
+                                    Button {
+                                        mark(event, read: isUnread)
+                                    } label: {
+                                        Label(isUnread ? "Read" : "Unread",
+                                              systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                                    }
+                                    .tint(Color.brandTint)
+                                }
+                            }
                     }
                 } header: {
                     GroupHeader(label: Text(group.label), count: group.events.count)
@@ -126,6 +146,10 @@ struct EventsView: View {
         selection.count == 1
             ? Text("Remove this event from your library?")
             : Text("Remove \(selection.count) events from your library?")
+    }
+
+    private func mark(_ event: Event, read: Bool) {
+        withAnimation(.snappy) { store.markRead([event], read: read) }
     }
 
     private func endSelecting() {

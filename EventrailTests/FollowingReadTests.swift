@@ -157,8 +157,8 @@ struct FollowingReadTests {
     @MainActor @Test func markingInBulkLeavesTheRestAlone() {
         let store = store()
         let one = event("1"), two = event("2"), three = event("3")
-        store.markFollowing([one, two, three], read: true)
-        store.markFollowing([two], read: false)
+        store.markRead([one, two, three], read: true)
+        store.markRead([two], read: false)
         #expect(store.unread(one) == nil)
         #expect(store.unread(two) == .new)
         #expect(store.unread(three) == nil)
@@ -166,14 +166,14 @@ struct FollowingReadTests {
 
     @MainActor @Test func aDateMarkedReadAndThenChangedIsUpdated() {
         let store = store()
-        store.markFollowing([event()], read: true)
+        store.markRead([event()], read: true)
         #expect(store.unread(event(startsAt: Self.ahead.addingTimeInterval(3600))) == .updated)
     }
 
     @MainActor @Test func deleteAllTurnsEveryDateBackToUnread() {
         let store = store()
         let one = event("1"), two = event("2")
-        store.markFollowing([one, two], read: true)
+        store.markRead([one, two], read: true)
         store.removeAllEvents()
         #expect(store.unread(one) == .new)
         #expect(store.unread(two) == .new)

@@ -94,11 +94,18 @@ struct LibraryRow: View {
     @Environment(EventStore.self) private var store
 
     let event: Event
+    /// Why the reader has not looked at this night yet, for the tag above the
+    /// title — nil where they have, and on every night already past.
+    var unread: FollowingUnread? = nil
     let open: () -> Void
 
     var body: some View {
         Button(action: open) {
             EventRowContent(event: event, detail: event.timeDetail) {
+                // Above the title, where Following carries it after the names:
+                // a library row has no billing line to put it on the end of.
+                if let unread { UnreadTag(unread: unread) }
+            } trailing: {
                 // Held apart over the row's full height rather than packed into
                 // the middle of it: the badge belongs beside the title it
                 // qualifies, and the chevron in the corner it points out of.

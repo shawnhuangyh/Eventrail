@@ -282,7 +282,7 @@ struct FollowingView: View {
     private func mark(_ events: [Event], read: Bool) {
         withAnimation(.snappy) {
             if read, unreadOnly { readWhileFiltering.formUnion(events.map(\.id)) }
-            store.markFollowing(events, read: read)
+            store.markRead(events, read: read)
         }
         if isSelecting { isSelecting = false }
     }
@@ -938,19 +938,7 @@ private struct FollowedDateRow: View {
                 // After the names, as the design has it, and held at its own
                 // size: a long bill is what gives way. Outside the button, so
                 // a tap on the tag opens the event rather than the performer.
-                if let tag {
-                    tag
-                        .textCase(.uppercase)
-                        .font(.system(size: 9.5, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundStyle(Color.brandTint)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.brandTint.opacity(0.13),
-                                    in: .rect(cornerRadius: 5, style: .continuous))
-                        .fixedSize()
-                        .transition(.scale.combined(with: .opacity))
-                }
+                if let unread { UnreadTag(unread: unread) }
             }
         } trailing: {
             LibraryToggle(event: event)
@@ -959,16 +947,6 @@ private struct FollowedDateRow: View {
         .onTapGesture(perform: open)
         .glassPanel()
         .accessibilityElement(children: .contain)
-    }
-
-    private var tag: Text? {
-        switch unread {
-        // Keyed in capitals as the design writes them, and apart from the
-        // refresh notice's "Updated", which is a sentence rather than a tag.
-        case .new: Text("NEW")
-        case .updated: Text("UPDATED")
-        case nil: nil
-        }
     }
 }
 

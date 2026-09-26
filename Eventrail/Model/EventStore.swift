@@ -514,10 +514,11 @@ final class EventStore {
         persist()
     }
 
-    // MARK: - What the reader has looked at on Following
+    // MARK: - What the reader has looked at on Following and My Events
 
     /// Whether this copy of a Following row is one the reader has not seen —
-    /// see ``FollowingRead``.
+    /// see ``FollowingRead``. My Events reads the same record for its
+    /// upcoming rows, so a date read on one tab is read on the other.
     func isUnread(_ event: Event) -> Bool { archive.isUnread(event) }
 
     /// Why a Following row is unread — new, or changed since it was read —
@@ -527,7 +528,7 @@ final class EventStore {
     /// Marks these rows read as the listing prints them now, or unread again.
     /// One write for the lot, however many there are — Select All then Mark
     /// is hundreds of them.
-    func markFollowing(_ events: some Sequence<Event>, read: Bool) {
+    func markRead(_ events: some Sequence<Event>, read: Bool) {
         let now = Date.now
         var reads = archive.followingReads ?? [:]
         var changed = false
