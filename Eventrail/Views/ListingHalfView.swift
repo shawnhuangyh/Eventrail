@@ -112,9 +112,11 @@ struct ListingHalfView: View {
                 .padding(.vertical, 6)
                 .glassPanel(cornerRadius: 28)
 
-                if feed.isLoadingMore || (events.isEmpty && feed.hasMore) {
+                if feed.moreFailure == nil, events.isEmpty, feed.hasMore, !feed.isLoadingMore {
+                    // Still paging towards this half's first row.
                     SearchProgress(compact: true)
                 }
+                FeedFooter(feed: feed) { store.remember(feed.items) }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

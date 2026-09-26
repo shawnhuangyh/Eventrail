@@ -13,6 +13,10 @@ final class Feed<Item: Identifiable & Sendable> {
     private(set) var isLoadingMore = false
     /// Why the last load stopped, in words the reader can act on.
     private(set) var failure: String?
+    /// Why the page after the ones on screen did not arrive. The pages already
+    /// read stay, and so does ``hasMore``: the listing is not finished, it is
+    /// waiting on a Try Again — see ``retryMore()``.
+    private(set) var moreFailure: String?
 
     /// How many pages have been read — what a cached copy records, so a
     /// restored listing pages on from where the read it came from stopped.
@@ -36,6 +40,7 @@ final class Feed<Item: Identifiable & Sendable> {
         page = 0
         hasMore = false
         failure = nil
+        moreFailure = nil
         isLoading = true
         defer { isLoading = false }
 
@@ -69,12 +74,17 @@ final class Feed<Item: Identifiable & Sendable> {
         page = pagesRead
         self.hasMore = hasMore
         failure = nil
+        moreFailure = nil
     }
 
     /// Loads the page after the one on screen. Safe to call from a row that
     /// appears more than once.
+    ///
+    /// Does nothing once a page has failed, until the reader asks again: a row
+    /// scrolled back into view is not somebody asking, and a site refusing
+    /// the app would only be asked again for nothing.
     func loadMore() async {
-        guard let source, hasMore, !isLoading, !isLoadingMore else { return }
+        guard let source, hasMore, moreFailure == nil, !isLoading, !isLoadingMore else { return }
         isLoadingMore = true
         defer { isLoadingMore = false }
 
@@ -88,9 +98,16 @@ final class Feed<Item: Identifiable & Sendable> {
         } catch is CancellationError {
         } catch {
             guard !Task.isCancelled else { return }
-            // Keep the pages already shown; the reader can scroll again to retry.
-            hasMore = false
+            // Keep the pages already shown, and keep the listing open: a
+            // failed page is not the last one.
+            moreFailure = error.localizedDescription
         }
+    }
+
+    /// The reader's Try Again on a page that failed.
+    func retryMore() async {
+        moreFailure = nil
+        await loadMore()
     }
 
     func clear() {
@@ -100,6 +117,7 @@ final class Feed<Item: Identifiable & Sendable> {
         page = 0
         hasMore = false
         failure = nil
+        moreFailure = nil
     }
 
     /// True when `item` is close enough to the end of the loaded pages that the

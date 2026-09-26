@@ -386,7 +386,7 @@ struct PerformerView: View {
             // would be counting the reading, not the performer.
             section(half: .past, count: feed.hasMore ? nil : past.count,
                     events: past, hasMore: hasMorePast)
-            if feed.isLoadingMore { SearchProgress(compact: true) }
+            FeedFooter(feed: feed) { store.remember(feed.items) }
             if !sameBill.isEmpty { sameBillCard }
             if let refreshFailure {
                 RefreshFailureNote(message: refreshFailure)

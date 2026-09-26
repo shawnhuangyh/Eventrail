@@ -100,7 +100,7 @@ struct SearchView: View {
                         .task { await store.pageOn(events, after: event) }
                 }
 
-                if events.isLoadingMore { SearchProgress(compact: true) }
+                FeedFooter(feed: events) { store.remember(events.items) }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -128,7 +128,7 @@ struct SearchView: View {
                         }
                 }
 
-                if performers.isLoadingMore { SearchProgress(compact: true) }
+                FeedFooter(feed: performers)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -257,6 +257,43 @@ struct SearchProgress: View {
             .frame(maxWidth: .infinity)
             .padding(.top, compact ? 12 : 60)
             .padding(.bottom, compact ? 12 : 0)
+    }
+}
+
+/// What sits under a paged listing: a spinner while the next page is on its
+/// way, or why it did not arrive and a Try Again. Without the second a failed
+/// page looked exactly like the end of the listing.
+struct FeedFooter<Item: Identifiable & Sendable>: View {
+    let feed: Feed<Item>
+    /// What the screen does with the rows once a retried page lands.
+    var landed: () -> Void = {}
+
+    var body: some View {
+        if let failure = feed.moreFailure {
+            HStack(spacing: 10) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.favorite)
+                    .frame(width: 18)
+                Text(verbatim: failure)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Try Again") {
+                    Task {
+                        await feed.retryMore()
+                        landed()
+                    }
+                }
+                .buttonStyle(.glass)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .glassPanel()
+        } else if feed.isLoadingMore {
+            SearchProgress(compact: true)
+        }
     }
 }
 

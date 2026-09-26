@@ -485,7 +485,7 @@ struct VenueView: View {
             // would be counting the reading, not the hall.
             section(half: .past, count: feed.hasMore ? nil : past.count,
                     events: past, hasMore: hasMorePast)
-            if feed.isLoadingMore { SearchProgress(compact: true) }
+            FeedFooter(feed: feed) { store.remember(feed.items) }
             if !regulars.isEmpty { regularsCard }
             if let refreshFailure {
                 RefreshFailureNote(message: refreshFailure)
