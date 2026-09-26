@@ -40,6 +40,17 @@ struct FollowedDatesTests {
         #expect(shown.endsAt! > now)
     }
 
+    @Test func anAllNightShowIsNotOverBeforeItsDoorsOpen() {
+        let now = Date.now
+        // 開場 23:30 開演 00:30 終演 05:00, read before times were put in order:
+        // start and end both on the morning of the day, doors that night.
+        let allNight = Fixtures.event(id: "night", date: now,
+                                      doorsOpen: now.addingTimeInterval(4 * 3600),
+                                      startsAt: now.addingTimeInterval(-19 * 3600),
+                                      endsAt: now.addingTimeInterval(-14 * 3600))
+        #expect(!allNight.hasEnded)
+    }
+
     @Test func anEndPastMidnightIsTheNextMorning() {
         let now = Date.now
         // Started an hour ago; its "00:30" end was read onto the same day,

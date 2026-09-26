@@ -39,9 +39,12 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
         // Following row as the listing printed it, read on Tokyo time; a row
         // since re-read on its hall's clock abroad is read back onto Tokyo's
         // first, or every instant in it differs from the one that was marked.
-        if fingerprint == event.instantFingerprint { return true }
-        return event.timeZone != Event.publishedZone
-            && fingerprint == event.published(in: Event.publishedZone).instantFingerprint
+        //
+        // And that copy had every time on the night's own day, before a clock
+        // earlier than the one before it was read as the next morning, so the
+        // mark is also held against the times put back on that day.
+        let tokyo = event.timeZone == Event.publishedZone ? event : event.published(in: Event.publishedZone)
+        return [tokyo, tokyo.onItsOwnDay].contains { fingerprint == $0.instantFingerprint }
     }
 }
 
@@ -72,17 +75,45 @@ nonisolated extension Event {
     /// the hall's zone (``Event/published(in:)``), and the two tabs share one
     /// mark: as instants the same unchanged row would read Updated on
     /// whichever tab had not marked it.
+    ///
+    /// The day once and each time as a clock alone, since that is all the page
+    /// prints: which morning an after-midnight time falls on is this app's
+    /// reading of it (see ``inOrder(_:_:_:)``), and a better reading must not
+    /// make an unchanged row read Updated.
     var listingFingerprint: String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let times = [date, doorsOpen, startsAt, endsAt].map { time in
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        let printedDay = [day.year, day.month, day.day].map { String($0 ?? 0) }.joined(separator: "-")
+        let times = [doorsOpen, startsAt, endsAt].map { time in
             time.map { time in
-                let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: time)
-                return [parts.year, parts.month, parts.day, parts.hour, parts.minute]
-                    .map { String($0 ?? 0) }.joined(separator: "-")
+                let clock = calendar.dateComponents([.hour, .minute], from: time)
+                return "\(clock.hour ?? 0):\(clock.minute ?? 0)"
             } ?? "-"
         }
-        return Self.digest([title, venue] + times + performers.map(\.name))
+        return Self.digest([title, venue, printedDay] + times + performers.map(\.name))
+    }
+
+    /// Every time put back on the night's own day, as every copy was read
+    /// before an after-midnight clock was taken to be the next morning. Only
+    /// for recognising a mark taken then — see ``FollowingRead/matches(_:)``.
+    var onItsOwnDay: Event {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        func onDay(_ time: Date?) -> Date? {
+            guard let time else { return nil }
+            var parts = calendar.dateComponents([.hour, .minute], from: time)
+            parts.year = day.year
+            parts.month = day.month
+            parts.day = day.day
+            return calendar.date(from: parts)
+        }
+        var event = self
+        event.doorsOpen = onDay(doorsOpen)
+        event.startsAt = onDay(startsAt)
+        event.endsAt = onDay(endsAt)
+        return event
     }
 
     /// The fingerprint as it was taken before it read the wall clock, over the

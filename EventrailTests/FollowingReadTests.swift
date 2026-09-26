@@ -66,6 +66,22 @@ struct FollowingReadTests {
         #expect(!archive([listed.id: old]).isUnread(listed.published(in: taipei)))
     }
 
+    @Test func readingAnEndAsTheNextMorningLeavesTheFingerprintAlone() {
+        let sameDay = Fixtures.event(startsAt: Fixtures.date(2027, 5, 9, 23), endsAt: Fixtures.date(2027, 5, 9, 1))
+        let nextMorning = Fixtures.event(startsAt: Fixtures.date(2027, 5, 9, 23), endsAt: Fixtures.date(2027, 5, 10, 1))
+        #expect(sameDay.listingFingerprint == nextMorning.listingFingerprint)
+    }
+
+    @Test func aMarkTakenBeforeTheEndMovedToTheNextMorningStillCounts() {
+        // A day as the page gives one, a midnight, with 23:00 on it and an
+        // end printed 01:00 — read once onto that day, now onto the next.
+        let sameDay = Fixtures.event(startsAt: Fixtures.date(2027, 5, 9, 23), endsAt: Fixtures.date(2027, 5, 9, 1))
+        var nextMorning = sameDay
+        nextMorning.endsAt = Fixtures.date(2027, 5, 10, 1)
+        let old = Stamped(FollowingRead(fingerprint: sameDay.instantFingerprint, day: sameDay.date), at: .now)
+        #expect(!archive([sameDay.id: old]).isUnread(nextMorning))
+    }
+
     // MARK: - Unread
 
     @Test func aDateNeverMarkedIsUnread() {

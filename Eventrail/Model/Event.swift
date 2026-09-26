@@ -175,11 +175,28 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     /// Tokyo time whatever its hall, so ``FollowedDates`` trusts this only for
     /// a hall it knows to be in Japan.
     var hasEnded: Bool {
-        guard var end = endsAt else { return false }
-        if let begins = startsAt ?? doorsOpen, end < begins {
-            end = end.addingTimeInterval(24 * 60 * 60)
-        }
+        guard let end = Event.inOrder(doorsOpen, startsAt, endsAt).ends else { return false }
         return end <= .now
+    }
+
+    /// Doors, start and end, each moved to the next day wherever it is earlier
+    /// than the one before it — how a night that runs past midnight has to be
+    /// read, since the page prints a clock and no date. What
+    /// ``EventernotePages`` stores, and what ``hasEnded`` reads older copies
+    /// as.
+    static func inOrder(
+        _ doors: Date?, _ starts: Date?, _ ends: Date?
+    ) -> (doors: Date?, starts: Date?, ends: Date?) {
+        var previous: Date?
+        func after(_ time: Date?) -> Date? {
+            guard var time else { return nil }
+            if let previous, time < previous { time = time.addingTimeInterval(24 * 60 * 60) }
+            previous = time
+            return time
+        }
+        let doors = after(doors)
+        let starts = after(starts)
+        return (doors, starts, after(ends))
     }
 
     /// How many whole days from today to the night itself — 0 on the day, 1
