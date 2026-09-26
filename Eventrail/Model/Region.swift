@@ -94,7 +94,9 @@ enum Region: String, CaseIterable, Identifiable, Hashable {
     /// whole of it, so the name at the front settles the area. An address that
     /// names none — a hall abroad, or a line that turned out to be something
     /// other than an address — belongs to no area rather than to a guessed one.
-    static func containing(address: String) -> Region? {
+    /// `nonisolated` for the reason ``prefectures`` is: ``JapanAddresses``
+    /// asks it from off the main actor.
+    nonisolated static func containing(address: String) -> Region? {
         let address = address.trimmingCharacters(in: .whitespacesAndNewlines)
         return allCases.first { region in
             region.prefectures.contains { address.hasPrefix($0) }

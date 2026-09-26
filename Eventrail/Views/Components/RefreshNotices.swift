@@ -82,7 +82,7 @@ extension RefreshNotice {
     /// fell short anywhere is a failure: some of the dates on screen were not
     /// refreshed, and "Updated" would say they all were.
     static func following(_ outcome: FollowedDates.Outcome) -> RefreshNotice {
-        outcome.failure.map(failed) ?? .updated
+        outcome.failure.map { .failed($0) } ?? .updated
     }
 
     /// One event's sheet.
@@ -96,7 +96,7 @@ extension RefreshNotice {
     /// The library, after Refresh on the Me card or the Welcome screen's first
     /// import.
     static func library(failure: String?) -> RefreshNotice {
-        failure.map(failed) ?? .updated
+        failure.map { .failed($0) } ?? .updated
     }
 
     /// Refresh Venue Locations in Settings. Nil while a run is still going —
