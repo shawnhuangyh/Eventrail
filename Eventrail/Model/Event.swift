@@ -113,6 +113,15 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     /// Which ``currentDetailFormat`` that import read. Nil for a copy imported
     /// before the app numbered them.
     var detailFormat: Int? = nil
+    /// When the event's own page was last read, by whichever device read it.
+    ///
+    /// Synced with the event, unlike ``PageReads``, because it is what settles
+    /// two devices' copies of one page: the later read is the truer one, and
+    /// without a date the merge could only prefer whichever copy it was handed,
+    /// so an iPad that had just read a moved start time took the phone's older
+    /// one back and sent it on. Nil for a list row and for a copy read before
+    /// this was kept.
+    var readAt: Date? = nil
 
     /// The zone an event's times are read in until its hall says otherwise.
     ///
@@ -354,7 +363,8 @@ nonisolated extension Event {
             imageURL: imported.imageURL ?? imageURL,
             sourceURL: imported.sourceURL,
             isDetailed: imported.isDetailed || isDetailed,
-            detailFormat: imported.detailFormat ?? detailFormat
+            detailFormat: imported.detailFormat ?? detailFormat,
+            readAt: imported.readAt ?? readAt
         )
     }
 }

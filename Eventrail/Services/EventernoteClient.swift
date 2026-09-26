@@ -153,6 +153,7 @@ nonisolated struct EventernoteClient: Sendable {
             imported.venueDetail = EventernotePages.venueDetail(in: venue)
             imported.venueAddress = EventernotePages.venueAddress(in: venue)
         }
+        imported.readAt = .now
         return event.merging(imported)
     }
 

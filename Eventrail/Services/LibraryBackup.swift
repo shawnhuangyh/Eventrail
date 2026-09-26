@@ -57,7 +57,11 @@ nonisolated struct LibraryBackup: Sendable {
     /// 6: the archive carries which Following dates the reader has looked at.
     /// Their own record, and nothing imports it back, so a build that has
     /// never heard of it is told to refuse the file rather than drop it.
-    static let currentFormat: UInt8 = 6
+    ///
+    /// 7: an event carries when its own page was last read, which is what
+    /// settles two copies of it in a merge. A build that dropped it would
+    /// hand the next merge an undated copy that loses to every dated one.
+    static let currentFormat: UInt8 = 7
 
     var app: String
     var created: Date

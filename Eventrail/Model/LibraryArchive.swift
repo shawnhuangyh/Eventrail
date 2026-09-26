@@ -175,9 +175,7 @@ nonisolated struct LibraryArchive: Codable, Sendable {
                 merged.events[id] = event
                 continue
             }
-            // Both are imports of the same public page, so either is true. The
-            // one that read the event's own page carries more of it.
-            merged.events[id] = mine.isDetailed ? mine.merging(event) : event.merging(mine)
+            merged.events[id] = Self.settle(mine, event)
         }
 
         merged.membership = Self.merge(membership, other.membership)
@@ -267,6 +265,23 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         guard let mine else { return theirs }
         guard let theirs else { return mine }
         return mine.newer(theirs)
+    }
+
+    /// Two devices' copies of one event.
+    ///
+    /// Both are imports of the same public page, so neither is the reader's
+    /// and neither needs a timestamp of its own — but the page changes, so
+    /// they are not equally true. Where both read the event's own page, the
+    /// later read's answers stand and the earlier one only fills what it left
+    /// empty; a copy with no ``Event/readAt`` was read before either device
+    /// kept one, so it counts as the earlier. Otherwise the one that read the
+    /// page carries more of it.
+    static func settle(_ mine: Event, _ theirs: Event) -> Event {
+        if mine.isDetailed, theirs.isDetailed, mine.readAt != theirs.readAt {
+            let mineIsLater = (mine.readAt ?? .distantPast) > (theirs.readAt ?? .distantPast)
+            return mineIsLater ? theirs.merging(mine) : mine.merging(theirs)
+        }
+        return mine.isDetailed ? mine.merging(theirs) : theirs.merging(mine)
     }
 
     private static func merge<Value>(

@@ -56,6 +56,36 @@ struct LibraryArchiveTests {
         #expect(theirs.merging(mine).events["1"]?.venueAddress == "東京都千代田区")
     }
 
+    /// The iPad has just read a start time the phone's older copy predates.
+    /// Whichever side runs the merge, the later read's time stands.
+    @Test func theLaterReadOfAPageWinsEitherWay() {
+        var phone = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 0),
+                                   summary: "S席 9,000円", isDetailed: true)
+        phone.readAt = earlier
+        var iPad = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 30),
+                                  isDetailed: true)
+        iPad.readAt = later
+
+        let onPhone = archive(with: [phone], at: earlier).merging(archive(with: [iPad], at: earlier))
+        let onIPad = archive(with: [iPad], at: earlier).merging(archive(with: [phone], at: earlier))
+        for merged in [onPhone, onIPad] {
+            let event = merged.events["1"]
+            #expect(event?.startsAt == Fixtures.date(2027, 5, 9, 18, 30))
+            #expect(event?.readAt == later)
+            // What the later read left empty is still filled from the earlier one.
+            #expect(event?.summary == "S席 9,000円")
+        }
+    }
+
+    @Test func anUndatedCopyCountsAsTheEarlierRead() {
+        let old = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 0), isDetailed: true)
+        var fresh = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 30), isDetailed: true)
+        fresh.readAt = later
+
+        let merged = archive(with: [fresh], at: earlier).merging(archive(with: [old], at: earlier))
+        #expect(merged.events["1"]?.startsAt == Fixtures.date(2027, 5, 9, 18, 30))
+    }
+
     @Test func notesTypedOnEachDeviceBothSurvive() {
         let base = Stamped(Tracking(cost: 1000, note: "a"), at: earlier)
         var phone = archive(with: [Fixtures.event(id: "1")], at: earlier)
