@@ -1296,8 +1296,7 @@ final class EventStore {
     func mirrorCalendar() async {
         guard let calendar else { return }
         guard calendarSyncEnabled else {
-            await calendar.stop()
-            calendarStatus = nil
+            calendarStatus = await calendar.stop()
             return
         }
         calendarStatus = await calendar.mirror(calendarEvents)

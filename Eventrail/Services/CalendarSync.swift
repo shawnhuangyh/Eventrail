@@ -138,11 +138,25 @@ final class CalendarSync {
     /// device's switch is still on and per-device. A momentary flap that
     /// settles itself is the price of the alternative being two calendars of
     /// one name, each holding the whole library; see ``adoptableCalendar()``.
-    func stop() async {
-        guard savedCalendarID != nil, await requestAccess() else { return }
-        defer { savedCalendarID = nil }
-        guard let id = savedCalendarID, let calendar = store.calendar(withIdentifier: id) else { return }
-        try? store.removeCalendar(calendar, commit: true)
+    ///
+    /// Answers only when the calendar is still there and could not be removed.
+    /// The identifier is kept then, so the next call — any edit, or the switch
+    /// turned again — tries once more rather than forgetting a calendar the
+    /// reader believes is gone.
+    func stop() async -> Outcome? {
+        guard let id = savedCalendarID, await requestAccess() else { return nil }
+        guard let calendar = store.calendar(withIdentifier: id) else {
+            savedCalendarID = nil
+            return nil
+        }
+        do {
+            try store.removeCalendar(calendar, commit: true)
+            savedCalendarID = nil
+            return nil
+        } catch {
+            Self.log.error("could not remove the calendar: \(error.localizedDescription, privacy: .public)")
+            return .failed(String(localized: "The Eventrail calendar could not be removed: \(error.localizedDescription)"))
+        }
     }
 
     // MARK: - Access
@@ -202,7 +216,13 @@ final class CalendarSync {
     private func discardDuplicates(of kept: EKCalendar) {
         for calendar in store.calendars(for: .event)
         where calendar.calendarIdentifier != kept.calendarIdentifier && isAdoptable(calendar) {
-            try? store.removeCalendar(calendar, commit: true)
+            // Not the reader's to hear about: the entries went to the calendar
+            // being kept either way, and the next mirror tries this again.
+            do {
+                try store.removeCalendar(calendar, commit: true)
+            } catch {
+                Self.log.error("could not remove a duplicate calendar: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 

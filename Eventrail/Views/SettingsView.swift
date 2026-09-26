@@ -252,8 +252,13 @@ struct SettingsView: View {
     }
 
     /// Only what needs the reader: a mirror that is working says nothing.
+    /// With the switch off the one thing left to say is that the calendar it
+    /// made could not be taken out again.
     private var calendarStatus: Text? {
-        guard store.calendarSyncEnabled else { return nil }
+        guard store.calendarSyncEnabled else {
+            if case .failed(let reason) = store.calendarStatus { return Text(verbatim: reason) }
+            return nil
+        }
         switch store.calendarStatus {
         case .denied:
             return Text("Calendar access is off in Settings")
