@@ -40,12 +40,13 @@ struct RootView: View {
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
 
     /// Made together, so the dates know which clock each hall keeps before
-    /// any screen reads them — see ``FollowedDates/hallZone``. Three answers,
+    /// any screen reads them — see ``FollowedDates/hallZone``. Four answers,
     /// none of them asked for here: a hall ``VenueRegions`` places in one of
     /// the site's areas is in Japan; the library's own copy of the night
-    /// carries its hall's clock once a placing retimed it; and a hall placed
-    /// under any address — the reader opening the night places it — answers
-    /// by its name.
+    /// carries its hall's clock once a placing retimed it; a hall abroad
+    /// whose clock ``VenueRegions/settleClocks(for:)`` settled from its
+    /// address keeps that; and a hall placed under any address — the reader
+    /// opening the night places it — answers by its name.
     init() {
         let store = EventStore()
         let followed = FollowedDates()
@@ -55,6 +56,7 @@ struct RootView: View {
             if let kept = store.event(id: event.id), kept.timeZone != Event.publishedZone {
                 return kept.timeZone
             }
+            if let zone = venues.timeZone(of: event) { return zone }
             return VenuePlaces.shared.timeZone(ofHallNamed: event.venue)
         }
         _store = State(initialValue: store)

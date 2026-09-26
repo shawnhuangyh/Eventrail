@@ -32,8 +32,12 @@ final class VenueRegions {
 
     /// What each hall asked about turned out to be, keyed by the name the
     /// listing row printed. A nil region is an answer too: the site files no
-    /// hall under that name, or the hall's page published no address.
+    /// hall under that name, the hall's page published no address, or the
+    /// address is abroad.
     private var answers: [String: Answer] = [:]
+
+    /// Whether the clocks of halls abroad are being settled at this moment.
+    private var isSettlingClocks = false
 
     @ObservationIgnored private let client: EventernoteClient
     /// Previews are handed their answers, and neither read this device's cache
@@ -46,7 +50,23 @@ final class VenueRegions {
     /// would take the whole cache with it.
     private struct Answer: Codable {
         var region: String?
+        /// The address the hall's page published, kept so a hall is never
+        /// looked up twice. Empty where the site files no hall under the name
+        /// or its page published none; nil on an answer written before the
+        /// address was kept, which is what sends a hall abroad back once.
+        var address: String?
+        /// The clock a hall abroad keeps, once ``VenueRegions/settleClocks(for:)``
+        /// has settled it — an identifier, for the reason ``region`` is a raw
+        /// value. Nil in Japan, where the region already answers it.
+        var timeZone: String?
         var asked: Date
+
+        /// An address that is somewhere, and somewhere outside the site's
+        /// five areas.
+        var abroadAddress: String? {
+            guard region == nil, let address, !address.isEmpty else { return nil }
+            return address
+        }
     }
 
     private static let cacheKey = "venueRegions"
@@ -89,6 +109,13 @@ final class VenueRegions {
         return answers[Self.key(event)]?.region.flatMap(Region.init(rawValue:))
     }
 
+    /// Which clock a hall outside Japan keeps, where ``settleClocks(for:)``
+    /// has settled it. Nil in Japan — ``region(of:)`` answers that — and
+    /// wherever nothing has.
+    func timeZone(of event: Event) -> TimeZone? {
+        answers[Self.key(event)]?.timeZone.flatMap(TimeZone.init(identifier:))
+    }
+
     /// How a list of events breaks down by area, with whatever nothing has
     /// placed yet counted under nil — what the filter sheet puts beside each
     /// area, and what it says about the rest.
@@ -107,16 +134,22 @@ final class VenueRegions {
     ///
     /// An event imported from its own page carries its venue's address, and a
     /// hall is the same hall whichever list it turned up in — so a reader who
-    /// has been somewhere before never pays to place it again.
+    /// has been somewhere before never pays to place it again. A hall abroad
+    /// that a placing has already retimed brings its clock along.
     func learn(from events: [Event]) {
         var learned = false
         for event in events {
             let key = Self.key(event)
-            guard !key.isEmpty, answers[key]?.region == nil,
-                  let address = event.publishedAddress,
-                  let region = Region.containing(address: address)
+            guard !key.isEmpty, let address = event.publishedAddress, !address.isEmpty else { continue }
+            let region = Region.containing(address: address)
+            let zone = region == nil && event.timeZone != Event.publishedZone
+                ? event.timeZone.identifier : nil
+            let known = answers[key]
+            guard known?.region == nil,
+                  known?.address?.isEmpty != false || (zone != nil && known?.timeZone == nil)
             else { continue }
-            answers[key] = Answer(region: region.rawValue, asked: .now)
+            answers[key] = Answer(region: region?.rawValue, address: address,
+                                  timeZone: zone ?? known?.timeZone, asked: .now)
             learned = true
         }
         if learned { save() }
@@ -144,7 +177,7 @@ final class VenueRegions {
             do {
                 let address = try await client.address(forVenue: venue)
                 let region = address.flatMap(Region.containing(address:))
-                answers[venue] = Answer(region: region?.rawValue, asked: .now)
+                answers[venue] = Answer(region: region?.rawValue, address: address ?? "", asked: .now)
                 save()
                 Self.log.info("venue \(venue, privacy: .public) → \(region?.rawValue ?? "nowhere the site names", privacy: .public)")
             } catch is CancellationError {
@@ -159,6 +192,71 @@ final class VenueRegions {
         }
     }
 
+    /// A ration of halls looked up, and then the clocks of whichever of them
+    /// are abroad — what the Following tab and the Me card run as they load.
+    func settle(_ events: [Event]) async {
+        await place(events)
+        await settleClocks(for: events)
+    }
+
+    /// Settles which clock each hall abroad in these events keeps, from the
+    /// address ``place(_:)`` kept for it — what lets the Following tab show
+    /// and end a night abroad on its hall's own time.
+    ///
+    /// ``VenuePlaces`` is asked first, on the terms an import's arrivals are
+    /// (``VenuePlaces/placeUnplaced(_:onProgress:)``: only halls it has no
+    /// answer for, paced, never narrowed to a building), so a hall already
+    /// placed costs nothing and a new one is placed once for good. Where that
+    /// settles no clock — no answer, or the phone's Maps may not be asked — the
+    /// address is read for a country that keeps one clock. A hall neither can
+    /// date keeps no clock, and ``FollowedDates`` then waits for its day to be
+    /// over everywhere rather than guessing.
+    ///
+    /// A settled clock is written down with the hall, since a hall does not
+    /// move: the next run asks nothing about it.
+    func settleClocks(for events: [Event]) async {
+        guard persists, !isSettlingClocks else { return }
+        var seen: Set<String> = []
+        let halls: [(key: String, event: Event)] = events.compactMap { event in
+            let key = Self.key(event)
+            guard seen.insert(key).inserted, let answer = answers[key],
+                  answer.timeZone == nil, let address = answer.abroadAddress
+            else { return nil }
+            var event = event
+            event.venueAddress = address
+            return (key, event)
+        }
+        guard !halls.isEmpty else { return }
+
+        isSettlingClocks = true
+        defer { isSettlingClocks = false }
+
+        let places = VenuePlaces.shared
+        _ = await places.placeUnplaced(halls.map(\.event)) { _ in }
+        let placed = places.timeZones(for: halls.map(\.event))
+
+        var settled = false
+        for hall in halls {
+            guard let address = hall.event.venueAddress,
+                  let zone = placed[hall.event.id] ?? Self.clock(readingAddress: address)
+            else { continue }
+            answers[hall.key]?.timeZone = zone.identifier
+            settled = true
+            Self.log.info("venue \(hall.key, privacy: .public) keeps \(zone.identifier, privacy: .public)")
+        }
+        if settled { save() }
+    }
+
+    /// The clock an address abroad plainly names a country for, where that
+    /// country keeps one — the reading ``VenueCountries`` makes for a hall
+    /// OpenStreetMap placed, made here without anybody placing it.
+    private static func clock(readingAddress address: String) -> TimeZone? {
+        if let country = VenueCountries.country(of: address) {
+            return VenueCountries.timeZone(forCountry: country)
+        }
+        return VenueCountries.isMainlandChina(address) ? VenueCountries.timeZone(forCountry: "cn") : nil
+    }
+
     /// The halls in these events that are worth asking about, soonest first —
     /// the order the events arrive in — and each hall once.
     private func pending(in events: [Event]) -> [String] {
@@ -168,6 +266,10 @@ final class VenueRegions {
             let key = Self.key(event)
             guard !key.isEmpty, seen.insert(key).inserted else { return nil }
             guard let answer = answers[key] else { return key }
+            // Asked before the address was kept: once more, for the address.
+            guard let address = answer.address else { return key }
+            // An address abroad is an answer for good — a hall does not move.
+            guard address.isEmpty else { return nil }
             // Asked, and the site had nothing to say. Left alone until the
             // month is up.
             return answer.asked.timeIntervalSinceNow < -Self.patience ? key : nil

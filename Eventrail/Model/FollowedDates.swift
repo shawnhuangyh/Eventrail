@@ -71,7 +71,8 @@ final class FollowedDates {
     /// the show. So a row whose hall's clock is known is re-read on it before
     /// it is shown or judged over — which also puts My Time right for it —
     /// and a row whose clock is not stays as it came and leaves only when its
-    /// day is out. Handed in by ``RootView``; nil until then, the safe answer.
+    /// day is over everywhere (``Event/isUpcomingAnywhere``). Handed in by
+    /// ``RootView``; nil until then, the safe answer.
     @ObservationIgnored var hallZone: (Event) -> TimeZone? = { _ in nil }
     /// Previews are handed their dates, and neither read this device's cache
     /// nor write to it.
@@ -122,7 +123,9 @@ final class FollowedDates {
             let cached = Self.stored
             // A listing holds what was upcoming when it was read, and a date
             // that has since passed is not a date the Following tab shows.
-            self.dates = cached.dates.mapValues { $0.filter(\.isUpcoming) }
+            // Over everywhere, since no hall's clock is known yet: the rest is
+            // ``dropFinished()``'s, once it is.
+            self.dates = cached.dates.mapValues { $0.filter(\.isUpcomingAnywhere) }
             readAt = cached.readAt
             persists = true
         }
@@ -262,12 +265,14 @@ final class FollowedDates {
         hallZone(event).map(event.published(in:)) ?? event
     }
 
-    /// Whether a date is over: its day gone, or — on a row whose hall's clock
-    /// is known — its published end gone by. A row on an assumed clock waits
-    /// for its day to end, since its end could be hours out either way.
+    /// Whether a date is over: on a row whose hall's clock is known, its day
+    /// gone or its published end gone by. A row on an assumed clock waits for
+    /// its day to be over everywhere, since read on Tokyo time its end — and
+    /// its day's — could be hours out either way: a Los Angeles night would
+    /// go the morning it opens.
     private func isOver(_ event: Event) -> Bool {
-        guard event.isUpcoming else { return true }
-        return event.hasEnded && hallZone(event) != nil
+        guard hallZone(event) != nil else { return !event.isUpcomingAnywhere }
+        return !event.isUpcoming || event.hasEnded
     }
 
     /// Drops whoever is no longer followed, so their dates stop being counted

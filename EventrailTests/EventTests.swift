@@ -96,6 +96,17 @@ struct EventTests {
         #expect(!Fixtures.event(date: Fixtures.day(fromToday: -2)).isUpcoming)
     }
 
+    @Test func isUpcomingAnywhereUntilTheLastZoneLeavesItsDay() {
+        // 9 May on Tokyo time: over there at 15:00 GMT on the 9th, and not
+        // over everywhere until 12:00 GMT on the 10th — the morning of the
+        // 9th in Los Angeles is when Tokyo's day ends.
+        let event = Fixtures.event(date: Fixtures.date(2027, 5, 9))
+        let gmt = TimeZone.gmt
+        #expect(event.isUpcomingAnywhere(asOf: Fixtures.date(2027, 5, 9, 16, in: gmt)))
+        #expect(event.isUpcomingAnywhere(asOf: Fixtures.date(2027, 5, 10, 11, 59, in: gmt)))
+        #expect(!event.isUpcomingAnywhere(asOf: Fixtures.date(2027, 5, 10, 12, in: gmt)))
+    }
+
     @Test func fallsComparesDaysNotInstants() {
         let event = Fixtures.event(date: Fixtures.day(fromToday: 3))
         let today = Calendar.current.startOfDay(for: .now)

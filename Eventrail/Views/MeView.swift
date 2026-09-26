@@ -13,6 +13,7 @@ enum MeList: Hashable {
 struct MeView: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
+    @Environment(VenueRegions.self) private var venues
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -194,6 +195,10 @@ struct MeView: View {
         if let outcome = await followed.load(for: store.followedPerformers) {
             notices?.report(.following(outcome), byHand: false)
         }
+        // The card counts what is still ahead, and a night abroad is ahead
+        // until its own hall's clock says otherwise.
+        venues.learn(from: store.library)
+        await venues.settle(followed.events(for: store.followedPerformers))
     }
 
     /// Refresh, and then say how it went — over the top of the screen, as well
@@ -469,4 +474,5 @@ struct MeView: View {
     MeView()
         .environment(EventStore.preview)
         .environment(FollowedDates.preview)
+        .environment(VenueRegions.preview)
 }

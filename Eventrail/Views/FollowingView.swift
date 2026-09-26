@@ -308,6 +308,7 @@ struct FollowingView: View {
         // The library is full of halls whose pages have already been read, and
         // a hall is the same hall whichever list it turned up in.
         venues.learn(from: store.library)
+        await venues.settle(dates)
     }
 
     private func reload() async {
@@ -624,22 +625,19 @@ private struct FollowingFilterSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            // Where the halls actually get read. Asked for here rather than
-            // when the tab loads, so a reader who never filters never costs the
-            // site a request — and so the ones asked about are the ones on
-            // screen.
-            //
-            // A run is rationed, so this keeps starting them for as long as the
-            // sheet is open and each one gets somewhere: the counts fill in
-            // while the reader watches rather than waiting on them closing the
-            // sheet and opening it again, which nothing tells them to do. A run
-            // that placed nothing means the site stopped answering, and pressing
-            // it further would only make that worse.
+            // The tab's own load reads a ration of halls too — a night abroad
+            // needs its hall's address before it can be shown on its hall's
+            // clock — but a run is rationed, so this keeps starting them for as
+            // long as the sheet is open and each one gets somewhere: the counts
+            // fill in while the reader watches rather than waiting on them
+            // closing the sheet and opening it again, which nothing tells them
+            // to do. A run that placed nothing means the site stopped
+            // answering, and pressing it further would only make that worse.
             .task {
                 while !Task.isCancelled {
                     let waiting = venues.pendingCount(events)
                     guard waiting > 0 else { return }
-                    await venues.place(events)
+                    await venues.settle(events)
                     guard venues.pendingCount(events) < waiting else { return }
                 }
             }

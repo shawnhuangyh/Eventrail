@@ -163,6 +163,25 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
         (calendar.date(byAdding: .day, value: 1, to: date) ?? date) > .now
     }
 
+    /// Upcoming until its day is over everywhere on Earth — the last hour
+    /// anywhere, twelve behind Greenwich, still on it.
+    ///
+    /// For a date whose hall's clock is not known: it is read on Tokyo time,
+    /// and Tokyo's midnight is the morning of the same day in Los Angeles, so
+    /// ``isUpcoming`` would drop a night there before its doors opened. Kept
+    /// too long rather than taken away too soon.
+    var isUpcomingAnywhere: Bool { isUpcomingAnywhere(asOf: .now) }
+
+    func isUpcomingAnywhere(asOf now: Date) -> Bool {
+        var westernmost = Calendar(identifier: .gregorian)
+        westernmost.timeZone = TimeZone(secondsFromGMT: -12 * 60 * 60) ?? .gmt
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let start = westernmost.date(from: day),
+              let end = westernmost.date(byAdding: .day, value: 1, to: start)
+        else { return isUpcoming }
+        return end > now
+    }
+
     /// Whether the page's published end time has already gone by. False where
     /// it published none — most nights — since nothing then says when it is
     /// over, and the day's end is the one line ``isUpcoming`` can draw.
