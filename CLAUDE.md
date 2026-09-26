@@ -201,6 +201,7 @@ gh pr create --base release --head main --title "release: <what is in this build
 - **Keep `main` buildable anyway.** Nothing else watches it, so a broken `main` is only found when a release PR is opened. Build before pushing.
 - **A hotfix branches off `release`**, not `main`, whenever `main` is carrying unfinished work: `git switch -c fix/<summary> release`, open its PR against `release` to ship, and merge it into `main` too so the fix is not lost at the next release.
 - **A pull request into `main` is still welcome for anything worth reviewing** — a large feature, or a change whose diff wants reading. It is not required for ordinary work. Where one is opened, name the branch for the commit type it carries (`feat/`, `fix/`, `docs/`, `test/`, `refactor/`, `chore/`).
+- **Pull requests are written in English** — title and description alike, whichever language the conversation that opened them was in, the same as commit messages.
 - **Xcode Cloud builds what the repository holds**, so a change that only exists in local Xcode state — a scheme, a build setting, a file Xcode has not written into the project — fails there while it builds here. Its own record of what to build is `Eventrail.xcodeproj/xcshareddata/xcodecloud/manifest.json`, and `xcshareddata/` is tracked for that reason; `xcuserdata/` is the ignored one.
 
 ## Commit messages
