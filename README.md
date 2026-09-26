@@ -23,7 +23,7 @@ Eventrail is in **beta testing** through TestFlight. It is not on the App Store 
 - **🔍 Native browsing** — Search Eventernote's public events and performers in a real iOS app, with detail pages for events, performers and venues
 - **🎫 Your own records** — Keep events in a library with your ticket, seat, price, lottery entries and notes
 - **⭐ Favorites & following** — Favorite events and follow performers to see every upcoming date they are billed on, with new and changed dates marked until you have looked at them
-- **🗺️ Event Passport** — A map of every hall you have been to, with the numbers behind your nights
+- **🗺️ Event Passport** — A map of the halls you have been to, with the numbers behind your nights
 - **📅 Calendar mirror** — Write your library into a calendar of the app's own, with an alert when the doors open
 - **📥 Profile import** — Import a public Eventernote profile's attendance history and favorites (read-only, no password)
 - **☁️ iCloud sync** — Keep your records in step across iPhone and iPad through your private iCloud storage

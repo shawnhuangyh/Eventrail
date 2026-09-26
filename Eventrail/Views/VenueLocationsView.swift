@@ -84,7 +84,7 @@ struct VenueLocationsView: View {
             SettingRowDivider()
             PlacingStep(
                 "scope", "OpenStreetMap", count: breakdown.openStreetMap,
-                detail: "Narrows a block to its building, while Refine with OpenStreetMap is on."
+                detail: "Narrows a block to its building, while Refine with OpenStreetMap is on. In mainland China it also places halls outside Japan and the mainland, whatever the switch says."
             )
             SettingRowDivider()
             PlacingStep(

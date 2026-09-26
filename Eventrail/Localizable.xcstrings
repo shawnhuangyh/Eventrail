@@ -4401,24 +4401,24 @@
         }
       }
     },
-    "Narrows a block to its building, while Refine with OpenStreetMap is on." : {
+    "Narrows a block to its building, while Refine with OpenStreetMap is on. In mainland China it also places halls outside Japan and the mainland, whatever the switch says." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「OpenStreetMap で位置を絞り込む」がオンのとき、街区から建物まで絞り込みます。"
+            "value" : "「OpenStreetMap で位置を絞り込む」がオンのとき、街区から建物まで絞り込みます。中国本土では、スイッチに関係なく日本・中国本土以外の会場の位置も特定します。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "开启「用 OpenStreetMap 细化位置」时，从街区细化到建筑。"
+            "value" : "开启「用 OpenStreetMap 细化位置」时，从街区细化到建筑。在中国大陆时，无论开关如何，也会用它定位日本和中国大陆以外的场馆。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開啟「用 OpenStreetMap 細化位置」時，從街區細化到建築。"
+            "value" : "開啟「用 OpenStreetMap 細化位置」時，從街區細化到建築。在中國大陸時，無論開關如何，也會用它定位日本和中國大陸以外的場館。"
           }
         }
       }
