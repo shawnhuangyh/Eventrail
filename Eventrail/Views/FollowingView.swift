@@ -303,12 +303,7 @@ struct FollowingView: View {
         if let outcome = await followed.load(for: performers) {
             notices?.report(.following(outcome), byHand: false)
         }
-        let dates = followed.events(for: performers)
-        store.remember(dates)
-        // The library is full of halls whose pages have already been read, and
-        // a hall is the same hall whichever list it turned up in.
-        venues.learn(from: store.library)
-        await venues.settle(dates)
+        await venues.settle(arrivedDates())
     }
 
     private func reload() async {
@@ -316,7 +311,24 @@ struct FollowingView: View {
         if let outcome = await followed.reload(for: performers) {
             notices?.report(.following(outcome), byHand: true)
         }
-        store.remember(followed.events(for: performers))
+        // A pull can bring a hall abroad nothing has dated yet, and until its
+        // clock is settled the row reads on Tokyo time. Settled as a load
+        // settles them, but not inside the pull: looking halls up is paced, and
+        // the spinner is for the listings the reader asked for.
+        let dates = arrivedDates()
+        Task { await venues.settle(dates) }
+    }
+
+    /// What the listings now hold, handed to the store and with every hall
+    /// the library already knows learnt — what a load and a pull both do with
+    /// what arrived before their halls are settled.
+    private func arrivedDates() -> [Event] {
+        let dates = followed.events(for: performers)
+        store.remember(dates)
+        // The library is full of halls whose pages have already been read, and
+        // a hall is the same hall whichever list it turned up in.
+        venues.learn(from: store.library)
+        return dates
     }
 
     // MARK: - Narrowing to one of them

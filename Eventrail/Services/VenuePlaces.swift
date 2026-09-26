@@ -487,11 +487,27 @@ final class VenuePlaces {
             let name = hallName(name)
             switch zones[name] {
             case nil: zones[name] = zone
-            case let kept? where kept?.secondsFromGMT() != zone.secondsFromGMT(): zones[name] = .some(nil)
+            case let kept? where !(kept.map { keepsTheSameClock($0, zone) } ?? false): zones[name] = .some(nil)
             default: break
             }
         }
         return zones.compactMapValues(\.self)
+    }
+
+    /// Whether two zones read every clock the same way: the same offset now
+    /// and in the depths of both halves of the year. Today's offset alone
+    /// would call London and Accra one clock all winter, and a summer night
+    /// read on the wrong one ends an hour out. Shanghai and Taipei, which no
+    /// transition ever parts, stay one.
+    private nonisolated static func keepsTheSameClock(_ one: TimeZone, _ other: TimeZone) -> Bool {
+        guard one.identifier != other.identifier else { return true }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
+        let year = calendar.component(.year, from: .now)
+        let instants = [Date.now] + [1, 7].compactMap {
+            calendar.date(from: DateComponents(year: year, month: $0, day: 15))
+        }
+        return instants.allSatisfy { one.secondsFromGMT(for: $0) == other.secondsFromGMT(for: $0) }
     }
 
     /// A hall's name as the index keys it, however a page padded it.

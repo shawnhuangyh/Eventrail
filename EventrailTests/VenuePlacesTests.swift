@@ -18,6 +18,14 @@ struct VenuePlacesTests {
         #expect(zones["Grand Hall"] == nil)
     }
 
+    /// London and Accra share an offset all winter and part in summer: one
+    /// name placed in both has no clock a summer night can be read on.
+    @Test func zonesThatPartForSummerAreDifferentClocks() {
+        let zones = VenuePlaces.zonesByName([("Grand Hall", TimeZone(identifier: "Europe/London")!),
+                                             ("Grand Hall", TimeZone(identifier: "Africa/Accra")!)])
+        #expect(zones["Grand Hall"] == nil)
+    }
+
     /// Two answers of one hour — Maps filing a Taipei hall under Shanghai on a
     /// mainland phone — are one clock.
     @Test func aNameTwoPlacingsAgreeOnKeepsItsClock() {
