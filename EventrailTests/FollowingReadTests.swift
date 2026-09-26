@@ -45,6 +45,20 @@ struct FollowingReadTests {
         }
     }
 
+    @Test func aNightRetimedAtItsHallGivesTheSameFingerprint() throws {
+        let listed = Fixtures.event(startsAt: Fixtures.date(2027, 5, 9, 18), performers: ["A"])
+        let taipei = try #require(TimeZone(identifier: "Asia/Taipei"))
+        let kept = listed.published(in: taipei)
+        #expect(kept.startsAt != listed.startsAt)
+        #expect(kept.listingFingerprint == listed.listingFingerprint)
+    }
+
+    @Test func aMarkTakenOverInstantsStillCounts() {
+        let one = event(startsAt: Self.ahead.addingTimeInterval(18 * 60 * 60))
+        let old = Stamped(FollowingRead(fingerprint: one.instantFingerprint, day: one.date), at: .now)
+        #expect(!archive([one.id: old]).isUnread(one))
+    }
+
     // MARK: - Unread
 
     @Test func aDateNeverMarkedIsUnread() {

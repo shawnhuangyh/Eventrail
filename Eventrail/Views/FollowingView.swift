@@ -214,8 +214,8 @@ struct FollowingView: View {
                     }
                 }
                 ToolbarItemGroup(placement: .bottomBar) {
-                    Spacer()
                     markButton
+                    Spacer()
                 }
             } else {
                 // The two ways of narrowing the list share a capsule; picking
@@ -231,19 +231,12 @@ struct FollowingView: View {
         }
     }
 
-    /// One button rather than Mail's menu, doing whichever of the two the
-    /// picked rows call for: read if any of them is still unread, unread only
-    /// once every one of them has been read.
-    private var markButton: some View {
+    private var markButton: MarkReadButton {
         let picked = chosen
         let marksRead = picked.isEmpty || picked.contains(where: store.isUnread)
-        return Button(marksRead ? "Mark as Read" : "Mark as Unread",
-                      systemImage: marksRead ? "envelope.open" : "envelope.badge") {
+        return MarkReadButton(marksRead: marksRead, isEnabled: !picked.isEmpty) {
             mark(picked, read: marksRead)
         }
-        .labelStyle(.iconOnly)
-        .contentTransition(.symbolEffect(.replace))
-        .disabled(picked.isEmpty)
     }
 
     /// Only the dates not looked at yet. Filled in and tinted while it is on,

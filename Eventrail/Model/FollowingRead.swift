@@ -31,7 +31,10 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
     var day: Date
 
     func matches(_ event: Event) -> Bool {
-        fingerprint == event.listingFingerprint
+        // A mark written before the fingerprint read the wall clock still
+        // counts for the copy it was taken of, rather than every date the
+        // reader had looked at coming back Updated at once.
+        fingerprint == event.listingFingerprint || fingerprint == event.instantFingerprint
     }
 }
 
@@ -55,10 +58,35 @@ nonisolated extension Event {
     /// string rather than a copy of the row, and hashed with SHA-256 rather
     /// than `hashValue`, which is seeded afresh on every launch — and on every
     /// device, which a synced mark has to agree across.
+    ///
+    /// The times are taken as the page prints them — the wall clock in the
+    /// event's own zone — rather than as instants. The Following tab's copy
+    /// of a night abroad stays on Tokyo time while the library's is re-read in
+    /// the hall's zone (``Event/published(in:)``), and the two tabs share one
+    /// mark: as instants the same unchanged row would read Updated on
+    /// whichever tab had not marked it.
     var listingFingerprint: String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let times = [date, doorsOpen, startsAt, endsAt].map { time in
+            time.map { time in
+                let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: time)
+                return [parts.year, parts.month, parts.day, parts.hour, parts.minute]
+                    .map { String($0 ?? 0) }.joined(separator: "-")
+            } ?? "-"
+        }
+        return Self.digest([title, venue] + times + performers.map(\.name))
+    }
+
+    /// The fingerprint as it was taken before it read the wall clock, over the
+    /// instants themselves. Only ever compared against, never written.
+    var instantFingerprint: String {
         let times = [date, doorsOpen, startsAt, endsAt]
             .map { $0.map { String(Int($0.timeIntervalSince1970)) } ?? "-" }
-        let fields = [title, venue] + times + performers.map(\.name)
+        return Self.digest([title, venue] + times + performers.map(\.name))
+    }
+
+    private static func digest(_ fields: [String]) -> String {
         let digest = SHA256.hash(data: Data(fields.joined(separator: "\u{1F}").utf8))
         return digest.prefix(12).map { String(format: "%02x", $0) }.joined()
     }

@@ -70,6 +70,7 @@ struct EventsView: View {
                                 endSelecting()
                             }
                         ),
+                        markRead: filter == .upcoming ? markButton : nil,
                         remove: { isConfirmingRemoval = true }
                     )
                 }
@@ -79,6 +80,16 @@ struct EventsView: View {
             // and nothing survives leaving the mode that picked it.
             .onChange(of: filter) { selection.removeAll() }
             .onChange(of: isSelecting) { selection.removeAll() }
+            // Read again as the sheet closes, against the copy the sheet has
+            // just read: the row was marked as it stood when tapped, and a
+            // page that had changed since would otherwise come back Updated
+            // from the very sheet that showed the change.
+            .onChange(of: openEvent) { closed, open in
+                guard open == nil, let closed, let current = store.event(id: closed.id),
+                      current.isUpcoming
+                else { return }
+                mark(current, read: true)
+            }
         }
     }
 
@@ -92,12 +103,14 @@ struct EventsView: View {
                         // its record has been pruned with the night anyway.
                         let unread = event.isUpcoming ? store.unread(event) : nil
                         LibraryRow(event: event, unread: unread) {
-                            // In edit mode the row belongs to the selection, not
-                            // to the sheet.
-                            guard !isSelecting else { return }
                             if event.isUpcoming { mark(event, read: true) }
                             openEvent = event
                         }
+                            // In edit mode the row belongs to the selection, not
+                            // to the sheet: the row's own button would otherwise
+                            // take the tap, and only the strip the List draws
+                            // its mark in would pick the row.
+                            .allowsHitTesting(!isSelecting)
                             .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
@@ -128,11 +141,13 @@ struct EventsView: View {
     }
 
     /// The subtitle carries the count that matters at the moment: how many are
-    /// about to be removed, rather than how many there are.
+    /// about to be removed, rather than how many there are. Only Upcoming can
+    /// mark as well, so only Upcoming says so.
     private var subtitle: Text {
         if isSelecting {
             selection.isEmpty
-                ? Text("Select events to remove")
+                ? (filter == .upcoming ? Text("Select events to mark or remove")
+                                       : Text("Select events to remove"))
                 : Text("^[\(selection.count) event](inflect: true) selected")
         } else {
             Text("^[\(eventCount) event](inflect: true)")
@@ -146,6 +161,23 @@ struct EventsView: View {
         selection.count == 1
             ? Text("Remove this event from your library?")
             : Text("Remove \(selection.count) events from your library?")
+    }
+
+    /// Following's logic, over the picked nights still ahead: a past one has no
+    /// read state, and would only write a record the next prune takes away.
+    private var markButton: MarkReadButton {
+        let picked = chosen.filter(\.isUpcoming)
+        let marksRead = picked.isEmpty || picked.contains(where: store.isUnread)
+        return MarkReadButton(marksRead: marksRead, isEnabled: !picked.isEmpty) {
+            // One transaction for both. Here, unlike on Following, the tag
+            // changes the row's height, and a List resizing its rows in an
+            // animation left the edit-mode circles in place when edit mode was
+            // ended outside it.
+            withAnimation(.snappy) {
+                endSelecting()
+                store.markRead(picked, read: marksRead)
+            }
+        }
     }
 
     private func mark(_ event: Event, read: Bool) {

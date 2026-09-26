@@ -146,11 +146,20 @@ struct SelectionToolbar: ToolbarContent {
     /// Set where the act is worth asking about first; the trash acts at once
     /// where it is not.
     var confirmation: RemovalConfirmation?
+    /// Set where the rows have a read state — My Events' nights still ahead —
+    /// and drawn opposite the trash, where Following keeps its own.
+    var markRead: MarkReadButton?
     let remove: () -> Void
 
     var body: some ToolbarContent {
-        ToolbarItemGroup(placement: .bottomBar) {
+        // Where Mail keeps it, and Following with it: the pick-everything
+        // control opposite the way out.
+        ToolbarItem(placement: .topBarLeading) {
             Button(isEverythingSelected ? "Deselect All" : "Select All", action: selectAll)
+        }
+
+        ToolbarItemGroup(placement: .bottomBar) {
+            if let markRead { markRead }
 
             Spacer()
 
@@ -175,6 +184,25 @@ struct SelectionToolbar: ToolbarContent {
         } else {
             trash
         }
+    }
+}
+
+/// The bottom-left control while dates are being picked, on Following and My
+/// Events alike. One button rather than Mail's menu, doing whichever of the two
+/// the picked rows call for: read if any of them is still unread, unread only
+/// once every one of them has been read.
+struct MarkReadButton: View {
+    let marksRead: Bool
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(marksRead ? "Mark as Read" : "Mark as Unread",
+               systemImage: marksRead ? "envelope.open" : "envelope.badge",
+               action: action)
+            .labelStyle(.iconOnly)
+            .contentTransition(.symbolEffect(.replace))
+            .disabled(!isEnabled)
     }
 }
 

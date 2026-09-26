@@ -6447,6 +6447,28 @@
         }
       }
     },
+    "Select events to mark or remove" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マークまたは削除するイベントを選択"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要标记或移除的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇要標示或移除的活動"
+          }
+        }
+      }
+    },
     "Select events to remove" : {
       "localizations" : {
         "ja" : {
