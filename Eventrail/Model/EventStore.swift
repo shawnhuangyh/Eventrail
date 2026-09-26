@@ -986,6 +986,13 @@ final class EventStore {
             }
             return false
         }
+        // Some pages landed and some did not. "Updated" would say every event
+        // on screen is current, when the ones that failed are still showing
+        // their last read.
+        let missed = events.count - landed
+        if missed > 0, refreshFailure == nil {
+            refreshFailure = String(localized: "\(missed) of \(events.count) event pages could not be read. Those events keep what was read before.")
+        }
         return true
     }
 
