@@ -59,17 +59,28 @@ final class VenuePlaces {
         /// address is something Maps can be asked for, and a placeholder the
         /// site files streams and undisclosed rooms under (see
         /// ``Event/isAtHall``) is not a place at all.
-        init?(name: String, address: String?) {
+        init?(name: String, address: String?, countryHint: String? = nil) {
             guard !name.hasPrefix("!_"), !name.isEmpty || address != nil else { return nil }
             self.name = name
             self.address = address
+            self.countryHint = countryHint
         }
 
         /// Nil where the site has not named a hall yet — it announces plenty of
         /// events before it has booked one.
         init?(_ event: Event) {
-            self.init(name: event.venue, address: event.publishedAddress)
+            let address = event.publishedAddress
+            let hint = (address ?? "").isEmpty ? VenueCountries.country(of: event.title) : nil
+            self.init(name: event.venue, address: address, countryHint: hint)
         }
+
+        /// Where a hall with no published address is, as the event's own title
+        /// names it — 林鼓子2026香港粉絲見面會 at a 歷山酒店 whose page
+        /// Eventernote's members left empty. The last resort, and only ever
+        /// used to keep a name search inside one country or city: see
+        /// ``VenuePlaces/search(_:mayAskOpenStreetMap:)``. Not part of ``key``,
+        /// since it is not something the hall's page says.
+        let countryHint: String?
 
         /// The hall's name without the alias Eventernote is apt to append in
         /// brackets — "ワールド記念ホール(神戸ポートアイランドホール)". Maps
@@ -117,8 +128,18 @@ final class VenuePlaces {
         /// this block is the hall, and had none to offer. A block it turned
         /// down stays a block rather than being asked about on every sheet.
         var triedBuilding: Bool?
+        /// The ISO code of the country the answer placed the hall in, as the
+        /// source filed it — OpenStreetMap's `cn` for Hong Kong included. Nil
+        /// from Maps, and on every answer written before there was one.
+        var country: String?
 
         var wasFound: Bool { latitude != nil && longitude != nil }
+
+        /// Found, and found in Japan.
+        var isInJapan: Bool {
+            guard let latitude, let longitude else { return false }
+            return JapanAddresses.isInJapan(CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
+        }
 
         /// Which clock the hall keeps, as far as this answer settles it.
         ///
@@ -147,16 +168,33 @@ final class VenuePlaces {
 
         var placing: Placing? {
             guard let latitude, let longitude else { return nil }
+            let source = self.source.flatMap(Source.init(rawValue:))
+            // Kept in WGS-84 and shifted only as drawn, on the one provider
+            // that needs it — see ``MainlandOffset``. Maps' own answers there
+            // are shifted already.
+            var coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            // By the country the answer came back in wherever it carries one,
+            // so a hall on the mainland that the address reading missed is
+            // shifted as well; by where it stands on answers older than that.
+            if source == .openStreetMap || source == .openStreetMapAddress,
+               VenuePlaces.mapsIsMainland,
+               country.map(MainlandOffset.applies(toCountry:)) ?? MainlandOffset.applies(at: coordinate) {
+                coordinate = MainlandOffset.shifted(coordinate)
+            }
             let item = MKMapItem(
-                location: CLLocation(latitude: latitude, longitude: longitude),
+                location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude),
                 address: address.flatMap { MKAddress(fullAddress: $0, shortAddress: nil) }
             )
             item.name = name
             // An answer written before there were sources reads as the blunt
             // one, which is the safe way round: it widens a frame that did not
             // need widening, rather than claiming a precision it may not have.
-            let source = self.source.flatMap(Source.init(rawValue:)) ?? .register
-            return Placing(item: item, uncertainty: source.uncertainty, timeZone: zone)
+            return Placing(item: item, uncertainty: (source ?? .register).uncertainty, timeZone: zone)
+        }
+
+        init(_ found: Found?) {
+            self.init(found?.item, from: found?.source)
+            country = found?.country
         }
 
         init(_ found: MKMapItem?, from source: Source?) {
@@ -185,6 +223,10 @@ final class VenuePlaces {
         case maps
         case register
         case openStreetMap = "osm"
+        /// OpenStreetMap placing a hall abroad by its address alone, having
+        /// found no building of that name near it — the abroad counterpart of
+        /// the register's block.
+        case openStreetMapAddress = "osm-address"
 
         /// How far the coordinate might be from the hall's door.
         ///
@@ -195,7 +237,7 @@ final class VenuePlaces {
         var uncertainty: CLLocationDistance {
             switch self {
             case .maps, .openStreetMap: 0
-            case .register: 300
+            case .register, .openStreetMapAddress: 300
             }
         }
     }
@@ -254,7 +296,26 @@ final class VenuePlaces {
     /// answered with somewhere in Japan. What that reading turns down is
     /// already written down on the phones it was wrong on, and a pin on the
     /// mainland for a hall in 此花区 does not correct itself.
-    private static let ruleset = 8
+    ///
+    /// And again now that, on a phone whose Maps is the mainland provider, a
+    /// hall abroad and off the mainland is never taken from Maps at all — see
+    /// ``search(_:mayAskOpenStreetMap:)``. Only answers outside Japan are
+    /// asked again for that one (``isWorthAskingAgain(_:)``): the Seoul arena
+    /// pinned on the mainland is what it corrects, and nothing about a hall
+    /// placed in Japan changed.
+    ///
+    /// And again for halls with no published address, which a title naming
+    /// their city now lets OpenStreetMap place: every one of them was written
+    /// down as "no such place" and would otherwise stay that way for a month.
+    ///
+    /// And again once a hall's name is tried without its first word: the arena
+    /// on a Seoul campus had been written down as the campus. And once more
+    /// now that a Korean address written in kanji is read as Korea: KINTEX
+    /// had been written down as nowhere.
+    private static let ruleset = 12
+
+    /// The last ruleset whose answers *inside Japan* still stand.
+    private static let japanRuleset = 8
 
     /// How long "Maps has never heard of this hall" is believed for.
     ///
@@ -295,7 +356,7 @@ final class VenuePlaces {
     /// A hint rather than a filter, but a strong one: pointed at Japan, Maps
     /// will not offer Shanghai at all. So it is only where a search looks
     /// *first*, and a hall it does not find there is asked for again with no
-    /// hint — see ``search(_:)``.
+    /// hint — see ``search(_:mayAskOpenStreetMap:)``.
     private static let japan = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 36.2, longitude: 138.25),
         span: MKCoordinateSpan(latitudeDelta: 14, longitudeDelta: 18)
@@ -406,7 +467,7 @@ final class VenuePlaces {
             switch answer.source.flatMap(Source.init(rawValue:)) ?? .register {
             case .maps: breakdown.maps += 1
             case .register: breakdown.register += 1
-            case .openStreetMap: breakdown.openStreetMap += 1
+            case .openStreetMap, .openStreetMapAddress: breakdown.openStreetMap += 1
             }
         }
         return breakdown
@@ -450,6 +511,10 @@ final class VenuePlaces {
         // search settles it for good, and until it is settled every event held
         // there sits an hour or a day out in the reader's calendar.
         let known = cache[venue.key]
+        // Which provider this phone has, before a kept answer is drawn — it
+        // decides whether an OpenStreetMap pin is shifted. Once a launch, and
+        // a failure only leaves the last launch's answer standing.
+        if seesJapan == nil { _ = try? await mapsSeesJapan() }
         if let known, !Self.isWorthAskingAgain(known), !known.needsZone {
             // Settled already — but a block settled by an import, which may
             // not ask OpenStreetMap, or while the switch was off, is narrowed
@@ -464,12 +529,12 @@ final class VenuePlaces {
             return answer.placing
         }
         do {
-            let found = try await search(venue)
+            let found = try await search(venue, mayAskOpenStreetMap: true)
             Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(found), privacy: .public)")
             // The one caller that may upgrade a block to a building: somebody
             // is looking at this hall, and it is one hall. See ``VenueBuildings``.
             let answer = await narrowed(
-                Self.carrying(Answer(found?.item, from: found?.source), from: cache[venue.key]), for: venue)
+                Self.carrying(Answer(found), from: cache[venue.key]), for: venue)
             settle(answer, for: venue.key)
             // A hall that has just arrived somewhere it was not before. The
             // calendar entry written while it was nowhere is now wrong, and
@@ -538,7 +603,8 @@ final class VenuePlaces {
     /// again, and a building it did not have is not asked for again either.
     /// Without this, every refresh would ask about every building afresh.
     private static func carrying(_ fresh: Answer, from known: Answer?) -> Answer {
-        guard fresh.source == Source.register.rawValue, let known, known.ruleset == ruleset
+        guard fresh.source == Source.register.rawValue, let known,
+              known.ruleset == ruleset || (known.ruleset == japanRuleset && known.isInJapan)
         else { return fresh }
         if known.source == Source.openStreetMap.rawValue {
             var kept = known
@@ -633,7 +699,7 @@ final class VenuePlaces {
         var venues: [Venue] = []
         var asked: Set<String> = []
         for event in events {
-            guard let venue = Venue(event), venue.address?.isEmpty == false,
+            guard let venue = Venue(event), venue.address?.isEmpty == false || venue.countryHint != nil,
                   asked.insert(venue.key).inserted, include(venue)
             else { continue }
             venues.append(venue)
@@ -666,11 +732,11 @@ final class VenuePlaces {
             // written so far is already kept.
             guard !Task.isCancelled else { return .refreshed(found: found, of: index) }
             do {
-                let placed = try await search(venue)
+                let placed = try await search(venue, mayAskOpenStreetMap: narrowing)
                 Self.log.info("venue \(venue.key, privacy: .public) → \(Self.describe(placed), privacy: .public)")
                 // Read now rather than when the run began: it takes minutes,
                 // and a sheet opened meanwhile may have narrowed this hall.
-                var answer = Self.carrying(Answer(placed?.item, from: placed?.source), from: cache[venue.key])
+                var answer = Self.carrying(Answer(placed), from: cache[venue.key])
                 if narrowing {
                     do {
                         answer = try await narrow(answer, for: venue)
@@ -684,6 +750,8 @@ final class VenuePlaces {
                 settle(answer, for: venue.key)
                 if placed != nil { found += 1 }
                 failures = 0
+            } catch is Deferred {
+                // Left for a sheet or a refresh — see ``Deferred``.
             } catch {
                 // The hall keeps whatever answer it had; only a run of these
                 // ends the refresh.
@@ -697,6 +765,10 @@ final class VenuePlaces {
         }
         return .refreshed(found: found, of: venues.count)
     }
+
+    /// What a search found: the place, who found it, and the country it filed
+    /// the place under where it said.
+    private typealias Found = (item: MKMapItem, source: Source, country: String?)
 
     /// The hall, as Maps has it. A throw is the search itself failing —
     /// offline, or throttled; a hall Maps does not have returns nil.
@@ -735,28 +807,64 @@ final class VenuePlaces {
     /// opened straight from a search row has only the name until its own page
     /// is imported, and it is worth the wait: a name on its own is how a
     /// concert in Shanghai came to be pinned to a Mercedes showroom in Nara.
-    private func search(_ venue: Venue) async throws -> (item: MKMapItem, source: Source)? {
-        guard let address = venue.address, !address.isEmpty else { return nil }
+    private func search(
+        _ venue: Venue, mayAskOpenStreetMap: Bool
+    ) async throws -> Found? {
+        guard let address = venue.address, !address.isEmpty else {
+            // **The one place a hall is looked for by name alone**, and only
+            // where the event's title names the city it is in: the hall's page
+            // published no address, and a name searched for everywhere is how
+            // a concert in Shanghai came to be pinned to a Mercedes showroom in
+            // Nara. Held to that one country or city, a namesake elsewhere is
+            // never offered. On every provider, since Maps would be asked the
+            // same unanchored question.
+            guard let country = venue.countryHint, !venue.plainName.isEmpty else { return nil }
+            guard mayAskOpenStreetMap else { throw Deferred() }
+            return try await openStreetMap(venue, at: nil, country: country)
+        }
 
         // The country the site itself published, read the way every other
         // screen reads it. A hall it places in Japan is asked for with the
         // hint on and nowhere else; a hall it places nowhere — abroad, or an
         // address too odd to name a prefecture — is asked for both ways.
         let inJapan = Region.containing(address: address) != nil
-        let regions: [MKCoordinateRegion?] = inJapan ? [Self.japan] : [Self.japan, nil]
+        var regions: [MKCoordinateRegion?] = inJapan ? [Self.japan] : [Self.japan, nil]
+
+        // **On a phone whose Maps is the mainland provider, Maps is asked only
+        // about the mainland.** It has no Japanese venues, and about a hall in
+        // Seoul or Hong Kong it offers whichever of its own places shares a
+        // number with the address — 안암로 145 came back pinned on the
+        // mainland, dated GMT+8. So a hall in Japan goes straight to the
+        // register, a hall on the mainland is asked of Maps with no hint, and
+        // every other hall abroad is asked of OpenStreetMap.
+        if try await !mapsSeesJapan() {
+            if inJapan {
+                regions = []
+            } else if VenueCountries.isMainlandChina(address) {
+                regions = [nil]
+            } else {
+                guard mayAskOpenStreetMap else { throw Deferred() }
+                return try await openStreetMap(venue, at: address,
+                                               country: VenueCountries.country(of: address))
+            }
+        }
 
         for region in regions {
             if !venue.plainName.isEmpty {
                 let halls = try await results(for: venue.plainName, kinds: [.pointOfInterest], in: region)
                 if let hall = halls.first(where: { Self.answers($0, for: address, inJapan: inJapan) }) {
-                    return (hall, .maps)
+                    return (hall, .maps, nil)
                 }
             }
             let places = try await results(for: address, kinds: [.pointOfInterest, .address], in: region)
             if let place = places.first(where: { Self.answers($0, for: address, inJapan: inJapan) }) {
-                return (place, .maps)
+                return (place, .maps, nil)
             }
         }
+
+        // Only Japan is in the register, and a hall abroad Maps had nothing
+        // for is left unplaced rather than asked of it.
+        guard inJapan else { return nil }
 
         // Maps had nothing, which is where the register is asked — see
         // ``JapanAddresses``. Second rather than first because Maps' answer is
@@ -767,8 +875,63 @@ final class VenuePlaces {
 
         // The block is the answer. Where somebody is waiting on this hall,
         // ``narrowed(_:for:)`` may then ask which building at it is the hall.
-        return (Self.item(at: block, called: venue.plainName), .register)
+        return (Self.item(at: block, called: venue.plainName), .register, "jp")
     }
+
+    /// A hall abroad, placed by OpenStreetMap — see ``VenueBuildings/place(named:at:country:)``.
+    ///
+    /// Dated by its country, since OpenStreetMap carries no zone and Maps is
+    /// the one that does: a country keeping one clock settles it, and one
+    /// spanning several leaves the hall on the clock its members wrote.
+    private func openStreetMap(
+        _ venue: Venue, at address: String?, country: String?
+    ) async throws -> Found? {
+        guard let place = try await VenueBuildings.shared.place(
+            named: venue.plainName, at: address, country: country)
+        else { return nil }
+        let item = MKMapItem(
+            location: CLLocation(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude),
+            address: address.flatMap { MKAddress(fullAddress: $0, shortAddress: nil) }
+        )
+        item.name = venue.plainName.isEmpty ? address : venue.plainName
+        item.timeZone = place.country.flatMap(VenueCountries.timeZone(forCountry:))
+        return (item, place.isBuilding ? .openStreetMap : .openStreetMapAddress, place.country)
+    }
+
+    /// A hall abroad an import met, on a phone that could place it only by
+    /// asking OpenStreetMap — which an import may not do. Not a failure and
+    /// not an answer: nothing is written down, and the hall is placed when the
+    /// reader opens an event there or refreshes by hand.
+    private struct Deferred: Error {}
+
+    /// Whether this phone's Maps can see Japan at all — false where it is
+    /// served by the provider for mainland China.
+    ///
+    /// Asked of Maps itself rather than read off the locale or the region
+    /// setting, because the provider follows where the phone *is*: one search
+    /// for Tokyo Station, and an answer in Japan says yes. Remembered for the
+    /// launch, which is as long as a phone stays in one place for this
+    /// purpose; a throw is the search failing and is not remembered.
+    private func mapsSeesJapan() async throws -> Bool {
+        if let seesJapan { return seesJapan }
+        let answers = try await results(for: "東京駅", kinds: [.pointOfInterest], in: Self.japan)
+        let sees = answers.contains { JapanAddresses.isInJapan($0.location.coordinate) }
+        Self.log.info("maps \(sees ? "sees" : "does not see", privacy: .public) Japan")
+        seesJapan = sees
+        UserDefaults.standard.set(!sees, forKey: Self.mainlandKey)
+        return sees
+    }
+
+    private var seesJapan: Bool?
+
+    /// Whether the last look at this phone's Maps found the mainland provider
+    /// behind it — kept across launches, because a pin is drawn from what is
+    /// written down, often before this launch has searched for anything.
+    static var mapsIsMainland: Bool {
+        UserDefaults.standard.bool(forKey: mainlandKey)
+    }
+
+    private static let mainlandKey = "venueMapsIsMainland"
 
     /// The register's block as a map item, so that everything downstream —
     /// the kept answer, the map under the venue, the calendar entry — handles
@@ -818,7 +981,7 @@ final class VenuePlaces {
     /// Eventernote files in Japan is not on the mainland, however many numbers
     /// the two addresses turn out to share. The second question only ever has
     /// anything to say on a phone whose Maps cannot see Japan — see
-    /// ``search(_:)`` — and a hall it turns down is not left
+    /// ``search(_:mayAskOpenStreetMap:)`` — and a hall it turns down is not left
     /// unplaced but handed to the register, which can.
     private static func answers(_ item: MKMapItem, for address: String, inJapan: Bool) -> Bool {
         guard stands(item, at: address) else { return false }
@@ -870,7 +1033,8 @@ final class VenuePlaces {
     /// again once the month is up, and anything settled under an older reading
     /// of Maps' answers is asked again now.
     private static func isWorthAskingAgain(_ answer: Answer) -> Bool {
-        guard answer.ruleset == ruleset else { return true }
+        let standsInJapan = answer.ruleset == japanRuleset && answer.isInJapan
+        guard answer.ruleset == ruleset || standsInJapan else { return true }
         return !answer.wasFound && answer.asked.timeIntervalSinceNow < -patience
     }
 
@@ -881,7 +1045,7 @@ final class VenuePlaces {
     /// block the address names, and a run of the second where the first used
     /// to answer is this device having lost sight of Japan rather than the
     /// halls having moved.
-    private static func describe(_ found: (item: MKMapItem, source: Source)?) -> String {
+    private static func describe(_ found: Found?) -> String {
         guard let found else { return "nobody has such a place" }
         let coordinate = found.item.location.coordinate
         let kind = found.item.pointOfInterestCategory.map { "\($0.rawValue)" } ?? "the address"

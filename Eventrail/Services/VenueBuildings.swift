@@ -105,17 +105,45 @@ nonisolated struct VenueBuildings: Sendable {
     private func nearest(
         to reference: CLLocationCoordinate2D, matching query: String
     ) async throws -> Building? {
+        // Japan only, so a hall's namesake abroad is never even offered.
+        let rows = try await rows(for: query, in: "jp")
+        return Self.nearest(in: rows, to: reference, within: Self.tolerance, called: query)
+    }
+
+    private static func nearest(
+        in rows: [Row], to reference: CLLocationCoordinate2D,
+        within tolerance: CLLocationDistance, called query: String
+    ) -> Building? {
+        let origin = CLLocation(latitude: reference.latitude, longitude: reference.longitude)
+        return rows
+            .compactMap { row -> (away: CLLocationDistance, building: Building)? in
+                guard let coordinate = row.venueCoordinate else { return nil }
+                let away = origin.distance(from: CLLocation(latitude: coordinate.latitude,
+                                                            longitude: coordinate.longitude))
+                guard away <= tolerance else { return nil }
+                return (away, Building(name: row.name ?? query, coordinate: coordinate))
+            }
+            .min { $0.away < $1.away }?
+            .building
+    }
+
+    /// One search, in `country` where that is known — see
+    /// ``VenueCountries/searchScope(for:)``.
+    private func rows(for query: String, in country: String?) async throws -> [Row] {
         var components = URLComponents(url: Self.endpoint, resolvingAgainstBaseURL: false)
-        components?.queryItems = [
+        var items = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "format", value: "jsonv2"),
             URLQueryItem(name: "limit", value: "10"),
-            // Japan only, so a hall's namesake abroad is never even offered.
-            URLQueryItem(name: "countrycodes", value: "jp"),
+            // The country each answer is in, which is what a hall abroad is
+            // dated by — see ``VenueCountries/timeZone(forCountry:)``.
+            URLQueryItem(name: "addressdetails", value: "1"),
             // In Japanese, or Kアリーナ横浜 comes back as "K-Arena Yokohama"
             // — which is exactly the name this app declines to be argued into.
             URLQueryItem(name: "accept-language", value: "ja")
         ]
+        if let country { items += VenueCountries.searchScope(for: country) }
+        components?.queryItems = items
         guard let url = components?.url else { throw Failure.unreadable }
 
         var request = URLRequest(url: url)
@@ -129,22 +157,95 @@ nonisolated struct VenueBuildings: Sendable {
         guard let rows = try? JSONDecoder().decode([Row].self, from: data) else {
             throw Failure.unreadable
         }
-
-        let origin = CLLocation(latitude: reference.latitude, longitude: reference.longitude)
         return rows
-            .compactMap { row -> (away: CLLocationDistance, building: Building)? in
-                guard let category = row.category, !Self.notVenues.contains(category),
-                      let latitude = row.lat.flatMap(Double.init),
-                      let longitude = row.lon.flatMap(Double.init)
-                else { return nil }
-                let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-                guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
-                let away = origin.distance(from: CLLocation(latitude: latitude, longitude: longitude))
-                guard away <= Self.tolerance else { return nil }
-                return (away, Building(name: row.name ?? query, coordinate: coordinate))
+    }
+
+    // MARK: - A hall abroad
+
+    /// Where a hall outside Japan is, for a phone whose Maps cannot be trusted
+    /// with it — see ``VenuePlaces/search(_:mayAskOpenStreetMap:)``.
+    struct Place: Sendable {
+        let coordinate: CLLocationCoordinate2D
+        /// The ISO code OpenStreetMap files it under, lower case.
+        let country: String?
+        /// Whether the hall's own building was found, or only its address.
+        let isBuilding: Bool
+    }
+
+    /// How far from its address a hall abroad may stand and still be the hall.
+    ///
+    /// Wider than ``tolerance``: an address abroad is placed by street and
+    /// number rather than by a register's block, and a campus arena like the
+    /// one behind 안암로 145 sits well inside its grounds.
+    private static let abroadTolerance: CLLocationDistance = 2000
+
+    /// The hall abroad at `address`, the way the register and this file place
+    /// one in Japan: the address first, as the anchor, and then the building
+    /// carrying the hall's name near it.
+    ///
+    /// Held to the address wherever the address can be placed, because a name
+    /// on its own is how a concert in Shanghai came to be pinned to a Mercedes
+    /// showroom in Nara. Where it cannot, a name is believed only inside the
+    /// country the address plainly names (`country`) — Hangul is Korea, 香港 is
+    /// Hong Kong — and not at all where it names none. Three requests at most,
+    /// paced like every other.
+    ///
+    /// `address` may be nil — the hall's page published none, and the country
+    /// was read off the event's title instead (see ``VenuePlaces``). Then the
+    /// name is all there is, and it is believed only inside `country`.
+    func place(named name: String, at address: String?, country: String?) async throws -> Place? {
+        var anchor: Row?
+        if let address, !address.isEmpty {
+            await Self.pace.wait()
+            anchor = try await rows(for: address, in: country).first { $0.venueCoordinate != nil }
+        }
+        // The country the address plainly names before the one OpenStreetMap
+        // files it under: that is `cn` for Hong Kong, and a name search over
+        // the whole of China is not the one meant.
+        let within = country ?? anchor?.address?.countryCode
+
+        if within != nil {
+            for query in Self.shortenings(of: name) {
+                await Self.pace.wait()
+                let named = try await rows(for: query, in: within)
+                if let anchor, let reference = anchor.venueCoordinate {
+                    if let building = Self.nearest(in: named, to: reference,
+                                                   within: Self.abroadTolerance, called: query) {
+                        return Place(coordinate: building.coordinate, country: within, isBuilding: true)
+                    }
+                } else if let row = named.first(where: { $0.venueCoordinate != nil }),
+                          let coordinate = row.venueCoordinate {
+                    return Place(coordinate: coordinate, country: within, isBuilding: true)
+                }
             }
-            .min { $0.away < $1.away }?
-            .building
+        }
+        guard let anchor, let coordinate = anchor.venueCoordinate else { return nil }
+        return Place(coordinate: coordinate, country: within, isBuilding: false)
+    }
+
+    /// The name, then shorter forms of it, cut where a dash or a space says
+    /// which part is which.
+    ///
+    /// A space usually follows whose grounds the hall stands in, so the part
+    /// *after* it is tried first — 高麗大学校 化汀 体育館 is 化汀体育館 on the
+    /// map, and 高麗大学校 alone is the whole campus, eight hundred metres from
+    /// the arena. A dash usually comes before a room in the building, so only
+    /// the part *before* it is tried — 歷山酒店-宴會廳 is 歷山酒店, and 宴會廳
+    /// alone is every banquet hall in the city.
+    static func shortenings(of name: String) -> [String] {
+        let whole = name.trimmingCharacters(in: .whitespaces)
+        guard !whole.isEmpty else { return [] }
+        // Not the long-vowel ー, which is part of アリーナ rather than a break.
+        guard let cut = whole.firstIndex(where: { "-－‐― 　".contains($0) }) else { return [whole] }
+        let head = whole[..<cut].trimmingCharacters(in: .whitespaces)
+        let tail = whole[whole.index(after: cut)...].trimmingCharacters(in: .whitespaces)
+        let isSpace = whole[cut] == " " || whole[cut] == "　"
+        var tried = [whole]
+        for candidate in isSpace ? [tail, head] : [head]
+        where !candidate.isEmpty && !tried.contains(candidate) {
+            tried.append(candidate)
+        }
+        return tried
     }
 
     /// The name with one trailing room designation removed, or with its last
@@ -188,5 +289,24 @@ nonisolated struct VenueBuildings: Sendable {
         var lon: String?
         var name: String?
         var category: String?
+        var address: Address?
+
+        struct Address: Decodable {
+            var countryCode: String?
+
+            enum CodingKeys: String, CodingKey {
+                case countryCode = "country_code"
+            }
+        }
+
+        /// Where the row stands, where it could be a venue at all.
+        var venueCoordinate: CLLocationCoordinate2D? {
+            guard let category, !VenueBuildings.notVenues.contains(category),
+                  let latitude = lat.flatMap(Double.init),
+                  let longitude = lon.flatMap(Double.init)
+            else { return nil }
+            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
+        }
     }
 }
