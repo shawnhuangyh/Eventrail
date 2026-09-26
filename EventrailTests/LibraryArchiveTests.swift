@@ -60,10 +60,10 @@ struct LibraryArchiveTests {
     /// Whichever side runs the merge, the later read's time stands.
     @Test func theLaterReadOfAPageWinsEitherWay() {
         var phone = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 0),
-                                   summary: "S席 9,000円", isDetailed: true)
+                                   summary: "S席 9,000円", isDetailed: true, detailFormat: 1)
         phone.readAt = earlier
         var iPad = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 30),
-                                  isDetailed: true)
+                                  isDetailed: true, detailFormat: 1)
         iPad.readAt = later
 
         let onPhone = archive(with: [phone], at: earlier).merging(archive(with: [iPad], at: earlier))
@@ -72,8 +72,24 @@ struct LibraryArchiveTests {
             let event = merged.events["1"]
             #expect(event?.startsAt == Fixtures.date(2027, 5, 9, 18, 30))
             #expect(event?.readAt == later)
-            // What the later read left empty is still filled from the earlier one.
-            #expect(event?.summary == "S席 9,000円")
+            // The later read found no 概要 on the page: it was taken off.
+            #expect(event?.summary == nil)
+        }
+    }
+
+    /// A later read by an older build did not look for what the newer one read,
+    /// so what it left empty is filled from the earlier copy rather than cleared.
+    @Test func aLaterReadOfFewerFieldsOnlyFillsGaps() {
+        var phone = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 0),
+                                   summary: "S席 9,000円", isDetailed: true, detailFormat: 1)
+        phone.readAt = earlier
+        var iPad = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18, 30), isDetailed: true)
+        iPad.readAt = later
+
+        for merged in [archive(with: [phone], at: earlier).merging(archive(with: [iPad], at: earlier)),
+                       archive(with: [iPad], at: earlier).merging(archive(with: [phone], at: earlier))] {
+            #expect(merged.events["1"]?.startsAt == Fixtures.date(2027, 5, 9, 18, 30))
+            #expect(merged.events["1"]?.summary == "S席 9,000円")
         }
     }
 

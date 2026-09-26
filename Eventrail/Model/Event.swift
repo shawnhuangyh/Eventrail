@@ -384,6 +384,15 @@ nonisolated extension Event {
     /// Replaces the imported fields with a freshly imported copy, keeping this
     /// event's identity. The reader's ``Tracking`` lives outside the event and
     /// is untouched by any import.
+    ///
+    /// What a copy leaves empty means one of two things. A listing row
+    /// publishes no times, no 概要 and no links at all, so its gaps are filled
+    /// from what this copy already holds. A read of the event's own page — at
+    /// least as thorough as the one behind this copy — publishes all of them,
+    /// so its gaps are answers: a start time or a 概要 taken off the page is
+    /// gone from it, and keeping the old one would show it forever. The
+    /// hall's address and capacity are the exception either way, since they
+    /// come from a second page whose failure the import shrugs off.
     func merging(_ imported: Event) -> Event {
         // Which zone the clock on the page is read in is this device's answer
         // rather than the site's — every import reads ``publishedZone`` and
@@ -392,6 +401,10 @@ nonisolated extension Event {
         let imported = imported.timeZone == Event.publishedZone && timeZone != Event.publishedZone
             ? imported.published(in: timeZone)
             : imported
+        let isWholePage = imported.isDetailed && (imported.detailFormat ?? 0) >= (detailFormat ?? 0)
+        func page<Value>(_ new: Value?, _ old: Value?) -> Value? {
+            isWholePage ? new : new ?? old
+        }
 
         return Event(
             id: id,
@@ -402,20 +415,20 @@ nonisolated extension Event {
             // out what the venue's page already supplied.
             venueDetail: imported.venueDetail ?? venueDetail,
             venueAddress: imported.venueAddress ?? venueAddress,
-            placeID: imported.placeID ?? placeID,
+            placeID: page(imported.placeID, placeID),
             date: imported.date,
-            doorsOpen: imported.doorsOpen ?? doorsOpen,
-            startsAt: imported.startsAt ?? startsAt,
-            endsAt: imported.endsAt ?? endsAt,
+            doorsOpen: page(imported.doorsOpen, doorsOpen),
+            startsAt: page(imported.startsAt, startsAt),
+            endsAt: page(imported.endsAt, endsAt),
             timeZone: imported.timeZone,
-            listedAttendees: imported.listedAttendees ?? listedAttendees,
-            performers: imported.performers.isEmpty ? performers : imported.performers,
-            summary: imported.summary ?? summary,
-            relatedLinks: imported.relatedLinks ?? relatedLinks,
-            hashtags: imported.hashtags ?? hashtags,
-            editedBy: imported.editedBy ?? editedBy,
-            editedAt: imported.editedAt ?? editedAt,
-            imageURL: imported.imageURL ?? imageURL,
+            listedAttendees: page(imported.listedAttendees, listedAttendees),
+            performers: imported.performers.isEmpty && !isWholePage ? performers : imported.performers,
+            summary: page(imported.summary, summary),
+            relatedLinks: page(imported.relatedLinks, relatedLinks),
+            hashtags: page(imported.hashtags, hashtags),
+            editedBy: page(imported.editedBy, editedBy),
+            editedAt: page(imported.editedAt, editedAt),
+            imageURL: page(imported.imageURL, imageURL),
             sourceURL: imported.sourceURL,
             isDetailed: imported.isDetailed || isDetailed,
             detailFormat: imported.detailFormat ?? detailFormat,

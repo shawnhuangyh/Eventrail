@@ -53,6 +53,24 @@ struct EventTests {
         #expect(merged.detailFormat == 1)
     }
 
+    /// The page no longer prints a start time or a 概要: a fresh read of it
+    /// says so, where a listing row would have said nothing.
+    @Test func aReadOfThePageClearsWhatThePageNoLongerPrints() {
+        let held = Fixtures.event(
+            venueAddress: "東京都千代田区", startsAt: Fixtures.date(2027, 5, 9, 18, 0),
+            endsAt: Fixtures.date(2027, 5, 9, 21, 0), performers: ["A"],
+            summary: "S席 9,000円", isDetailed: true, detailFormat: 1)
+        let page = Fixtures.event(isDetailed: true, detailFormat: 1)
+
+        let merged = held.merging(page)
+        #expect(merged.startsAt == nil)
+        #expect(merged.endsAt == nil)
+        #expect(merged.summary == nil)
+        #expect(merged.performers.isEmpty)
+        // From the hall's own page, whose failure an import shrugs off.
+        #expect(merged.venueAddress == "東京都千代田区")
+    }
+
     @Test func aReimportDoesNotPutAHallAbroadBackOnTokyoTime() {
         let placed = Fixtures.event(startsAt: Fixtures.date(2027, 5, 9, 18, 0))
             .published(in: Fixtures.taipei)
