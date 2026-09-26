@@ -12,7 +12,7 @@ enum AppTab: Hashable {
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var store = EventStore()
+    @State private var store: EventStore
     /// Read from Eventernote rather than from the library, and shared by the
     /// two screens that show it — the Following tab and the Me card — so a
     /// followed performer's listing is asked for once per launch.
@@ -39,13 +39,25 @@ struct RootView: View {
     /// the only one they get.
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
 
-    /// Made together, so the dates know which halls keep Tokyo time before
-    /// any screen reads them — see ``FollowedDates/keepsPublishedClock``. A
-    /// hall ``VenueRegions`` places in one of the site's areas is in Japan.
+    /// Made together, so the dates know which clock each hall keeps before
+    /// any screen reads them — see ``FollowedDates/hallZone``. Three answers,
+    /// none of them asked for here: a hall ``VenueRegions`` places in one of
+    /// the site's areas is in Japan; the library's own copy of the night
+    /// carries its hall's clock once a placing retimed it; and a hall placed
+    /// under any address — the reader opening the night places it — answers
+    /// by its name.
     init() {
+        let store = EventStore()
         let followed = FollowedDates()
         let venues = VenueRegions()
-        followed.keepsPublishedClock = { venues.region(of: $0) != nil }
+        followed.hallZone = { event in
+            if venues.region(of: event) != nil { return Event.publishedZone }
+            if let kept = store.event(id: event.id), kept.timeZone != Event.publishedZone {
+                return kept.timeZone
+            }
+            return VenuePlaces.shared.timeZone(ofHallNamed: event.venue)
+        }
+        _store = State(initialValue: store)
         _followed = State(initialValue: followed)
         _venues = State(initialValue: venues)
     }

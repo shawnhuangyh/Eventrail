@@ -449,6 +449,33 @@ final class VenuePlaces {
         }
     }
 
+    /// Which clock a hall keeps, asked by its name alone — for a Following
+    /// row, whose listing prints the name and no address, and so cannot ask
+    /// the way an event of the library does.
+    ///
+    /// Answered from whatever placing of that hall is written down, under any
+    /// address: the reader opening the event puts one there, since the sheet
+    /// reads the page and places the hall. Nil where no placing settled a
+    /// clock. Nothing is asked for.
+    func timeZone(ofHallNamed name: String) -> TimeZone? {
+        if zonesByName == nil {
+            var zones: [String: TimeZone] = [:]
+            for (key, answer) in cache where !Self.isWorthAskingAgain(answer) {
+                guard let zone = answer.zone,
+                      let hall = key.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first
+                else { continue }
+                zones[String(hall)] = zone
+            }
+            zonesByName = zones
+        }
+        return zonesByName?[name]
+    }
+
+    /// ``timeZone(ofHallNamed:)``'s index, built once from the kept answers
+    /// and dropped whenever one is written: it is read per row as a list
+    /// draws, and the cache behind it is decoded afresh on every read.
+    private var zonesByName: [String: TimeZone]?
+
     /// How many of the halls behind `events` each answer placed, for the
     /// screen that explains the three of them.
     ///
@@ -1027,6 +1054,7 @@ final class VenuePlaces {
         var kept = cache.filter { $0.value.asked.timeIntervalSinceNow > -Self.keep }
         kept[key] = answer
         cache = kept
+        zonesByName = nil
     }
 
     /// A place found stays found. A place Maps did not have is asked about
