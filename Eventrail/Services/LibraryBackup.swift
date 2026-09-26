@@ -107,8 +107,8 @@ nonisolated struct LibraryBackup: Sendable {
     /// Reads a file the reader picked.
     ///
     /// A file chosen from elsewhere on the system is not ours until it proves it
-    /// is, so this is the one place that refuses rather than falling back to an
-    /// empty library the way ``LibraryFile/load()`` deliberately does.
+    /// is, so this is the one place that refuses rather than setting the file
+    /// aside and starting empty the way ``LibraryFile/load()`` does.
     static func read(at url: URL) throws -> LibraryBackup {
         // A document picked outside the container is handed over scoped, and
         // reading it without asking first returns nothing on a device.

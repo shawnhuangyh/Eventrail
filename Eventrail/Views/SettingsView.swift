@@ -295,10 +295,18 @@ struct SettingsView: View {
         Button {
             isChoosingBackup = true
         } label: {
-            SettingRowLabel("square.and.arrow.down", "Restore from Backup")
+            SettingRowLabel("square.and.arrow.down", "Restore from Backup",
+                            status: unreadableLibraryStatus, needsAttention: true)
                 .settingRowPadding()
         }
         .buttonStyle(.plain)
+    }
+
+    /// The one time the library on screen is known to be missing something:
+    /// a file this build could not read, kept aside for a build that can.
+    private var unreadableLibraryStatus: Text? {
+        guard store.unreadableLibraryFiles > 0 else { return nil }
+        return Text("Part of your library could not be read and was set aside. Restore a backup, or update the app.")
     }
 
     /// Writes the file the share sheet will hand over.

@@ -222,6 +222,11 @@ final class EventStore {
     /// one has run.
     private(set) var calendarStatus: CalendarSync.Outcome?
 
+    /// How many library files this build found and could not read. Each was
+    /// set aside rather than written over — see ``LibraryFile/load()`` — and
+    /// Settings says so, since the library on screen is missing what they hold.
+    private(set) var unreadableLibraryFiles = 0
+
     /// What a refresh of the venues is doing, or what the last one did. Nil
     /// until the reader asks for one.
     private(set) var venueStatus: VenuePlaces.Refresh?
@@ -297,7 +302,9 @@ final class EventStore {
             && UserDefaults.standard.bool(forKey: Self.calendarPreferenceKey)
         preciseVenuesEnabled = venues?.usesOpenStreetMap ?? false
 
-        var loaded = file?.load() ?? LibraryArchive()
+        let contents = file?.load()
+        unreadableLibraryFiles = contents?.unreadable ?? 0
+        var loaded = contents?.archive ?? LibraryArchive()
         if loaded.membership.isEmpty, !library.isEmpty {
             loaded.events = Dictionary(library.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             loaded.membership = library.reduce(into: [:]) { $0[$1.id] = Stamped(true) }
@@ -337,7 +344,7 @@ final class EventStore {
         // launch would be correcting it forever. A merge is written back for a
         // plainer reason — it is only in memory until something saves it, and
         // this is also where what *this* device holds goes back to iCloud.
-        if retimeEvents() || merged { persist() }
+        if retimeEvents() || merged || contents?.recovered == true { persist() }
     }
 
     deinit {

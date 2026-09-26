@@ -318,21 +318,83 @@ nonisolated struct LibraryFile: Sendable {
         return directory.appending(path: "library.json")
     }()
 
-    /// An unreadable file yields an empty library rather than a crash: the
-    /// reader can always add events again, and a refusal to launch helps nobody.
-    func load() -> LibraryArchive {
-        guard let data = try? Data(contentsOf: url) else { return LibraryArchive() }
+    /// What a launch found on disk.
+    struct Contents {
+        var archive: LibraryArchive
+        /// Files set aside because this build could not read them, now or on
+        /// an earlier launch. Nothing ever writes over them.
+        var unreadable = 0
+        /// Whether a file set aside earlier was read this time and folded back
+        /// in — which the store has to write down.
+        var recovered = false
+    }
+
+    /// Reads the library, and never loses one it cannot read.
+    ///
+    /// An unreadable file used to yield an empty library, and the next save
+    /// wrote that empty library over it: one field decoded wrongly, and every
+    /// record on a device without sync was gone. So a file that will not
+    /// decode is moved aside under a name of its own and the app starts empty
+    /// beside it, where nothing it saves can reach it. Every launch tries the
+    /// ones set aside again, so a build that has learnt to read them folds
+    /// them back in with an ordinary merge — the records written since keep
+    /// whichever copy is newer — and only then deletes them.
+    func load() -> Contents {
+        var contents = Contents(archive: LibraryArchive())
+        if let data = try? Data(contentsOf: url) {
+            if let archive = Self.decode(data) {
+                contents.archive = archive
+            } else {
+                setAside()
+            }
+        }
+
+        for copy in setAsideCopies() {
+            guard let data = try? Data(contentsOf: copy), let archive = Self.decode(data) else {
+                contents.unreadable += 1
+                continue
+            }
+            Self.log.notice("Recovered a library file set aside on an earlier launch.")
+            contents.archive = contents.archive.merging(archive)
+            contents.recovered = true
+            try? FileManager.default.removeItem(at: copy)
+        }
+        return contents
+    }
+
+    private static func decode(_ data: Data) -> LibraryArchive? {
         if let archive = try? JSONDecoder().decode(LibraryArchive.self, from: data) {
             return archive
         }
         // The first shipped format had no timestamps on it. Rather than drop a
         // library that predates syncing, read it and stamp it as it stands.
         if let legacy = try? JSONDecoder().decode(LegacyArchive.self, from: data) {
-            Self.log.notice("Migrating a pre-sync library file.")
+            log.notice("Migrating a pre-sync library file.")
             return legacy.migrated()
         }
-        Self.log.error("Library file could not be read; starting empty.")
-        return LibraryArchive()
+        return nil
+    }
+
+    private static let setAsidePrefix = "library.unreadable-"
+
+    private func setAside() {
+        let stamp = Date.now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false)
+            .timeSeparator(.omitted))
+        let destination = url.deletingLastPathComponent()
+            .appending(path: "\(Self.setAsidePrefix)\(stamp)-\(UUID().uuidString.prefix(8)).json")
+        do {
+            try FileManager.default.moveItem(at: url, to: destination)
+            Self.log.error("Library file could not be read; set aside as \(destination.lastPathComponent, privacy: .public).")
+        } catch {
+            Self.log.error("Library file could not be read or set aside: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func setAsideCopies() -> [URL] {
+        let directory = url.deletingLastPathComponent()
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))) ?? []
+        return names.filter { $0.hasPrefix(Self.setAsidePrefix) }.sorted()
+            .map { directory.appending(path: $0) }
     }
 
     func save(_ archive: LibraryArchive) {
