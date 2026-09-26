@@ -8492,6 +8492,94 @@
           }
         }
       }
+    },
+    "%lld of %lld event pages could not be read. Those events keep what was read before." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントページ%2$lld件のうち%1$lld件を読み込めませんでした。これらのイベントは前回読み込んだ内容のままです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld 个活动页面中有 %1$lld 个未能读取。这些活动保留上次读取的内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld 個活動頁面中有 %1$lld 個未能讀取。這些活動保留上次讀取的內容。"
+          }
+        }
+      }
+    },
+    "The Eventrail calendar could not be removed: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrailカレンダーを削除できませんでした：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法移除 Eventrail 日历：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法移除 Eventrail 日曆：%@"
+          }
+        }
+      }
+    },
+    "Part of your library could not be read and was set aside. Restore a backup, or update the app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリの一部を読み込めなかったため、別に保管しました。バックアップから復元するか、アプリをアップデートしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库的一部分无法读取，已另行保存。请从备份恢复，或更新 App。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料庫的一部分無法讀取，已另行保存。請從備份恢復，或更新 App。"
+          }
+        }
+      }
+    },
+    "iCloud holds a library this version cannot read — update the app to sync" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudにこのバージョンでは読み込めないライブラリがあります。同期するにはアプリをアップデートしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 中的资料库无法被此版本读取——更新 App 以同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 中的資料庫無法被此版本讀取——更新 App 以同步"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
