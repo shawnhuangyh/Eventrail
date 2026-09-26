@@ -316,10 +316,15 @@ final class CalendarSync {
         // Eventernote announces plenty of events months before it publishes a
         // time. Those land as all-day entries rather than at an invented hour.
         let isAllDay = event.startsAt == nil
-        let start = event.startsAt ?? event.date
+        let start = event.startsAt ?? Self.floatingDay(of: event)
         let end = event.endsAt
             ?? event.startsAt?.addingTimeInterval(Self.assumedLength)
-            ?? event.date
+            ?? start
+        // An all-day entry has no zone: Calendar draws it on its day wherever
+        // the diary is read, and reads its dates back as this device's
+        // midnight and last second of that day. So it is written floating and
+        // compared by the day, or every mirror would find it moved.
+        let zone = isAllDay ? nil : event.timeZone
 
         var changed = false
         if entry.title != event.title {
@@ -337,16 +342,16 @@ final class CalendarSync {
             entry.isAllDay = isAllDay
             changed = true
         }
-        if entry.startDate != start {
+        if isAllDay ? !Calendar.current.isDate(entry.startDate, inSameDayAs: start) : entry.startDate != start {
             entry.startDate = start
             changed = true
         }
-        if entry.endDate != end {
+        if isAllDay ? !Calendar.current.isDate(entry.endDate, inSameDayAs: end) : entry.endDate != end {
             entry.endDate = end
             changed = true
         }
-        if entry.timeZone != event.timeZone {
-            entry.timeZone = event.timeZone
+        if entry.timeZone != zone {
+            entry.timeZone = zone
             changed = true
         }
         // An alert when the doors open — see ``doorOffset(of:)``.
@@ -362,6 +367,19 @@ final class CalendarSync {
             changed = true
         }
         return changed
+    }
+
+    /// The night's day as its hall names it, at this device's midnight.
+    ///
+    /// ``Event/date`` is midnight on the hall's clock — Tokyo's, for most —
+    /// and handed to an all-day entry as it stands it lands wherever that
+    /// instant falls here: the evening before, on a phone in Shanghai. The
+    /// day is the hall's answer, so it is carried across as a day.
+    nonisolated static func floatingDay(of event: Event, in calendar: Calendar = .current) -> Date {
+        var hall = Calendar(identifier: .gregorian)
+        hall.timeZone = event.timeZone
+        let day = hall.dateComponents([.year, .month, .day], from: event.date)
+        return calendar.date(from: day) ?? event.date
     }
 
     // MARK: - When to set off
