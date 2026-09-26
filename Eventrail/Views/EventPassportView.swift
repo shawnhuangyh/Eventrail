@@ -924,6 +924,8 @@ private func axisName(_ label: String?, centered: Bool = false) -> some AxisMark
 /// ``PassportRankRow`` is: the card shows one of these and the sheet behind
 /// its See All shows five, and they are the two things most likely to drift.
 private struct PassportSpanRow: View {
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
     let span: PassportStats.Span
 
     var body: some View {
@@ -935,7 +937,7 @@ private struct PassportSpanRow: View {
                 // Day then hall, the way ``PassportLotteryRow`` reads it: two
                 // cards of rows a screen apart should not put the same two
                 // facts in a different order.
-                Text(verbatim: "\(span.event.dayLine) · \(span.event.venue)")
+                Text(verbatim: "\(span.event.shown(on: timeDisplay).dayLine) · \(span.event.venue)")
                     .font(.system(size: 11.5))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -1167,6 +1169,8 @@ private struct PassportRankRow: View {
 /// One night the reader applied for, how many times, and how that stands
 /// against the hardest they ever tried for a seat.
 private struct PassportLotteryRow: View {
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
     let row: PassportStats.Lottery
     /// The most entries in the list, which is what the bar is drawn against.
     let most: Int
@@ -1184,7 +1188,7 @@ private struct PassportLotteryRow: View {
                     .foregroundStyle(Color.trackTicket)
             }
             PassportBar(fraction: Double(row.entries) / Double(most), tint: .trackTicket)
-            Text(verbatim: "\(row.event.dayLine) · \(row.event.venue)")
+            Text(verbatim: "\(row.event.shown(on: timeDisplay).dayLine) · \(row.event.venue)")
                 .font(.system(size: 11.5))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)

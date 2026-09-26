@@ -189,6 +189,8 @@ struct SearchView: View {
 /// A search result. The circular control adds the event to the library, or
 /// removes it again — always an explicit choice.
 struct SearchResultRow: View {
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
     let event: Event
     let open: () -> Void
 
@@ -196,7 +198,7 @@ struct SearchResultRow: View {
     /// — the listed head count where there is one, and otherwise whatever the
     /// row would have said about the time anyway.
     private var detail: Text {
-        guard let listed = event.listedAttendees else { return event.timeDetail }
+        guard let listed = event.listedAttendees else { return event.shown(on: timeDisplay).timeDetail }
         return Text("\(listed.formatted()) going")
     }
 

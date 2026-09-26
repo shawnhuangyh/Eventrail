@@ -11,6 +11,8 @@ struct EventDetailView: View {
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     private let source: Event
     @State private var isImporting = false
@@ -259,8 +261,12 @@ struct EventDetailView: View {
     private var dateLine: Text {
         // An already-formatted date, so it is shown as given rather than as a
         // localizable key.
-        Text(verbatim: event.longDateLine)
+        Text(verbatim: shown.longDateLine)
     }
+
+    /// The event as it is printed on the chosen clock — see
+    /// ``Event/shown(on:)``. Only ever formatted.
+    private var shown: Event { event.shown(on: timeDisplay) }
 
     /// Which clock this sheet's times are on, where the app has established it
     /// rather than assumed it.
@@ -313,8 +319,13 @@ struct EventDetailView: View {
         HStack(spacing: 5) {
             Image(systemName: "globe")
                 .font(.system(size: 10, weight: .semibold))
+            // On the reader's own clock the offset is always known: it is
+            // this device's, on the night itself.
+            if timeDisplay == .local {
+                Text("My time · \(event.offsetLine(in: .current))")
+                    .font(.system(size: 10.5, weight: .semibold))
             // The offset only where there is one to give — see ``venueZone``.
-            if let zone = venueZone {
+            } else if let zone = venueZone {
                 Text("Venue time · \(event.offsetLine(in: zone))")
                     .font(.system(size: 10.5, weight: .semibold))
             } else {
@@ -328,7 +339,9 @@ struct EventDetailView: View {
         .glassCapsule()
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            venueZone.map { Text("Times shown in the venue's own time, \(event.offsetLine(in: $0))") }
+            timeDisplay == .local
+                ? Text("Times shown in your own time, \(event.offsetLine(in: .current))")
+                : venueZone.map { Text("Times shown in the venue's own time, \(event.offsetLine(in: $0))") }
                 ?? Text("Times shown in the venue's own time")
         )
     }
@@ -448,13 +461,13 @@ struct EventDetailView: View {
             StatTile(tint: .trackInterest, value: event.listedAttendees?.formatted() ?? "—",
                      sub: event.listedAttendees.map { _ in Text("people listed") },
                      label: "Eventernote", layout: .field)
-            StatTile(tint: .trackTicket, value: event.doorsLine ?? "—",
+            StatTile(tint: .trackTicket, value: shown.doorsLine ?? "—",
                      label: "Doors open", layout: .field)
             // The end time qualifies the start rather than standing on its own,
             // so it sits under it — and stays away entirely when the page has
             // published no end.
-            StatTile(tint: .trackAttended, value: event.timeLine ?? "—",
-                     sub: event.endsLine.map { Text("Ends \($0)") },
+            StatTile(tint: .trackAttended, value: shown.timeLine ?? "—",
+                     sub: shown.endsLine.map { Text("Ends \($0)") },
                      label: "Performance", layout: .field)
         }
         .padding(.horizontal, 18)

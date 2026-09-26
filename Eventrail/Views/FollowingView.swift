@@ -897,6 +897,8 @@ private struct RangeCalendar: View {
 /// listing changed after they did. A tag rather than a dot, because the
 /// caption above already leads with one.
 private struct FollowedDateRow: View {
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
     let event: Event
     let billing: [PerformerProfile]
     let unread: FollowingUnread?
@@ -904,7 +906,7 @@ private struct FollowedDateRow: View {
     let open: () -> Void
 
     var body: some View {
-        EventRowContent(event: event, detail: event.timeDetail) {
+        EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail) {
             HStack(spacing: 6) {
                 if let first = billing.first {
                     // The whole caption leads to the first name on it. Two

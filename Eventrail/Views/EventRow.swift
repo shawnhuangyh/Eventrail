@@ -2,6 +2,9 @@ import SwiftUI
 
 /// Flyer, title, venue and timing — the part every event row shares.
 struct EventRowContent<Billing: View, Trailing: View>: View {
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+
     let event: Event
     /// Shown after the date: the start time in the library, the listed head
     /// count in search results.
@@ -34,7 +37,7 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 HStack(spacing: 7) {
-                    Text(event.dayLine)
+                    Text(event.shown(on: timeDisplay).dayLine)
                         .font(.system(size: 12, weight: .semibold))
                         .monospacedDigit()
                     Circle()
@@ -92,6 +95,8 @@ extension Event {
 /// A row in the reader's own library. Tapping it opens the event.
 struct LibraryRow: View {
     @Environment(EventStore.self) private var store
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     let event: Event
     /// Why the reader has not looked at this night yet, for the tag above the
@@ -101,7 +106,7 @@ struct LibraryRow: View {
 
     var body: some View {
         Button(action: open) {
-            EventRowContent(event: event, detail: event.timeDetail) {
+            EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail) {
                 // Above the title, where Following carries it after the names:
                 // a library row has no billing line to put it on the end of.
                 if let unread { UnreadTag(unread: unread) }
@@ -146,6 +151,8 @@ struct LibraryRow: View {
 /// recorded something; an untracked row has nothing to say there.
 struct AppearanceRow: View {
     @Environment(EventStore.self) private var store
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     let event: Event
     /// Whose listing this row is in, which decides the line under the title:
@@ -162,7 +169,7 @@ struct AppearanceRow: View {
 
     var body: some View {
         Button(action: open) {
-            EventRowContent(event: event, detail: event.timeDetail, caption: caption) {
+            EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail, caption: caption) {
                 let status = store.status(for: event)
                 HStack(spacing: 8) {
                     if status != .untracked { StatusBadge(status: status) }

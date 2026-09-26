@@ -336,6 +336,8 @@ struct FlowLayout: Layout {
 /// out of a list looks the same wherever the list is.
 struct FavoriteEventRow: View {
     @Environment(EventStore.self) private var store
+    /// Which clock the day is printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     /// What stands where these rows would, when there are none.
     ///
@@ -371,7 +373,7 @@ struct FavoriteEventRow: View {
                         Text(event.title)
                             .font(.system(size: 14, weight: .semibold))
                             .lineLimit(1)
-                        Text(verbatim: "\(event.dayLine) · \(event.venue)")
+                        Text(verbatim: "\(event.shown(on: timeDisplay).dayLine) · \(event.venue)")
                             .font(.system(size: 11.5))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

@@ -39,6 +39,8 @@ struct SettingsView: View {
     @State private var cacheCleared = false
     /// Per-device — see ``Appearance``.
     @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
+    /// Per-device — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     /// Shown beside About, from the bundle rather than written down here, so a
     /// released build cannot claim a version it is not.
@@ -56,6 +58,8 @@ struct SettingsView: View {
                         languageRow
                         SettingRowDivider()
                         appearanceRow
+                        SettingRowDivider()
+                        timeDisplayRow
                         SettingRowDivider()
                         iCloudRow(store: $store)
                         SettingRowDivider()
@@ -169,6 +173,23 @@ struct SettingsView: View {
         // on the app's own `@AppStorage` fired for the first change and not
         // for the ones after it, and the window kept whichever came first.
         .onChange(of: appearance) { appearance.apply() }
+    }
+
+    /// Which clock event times are shown on: the hall's, or this device's.
+    /// Two answers, so on the row itself like Appearance, and segmented for
+    /// the same reason.
+    private var timeDisplayRow: some View {
+        SettingRowLabel("clock", "Time Zone") {
+            Picker("Time Zone", selection: $timeDisplay) {
+                ForEach(TimeDisplay.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+        }
+        .settingRowPadding()
     }
 
     private func iCloudRow(store: Bindable<EventStore>) -> some View {
