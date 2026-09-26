@@ -128,6 +128,19 @@ struct EventsView: View {
                                     .tint(Color.brandTint)
                                 }
                             }
+                            // Every row, past or ahead: the one-row form of the
+                            // selection bar's trash. Not asked about first, as no
+                            // swipe to delete on iOS is — what the account
+                            // still lists comes back on the next refresh, and the
+                            // rest is a search away.
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button("Remove", systemImage: "trash", role: .destructive) {
+                                    withAnimation(.snappy) { store.remove([event]) }
+                                }
+                                // Said outright: the role alone left the button
+                                // in the app's tint rather than the system red.
+                                .tint(.red)
+                            }
                     }
                 } header: {
                     GroupHeader(label: Text(group.label), count: group.events.count)
