@@ -31,10 +31,17 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
     var day: Date
 
     func matches(_ event: Event) -> Bool {
+        guard let fingerprint else { return false }
+        if fingerprint == event.listingFingerprint { return true }
         // A mark written before the fingerprint read the wall clock still
         // counts for the copy it was taken of, rather than every date the
-        // reader had looked at coming back Updated at once.
-        fingerprint == event.listingFingerprint || fingerprint == event.instantFingerprint
+        // reader had looked at coming back Updated at once. That copy was the
+        // Following row as the listing printed it, read on Tokyo time; a row
+        // since re-read on its hall's clock abroad is read back onto Tokyo's
+        // first, or every instant in it differs from the one that was marked.
+        if fingerprint == event.instantFingerprint { return true }
+        return event.timeZone != Event.publishedZone
+            && fingerprint == event.published(in: Event.publishedZone).instantFingerprint
     }
 }
 

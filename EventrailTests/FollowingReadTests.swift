@@ -59,6 +59,13 @@ struct FollowingReadTests {
         #expect(!archive([one.id: old]).isUnread(one))
     }
 
+    @Test func aMarkTakenOnTokyoTimeStillCountsOnceTheRowIsOnItsHallsClock() throws {
+        let listed = event(startsAt: Self.ahead.addingTimeInterval(18 * 60 * 60))
+        let old = Stamped(FollowingRead(fingerprint: listed.instantFingerprint, day: listed.date), at: .now)
+        let taipei = try #require(TimeZone(identifier: "Asia/Taipei"))
+        #expect(!archive([listed.id: old]).isUnread(listed.published(in: taipei)))
+    }
+
     // MARK: - Unread
 
     @Test func aDateNeverMarkedIsUnread() {
