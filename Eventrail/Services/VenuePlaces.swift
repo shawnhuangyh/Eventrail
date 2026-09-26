@@ -60,7 +60,11 @@ final class VenuePlaces {
         /// site files streams and undisclosed rooms under (see
         /// ``Event/isAtHall``) is not a place at all.
         init?(name: String, address: String?, countryHint: String? = nil) {
-            guard !name.hasPrefix("!_"), !name.isEmpty || address != nil else { return nil }
+            // The Passport's own test, so a hall it counts is one this asks
+            // about and a placeholder it leaves out is not — however the name
+            // is padded. A hall with no name and an address is still a hall.
+            let unnamed = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            guard Event.namesHall(name) || (unnamed && address != nil) else { return nil }
             self.name = name
             self.address = address
             self.countryHint = countryHint
@@ -456,19 +460,40 @@ final class VenuePlaces {
     /// Answered from whatever placing of that hall is written down, under any
     /// address: the reader opening the event puts one there, since the sheet
     /// reads the page and places the hall. Nil where no placing settled a
-    /// clock. Nothing is asked for.
+    /// clock, and nil where two halls of that name keep different ones — a
+    /// name shared across countries says nothing about which of them a row
+    /// means, and a row with no clock waits out its day everywhere instead.
+    /// Nothing is asked for.
     func timeZone(ofHallNamed name: String) -> TimeZone? {
         if zonesByName == nil {
-            var zones: [String: TimeZone] = [:]
-            for (key, answer) in cache where !Self.isWorthAskingAgain(answer) {
-                guard let zone = answer.zone,
+            zonesByName = Self.zonesByName(cache.compactMap { key, answer in
+                guard !Self.isWorthAskingAgain(answer), let zone = answer.zone,
                       let hall = key.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first
-                else { continue }
-                zones[String(hall)] = zone
-            }
-            zonesByName = zones
+                else { return nil }
+                return (String(hall), zone)
+            })
         }
-        return zonesByName?[name]
+        return zonesByName?[Self.hallName(name)]
+    }
+
+    /// Which clock each hall name keeps, from every placing of it: dropped
+    /// where two placings of one name keep different clocks.
+    nonisolated static func zonesByName(_ placings: [(name: String, zone: TimeZone)]) -> [String: TimeZone] {
+        var zones: [String: TimeZone?] = [:]
+        for (name, zone) in placings {
+            let name = hallName(name)
+            switch zones[name] {
+            case nil: zones[name] = zone
+            case let kept? where kept?.secondsFromGMT() != zone.secondsFromGMT(): zones[name] = .some(nil)
+            default: break
+            }
+        }
+        return zones.compactMapValues(\.self)
+    }
+
+    /// A hall's name as the index keys it, however a page padded it.
+    private nonisolated static func hallName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// ``timeZone(ofHallNamed:)``'s index, built once from the kept answers
