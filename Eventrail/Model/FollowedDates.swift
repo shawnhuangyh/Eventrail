@@ -109,7 +109,7 @@ final class FollowedDates {
             let cached = Self.stored
             // A listing holds what was upcoming when it was read, and a date
             // that has since passed is not a date the Following tab shows.
-            self.dates = cached.dates.mapValues { $0.filter(\.isUpcoming) }
+            self.dates = cached.dates.mapValues { $0.filter { $0.isUpcoming && !$0.hasEnded } }
             readAt = cached.readAt
             persists = true
         }
@@ -137,6 +137,7 @@ final class FollowedDates {
     /// ever posted about a read that happened.
     @discardableResult
     func load(for performers: [PerformerProfile]) async -> Outcome? {
+        dropFinished()
         forget(everyoneBut: performers)
         let stale = performers.filter { !isFresh($0.id) }
         guard !stale.isEmpty, running == nil else { return nil }
@@ -160,6 +161,8 @@ final class FollowedDates {
     /// pages twice.
     @discardableResult
     func reload(for performers: [PerformerProfile]) async -> Outcome? {
+        // First, and without asking anybody: the end times are already here.
+        dropFinished()
         if let running { return await running.value }
         forget(everyoneBut: performers)
         return await run(performers)
@@ -220,6 +223,22 @@ final class FollowedDates {
     private func isFresh(_ id: PerformerProfile.ID) -> Bool {
         guard dates[id] != nil, let read = readAt[id] else { return false }
         return read.timeIntervalSinceNow > -Self.freshness
+    }
+
+    /// Takes out of the cache every date that is over — its day gone, or its
+    /// published end — before anything is asked of Eventernote.
+    ///
+    /// The end time is in the cache already, so there is nothing to wait for:
+    /// a pull clears a finished night from the list the moment it starts, and
+    /// the listing it then reads would leave it out only because its day had
+    /// not finished. ``events(for:)`` checks the same thing as it is read, for
+    /// the redraws in between.
+    func dropFinished() {
+        let kept = dates.mapValues { $0.filter { $0.isUpcoming && !$0.hasEnded } }
+        let dropped = dates.values.map(\.count).reduce(0, +) - kept.values.map(\.count).reduce(0, +)
+        guard dropped > 0 else { return }
+        dates = kept
+        save()
     }
 
     /// Drops whoever is no longer followed, so their dates stop being counted
@@ -292,7 +311,9 @@ final class FollowedDates {
 
         for page in 1...Self.pageLimit {
             let result = try await client.events(forPerformer: performer, page: page)
-            for event in result.items where event.isUpcoming {
+            // Not a night already over, though the page lists it: its end is
+            // published and gone by. Paging still stops on the day, below.
+            for event in result.items where event.isUpcoming && !event.hasEnded {
                 guard known.insert(event.id).inserted else { continue }
                 collected.append(event)
             }
@@ -309,7 +330,7 @@ final class FollowedDates {
     /// listing has not been read. Nil rather than zero: "none yet" and "not
     /// asked yet" are different things to say to the reader.
     func count(for performer: PerformerProfile) -> Int? {
-        dates[performer.id]?.count
+        dates[performer.id]?.count { !$0.hasEnded }
     }
 
     /// Every date published for the given performers, soonest first and each
@@ -318,7 +339,12 @@ final class FollowedDates {
         var merged: [Event] = []
         var known: Set<Event.ID> = []
         for performer in performers {
-            for event in dates[performer.id] ?? [] {
+            // A night whose published end has gone by is over, though its day
+            // is not: kept in the cache until the day ends, like every other
+            // date, and left out of what the tab shows once it finishes.
+            // Checked as the tab reads rather than when the listing was read,
+            // so it goes at the tab's next redraw rather than its next read.
+            for event in dates[performer.id] ?? [] where !event.hasEnded {
                 guard known.insert(event.id).inserted else { continue }
                 merged.append(event)
             }

@@ -163,6 +163,13 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
         (calendar.date(byAdding: .day, value: 1, to: date) ?? date) > .now
     }
 
+    /// Whether the page's published end time has already gone by. False where
+    /// it published none — most nights — since nothing then says when it is
+    /// over, and the day's end is the one line ``isUpcoming`` can draw.
+    var hasEnded: Bool {
+        endsAt.map { $0 <= .now } ?? false
+    }
+
     /// How many whole days from today to the night itself — 0 on the day, 1
     /// for tomorrow — and nil once it has been.
     ///
