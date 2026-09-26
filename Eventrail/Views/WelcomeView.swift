@@ -230,6 +230,8 @@ struct WelcomeView: View {
             Text("Sign in to iCloud to sync")
         case .accountChanged:
             Text("iCloud account changed — turn on again to sync")
+        case .unreadableCopy:
+            Text("iCloud holds a library this version cannot read — update the app to sync")
         case .failed(let reason):
             Text(verbatim: reason)
         default:

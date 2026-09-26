@@ -43,6 +43,10 @@ nonisolated struct CloudSync: Sendable {
         /// holds is no longer this store's to hand over. Syncing stops until
         /// the reader says otherwise — see ``EventStore/cloudAccountChanged()``.
         case accountChanged
+        /// iCloud holds a library this build cannot read — most likely one a
+        /// newer version wrote. Nothing is pushed while it stands, because a
+        /// push would replace it — see ``Copy/unreadable``.
+        case unreadableCopy
         /// The library outgrew the key-value store's quota.
         case tooLarge(bytes: Int)
         case failed(String)
@@ -79,16 +83,27 @@ nonisolated struct CloudSync: Sendable {
         NSUbiquitousKeyValueStore.default.synchronize()
     }
 
-    /// Whatever iCloud currently holds, or nil if it holds nothing readable.
-    func load() -> LibraryArchive? {
+    /// What iCloud holds under the library's key.
+    enum Copy {
+        /// Nothing, or nothing yet — the store downloads after launch.
+        case absent
+        /// Something this build cannot unpack or decode. Not the same as
+        /// nothing: it is somebody's library, and the whole of it is replaced
+        /// by the next write.
+        case unreadable
+        case loaded(LibraryArchive)
+    }
+
+    /// Whatever iCloud currently holds.
+    func load() -> Copy {
         guard isConfigured,
               let data = NSUbiquitousKeyValueStore.default.data(forKey: Self.key)
-        else { return nil }
+        else { return .absent }
         do {
-            return try Self.unpack(data)
+            return .loaded(try Self.unpack(data))
         } catch {
             Self.log.error("iCloud copy could not be read: \(error.localizedDescription)")
-            return nil
+            return .unreadable
         }
     }
 

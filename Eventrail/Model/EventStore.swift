@@ -259,6 +259,12 @@ final class EventStore {
     private var cloudCopyIsSettled = false
     /// A push held back while that was still open, to be made once it closes.
     private var owesCloudPush = false
+    /// Whether the last read of iCloud's copy could not be decoded. Pushing
+    /// is held for as long as it stands, whatever the wait says: an unreadable
+    /// copy is a library this build cannot see, not an empty store, and a push
+    /// would replace every record in it. It clears when a readable copy
+    /// arrives — another device writing, or this one updated.
+    private var cloudCopyIsUnreadable = false
     private var venuePlacings: Task<Void, Never>?
     private var pendingMirror: Task<Void, Never>?
     /// The halls an import brought in, being placed behind it.
@@ -328,7 +334,7 @@ final class EventStore {
             // synced before there is nothing there yet — the store downloads
             // asynchronously, and this read is what starts it — so what comes
             // back also says whether this device may write yet.
-            let remote = cloud.load()
+            let remote = readCloudCopy(cloud)
             if let remote {
                 archive = archive.merging(remote)
                 merged = true
@@ -1150,7 +1156,7 @@ final class EventStore {
             syncStatus = .signedOut
             return
         }
-        let remote = cloud.load()
+        let remote = readCloudCopy(cloud)
         if let remote {
             archive = archive.merging(remote)
             revision += 1
@@ -1208,7 +1214,26 @@ final class EventStore {
     /// written at all, because it can only overwrite and has nothing to add.
     /// A push refused by either is remembered and made as soon as it may be.
     private var mayPushToCloud: Bool {
-        cloudCopyIsSettled && !archive.holdsNothing
+        cloudCopyIsSettled && !cloudCopyIsUnreadable && !archive.holdsNothing
+    }
+
+    /// Reads iCloud's copy, and notes whether it could be read at all.
+    ///
+    /// Nil for a store with nothing in it and for one holding what this build
+    /// cannot decode, but only the first is a store a push may write into —
+    /// see ``cloudCopyIsUnreadable``.
+    private func readCloudCopy(_ cloud: CloudSync) -> LibraryArchive? {
+        switch cloud.load() {
+        case .absent:
+            return nil
+        case .unreadable:
+            cloudCopyIsUnreadable = true
+            syncStatus = .unreadableCopy
+            return nil
+        case .loaded(let remote):
+            cloudCopyIsUnreadable = false
+            return remote
+        }
     }
 
     /// How long a first push waits for iCloud's copy before going without it.
@@ -1248,6 +1273,7 @@ final class EventStore {
         cloudWait?.cancel()
         cloudWait = nil
         cloudCopyIsSettled = false
+        cloudCopyIsUnreadable = false
         owesCloudPush = false
         // The switch clears the status on its way down, so the reason is
         // written after it rather than before.
@@ -1475,7 +1501,7 @@ final class EventStore {
 
     /// Folds in what iCloud now holds, after a change that was another device's.
     private func mergeCloudCopy() {
-        guard let remote = cloud?.load() else { return }
+        guard let cloud, let remote = readCloudCopy(cloud) else { return }
         archive = archive.merging(remote)
         revision += 1
         retimeEvents()

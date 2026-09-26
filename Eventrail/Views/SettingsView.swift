@@ -203,6 +203,8 @@ struct SettingsView: View {
             return Text("Sign in to iCloud to sync")
         case .accountChanged:
             return Text("iCloud account changed — turn on again to sync")
+        case .unreadableCopy:
+            return Text("iCloud holds a library this version cannot read — update the app to sync")
         case .rejected:
             return Text("iCloud refused the library — will retry")
         case .tooLarge(let bytes):
