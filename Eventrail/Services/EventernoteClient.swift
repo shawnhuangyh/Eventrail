@@ -64,7 +64,7 @@ nonisolated struct EventernoteClient: Sendable {
             at: "/events/search",
             query: ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)"]
         )
-        return EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
+        return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
     func searchPerformers(keyword: String, page: Int = 1) async throws -> EventernotePage<PerformerProfile> {
@@ -72,7 +72,7 @@ nonisolated struct EventernoteClient: Sendable {
             at: "/actors/search",
             query: ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)"]
         )
-        return EventernotePages.performers(in: html, page: page, pageSize: Self.pageSize)
+        return try EventernotePages.performers(in: html, page: page, pageSize: Self.pageSize)
     }
 
     /// Finds the profile page behind a name billed on an event.
@@ -94,7 +94,7 @@ nonisolated struct EventernoteClient: Sendable {
         let path = "/actors/\(performer.slug)/\(performer.id)/events"
         let html = try await html(at: path, query: ["limit": "\(Self.pageSize)", "page": "\(page)"],
                                   isPreEncoded: true)
-        return EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
+        return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
     // MARK: - A member's own history
@@ -133,7 +133,7 @@ nonisolated struct EventernoteClient: Sendable {
             at: "/users/\(handle)/events",
             query: ["limit": "\(Self.importPageSize)", "page": "\(page)"]
         )
-        return EventernotePages.events(in: html, page: page, pageSize: Self.importPageSize)
+        return try EventernotePages.events(in: html, page: page, pageSize: Self.importPageSize)
     }
 
     // MARK: - One event
@@ -210,7 +210,7 @@ nonisolated struct EventernoteClient: Sendable {
     func events(atVenue id: Int, page: Int = 1) async throws -> EventernotePage<Event> {
         let html = try await html(at: "/places/\(id)/events",
                                   query: ["limit": "\(Self.pageSize)", "page": "\(page)"])
-        return EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
+        return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
     // MARK: - Fetching

@@ -121,11 +121,15 @@ nonisolated enum EventernotePages {
 
     /// The `gb_listevent` block shared by the event search, the calendar and a
     /// performer's own event list.
-    static func events(in html: String, page: Int, pageSize: Int) -> EventernotePage<Event> {
+    ///
+    /// Throws where the block is missing from a page that is not the site's own
+    /// smartphone template — see ``confirmsNoRows(_:)``.
+    static func events(in html: String, page: Int, pageSize: Int) throws -> EventernotePage<Event> {
         var cursor = HTMLCursor(html)
         guard cursor.advance(past: #"<div class="gb_listevent">"#),
               let list = cursor.take(upTo: "</ul>")
         else {
+            try confirmsNoRows(html)
             return EventernotePage(items: [], total: totalCount(in: html) ?? 0,
                                    page: page, pageSize: pageSize)
         }
@@ -140,11 +144,12 @@ nonisolated enum EventernotePages {
     }
 
     /// The performer search results.
-    static func performers(in html: String, page: Int, pageSize: Int) -> EventernotePage<PerformerProfile> {
+    static func performers(in html: String, page: Int, pageSize: Int) throws -> EventernotePage<PerformerProfile> {
         var cursor = HTMLCursor(html)
         guard cursor.advance(past: #"<div class="gb_listview">"#),
               let list = cursor.take(upTo: "</ul>")
         else {
+            try confirmsNoRows(html)
             return EventernotePage(items: [], total: totalCount(in: html) ?? 0,
                                    page: page, pageSize: pageSize)
         }
@@ -166,6 +171,22 @@ nonisolated enum EventernotePages {
 
         return EventernotePage(items: profiles, total: totalCount(in: html) ?? profiles.count,
                                page: page, pageSize: pageSize)
+    }
+
+    /// Whether a page without its list is a listing with nothing in it.
+    ///
+    /// The site prints no list at all where nothing matches — an event search
+    /// for nothing says so with only an empty space under the form — so a
+    /// missing list is only an empty one on a page that is otherwise the
+    /// site's own. `gb_foot_menu` closes every page of the smartphone
+    /// template and none of the desktop one, and a maintenance page, a
+    /// captcha or a proxy's error page carries neither. Reading any of those
+    /// as "nothing found" would have the Following tab cache a performer as
+    /// having no dates for the whole freshness window.
+    private static func confirmsNoRows(_ html: String) throws {
+        guard html.contains(#"class="gb_foot_menu""#) else {
+            throw EventernoteClient.Failure.unreadable
+        }
     }
 
     /// The size of the whole result set, however the page in hand states it.

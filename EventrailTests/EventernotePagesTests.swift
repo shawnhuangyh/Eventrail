@@ -33,7 +33,7 @@ struct EventernotePagesTests {
         """
 
     @Test func readsListingRows() throws {
-        let page = EventernotePages.events(in: Self.eventListing, page: 1, pageSize: 30)
+        let page = try EventernotePages.events(in: Self.eventListing, page: 1, pageSize: 30)
 
         // The row with no date is dropped rather than imported half-read.
         #expect(page.items.map(\.id) == ["300001", "300003"])
@@ -61,21 +61,37 @@ struct EventernotePagesTests {
         #expect(second.artist == "Rock & Roll")
     }
 
-    @Test func aMemberListingTakesItsTotalFromTheHeading() {
+    @Test func aMemberListingTakesItsTotalFromTheHeading() throws {
         let html = """
             <h2 class="gb_subtitle">参加イベント一覧(879)</h2>
             <div class="gb_listevent"><ul></ul></div>
             """
-        let page = EventernotePages.events(in: html, page: 1, pageSize: 30)
+        let page = try EventernotePages.events(in: html, page: 1, pageSize: 30)
         #expect(page.items.isEmpty)
         #expect(page.total == 879)
     }
 
-    @Test func aPageWithoutTheListReadsAsEmpty() {
-        let page = EventernotePages.events(in: "<html>maintenance</html>", page: 1, pageSize: 30)
-        #expect(page.items.isEmpty)
-        #expect(page.total == 0)
-        #expect(!page.hasMore)
+    /// What the site sends for a search that matches nothing: the form, and
+    /// no list under it.
+    @Test func theSitesOwnPageWithoutTheListReadsAsEmpty() throws {
+        let html = #"<div class="gb_form"></div><ul class="gb_foot_menu"></ul>"#
+        let events = try EventernotePages.events(in: html, page: 1, pageSize: 30)
+        #expect(events.items.isEmpty)
+        #expect(events.total == 0)
+        #expect(!events.hasMore)
+        let performers = try EventernotePages.performers(in: html, page: 1, pageSize: 20)
+        #expect(performers.items.isEmpty)
+    }
+
+    /// A maintenance page, a captcha, the desktop template: none of them says
+    /// nothing was found.
+    @Test func aPageThatIsNotTheSitesOwnIsNotAnEmptyListing() {
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.events(in: "<html>maintenance</html>", page: 1, pageSize: 30)
+        }
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.performers(in: "<html>maintenance</html>", page: 1, pageSize: 20)
+        }
     }
 
     @Test func readsPerformerSearch() throws {
@@ -86,7 +102,7 @@ struct EventernotePagesTests {
             <li><a href="/actors/Lynn/9001">Lynn<span>88</span></a></li>
             </ul></div>
             """
-        let page = EventernotePages.performers(in: html, page: 1, pageSize: 20)
+        let page = try EventernotePages.performers(in: html, page: 1, pageSize: 20)
         #expect(page.total == 2)
         #expect(!page.hasMore)
 
