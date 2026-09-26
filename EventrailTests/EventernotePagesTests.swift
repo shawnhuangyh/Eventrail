@@ -61,6 +61,14 @@ struct EventernotePagesTests {
         #expect(second.artist == "Rock & Roll")
     }
 
+    @Test func anEndPastMidnightIsReadAsTheNextMorning() throws {
+        let html = Self.eventListing.replacingOccurrences(
+            of: "開場 17:00 開演 18:00 終演 20:30", with: "開場 22:30 開演 23:00 終演 05:00")
+        let first = try #require(try EventernotePages.events(in: html, page: 1, pageSize: 30).items.first)
+        #expect(first.startsAt == Fixtures.date(2027, 5, 9, 23, 0))
+        #expect(first.endsAt == Fixtures.date(2027, 5, 10, 5, 0))
+    }
+
     @Test func aMemberListingTakesItsTotalFromTheHeading() throws {
         let html = """
             <h2 class="gb_subtitle">参加イベント一覧(879)</h2>

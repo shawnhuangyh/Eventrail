@@ -16,10 +16,10 @@ struct RootView: View {
     /// Read from Eventernote rather than from the library, and shared by the
     /// two screens that show it — the Following tab and the Me card — so a
     /// followed performer's listing is asked for once per launch.
-    @State private var followed = FollowedDates()
+    @State private var followed: FollowedDates
     /// Where each hall is, read from Eventernote's own venue pages and kept for
     /// the life of the launch beside the dates it places.
-    @State private var venues = VenueRegions()
+    @State private var venues: VenueRegions
     /// What the last refresh said, wherever it was started from — see
     /// ``RefreshNotices``.
     @State private var notices = RefreshNotices()
@@ -38,6 +38,17 @@ struct RootView: View {
     /// Closing it early costs them this launch's showing; it does not spend
     /// the only one they get.
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
+
+    /// Made together, so the dates know which halls keep Tokyo time before
+    /// any screen reads them — see ``FollowedDates/keepsPublishedClock``. A
+    /// hall ``VenueRegions`` places in one of the site's areas is in Japan.
+    init() {
+        let followed = FollowedDates()
+        let venues = VenueRegions()
+        followed.keepsPublishedClock = { venues.region(of: $0) != nil }
+        _followed = State(initialValue: followed)
+        _venues = State(initialValue: venues)
+    }
 
     var body: some View {
         TabView(selection: $selection) {

@@ -60,6 +60,17 @@ final class FollowedDates {
     private(set) var generation = 0
 
     @ObservationIgnored private let client: EventernoteClient
+
+    /// Whether a row's times are on the clock its hall keeps — which is what
+    /// a published end has to be before it can say a night is over.
+    ///
+    /// A listing row is read on Tokyo time whatever its hall, and nothing here
+    /// knows where the hall is: a 21:00 finish in Taipei would read as an hour
+    /// early, and one in Los Angeles as the morning before the show. So a row
+    /// leaves at its end only where this says its hall is in Japan — handed in
+    /// by ``RootView`` from ``VenueRegions`` — and every other row stays until
+    /// its day is out, as before. False until then, which is the safe answer.
+    @ObservationIgnored var keepsPublishedClock: (Event) -> Bool = { _ in false }
     /// Previews are handed their dates, and neither read this device's cache
     /// nor write to it.
     @ObservationIgnored private let persists: Bool
@@ -109,7 +120,7 @@ final class FollowedDates {
             let cached = Self.stored
             // A listing holds what was upcoming when it was read, and a date
             // that has since passed is not a date the Following tab shows.
-            self.dates = cached.dates.mapValues { $0.filter { $0.isUpcoming && !$0.hasEnded } }
+            self.dates = cached.dates.mapValues { $0.filter(\.isUpcoming) }
             readAt = cached.readAt
             persists = true
         }
@@ -234,11 +245,18 @@ final class FollowedDates {
     /// not finished. ``events(for:)`` checks the same thing as it is read, for
     /// the redraws in between.
     func dropFinished() {
-        let kept = dates.mapValues { $0.filter { $0.isUpcoming && !$0.hasEnded } }
+        let kept = dates.mapValues { $0.filter { !isOver($0) } }
         let dropped = dates.values.map(\.count).reduce(0, +) - kept.values.map(\.count).reduce(0, +)
         guard dropped > 0 else { return }
         dates = kept
         save()
+    }
+
+    /// Whether a date is over: its day gone, or its published end gone by at a
+    /// hall known to keep the clock it was read on — see
+    /// ``keepsPublishedClock``.
+    private func isOver(_ event: Event) -> Bool {
+        !event.isUpcoming || (event.hasEnded && keepsPublishedClock(event))
     }
 
     /// Drops whoever is no longer followed, so their dates stop being counted
@@ -313,7 +331,7 @@ final class FollowedDates {
             let result = try await client.events(forPerformer: performer, page: page)
             // Not a night already over, though the page lists it: its end is
             // published and gone by. Paging still stops on the day, below.
-            for event in result.items where event.isUpcoming && !event.hasEnded {
+            for event in result.items where !isOver(event) {
                 guard known.insert(event.id).inserted else { continue }
                 collected.append(event)
             }
@@ -330,7 +348,7 @@ final class FollowedDates {
     /// listing has not been read. Nil rather than zero: "none yet" and "not
     /// asked yet" are different things to say to the reader.
     func count(for performer: PerformerProfile) -> Int? {
-        dates[performer.id]?.count { !$0.hasEnded }
+        dates[performer.id]?.count { !isOver($0) }
     }
 
     /// Every date published for the given performers, soonest first and each
@@ -344,7 +362,7 @@ final class FollowedDates {
             // date, and left out of what the tab shows once it finishes.
             // Checked as the tab reads rather than when the listing was read,
             // so it goes at the tab's next redraw rather than its next read.
-            for event in dates[performer.id] ?? [] where !event.hasEnded {
+            for event in dates[performer.id] ?? [] where !isOver(event) {
                 guard known.insert(event.id).inserted else { continue }
                 merged.append(event)
             }

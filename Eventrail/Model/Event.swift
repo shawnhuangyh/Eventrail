@@ -166,8 +166,20 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     /// Whether the page's published end time has already gone by. False where
     /// it published none — most nights — since nothing then says when it is
     /// over, and the day's end is the one line ``isUpcoming`` can draw.
+    ///
+    /// An end earlier than the start is the next morning — see
+    /// ``EventernotePages``, which now reads it so; this covers copies read
+    /// before it did.
+    ///
+    /// Only as right as the zone the times were read in. A Following row is on
+    /// Tokyo time whatever its hall, so ``FollowedDates`` trusts this only for
+    /// a hall it knows to be in Japan.
     var hasEnded: Bool {
-        endsAt.map { $0 <= .now } ?? false
+        guard var end = endsAt else { return false }
+        if let begins = startsAt ?? doorsOpen, end < begins {
+            end = end.addingTimeInterval(24 * 60 * 60)
+        }
+        return end <= .now
     }
 
     /// How many whole days from today to the night itself — 0 on the day, 1

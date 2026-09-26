@@ -589,6 +589,17 @@ nonisolated enum EventernotePages {
         calendar.timeZone = Event.publishedZone
         guard let date = calendar.date(from: day) else { return nil }
 
+        let doorsOpen = time(labelled: "開場", in: times, on: day, calendar: calendar)
+        let startsAt = time(labelled: "開演", in: times, on: day, calendar: calendar)
+        var endsAt = time(labelled: "終演", in: times, on: day, calendar: calendar)
+        // A clock with no date: "終演 00:30", or an all-night show's 05:00, is
+        // the next morning rather than the start of the same day — which put
+        // the end before the show began, in the calendar entry and in
+        // ``Event/hasEnded`` alike. (25:00 already rolls over by itself.)
+        if let end = endsAt, let begins = startsAt ?? doorsOpen, end < begins {
+            endsAt = calendar.date(byAdding: .day, value: 1, to: end)
+        }
+
         return Event(
             id: id,
             title: title,
@@ -597,9 +608,9 @@ nonisolated enum EventernotePages {
             venueDetail: venueDetail,
             placeID: placeID,
             date: date,
-            doorsOpen: time(labelled: "開場", in: times, on: day, calendar: calendar),
-            startsAt: time(labelled: "開演", in: times, on: day, calendar: calendar),
-            endsAt: time(labelled: "終演", in: times, on: day, calendar: calendar),
+            doorsOpen: doorsOpen,
+            startsAt: startsAt,
+            endsAt: endsAt,
             timeZone: Event.publishedZone,
             listedAttendees: listedAttendees,
             performers: performers,
