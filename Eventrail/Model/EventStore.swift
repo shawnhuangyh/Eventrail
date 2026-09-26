@@ -227,6 +227,16 @@ final class EventStore {
     /// Settings says so, since the library on screen is missing what they hold.
     private(set) var unreadableLibraryFiles = 0
 
+    /// Whether the library file on disk could not be read this launch and is
+    /// still where it was — see ``LibraryFile/Contents/isBlocked``. Nothing is
+    /// written to it meanwhile; each save tries the read again first
+    /// (``fileToWrite()``), and Settings says so while it lasts.
+    private(set) var libraryFileIsBlocked = false
+
+    /// Set-aside files folded back in at launch, deleted once the library
+    /// holding them is on disk — see ``LibraryFile/discard(_:)``.
+    private var recoveredCopies: [URL] = []
+
     /// What a refresh of the venues is doing, or what the last one did. Nil
     /// until the reader asks for one.
     private(set) var venueStatus: VenuePlaces.Refresh?
@@ -310,6 +320,8 @@ final class EventStore {
 
         let contents = file?.load()
         unreadableLibraryFiles = contents?.unreadable ?? 0
+        libraryFileIsBlocked = contents?.isBlocked ?? false
+        recoveredCopies = contents?.recoveredCopies ?? []
         var loaded = contents?.archive ?? LibraryArchive()
         if loaded.membership.isEmpty, !library.isEmpty {
             loaded.events = Dictionary(library.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -1168,7 +1180,7 @@ final class EventStore {
         retimeEvents()
         archive = archive.pruned()
         pushToCloud()
-        file?.save(archive)
+        writeFile()
         if cloudChanges == nil { observeCloudChanges() }
     }
 
@@ -1290,7 +1302,7 @@ final class EventStore {
         pendingSave?.cancel()
         pendingSave = nil
         archive = archive.pruned()
-        file?.save(archive)
+        writeFile()
         pushToCloud()
     }
 
@@ -1511,7 +1523,7 @@ final class EventStore {
         noteCloudCopy(seen: true)
         lastSynced = .now
         syncStatus = .synced
-        file?.save(archive)
+        writeFile()
     }
 
     // MARK: - Persisting
@@ -1524,8 +1536,6 @@ final class EventStore {
         // being uploaded, not linger in iCloud until some other device syncs.
         archive = archive.pruned()
         revision += 1
-        let archive = archive
-        let file = file
         guard file != nil || (iCloudSyncEnabled && cloud != nil) else { return }
 
         pendingSave = Task { [weak self] in
@@ -1534,20 +1544,52 @@ final class EventStore {
             // Whether iCloud is owed this write is settled here, after the
             // pause rather than before it, so a hold lifted meanwhile counts.
             let cloud = self.cloudForPush()
+            let file = self.fileToWrite()
+            let archive = self.archive
+            let copies = self.recoveredCopies
             // Only the encode and the compression go off the main actor. The
             // write itself stays on it: two paths handing the same key-value
             // store different payloads from different threads is a race the
             // store makes no promise about.
-            let payload = await Task.detached(priority: .utility) { () -> CloudSync.Payload? in
-                file?.save(archive)
-                return cloud?.payload(for: archive)
+            let (saved, payload) = await Task.detached(priority: .utility) { () -> (Bool, CloudSync.Payload?) in
+                let saved = file?.save(archive) ?? false
+                if saved { file?.discard(copies) }
+                return (saved, cloud?.payload(for: archive))
             }.value
+            if saved { self.recoveredCopies.removeAll(where: copies.contains) }
             guard !Task.isCancelled else { return }
             if let cloud, let payload { self.record(cloud.save(payload)) }
             // The calendar follows the same pause as the disk write: a ticket
             // toggled twice while deciding should reach EventKit once.
             await self.mirrorCalendar()
         }
+    }
+
+    /// Writes the library to disk now, where it is safe to.
+    private func writeFile() {
+        guard let file = fileToWrite(), file.save(archive) else { return }
+        file.discard(recoveredCopies)
+        recoveredCopies = []
+    }
+
+    /// The file to save to, or nil while the one on disk could not be read.
+    ///
+    /// A blocked file is read again first — it is usually a device that had
+    /// not been unlocked yet, and by the next edit it has — and what it holds
+    /// is folded into the library in memory before anything is written over
+    /// it, the same merge a launch would have made.
+    private func fileToWrite() -> LibraryFile? {
+        guard let file else { return nil }
+        guard libraryFileIsBlocked else { return file }
+        let contents = file.load()
+        guard !contents.isBlocked else { return nil }
+        libraryFileIsBlocked = false
+        unreadableLibraryFiles = contents.unreadable
+        recoveredCopies = Array(Set(recoveredCopies).union(contents.recoveredCopies))
+        archive = archive.merging(contents.archive).pruned()
+        revision += 1
+        retimeEvents()
+        return file
     }
 
     // MARK: - Grouping

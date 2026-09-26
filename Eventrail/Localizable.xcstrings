@@ -529,6 +529,28 @@
         }
       }
     },
+    "Your library could not be read from this device's storage, so nothing is being saved over it. Close and reopen the app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このデバイスのストレージからライブラリを読み込めなかったため、上書き保存を止めています。アプリを閉じて開き直してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从此设备的存储中读取资料库，因此暂不保存以免将其覆盖。请关闭并重新打开 App。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法從此裝置的儲存空間讀取資料庫，因此暫不儲存以免將其覆寫。請關閉並重新開啟 App。"
+          }
+        }
+      }
+    },
     "^[%lld date](inflect: true) here" : {
       "localizations" : {
         "ja" : {

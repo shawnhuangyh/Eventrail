@@ -339,9 +339,20 @@ nonisolated struct LibraryFile: Sendable {
         /// Files set aside because this build could not read them, now or on
         /// an earlier launch. Nothing ever writes over them.
         var unreadable = 0
+        /// Files set aside earlier that were read this time and folded back
+        /// in. They are the only copy of what they hold until the merged
+        /// library is on disk, so they are handed back to be deleted after the
+        /// first save that lands (``discard(_:)``) rather than deleted here.
+        var recoveredCopies: [URL] = []
         /// Whether a file set aside earlier was read this time and folded back
         /// in — which the store has to write down.
-        var recovered = false
+        var recovered: Bool { !recoveredCopies.isEmpty }
+        /// Whether the library file is still where it was and could not be
+        /// read — the bytes would not open (a device not yet unlocked since it
+        /// started, most likely), or would not decode and could not be moved
+        /// aside. The empty library that comes back beside it is not the
+        /// reader's, and a save would write it over the one that is.
+        var isBlocked = false
     }
 
     /// Reads the library, and never loses one it cannot read.
@@ -353,15 +364,26 @@ nonisolated struct LibraryFile: Sendable {
     /// beside it, where nothing it saves can reach it. Every launch tries the
     /// ones set aside again, so a build that has learnt to read them folds
     /// them back in with an ordinary merge — the records written since keep
-    /// whichever copy is newer — and only then deletes them.
+    /// whichever copy is newer — and deletes them once that merge is saved.
+    ///
+    /// Where the file cannot even be moved aside, or its bytes cannot be read
+    /// at all, it is left where it is and the answer says so
+    /// (``Contents/isBlocked``): nothing may be saved over it until a later
+    /// read gets through.
     func load() -> Contents {
         var contents = Contents(archive: LibraryArchive())
-        if let data = try? Data(contentsOf: url) {
+        do {
+            let data = try Data(contentsOf: url)
             if let archive = Self.decode(data) {
                 contents.archive = archive
-            } else {
-                setAside()
+            } else if !setAside() {
+                contents.isBlocked = true
             }
+        } catch CocoaError.fileReadNoSuchFile {
+            // No library yet: a first launch, or one after Delete All's file went.
+        } catch {
+            Self.log.error("Library file could not be opened: \(error.localizedDescription, privacy: .public)")
+            contents.isBlocked = true
         }
 
         for copy in setAsideCopies() {
@@ -371,10 +393,17 @@ nonisolated struct LibraryFile: Sendable {
             }
             Self.log.notice("Recovered a library file set aside on an earlier launch.")
             contents.archive = contents.archive.merging(archive)
-            contents.recovered = true
-            try? FileManager.default.removeItem(at: copy)
+            contents.recoveredCopies.append(copy)
         }
         return contents
+    }
+
+    /// Deletes set-aside copies ``load()`` folded back in, once the library
+    /// holding them has been saved.
+    func discard(_ copies: [URL]) {
+        for copy in copies {
+            try? FileManager.default.removeItem(at: copy)
+        }
     }
 
     private static func decode(_ data: Data) -> LibraryArchive? {
@@ -392,7 +421,8 @@ nonisolated struct LibraryFile: Sendable {
 
     private static let setAsidePrefix = "library.unreadable-"
 
-    private func setAside() {
+    /// Whether the unreadable file is out of the way.
+    private func setAside() -> Bool {
         let stamp = Date.now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false)
             .timeSeparator(.omitted))
         let destination = url.deletingLastPathComponent()
@@ -400,8 +430,10 @@ nonisolated struct LibraryFile: Sendable {
         do {
             try FileManager.default.moveItem(at: url, to: destination)
             Self.log.error("Library file could not be read; set aside as \(destination.lastPathComponent, privacy: .public).")
+            return true
         } catch {
             Self.log.error("Library file could not be read or set aside: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
@@ -412,11 +444,15 @@ nonisolated struct LibraryFile: Sendable {
             .map { directory.appending(path: $0) }
     }
 
-    func save(_ archive: LibraryArchive) {
+    /// Whether the library landed on disk.
+    @discardableResult
+    func save(_ archive: LibraryArchive) -> Bool {
         do {
             try JSONEncoder().encode(archive).write(to: url, options: .atomic)
+            return true
         } catch {
             Self.log.error("Library file could not be written: \(error.localizedDescription)")
+            return false
         }
     }
 }

@@ -325,9 +325,13 @@ struct SettingsView: View {
         .buttonStyle(.plain)
     }
 
-    /// The one time the library on screen is known to be missing something:
+    /// The times the library on screen is known to be missing something: a
+    /// file this launch could not open, left where it is until it can, or
     /// a file this build could not read, kept aside for a build that can.
     private var unreadableLibraryStatus: Text? {
+        if store.libraryFileIsBlocked {
+            return Text("Your library could not be read from this device's storage, so nothing is being saved over it. Close and reopen the app.")
+        }
         guard store.unreadableLibraryFiles > 0 else { return nil }
         return Text("Part of your library could not be read and was set aside. Restore a backup, or update the app.")
     }

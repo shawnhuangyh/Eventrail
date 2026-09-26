@@ -43,6 +43,7 @@ struct LibraryFileTests {
         let loaded = file.load()
         #expect(loaded.archive.holdsNothing)
         #expect(loaded.unreadable == 0)
+        #expect(!loaded.isBlocked)
     }
 
     @Test func anUnreadableFileIsSetAsideRatherThanSavedOver() throws {
@@ -79,6 +80,38 @@ struct LibraryFileTests {
         #expect(loaded.archive.isInLibrary("new"))
         #expect(loaded.recovered)
         #expect(loaded.unreadable == 0)
+        // Still there until the merged library has been saved.
+        #expect(try contents(of: directory).count == 2)
+
+        #expect(file.save(loaded.archive))
+        file.discard(loaded.recoveredCopies)
         #expect(try contents(of: directory) == ["library.json"])
+    }
+
+    @Test func aFileThatWillNotOpenIsBlockedRatherThanReadAsEmpty() throws {
+        let (file, directory) = try file()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        file.save(archive(holding: "1"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: file.url.path(percentEncoded: false))
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.url.path(percentEncoded: false)) }
+
+        let loaded = file.load()
+        #expect(loaded.isBlocked)
+        #expect(loaded.archive.holdsNothing)
+        #expect(try contents(of: directory) == ["library.json"])
+    }
+
+    @Test func anUnreadableFileThatCannotBeMovedAsideIsBlocked() throws {
+        let (file, directory) = try file()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let garbage = Data("{ not a library".utf8)
+        try garbage.write(to: file.url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directory.path(percentEncoded: false))
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path(percentEncoded: false)) }
+
+        let loaded = file.load()
+        #expect(loaded.isBlocked)
+        #expect(!file.save(archive(holding: "2")))
+        #expect(try Data(contentsOf: file.url) == garbage)
     }
 }
