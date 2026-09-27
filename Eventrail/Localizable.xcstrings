@@ -2753,6 +2753,28 @@
         }
       }
     },
+    "Eventrail's iCloud data was deleted — turn on again to sync" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud上のEventrailのデータが削除されました — 同期するには再度オンにしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 的 iCloud 数据已被删除 — 重新打开以同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 的 iCloud 資料已被刪除 — 重新開啟以同步"
+          }
+        }
+      }
+    },
     "Events" : {
       "localizations" : {
         "ja" : {

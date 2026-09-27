@@ -212,7 +212,12 @@ struct SettingsView: View {
     /// for why iCloud turned it off.
     private var syncStatus: Text? {
         guard store.iCloudSyncEnabled else {
-            return store.syncStatus == .accountChanged ? CloudSyncStatus.text(for: store.syncStatus) : nil
+            switch store.syncStatus {
+            case .accountChanged, .cloudDataDeleted:
+                return CloudSyncStatus.text(for: store.syncStatus)
+            default:
+                return nil
+            }
         }
         switch store.syncStatus {
         case .synced, .none:

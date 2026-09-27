@@ -54,6 +54,10 @@ final class LibraryDatabase {
         /// swapped for another, so syncing stopped — see
         /// ``checkAccount()``. Said while the switch is off, since it is why.
         case accountChanged
+        /// The reader deleted Eventrail's data from iCloud (Settings › iCloud ›
+        /// Manage Storage), so syncing stopped rather than send the library
+        /// straight back. Said while the switch is off, like ``accountChanged``.
+        case cloudDataDeleted
         case failed(String)
     }
 
@@ -89,10 +93,11 @@ final class LibraryDatabase {
 
     /// Run once another device's changes have landed and been folded in.
     @ObservationIgnored var onRemoteChanges: (() -> Void)?
-    /// Run when the iCloud account changes under the library, to turn the
-    /// switch off — which opens the store without CloudKit. Without it the
-    /// store is simply opened that way.
-    @ObservationIgnored var onAccountChanged: (() -> Void)?
+    /// Run when iCloud stops the library syncing — the account changed, or
+    /// the reader deleted its data there — to turn the switch off, which
+    /// opens the store without CloudKit. Without it the store is simply
+    /// opened that way.
+    @ObservationIgnored var onSyncStopped: (() -> Void)?
 
     @ObservationIgnored private let location: Location
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
@@ -247,33 +252,44 @@ final class LibraryDatabase {
     private func checkAccount() {
         Task {
             let container = CKContainer(identifier: Self.containerID)
-            let status = try? await container.accountStatus()
+            let status: CKAccountStatus
+            do {
+                status = try await container.accountStatus()
+            } catch {
+                // Said rather than left blank: the switch has just cleared the
+                // status, and blank reads as syncing fine.
+                if isSyncing { syncStatus = Self.status(for: error) }
+                return
+            }
             guard isSyncing else { return }
             let syncedWith = UserDefaults.standard.string(forKey: Self.accountKey)
             switch status {
             case .available:
-                // Offline, the user cannot be named; the next change asks again.
+                // Offline, the user cannot be named; the next sync that lands
+                // asks again (``finished(isImport:at:succeeded:error:)``).
                 guard let user = try? await container.userRecordID().recordName, isSyncing else { return }
                 if let syncedWith, syncedWith != user {
-                    accountChanged()
+                    stopSyncing(.accountChanged)
                 } else if syncedWith == nil {
                     UserDefaults.standard.set(user, forKey: Self.accountKey)
                 }
             case .noAccount:
-                if syncedWith != nil { accountChanged() } else { syncStatus = .signedOut }
-            case .restricted, .temporarilyUnavailable:
+                if syncedWith != nil { stopSyncing(.accountChanged) } else { syncStatus = .signedOut }
+            case .restricted, .temporarilyUnavailable, .couldNotDetermine:
                 syncStatus = .unavailable
-            default:
-                break
+            @unknown default:
+                syncStatus = .unavailable
             }
         }
     }
 
-    private func accountChanged() {
-        Self.log.notice("The iCloud account changed; syncing stopped.")
-        if let onAccountChanged { onAccountChanged() } else { setSyncing(false) }
+    /// Turns syncing off because iCloud said to, and says why until the reader
+    /// turns it on again.
+    private func stopSyncing(_ reason: SyncStatus) {
+        Self.log.notice("Syncing stopped: \(String(describing: reason), privacy: .public)")
+        if let onSyncStopped { onSyncStopped() } else { setSyncing(false) }
         // After the switch, which clears the status on its way down.
-        syncStatus = .accountChanged
+        syncStatus = reason
     }
 
     private func observeSyncEvents() {
@@ -322,11 +338,16 @@ final class LibraryDatabase {
         let before = isImport ? beforeImport : nil
         if isImport { beforeImport = nil }
         guard succeeded else {
-            syncStatus = Self.status(for: error)
+            let status = Self.status(for: error)
+            // Left syncing, SwiftData would make the zone again and send the
+            // whole library back into it, undoing what the reader just did.
+            if status == .cloudDataDeleted { stopSyncing(status) } else { syncStatus = status }
             return
         }
         syncStatus = .synced
         lastSynced = date
+        // Syncing started offline and never learned whose account this is.
+        if UserDefaults.standard.string(forKey: Self.accountKey) == nil { checkAccount() }
         guard isImport else { return }
         do {
             try Self.deduplicate(in: context)
@@ -339,7 +360,11 @@ final class LibraryDatabase {
 
     static func status(for error: (any Error)?) -> SyncStatus {
         guard let error else { return .failed(String(localized: "iCloud did not say why")) }
-        switch (error as? CKError)?.code {
+        let ckError = error as? CKError
+        // Usually one record's answer inside a partial failure, not the whole.
+        let partial = ckError?.partialErrorsByItemID?.values.compactMap { ($0 as? CKError)?.code } ?? []
+        if ckError?.code == .userDeletedZone || partial.contains(.userDeletedZone) { return .cloudDataDeleted }
+        switch ckError?.code {
         case .notAuthenticated: return .signedOut
         case .quotaExceeded: return .iCloudFull
         case .networkUnavailable, .networkFailure: return .offline

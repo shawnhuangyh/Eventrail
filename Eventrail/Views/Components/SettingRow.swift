@@ -154,6 +154,8 @@ enum CloudSyncStatus {
             Text("Your iCloud storage is full")
         case .accountChanged:
             Text("iCloud account changed — turn on again to sync")
+        case .cloudDataDeleted:
+            Text("Eventrail's iCloud data was deleted — turn on again to sync")
         case .failed(let reason):
             Text(verbatim: reason)
         case .synced, .none:

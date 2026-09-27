@@ -321,7 +321,7 @@ final class EventStore {
         moveInLibraryFile()
         seed(library: library, tracking: tracking, follows: follows)
         self.database.onRemoteChanges = { [weak self] in self?.remoteChangesArrived() }
-        self.database.onAccountChanged = { [weak self] in self?.iCloudSyncEnabled = false }
+        self.database.onSyncStopped = { [weak self] in self?.iCloudSyncEnabled = false }
 
         // A hall being placed is owed a mirror whether or not this device syncs.
         observeVenuePlacings()

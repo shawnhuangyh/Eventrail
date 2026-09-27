@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import SwiftData
 import Testing
@@ -278,6 +279,26 @@ struct LibraryDatabaseTests {
         #expect(try LibraryDatabase.reconcile(before, in: context) == false)
         #expect(try context.fetch(FetchDescriptor<LibraryEvent>()).contains { $0.eventID == "2" } == false)
         withExtendedLifetime(database) {}
+    }
+
+    // MARK: - How sync stands
+
+    @Test func deletingTheZoneFromICloudIsItsOwnStatus() {
+        #expect(LibraryDatabase.status(for: CKError(.userDeletedZone)) == .cloudDataDeleted)
+    }
+
+    /// The deletion usually arrives as one record's answer inside a partial
+    /// failure rather than as the whole error.
+    @Test func aDeletedZoneInsideAPartialFailureIsFound() {
+        let zone = CKRecordZone.ID(zoneName: "com.apple.coredata.cloudkit.zone")
+        let error = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [zone: CKError(.userDeletedZone)]])
+        #expect(LibraryDatabase.status(for: error) == .cloudDataDeleted)
+    }
+
+    @Test func otherErrorsKeepTheirStatus() {
+        #expect(LibraryDatabase.status(for: CKError(.quotaExceeded)) == .iCloudFull)
+        #expect(LibraryDatabase.status(for: CKError(.networkUnavailable)) == .offline)
+        #expect(LibraryDatabase.status(for: CKError(.notAuthenticated)) == .signedOut)
     }
 
     // MARK: - The library file
