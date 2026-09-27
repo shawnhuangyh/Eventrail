@@ -408,6 +408,58 @@ nonisolated extension LibraryArchive {
     }
 }
 
+nonisolated extension Date {
+    /// This moment cut to the millisecond, as CloudKit keeps a date.
+    var toTheMillisecond: Date {
+        Date(timeIntervalSinceReferenceDate: (timeIntervalSinceReferenceDate * 1000).rounded(.down) / 1000)
+    }
+}
+
+nonisolated extension LibraryArchive {
+    /// This archive with every date in it cut to the millisecond.
+    ///
+    /// What two copies of a record are compared by before one is written over
+    /// the other. CloudKit keeps a date to the millisecond, so a record this
+    /// device sent comes back a fraction older than it went; read as a
+    /// different answer, it was written back and sent again, and came back cut
+    /// short again, for as long as syncing was on.
+    var toTheMillisecond: LibraryArchive {
+        var cut = self
+        cut.events = events.mapValues { event in
+            var event = event
+            event.date = event.date.toTheMillisecond
+            event.doorsOpen = event.doorsOpen?.toTheMillisecond
+            event.startsAt = event.startsAt?.toTheMillisecond
+            event.endsAt = event.endsAt?.toTheMillisecond
+            event.editedAt = event.editedAt?.toTheMillisecond
+            event.readAt = event.readAt?.toTheMillisecond
+            return event
+        }
+        cut.membership = membership.mapValues(\.toTheMillisecond)
+        cut.favorites = favorites.mapValues(\.toTheMillisecond)
+        cut.tracking = tracking.mapValues { record in
+            var record = record.toTheMillisecond
+            record.value.edits = record.value.edits.mapValues(\.toTheMillisecond)
+            return record
+        }
+        cut.follows = follows?.mapValues(\.toTheMillisecond)
+        cut.followingReads = followingReads?.mapValues { record in
+            var record = record.toTheMillisecond
+            record.value.day = record.value.day.toTheMillisecond
+            return record
+        }
+        cut.recentSearches = recentSearches.toTheMillisecond
+        cut.eventernoteAccount = eventernoteAccount?.toTheMillisecond
+        cut.lastRefreshed = lastRefreshed?.toTheMillisecond
+        cut.lastImported = lastImported?.toTheMillisecond
+        return cut
+    }
+}
+
+nonisolated extension Stamped {
+    var toTheMillisecond: Stamped { Stamped(value, at: modified.toTheMillisecond) }
+}
+
 /// The JSON file older builds kept the library in, read now only to be moved
 /// into ``LibraryDatabase`` — see ``LibraryDatabase/moveIn(from:)`` — and
 /// written only by the tests that make one.

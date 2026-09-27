@@ -228,7 +228,8 @@ struct LibraryDatabaseTests {
         let before = try LibraryDatabase.archive(in: context)
 
         try imported(tracked(base.edited(to: Tracking(note: "this morning"), at: later)), over: "1", in: context)
-        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
+        let outcome = try LibraryDatabase.settleImport(against: before, in: context)
+        #expect(!outcome.wrote && outcome.landed)
         #expect(!context.hasChanges)
         #expect(try LibraryDatabase.archive(in: context).tracking["1"]?.value.note == "this morning")
         withExtendedLifetime(database) {}
@@ -300,6 +301,81 @@ struct LibraryDatabaseTests {
 
         #expect(try LibraryDatabase.reconcile(before, in: context) == false)
         #expect(try context.fetchCount(FetchDescriptor<LibraryEvent>()) == 0)
+        withExtendedLifetime(database) {}
+    }
+
+    /// CloudKit keeps a date to the millisecond, so what this device sent
+    /// comes back a fraction older than it went. Taken for an older copy
+    /// landing over a newer one, it was written back, sent, cut short again
+    /// and brought back — for as long as syncing was on.
+    @Test func anEchoCutToTheMillisecondIsNotWrittenBack() throws {
+        let (database, context) = try database()
+        let precise = Date(timeIntervalSinceReferenceDate: 812_345_678.123_456)
+        var archive = LibraryArchive()
+        var event = Fixtures.event(id: "1", isDetailed: true)
+        event.readAt = precise
+        event.editedAt = precise
+        archive.events["1"] = event
+        archive.membership["1"] = Stamped(true, at: precise)
+        archive.favorites["1"] = Stamped(true, at: precise)
+        archive.tracking["1"] = Stamped(Tracking(seat: "A12", note: "front row"), at: precise)
+            .edited(to: Tracking(seat: "A12", cost: 9000, note: "front row"), at: precise.addingTimeInterval(0.000_7))
+        archive.followingReads = ["1": Stamped(FollowingRead(fingerprint: "x", day: ahead), at: precise)]
+        try stored(archive, in: context)
+        let before = try LibraryDatabase.archive(in: context)
+
+        // What an import of this device's own record writes back.
+        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first)
+        func cut(_ date: Date?) -> Date? {
+            date.map { Date(timeIntervalSinceReferenceDate: ($0.timeIntervalSinceReferenceDate * 1000).rounded(.down) / 1000) }
+        }
+        row.readAt = cut(row.readAt)
+        row.editedAt = cut(row.editedAt)
+        row.inLibraryChanged = cut(row.inLibraryChanged)
+        row.favoriteChanged = cut(row.favoriteChanged)
+        row.trackingChanged = cut(row.trackingChanged)
+        row.readChanged = cut(row.readChanged)
+        try context.save()
+
+        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
+        #expect(!context.hasChanges)
+        // Nothing landed either, so nothing is read again or redrawn.
+        let outcome = try LibraryDatabase.settleImport(against: before, in: context)
+        #expect(!outcome.wrote && !outcome.landed)
+        withExtendedLifetime(database) {}
+    }
+
+    func placed(in zone: TimeZone, read: Date, title: String = "Live") -> LibraryArchive {
+        var archive = LibraryArchive()
+        var event = Fixtures.event(id: "1", title: title, startsAt: Fixtures.date(2027, 5, 9, 18, in: zone),
+                                   timeZone: zone, isDetailed: true)
+        event.readAt = read
+        archive.events["1"] = event
+        archive.membership["1"] = Stamped(true, at: earlier)
+        return archive
+    }
+
+    /// Two devices holding different copies of one page read at the same
+    /// moment each kept their own, and sent it back over the other's for good.
+    @Test func factsReadAtTheSameMomentLeaveTheArrivedCopy() throws {
+        let (database, context) = try database()
+        try stored(placed(in: Fixtures.tokyo, read: earlier), in: context)
+        let before = try LibraryDatabase.archive(in: context)
+
+        try imported(placed(in: Fixtures.taipei, read: earlier), over: "1", in: context)
+        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
+        #expect(try LibraryDatabase.archive(in: context).events["1"]?.timeZone == Fixtures.taipei)
+        withExtendedLifetime(database) {}
+    }
+
+    @Test func aLaterReadOfThePageHereIsPutBack() throws {
+        let (database, context) = try database()
+        try stored(placed(in: Fixtures.tokyo, read: later, title: "Moved to the big hall"), in: context)
+        let before = try LibraryDatabase.archive(in: context)
+
+        try imported(placed(in: Fixtures.tokyo, read: earlier), over: "1", in: context)
+        #expect(try LibraryDatabase.reconcile(before, in: context))
+        #expect(try LibraryDatabase.archive(in: context).events["1"]?.title == "Moved to the big hall")
         withExtendedLifetime(database) {}
     }
 

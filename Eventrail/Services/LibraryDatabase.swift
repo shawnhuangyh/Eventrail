@@ -457,8 +457,12 @@ final class LibraryDatabase {
         lastSynced = date
         guard isImport else { return }
         do {
-            try Self.deduplicate(in: context)
-            if let before { try Self.reconcile(before, in: context) }
+            let folded = try Self.deduplicate(in: context)
+            let outcome = try before.map { try Self.settleImport(against: $0, in: context) }
+            // This device's own records coming back, cut to the millisecond:
+            // nothing to read again, redraw or mirror. Left to go on, every save
+            // cost a pass over the whole library a few seconds after it.
+            if !folded, let outcome, !outcome.wrote, !outcome.landed { return }
         } catch {
             Self.log.error("Library could not be settled after an import: \(error.localizedDescription, privacy: .public)")
         }
@@ -540,7 +544,7 @@ final class LibraryDatabase {
             context.delete(row)
             return true
         case (let wanted?, let row?):
-            guard row.slice != wanted else { return false }
+            guard row.slice?.toTheMillisecond != wanted.toTheMillisecond else { return false }
             row.take(wanted)
             return true
         case (let wanted?, nil):
@@ -609,11 +613,27 @@ final class LibraryDatabase {
     /// race. The row made for it is sent like any other.
     @discardableResult
     static func reconcile(_ before: LibraryArchive, in context: ModelContext) throws -> Bool {
+        try settleImport(against: before, in: context).wrote
+    }
+
+    /// What an import came to: whether this device wrote anything back, and
+    /// whether anything landed at all — an import can be nothing but this
+    /// device's own records coming back cut to the millisecond.
+    struct ImportOutcome {
+        var wrote = false
+        var landed = false
+    }
+
+    /// ``reconcile(_:in:)``, saying as well whether the import changed anything.
+    static func settleImport(against before: LibraryArchive, in context: ModelContext) throws -> ImportOutcome {
         var present = Set<LibraryArchive.RecordKey>()
-        var changed = try reconcile(LibraryEvent.self, with: before, present: &present, in: context)
-        changed = try reconcile(FollowedPerformer.self, with: before, present: &present, in: context) || changed
-        changed = try reconcile(LibrarySettings.self, with: before, present: &present, in: context) || changed
+        var outcome = ImportOutcome()
+        try reconcile(LibraryEvent.self, with: before, present: &present, outcome: &outcome, in: context)
+        try reconcile(FollowedPerformer.self, with: before, present: &present, outcome: &outcome, in: context)
+        try reconcile(LibrarySettings.self, with: before, present: &present, outcome: &outcome, in: context)
+        var changed = outcome.wrote
         for key in before.recordKeys.subtracting(present) {
+            outcome.landed = true
             guard let held = before.slice(for: key) else { continue }
             switch key {
             case .event(let id):
@@ -633,24 +653,47 @@ final class LibraryDatabase {
             changed = true
         }
         if changed { try context.save() }
-        return changed
+        outcome.wrote = changed
+        return outcome
     }
 
     private static func reconcile<Row: ArchiveRow>(
         _ type: Row.Type, with before: LibraryArchive,
-        present: inout Set<LibraryArchive.RecordKey>, in context: ModelContext
-    ) throws -> Bool {
-        var changed = false
+        present: inout Set<LibraryArchive.RecordKey>, outcome: inout ImportOutcome, in context: ModelContext
+    ) throws {
         for row in try context.fetch(FetchDescriptor<Row>()) {
             present.insert(row.key)
-            guard let held = before.slice(for: row.key),
-                  let arrived = row.slice, arrived != held,
-                  let merged = arrived.merging(held).slice(for: row.key), merged != arrived
-            else { continue }
+            let held = before.slice(for: row.key)
+            let arrived = row.slice
+            guard let held, let arrived else {
+                if held != nil || arrived != nil { outcome.landed = true }
+                continue
+            }
+            guard arrived != held else { continue }
+            if arrived.toTheMillisecond != held.toTheMillisecond { outcome.landed = true }
+            guard var merged = arrived.merging(held).slice(for: row.key) else { continue }
+            // The facts this device held stand only where its read of the page
+            // is the later one. A tie left to the merge kept each device's own
+            // copy, and two devices holding different ones sent them back and
+            // forth for good.
+            if case .event(let id) = row.key, merged.events[id] != nil,
+               let landed = arrived.events[id], let mine = held.events[id],
+               !isLaterRead(mine, than: landed) {
+                merged.events[id] = landed
+            }
+            // Nothing but what CloudKit rounds away is no change at all.
+            guard merged.toTheMillisecond != arrived.toTheMillisecond else { continue }
             row.take(merged)
-            changed = true
+            outcome.wrote = true
         }
-        return changed
+    }
+
+    /// Whether `mine` was read from the event's page after `theirs`, by more
+    /// than the millisecond CloudKit keeps.
+    private static func isLaterRead(_ mine: Event, than theirs: Event) -> Bool {
+        guard mine.isDetailed else { return false }
+        guard theirs.isDetailed else { return true }
+        return (mine.readAt ?? .distantPast).toTheMillisecond > (theirs.readAt ?? .distantPast).toTheMillisecond
     }
 
     /// Drops what the archive would prune: a Following read whose night has
