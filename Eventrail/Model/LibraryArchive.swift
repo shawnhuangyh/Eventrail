@@ -167,47 +167,65 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
     /// facts are not the reader's, so the more complete import wins and no
     /// timestamp is needed for them.
     func merging(_ other: LibraryArchive) -> LibraryArchive {
-        combining(other).pruned()
-    }
-
-    /// Folds in a run of other copies at once — the records one fetch from
-    /// iCloud delivered, each a slice of somebody's archive — and prunes once
-    /// at the end rather than after every one.
-    func merging(contentsOf others: [LibraryArchive]) -> LibraryArchive {
-        others.reduce(self) { $0.combining($1) }.pruned()
-    }
-
-    private func combining(_ other: LibraryArchive) -> LibraryArchive {
         var merged = self
+        merged.combine(other)
+        return merged.pruned()
+    }
+
+    /// Folds in a run of other copies at once — every row of the store, or
+    /// the records one read of iCloud delivered, each a slice of somebody's
+    /// archive — and prunes once at the end rather than after every one.
+    ///
+    /// Folded in place: a copy of the whole archive per slice made reading a
+    /// library of nine hundred rows quadratic.
+    func merging(contentsOf others: [LibraryArchive]) -> LibraryArchive {
+        var merged = self
+        for other in others { merged.combine(other) }
+        return merged.pruned()
+    }
+
+    private mutating func combine(_ other: LibraryArchive) {
+        // Settled against both sides as they stood, before either link moves.
+        let account = Self.newer(eventernoteAccount, other.eventernoteAccount)
+        let profile = Self.profile(forWinning: account, mine: self, theirs: other)
 
         for (id, event) in other.events {
-            guard let mine = merged.events[id] else {
-                merged.events[id] = event
-                continue
+            if let mine = events[id] {
+                events[id] = Self.settle(mine, event)
+            } else {
+                events[id] = event
             }
-            merged.events[id] = Self.settle(mine, event)
         }
 
-        merged.membership = Self.merge(membership, other.membership)
+        membership.merge(other.membership) { $0.newer($1) }
         // Alone among the reader's records, a tracking record holds five
         // answers rather than one, so it is settled answer by answer — see
         // ``Stamped/merging(_:)``.
-        merged.tracking = tracking.merging(other.tracking) { $0.merging($1) }
-        merged.favorites = Self.merge(favorites, other.favorites)
-        merged.follows = Self.merge(follows ?? [:], other.follows ?? [:])
-        merged.followingReads = Self.merge(followingReads ?? [:], other.followingReads ?? [:])
+        tracking.merge(other.tracking) { $0.merging($1) }
+        favorites.merge(other.favorites) { $0.newer($1) }
+        Self.merge(&follows, other.follows) { $0.newer($1) }
+        Self.merge(&followingReads, other.followingReads) { $0.newer($1) }
         // Both sides read the same public page, so either is true; this device's
         // copy is kept so the merge stays stable.
-        merged.followedPerformers = (followedPerformers ?? [:])
-            .merging(other.followedPerformers ?? [:]) { mine, _ in mine }
-        merged.recentSearches = recentSearches.newer(other.recentSearches)
-        merged.eventernoteAccount = Self.newer(eventernoteAccount, other.eventernoteAccount)
-        merged.eventernoteProfile = Self.profile(forWinning: merged.eventernoteAccount,
-                                                 mine: self, theirs: other)
-        merged.lastRefreshed = [lastRefreshed, other.lastRefreshed].compactMap { $0 }.max()
-        merged.lastImported = [lastImported, other.lastImported].compactMap { $0 }.max()
+        Self.merge(&followedPerformers, other.followedPerformers) { mine, _ in mine }
+        recentSearches = recentSearches.newer(other.recentSearches)
+        eventernoteAccount = account
+        eventernoteProfile = profile
+        lastRefreshed = [lastRefreshed, other.lastRefreshed].compactMap { $0 }.max()
+        lastImported = [lastImported, other.lastImported].compactMap { $0 }.max()
+    }
 
-        return merged
+    /// Merges into an optional dictionary without copying it: taken out of
+    /// the property first, so the one being merged into is the only reference.
+    /// Left non-nil, as a merge always has.
+    private static func merge<Value>(
+        _ mine: inout [String: Value]?, _ theirs: [String: Value]?,
+        uniquingKeysWith combine: (Value, Value) -> Value
+    ) {
+        var merged = mine ?? [:]
+        mine = nil
+        merged.merge(theirs ?? [:], uniquingKeysWith: combine)
+        mine = merged
     }
 
     /// Folds a backup the reader asked to restore into this archive.
@@ -292,12 +310,6 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
             return mineIsLater ? theirs.merging(mine) : mine.merging(theirs)
         }
         return mine.isDetailed ? mine.merging(theirs) : theirs.merging(mine)
-    }
-
-    private static func merge<Value>(
-        _ mine: [Event.ID: Stamped<Value>], _ theirs: [Event.ID: Stamped<Value>]
-    ) -> [Event.ID: Stamped<Value>] {
-        mine.merging(theirs) { $0.newer($1) }
     }
 
     /// Drops what neither device needs to keep agreeing on: events nothing

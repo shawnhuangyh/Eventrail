@@ -449,6 +449,8 @@ final class LibraryDatabase {
             // Left syncing, SwiftData would make the zone again and send the
             // whole library back into it, undoing what the reader just did.
             if status == .cloudDataDeleted { stopSyncing(status) } else { syncStatus = status }
+            // Part of a failed import may still have landed.
+            if isImport { onRemoteChanges?() }
             return
         }
         syncStatus = .synced

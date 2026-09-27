@@ -508,7 +508,7 @@ struct VenueView: View {
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
             StatTile(tint: .trackAttended,
-                     value: kept.events.attended.count { $0.venue == link.name }.formatted(),
+                     value: store.events(of: kept).attended.count { $0.venue == link.name }.formatted(),
                      label: "You attended")
             StatTile(tint: .trackTicket, value: feed.total.formatted(),
                      label: "Listed events")
