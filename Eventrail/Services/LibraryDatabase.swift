@@ -77,9 +77,10 @@ final class LibraryDatabase {
     private(set) var isSyncing: Bool
     /// Whether the file would not open, so ``container`` is held in memory.
     private(set) var isBlocked = false
-    /// The container this one replaced, kept until the next is opened so a
-    /// screen still drawing one of its rows is not left holding a row whose
-    /// store has gone.
+    /// The container this one replaced, kept for a moment so a screen still
+    /// drawing one of its rows is not left holding a row whose store has gone
+    /// — and only for a moment, since a CloudKit container kept alive goes on
+    /// mirroring the file the new one writes to (``replace(with:)``).
     @ObservationIgnored private var retired: ModelContainer?
 
     /// Run once another device's changes have landed and been folded in.
@@ -168,10 +169,25 @@ final class LibraryDatabase {
     }
 
     private func replace(with opened: ModelContainer) {
-        retired = container
+        let outgoing = container
+        retired = outgoing
         container = opened
         generation += 1
+        // Let go once the screens have drawn on the new one. The store keeps
+        // its rows and the screens re-read it at once, but a container opened
+        // with CloudKit and held after sync is turned off goes on importing
+        // pushes and exporting whatever the new one writes to the same file —
+        // so the off switch would not keep the library out of iCloud.
+        Task { [weak self] in
+            try? await Task.sleep(for: Self.retiredHold)
+            guard let self, retired === outgoing else { return }
+            retired = nil
+        }
     }
+
+    /// How long a replaced container is held: past the redraw that moves the
+    /// screens onto the new one, and no longer.
+    private static let retiredHold = Duration.seconds(1)
 
     private static func memoryContainer() -> ModelContainer {
         do {
