@@ -189,9 +189,9 @@ final class EventStore {
             UserDefaults.standard.set(iCloudSyncEnabled, forKey: Self.syncPreferenceKey)
             // Written out first: the store is about to be opened again the
             // other way, and the rows held here belong to the old container.
+            // The rows are read again as it opens (``LibraryDatabase/onReopened``).
             saveNow()
             database.setSyncing(iCloudSyncEnabled)
-            reindex()
         }
     }
 
@@ -322,6 +322,7 @@ final class EventStore {
         seed(library: library, tracking: tracking, follows: follows)
         self.database.onRemoteChanges = { [weak self] in self?.remoteChangesArrived() }
         self.database.onSyncStopped = { [weak self] in self?.iCloudSyncEnabled = false }
+        self.database.onReopened = { [weak self] in self?.reindex() }
 
         // A hall being placed is owed a mirror whether or not this device syncs.
         observeVenuePlacings()
@@ -1232,16 +1233,18 @@ final class EventStore {
     // MARK: - Syncing
 
     /// Catches up on coming back to the app: tries the store again if it
-    /// would not open, and brings the calendar into line.
+    /// would not open, starts syncing if the account could not be checked
+    /// before, and brings the calendar into line.
     ///
-    /// iCloud needs nothing from here — SwiftData imports what another
-    /// device wrote and sends what this one has, by itself, and
+    /// Once syncing, iCloud needs nothing from here — SwiftData imports what
+    /// another device wrote and sends what this one has, by itself, and
     /// ``remoteChangesArrived()`` picks up what lands.
     func syncNow() async {
         // A ticket bought on the other device is a calendar entry owed on this
         // one, so the mirror runs whether or not iCloud is in the picture.
         defer { Task { await mirrorCalendar() } }
         if libraryFileIsBlocked { moveInLibraryFile() }
+        database.resumeSyncing()
     }
 
     /// Flushes a pending write immediately.

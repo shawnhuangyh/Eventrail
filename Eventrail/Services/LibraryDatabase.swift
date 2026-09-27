@@ -81,8 +81,10 @@ final class LibraryDatabase {
     private(set) var generation = 0
     private(set) var syncStatus: SyncStatus?
     private(set) var lastSynced: Date?
-    /// Whether the store is open with CloudKit.
-    private(set) var isSyncing: Bool
+    /// Whether the store is open with CloudKit. Not the switch: with the
+    /// switch on, the store is opened without CloudKit until the iCloud user
+    /// has been checked (``checkAccount()``).
+    private(set) var isSyncing = false
     /// Whether the file would not open, so ``container`` is held in memory.
     private(set) var isBlocked = false
     /// The container this one replaced, kept for a moment so a screen still
@@ -98,8 +100,16 @@ final class LibraryDatabase {
     /// opens the store without CloudKit. Without it the store is simply
     /// opened that way.
     @ObservationIgnored var onSyncStopped: (() -> Void)?
+    /// Run whenever the store has been opened again, on a new container —
+    /// which can be a while after the switch is turned, since syncing starts
+    /// only once the account has been checked.
+    @ObservationIgnored var onReopened: (() -> Void)?
 
     @ObservationIgnored private let location: Location
+    /// Whether the switch is on: the store is to be synced once the iCloud
+    /// user is known to be the one it synced with.
+    @ObservationIgnored private var wantsSyncing: Bool
+    @ObservationIgnored private var retry: Task<Void, Never>?
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     /// The library as it stood when the import running now began — what
     /// ``reconcile(_:in:)`` holds the import up against.
@@ -112,11 +122,14 @@ final class LibraryDatabase {
 
     init(at location: Location = LibraryDatabase.defaultLocation, syncing: Bool) {
         self.location = location
-        isSyncing = syncing && location != .memory
+        wantsSyncing = syncing && location != .memory
         container = Self.memoryContainer()
+        // Without CloudKit even with the switch on: the account may have
+        // changed while the app was not running, and a store opened with
+        // CloudKit starts sending before any check could answer.
         open()
         observeSyncEvents()
-        if isSyncing { checkAccount() }
+        if wantsSyncing { checkAccount() }
     }
 
     isolated deinit {
@@ -135,30 +148,63 @@ final class LibraryDatabase {
         return !isBlocked
     }
 
-    /// Opens the store with CloudKit, or without it.
+    /// Turns syncing on or off. On, the store is opened with CloudKit once
+    /// the account has been checked; off, at once without it.
     func setSyncing(_ syncing: Bool) {
-        guard location != .memory, syncing != isSyncing else { return }
-        try? context.save()
-        isSyncing = syncing
+        guard location != .memory, syncing != wantsSyncing else { return }
+        wantsSyncing = syncing
         syncStatus = nil
         beforeImport = nil
+        retry?.cancel()
         // Turned on, it is whichever account is signed in now that the reader
         // said yes to, so the record is written afresh.
         UserDefaults.standard.removeObject(forKey: Self.accountKey)
+        if syncing {
+            checkAccount()
+        } else if isSyncing {
+            isSyncing = false
+            open()
+        }
+    }
+
+    /// Asks again whether syncing can start, where the switch is on and the
+    /// last check could not tell — offline, say. Run on coming back to the app.
+    func resumeSyncing() {
+        guard wantsSyncing, !isSyncing, syncStatus != .notConfigured else { return }
+        checkAccount()
+    }
+
+    /// Opens the store with CloudKit, now that the account is the one the
+    /// reader said yes to.
+    private func startSyncing() {
+        guard wantsSyncing, !isSyncing, !isBlocked else { return }
+        isSyncing = true
+        syncStatus = nil
         open()
-        if syncing { checkAccount() }
     }
 
     private func open() {
-        // What was written while the file would not open, to be folded in.
-        let meanwhile = isBlocked ? try? Self.archive(in: context) : nil
-        try? context.save()
+        // What the old container holds and has not written, folded into the
+        // new one below so a swap never drops an edit: all of it while the
+        // file would not open, and otherwise whatever a failed save left.
+        var meanwhile: LibraryArchive?
+        if isBlocked {
+            meanwhile = try? Self.archive(in: context)
+        } else if context.hasChanges {
+            do {
+                try context.save()
+            } catch {
+                Self.log.error("Library could not be saved before reopening: \(error.localizedDescription, privacy: .public)")
+                meanwhile = try? Self.archive(in: context)
+            }
+        }
         do {
             let opened = try Self.makeContainer(at: location, syncing: isSyncing)
             replace(with: opened)
             isBlocked = false
         } catch where isSyncing {
             Self.log.error("Library could not be opened with CloudKit: \(error.localizedDescription, privacy: .public)")
+            isSyncing = false
             syncStatus = .notConfigured
             if let opened = try? Self.makeContainer(at: location, syncing: false) {
                 replace(with: opened)
@@ -170,6 +216,7 @@ final class LibraryDatabase {
             Self.log.error("Library could not be opened: \(error.localizedDescription, privacy: .public)")
             block()
         }
+        defer { onReopened?() }
         guard !isBlocked else { return }
         do {
             if let meanwhile, !meanwhile.holdsNothing {
@@ -180,6 +227,8 @@ final class LibraryDatabase {
             try Self.deduplicate(in: context)
             try Self.prune(in: context)
         } catch {
+            // A merge that would not save stays in the context, to be written
+            // with the next edit.
             Self.log.error("Library could not be tidied: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -239,16 +288,19 @@ final class LibraryDatabase {
 
     // MARK: - Syncing
 
-    /// Says early what an import would only say by failing — no account, or
-    /// one iCloud cannot reach — and stops syncing when the account is no
-    /// longer the one the library synced with.
+    /// Checks the iCloud user before the store is synced, and again whenever
+    /// CloudKit says the account changed.
     ///
-    /// Asked as syncing starts and whenever CloudKit says the account changed.
     /// A store synced with one person's iCloud holds that person's library;
     /// handed on to whoever signs in next it would be uploaded into their
-    /// private database. So a sign-out, or a different user, turns the switch
-    /// off, and syncing waits for the reader to say yes to the new account —
-    /// what the build before SwiftData did on the same news.
+    /// private database. So the store is opened with CloudKit only once the
+    /// signed-in user is the one it first synced with — or, the first time,
+    /// once there is a user to write down — and a sign-out or a different
+    /// user turns the switch off, to wait for the reader to say yes to the new
+    /// account. What the build before SwiftData did on the same news.
+    ///
+    /// Also says early what an import would only say by failing: no account,
+    /// or one iCloud cannot reach.
     private func checkAccount() {
         Task {
             let container = CKContainer(identifier: Self.containerID)
@@ -258,20 +310,26 @@ final class LibraryDatabase {
             } catch {
                 // Said rather than left blank: the switch has just cleared the
                 // status, and blank reads as syncing fine.
-                if isSyncing { syncStatus = Self.status(for: error) }
+                couldNotCheck(error)
                 return
             }
-            guard isSyncing else { return }
+            guard wantsSyncing else { return }
             let syncedWith = UserDefaults.standard.string(forKey: Self.accountKey)
             switch status {
             case .available:
-                // Offline, the user cannot be named; the next sync that lands
-                // asks again (``finished(isImport:at:succeeded:error:)``).
-                guard let user = try? await container.userRecordID().recordName, isSyncing else { return }
+                let user: String
+                do {
+                    user = try await container.userRecordID().recordName
+                } catch {
+                    couldNotCheck(error)
+                    return
+                }
+                guard wantsSyncing else { return }
                 if let syncedWith, syncedWith != user {
                     stopSyncing(.accountChanged)
-                } else if syncedWith == nil {
-                    UserDefaults.standard.set(user, forKey: Self.accountKey)
+                } else {
+                    if syncedWith == nil { UserDefaults.standard.set(user, forKey: Self.accountKey) }
+                    startSyncing()
                 }
             case .noAccount:
                 if syncedWith != nil { stopSyncing(.accountChanged) } else { syncStatus = .signedOut }
@@ -280,6 +338,21 @@ final class LibraryDatabase {
             @unknown default:
                 syncStatus = .unavailable
             }
+        }
+    }
+
+    /// The account could not be checked. A store already syncing goes on; one
+    /// waiting to start stays unsynced — nothing is sent to a user nobody has
+    /// named — and asks again in a minute, and on coming back to the app.
+    private func couldNotCheck(_ error: any Error) {
+        guard wantsSyncing else { return }
+        syncStatus = Self.status(for: error)
+        guard !isSyncing else { return }
+        retry?.cancel()
+        retry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled, let self else { return }
+            self.resumeSyncing()
         }
     }
 
@@ -316,7 +389,7 @@ final class LibraryDatabase {
             forName: .CKAccountChanged, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.isSyncing else { return }
+                guard let self, self.wantsSyncing else { return }
                 self.checkAccount()
             }
         })
@@ -346,8 +419,6 @@ final class LibraryDatabase {
         }
         syncStatus = .synced
         lastSynced = date
-        // Syncing started offline and never learned whose account this is.
-        if UserDefaults.standard.string(forKey: Self.accountKey) == nil { checkAccount() }
         guard isImport else { return }
         do {
             try Self.deduplicate(in: context)
