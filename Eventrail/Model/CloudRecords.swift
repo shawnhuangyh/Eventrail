@@ -97,7 +97,7 @@ nonisolated enum CloudRecord {
     }
 }
 
-extension LibraryArchive {
+nonisolated extension LibraryArchive {
     /// Every record this archive has something to say in.
     var cloudKeys: Set<CloudRecord.Key> {
         var keys = Set<CloudRecord.Key>()

@@ -1,5 +1,4 @@
 import SwiftUI
-import Translation
 
 /// The two languages the app speaks in, pushed from Settings: the one the
 /// whole app is drawn in, and the one an event's description is translated
@@ -95,7 +94,7 @@ struct LanguageSettingsView: View {
     /// app's own language. A choice stored earlier that the list no longer
     /// carries is kept in it, so the checkmark is never lost off the screen.
     private func loadLanguages() async {
-        var found = await LanguageAvailability().supportedLanguages
+        var found = await TranslationTarget.supportedLanguages()
             .filter(TranslationTarget.isWorthOffering)
         if !target.isEmpty,
            !found.contains(where: { $0.minimalIdentifier == target }) {

@@ -14,7 +14,7 @@ struct FeedTests {
 
     /// A three-page listing of two rows a page, whose second page fails while
     /// `failing` says so.
-    private final class Listing: @unchecked Sendable {
+    private nonisolated final class Listing: @unchecked Sendable {
         var failing = true
 
         func page(_ number: Int) throws -> EventernotePage<Row> {

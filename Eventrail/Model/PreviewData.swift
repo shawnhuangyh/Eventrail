@@ -154,10 +154,11 @@ extension Feed where Item == Event {
     /// that is handed one rather than loading its own.
     @MainActor static var preview: Feed<Event> {
         let feed = Feed<Event>()
+        let events = PreviewData.events
         Task {
             await feed.load { page in
-                EventernotePage(items: PreviewData.events, total: PreviewData.events.count,
-                                page: page, pageSize: PreviewData.events.count)
+                EventernotePage(items: events, total: events.count,
+                                page: page, pageSize: events.count)
             }
         }
         return feed
