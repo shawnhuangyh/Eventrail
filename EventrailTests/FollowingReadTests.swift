@@ -215,4 +215,15 @@ struct FollowingReadTests {
         #expect(store.unread(one) == .new)
         #expect(store.unread(two) == .new)
     }
+
+    @MainActor @Test func deleteAllUnfollowsEveryoneAndUnlinksTheAccount() {
+        let store = store()
+        let performer = PerformerProfile(id: 1, name: "A", reading: nil, fanCount: nil, slug: "a")
+        store.toggleFollow(performer)
+        store.link(EventernoteProfile(handle: "someone", name: "Someone", bio: nil, eventCount: nil,
+                                      favoritePerformers: [], avatarURL: nil))
+        store.removeAllEvents()
+        #expect(!store.isFollowing(performer))
+        #expect(store.eventernoteHandle == nil)
+    }
 }

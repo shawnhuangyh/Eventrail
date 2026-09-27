@@ -221,28 +221,6 @@
         }
       }
     },
-    "%@ will go from this device and from your other devices, along with everything you wrote on them — your notes, your seats, and what the tickets cost. Anything your Eventernote account still lists comes back on the next refresh, but what you wrote does not; the rest you can add again from Search." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@をこのデバイスとほかのデバイスから削除します。メモ、座席、チケット代など、自分で入力した内容も削除されます。Eventernoteアカウントに残っているものは次回の更新で復元されますが、自分で入力した内容は戻りません。それ以外は「検索」から追加し直せます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 将从此设备及你的其他设备中移除，包括你添加的所有内容——备注、座位和票价。Eventernote 账号中仍列出的内容会在下次刷新时恢复，但你添加的内容不会恢复；其余内容可从“搜索”重新添加。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 將從此裝置及你的其他裝置中移除，包括你新增的所有內容——備註、座位和票價。Eventernote 帳號中仍列出的內容會在下次重新整理時恢復，但你新增的內容不會恢復；其餘內容可從“搜尋”重新新增。"
-          }
-        }
-      }
-    },
     "%@ · %@ · %lld unread" : {
       "localizations" : {
         "ja" : {
@@ -3077,6 +3055,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你跟蹤的活動會顯示在這裡。可在“搜尋”中尋找。"
+          }
+        }
+      }
+    },
+    "Every event, favorite and followed performer goes from all your devices, along with the notes you wrote on them, and your Eventernote account is unlinked. Your settings are kept." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのイベント、お気に入り、フォロー中の出演者が、書き込んだメモとともにすべてのデバイスから削除され、Eventernoteアカウントの連携も解除されます。設定はそのまま残ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有活动、收藏和关注的艺人将从你的所有设备中移除，连同你写的备注，Eventernote 账号也会解除关联。你的设置会保留。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有活動、收藏和關注的藝人將從你的所有裝置中移除，連同你寫的備註，Eventernote 帳號也會解除連結。你的設定會保留。"
           }
         }
       }

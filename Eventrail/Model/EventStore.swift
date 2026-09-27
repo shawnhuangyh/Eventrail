@@ -398,6 +398,8 @@ final class EventStore: CloudSyncHost {
         !library.isEmpty
             || !favoriteEvents.isEmpty
             || archive.tracking.contains { !$0.value.value.isEmpty }
+            || eventernoteHandle != nil
+            || (archive.follows ?? [:]).values.contains(where: \.value)
     }
 
     /// The freshest copy of an event this app holds, wherever it came from.
@@ -461,8 +463,10 @@ final class EventStore: CloudSyncHost {
         persist()
     }
 
-    /// Empties the library, and with it the favorites and everything the reader
-    /// wrote on top of the events.
+    /// Empties the library, and with it the favorites, everything the reader
+    /// wrote on top of the events, everyone they follow and the linked
+    /// Eventernote account — the account goes so the next refresh does not
+    /// import everything straight back. The app's settings stay.
     ///
     /// Favorites go too here, unlike a removal of some events: a reader who
     /// asked for every event to go should not be left looking at a Favorites
@@ -493,6 +497,14 @@ final class EventStore: CloudSyncHost {
             archive.followingReads?[id] = Stamped(FollowingRead(fingerprint: nil, day: record.value.day),
                                                   at: now)
         }
+        // Everyone followed goes too, as tombstones so the other device's
+        // follows are not merged back; `pruned()` drops their profiles.
+        for (id, record) in archive.follows ?? [:] where record.value {
+            archive.follows?[id] = Stamped(false, at: now)
+        }
+        archive.followedPerformers = [:]
+        // And the account, so the next refresh does not import it all back.
+        unlinkAccount()
         persist()
     }
 

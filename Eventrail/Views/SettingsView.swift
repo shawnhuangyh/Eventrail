@@ -425,21 +425,10 @@ struct SettingsView: View {
         }
     }
 
-    /// Says what actually goes, and what does not come back.
-    ///
-    /// Spelled out rather than inflected, for the reason ``EventsView``'s own
-    /// removal gives: a dialog's words reach UIKit as plain text, and the
-    /// `^[…](inflect:)` markup arrives there unprocessed.
+    /// Says what goes, and that the settings stay. No counts: the reader
+    /// asked for all of it.
     private var deleteAllDetail: Text {
-        let events = store.library.count
-        let favorites = store.favoriteEvents.count
-        let what = events == 1 ? Text("1 event") : Text("\(events) events")
-        let all: Text = switch favorites {
-        case 0: what
-        case 1: Text("\(what) and 1 favorite")
-        default: Text("\(what) and \(favorites) favorites")
-        }
-        return Text("\(all) will go from this device and from your other devices, along with everything you wrote on them — your notes, your seats, and what the tickets cost. Anything your Eventernote account still lists comes back on the next refresh, but what you wrote does not; the rest you can add again from Search.")
+        Text("Every event, favorite and followed performer goes from all your devices, along with the notes you wrote on them, and your Eventernote account is unlinked. Your settings are kept.")
     }
 }
 
