@@ -37,7 +37,9 @@ protocol CloudSyncHost: AnyObject {
 /// reader owns carries its own tombstone, so a removal is a save, not a
 /// delete; a record is only deleted once its slice has pruned to nothing —
 /// a Following read whose night has gone — and every device prunes the same
-/// way on its own.
+/// way on its own. A delete is unconditional, so it can land on another
+/// device's save of the same record; a device that finds a record deleted
+/// while it still holds something there once pruned sends it again.
 ///
 /// Nothing imported from Eventernote is private, but the reader's notes are:
 /// the private database is theirs alone, and the payload goes in
@@ -327,11 +329,26 @@ final class CloudSync: CKSyncEngineDelegate {
         case .fetchedRecordZoneChanges(let changes):
             receive(changes.modifications.map(\.record))
             // The record's content says nothing here — see the type's notes —
-            // but its system fields are stale. The digest stays, so the
-            // slice is not sent straight back before this device prunes it too.
-            for deletion in changes.deletions {
-                memory.systemFields[deletion.recordID.recordName] = nil
+            // but its system fields are stale.
+            //
+            // A delete is unconditional, though, so it can land on a save it
+            // never saw: one device pruning away an old Following read while
+            // another adds the same night to the library leaves the server
+            // with neither. Whatever this device still holds once it has
+            // pruned is sent back. A slice that prunes to nothing is not, so
+            // two devices do not trade an expired read back and forth.
+            var resend: [CKSyncEngine.PendingRecordZoneChange] = []
+            let kept = changes.deletions.isEmpty ? nil : host?.archiveForCloud.pruned()
+            for deletion in changes.deletions where deletion.recordID.zoneID == Self.zoneID {
+                let name = deletion.recordID.recordName
+                memory.systemFields[name] = nil
+                guard memory.held[name] == nil,
+                      let key = CloudRecord.Key(recordName: name),
+                      kept?.slice(for: key) != nil
+                else { continue }
+                resend.append(.saveRecord(deletion.recordID))
             }
+            if !resend.isEmpty { syncEngine.state.add(pendingRecordZoneChanges: resend) }
             if !changes.deletions.isEmpty { writeMemory() }
 
         case .sentRecordZoneChanges(let sent):

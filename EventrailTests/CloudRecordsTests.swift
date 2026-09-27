@@ -103,4 +103,28 @@ struct CloudRecordsTests {
         #expect(merged?.seat == "A12")
         #expect(merged?.cost == 9000)
     }
+
+    /// What a device checks when another deletes a record: whether anything
+    /// under that name outlives its own pruning. An expired Following read
+    /// does not, so it is not traded back; the same night added to the library
+    /// meanwhile does, so the delete does not take it off the server.
+    @Test func onlyWhatOutlivesPruningAnswersADelete() {
+        let past = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
+        let night = Fixtures.event(id: "7", date: past)
+        var archive = LibraryArchive()
+        archive.followingReads = ["7": Stamped(FollowingRead(fingerprint: night.listingFingerprint, day: past), at: earlier)]
+        #expect(archive.slice(for: .event("7")) != nil)
+        #expect(archive.pruned().slice(for: .event("7")) == nil)
+
+        archive.events["7"] = night
+        archive.membership["7"] = Stamped(true, at: later)
+        #expect(archive.pruned().slice(for: .event("7"))?.membership["7"]?.value == true)
+    }
+
+    /// A removal is a tombstone, and a tombstone is something to send back.
+    @Test func aTombstoneAnswersADelete() {
+        var archive = LibraryArchive()
+        archive.membership["7"] = Stamped(false, at: later)
+        #expect(archive.pruned().slice(for: .event("7")) != nil)
+    }
 }
