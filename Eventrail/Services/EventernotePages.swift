@@ -484,6 +484,12 @@ nonisolated enum EventernotePages {
     /// that a copy held for a year does not go on claiming the edit was 127
     /// days ago. A row printed any other way leaves the date nil and keeps the
     /// name, which is the half that cannot be wrong.
+    ///
+    /// Dated to the start of that day on the site's clock, since a count of
+    /// days says nothing finer. Counted back from the moment of reading, every
+    /// read carried its own hour and minute, so a page nobody had touched read
+    /// as edited each time it was opened — and was written into the library,
+    /// and sent to iCloud, for it.
     private static func lastEdit(in html: String) -> (handle: String, at: Date?)? {
         var cursor = HTMLCursor(html)
         guard cursor.advance(past: #"id="authors""#),
@@ -493,7 +499,7 @@ nonisolated enum EventernotePages {
         guard let printed = cursor.text(after: #"<span class="s color2">"#, upTo: "</span>"),
               printed.hasSuffix("日前"), let days = number(in: printed)
         else { return (handle, nil) }
-        return (handle, Calendar.current.date(byAdding: .day, value: -days, to: .now))
+        return (handle, Event.siteCalendar.date(byAdding: .day, value: -days, to: Event.siteDay(of: .now)))
     }
 
     /// Address and capacity from a venue's page, in the form the detail sheet

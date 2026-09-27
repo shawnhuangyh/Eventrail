@@ -238,6 +238,15 @@ struct EventernotePagesTests {
         #expect(days == 3)
     }
 
+    /// "3日前" names a day, so two reads of it name the same moment rather
+    /// than each carrying the hour it was read at.
+    @Test func theLatestEditIsDatedByTheDay() throws {
+        let first = try #require(EventernotePages.event(in: Self.eventPage, id: "300001")?.editedAt)
+        let second = try #require(EventernotePages.event(in: Self.eventPage, id: "300001")?.editedAt)
+        #expect(first == second)
+        #expect(Event.siteDay(of: first) == first)
+    }
+
     @Test func anEventPageWithoutSectionsStillReads() throws {
         let html = """
             <h1 class="gb_subtitle gb_curl_effect">Announced</h1>

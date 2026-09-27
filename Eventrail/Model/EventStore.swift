@@ -733,9 +733,13 @@ final class EventStore {
     /// the read is written down — see ``isStale(_:)`` for what that decides.
     /// `asked` is when the page was asked for, so a read the cache was
     /// cleared under is not stamped fresh on its way in.
+    ///
+    /// A read that found nothing new leaves the row alone — see
+    /// ``Event/isSameRead(as:)`` — and is still written down as a read.
     private func apply(_ imported: Event, asked: Date) {
         pageReads?.record(imported.id, asked: asked)
-        if let row = rows[imported.id], row.hasFacts {
+        if let row = rows[imported.id], let held = row.facts {
+            guard !imported.isSameRead(as: held) else { return }
             row.facts = imported
         } else {
             seen[imported.id] = imported

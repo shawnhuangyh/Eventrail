@@ -94,6 +94,27 @@ struct EventTests {
         #expect(event.isFullyDetailed == expected)
     }
 
+    // MARK: - A read that found nothing new
+
+    /// Opening an event reads its page again; finding it as it was is not a
+    /// change, whatever hour the read and the old edit date carry.
+    @Test func aReadThatFoundNothingNewIsTheSameRead() {
+        var held = Fixtures.event(startsAt: Fixtures.date(2027, 5, 9, 18), isDetailed: true, detailFormat: 3)
+        held.editedAt = Fixtures.date(2027, 2, 1, 14, 37)
+        held.readAt = Fixtures.date(2027, 5, 1, 14, 37)
+        var read = held
+        read.editedAt = Fixtures.date(2027, 2, 1)
+        read.readAt = Fixtures.date(2027, 5, 2, 9, 5)
+        #expect(read.isSameRead(as: held))
+
+        var moved = read
+        moved.startsAt = Fixtures.date(2027, 5, 9, 18, 30)
+        #expect(!moved.isSameRead(as: held))
+        var edited = read
+        edited.editedAt = Fixtures.date(2027, 4, 30)
+        #expect(!edited.isSameRead(as: held))
+    }
+
     // MARK: - Where the night stands
 
     @Test func sortDatePrefersTheStartTime() {

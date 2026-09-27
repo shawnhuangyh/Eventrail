@@ -445,6 +445,37 @@ nonisolated extension Event {
             readAt: imported.readAt ?? readAt
         )
     }
+
+    /// Whether another read of the page found nothing this copy does not
+    /// already say, the moment each was read aside.
+    ///
+    /// Such a read is not written into the library. Every row written is a
+    /// record iCloud sends on whole, so opening an event on a device that had
+    /// not yet heard of its removal sent it back into the library everywhere,
+    /// until the device that removed it put the removal back. The edit date is
+    /// compared by the day, since a copy read before it was dated by the day
+    /// carries the hour of that read.
+    func isSameRead(as other: Event) -> Bool {
+        var mine = self
+        var theirs = other
+        mine.readAt = nil
+        theirs.readAt = nil
+        mine.editedAt = mine.editedAt.map(Event.siteDay(of:))
+        theirs.editedAt = theirs.editedAt.map(Event.siteDay(of:))
+        return mine == theirs
+    }
+
+    /// The calendar the site counts days on.
+    static var siteCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = publishedZone
+        return calendar
+    }
+
+    /// The start of the day a moment falls on, on the site's clock.
+    static func siteDay(of date: Date) -> Date {
+        siteCalendar.startOfDay(for: date)
+    }
 }
 
 nonisolated extension Event {
