@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Everyone the reader follows, in full.
@@ -16,7 +17,9 @@ struct FollowedPerformersView: View {
     @State private var selection: Set<PerformerProfile.ID> = []
     @State private var isConfirmingUnfollow = false
 
-    private var performers: [PerformerProfile] { store.followedPerformers }
+    @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
+
+    private var performers: [PerformerProfile] { followedRows.profiles }
 
     private var chosen: [PerformerProfile] {
         performers.filter { selection.contains($0.id) }
@@ -121,6 +124,6 @@ struct FollowedPerformersView: View {
     NavigationStack {
         FollowedPerformersView()
     }
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
     .environment(FollowedDates.preview)
 }

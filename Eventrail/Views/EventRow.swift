@@ -197,5 +197,5 @@ struct AppearanceRow: View {
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
     .washBackground()
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
 }

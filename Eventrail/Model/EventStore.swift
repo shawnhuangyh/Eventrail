@@ -341,7 +341,7 @@ final class EventStore {
     /// back any copy one set aside unread — see ``LibraryDatabase/moveIn(from:)``.
     /// Tried again while either would not open.
     private func moveInLibraryFile() {
-        database.reopen()
+        if database.isBlocked { database.reopen() }
         let contents = libraryFile.flatMap { database.moveIn(from: $0) }
         unreadableLibraryFiles = contents?.unreadable ?? 0
         libraryFileIsBlocked = database.isBlocked || contents?.isBlocked == true
@@ -352,7 +352,7 @@ final class EventStore {
     private func seed(library: [Event], tracking: [Event.ID: Tracking], follows: [PerformerProfile]) {
         if rows.isEmpty {
             for event in library {
-                guard let row = makeRow(for: event.id) else { continue }
+                let row = makeRow(for: event.id)
                 row.facts = event
                 row.membership = Stamped(true)
                 row.tracking = tracking[event.id].map { Stamped($0) }
@@ -360,7 +360,7 @@ final class EventStore {
         }
         if performerRows.isEmpty {
             for performer in follows {
-                guard let row = makePerformerRow(for: performer.id) else { continue }
+                let row = makePerformerRow(for: performer.id)
                 row.follow = Stamped(true)
                 row.profile = performer
             }
@@ -373,12 +373,7 @@ final class EventStore {
     /// Reads every row into the index, after anything that may have changed
     /// them underneath.
     private func reindex() {
-        guard let context = database.context else {
-            rows = [:]
-            performerRows = [:]
-            settingsRow = nil
-            return
-        }
+        let context = database.context
         let events = (try? context.fetch(FetchDescriptor<LibraryEvent>())) ?? []
         rows = Dictionary(events.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
         let performers = (try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? []
@@ -391,33 +386,26 @@ final class EventStore {
     func record(for id: Event.ID) -> LibraryEvent? { rows[id] }
 
     /// The row an event's record is written to, made where there is none.
-    /// Nil only while the store will not open.
-    private func makeRow(for id: Event.ID) -> LibraryEvent? {
+    private func makeRow(for id: Event.ID) -> LibraryEvent {
         if let row = rows[id] { return row }
-        if database.isBlocked { moveInLibraryFile() }
-        guard let context = database.context else { return nil }
         let row = LibraryEvent(eventID: id)
-        context.insert(row)
+        database.context.insert(row)
         rows[id] = row
         return row
     }
 
-    private func makePerformerRow(for id: Int) -> FollowedPerformer? {
+    private func makePerformerRow(for id: Int) -> FollowedPerformer {
         if let row = performerRows[id] { return row }
-        if database.isBlocked { moveInLibraryFile() }
-        guard let context = database.context else { return nil }
         let row = FollowedPerformer(actorID: id)
-        context.insert(row)
+        database.context.insert(row)
         performerRows[id] = row
         return row
     }
 
-    private func makeSettingsRow() -> LibrarySettings? {
+    private func makeSettingsRow() -> LibrarySettings {
         if let settingsRow { return settingsRow }
-        if database.isBlocked { moveInLibraryFile() }
-        guard let context = database.context else { return nil }
         let row = LibrarySettings()
-        context.insert(row)
+        database.context.insert(row)
         settingsRow = row
         return row
     }
@@ -433,15 +421,20 @@ final class EventStore {
             row.take(pruned)
         } else {
             rows[row.eventID] = nil
-            database.context?.delete(row)
+            database.context.delete(row)
         }
     }
 
     // MARK: - Reading
 
-    var library: [Event] { rows.values.compactMap { $0.inLibrary ? $0.facts : nil } }
+    // Lists are the screens' own `@Query` — see ``LibraryEvent/library``.
+    // What is here answers for one event, one performer or the account, for
+    // anything holding one; each reads the row itself, so a screen showing it
+    // is drawn again when that row changes and not when another does.
 
-    var recentSearches: [String] { settingsRow?.recentSearches ?? [] }
+    /// The library, for the work done here rather than on a screen: the
+    /// calendar, the halls, a refresh.
+    private var library: [Event] { rows.values.compactMap { $0.inLibrary ? $0.facts : nil } }
 
     var lastRefreshed: Date? { settingsRow?.lastRefreshed }
 
@@ -500,7 +493,7 @@ final class EventStore {
     // MARK: - Writing
 
     func setTracking(_ tracking: Tracking, for event: Event) {
-        guard let row = makeRow(for: event.id) else { return }
+        let row = makeRow(for: event.id)
         // Written against the record as it stands, so that a merge can tell
         // which of the five answers this device actually changed — see
         // ``Stamped/edited(to:at:)``. A record this device has never held is
@@ -514,7 +507,7 @@ final class EventStore {
     }
 
     func toggleFavorite(_ event: Event) {
-        guard let row = makeRow(for: event.id) else { return }
+        let row = makeRow(for: event.id)
         row.favorite = Stamped(!row.isFavorite)
         keep(event, in: row)
         settle(row)
@@ -526,7 +519,7 @@ final class EventStore {
     /// answers only for this device and the reader's other ones — an event the
     /// linked account still lists is imported again on the next refresh.
     func toggleLibraryMembership(_ event: Event) {
-        guard let row = makeRow(for: event.id) else { return }
+        let row = makeRow(for: event.id)
         let wasIn = row.inLibrary
         if wasIn {
             tombstone(row, at: .now)
@@ -626,7 +619,7 @@ final class EventStore {
         let now = Date.now
         var changed = false
         for event in events where isUnread(event) == read {
-            guard let row = makeRow(for: event.id) else { continue }
+            let row = makeRow(for: event.id)
             row.followingRead = Stamped(
                 FollowingRead(fingerprint: read ? event.listingFingerprint : nil, day: event.date),
                 at: now)
@@ -672,7 +665,8 @@ final class EventStore {
 
     func remember(search term: String) {
         let term = term.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty, let settings = makeSettingsRow() else { return }
+        guard !term.isEmpty else { return }
+        let settings = makeSettingsRow()
         var recents = settings.recentSearches
         recents.removeAll { $0.caseInsensitiveCompare(term) == .orderedSame }
         recents.insert(term, at: 0)
@@ -681,7 +675,7 @@ final class EventStore {
     }
 
     func clearRecentSearches() {
-        guard let settings = makeSettingsRow() else { return }
+        let settings = makeSettingsRow()
         settings.searches = Stamped([])
         save()
     }
@@ -833,7 +827,7 @@ final class EventStore {
         // The timestamp moves only when something actually arrived, so a run
         // that reached nothing cannot pass itself off as a successful refresh.
         guard landed else { return true }
-        makeSettingsRow()?.lastRefreshed = .now
+        makeSettingsRow().lastRefreshed = .now
         save()
         placeArrivedVenues()
         return true
@@ -960,7 +954,7 @@ final class EventStore {
 
         let profile = LinkedProfile(name: read.name, avatarURL: read.avatarURL)
         let changedProfile = profile != settingsRow?.eventernoteProfile
-        if changedProfile { makeSettingsRow()?.eventernoteProfile = profile }
+        if changedProfile { makeSettingsRow().eventernoteProfile = profile }
 
         let follows = adoptFollows(read.favoritePerformers)
         if changedProfile || follows.changed { save() }
@@ -999,7 +993,7 @@ final class EventStore {
         var changed = false
 
         for performer in performers {
-            guard let row = makePerformerRow(for: performer.id) else { continue }
+            let row = makePerformerRow(for: performer.id)
             // Anything but an existing `true` is written: a missing record is
             // the first read of them, and a tombstone is undone by the same act
             // that would have to undo it — asking Eventernote again.
@@ -1122,7 +1116,7 @@ final class EventStore {
         // reader has just looked at a fresh copy of their page — it is the newest
         // the app will have until the next refresh, so it is kept either way.
         let isSameAccount = profile.handle == eventernoteHandle
-        guard let settings = makeSettingsRow() else { return }
+        let settings = makeSettingsRow()
         settings.eventernoteProfile = LinkedProfile(name: profile.name, avatarURL: profile.avatarURL)
         guard !isSameAccount else { return save() }
 
@@ -1199,7 +1193,7 @@ final class EventStore {
         var seen: Set<Event.ID> = []
         let distinct = imported.filter { seen.insert($0.id).inserted }
 
-        makeSettingsRow()?.lastImported = .now
+        makeSettingsRow().lastImported = .now
         importSummary = ImportSummary(read: distinct.count, added: adopt(distinct))
         return true
     }
@@ -1219,7 +1213,7 @@ final class EventStore {
         var added = 0
 
         for event in imported {
-            guard let row = makeRow(for: event.id) else { continue }
+            let row = makeRow(for: event.id)
             // A removal is not permanent. The account's history is what the
             // reader is asking for when they tap Refresh, so an event they took
             // out comes back if Eventernote still lists it — the same rule the
@@ -1449,45 +1443,12 @@ final class EventStore {
 
     /// Writes whatever the rows hold that the store does not.
     private func commit() {
-        guard let context = database.context, context.hasChanges else { return }
+        let context = database.context
+        guard context.hasChanges else { return }
         do {
             try context.save()
         } catch {
             Self.log.error("Library could not be saved: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    // MARK: - Grouping
-
-    func events(matching filter: LibraryFilter) -> [Event] {
-        events(in: library, matching: filter)
-    }
-
-    /// The same half of a list the caller has already chosen — the favorites,
-    /// say, rather than the whole library.
-    func events(in pool: some Sequence<Event>, matching filter: LibraryFilter) -> [Event] {
-        filter.rows(of: pool)
-    }
-
-    func groups(filter: LibraryFilter, grouping: Grouping) -> [EventGroup] {
-        groups(of: library, filter: filter, grouping: grouping)
-    }
-
-    /// The same breakdown over a chosen list, for the screens that hold one
-    /// that is not the library.
-    func groups(of pool: some Sequence<Event>, filter: LibraryFilter,
-                grouping: Grouping) -> [EventGroup] {
-        let events = events(in: pool, matching: filter)
-        switch grouping {
-        case .date:
-            return EventGroup.byMonth(events)
-        case .artist:
-            var buckets: [String: [Event]] = [:]
-            for event in events { buckets[event.artist, default: []].append(event) }
-            return buckets
-                .map { EventGroup(id: $0.key, label: $0.key, events: $0.value) }
-                // Busiest artist first, then alphabetically so the order is stable.
-                .sorted { ($0.events.count, $1.label) > ($1.events.count, $0.label) }
         }
     }
 
@@ -1501,9 +1462,8 @@ final class EventStore {
 
     /// The whole store as one archive, including edits not yet saved.
     private var archive: LibraryArchive {
-        guard let context = database.context else { return LibraryArchive() }
         do {
-            return try LibraryDatabase.archive(in: context)
+            return try LibraryDatabase.archive(in: database.context)
         } catch {
             Self.log.error("Library could not be read: \(error.localizedDescription, privacy: .public)")
             return LibraryArchive()
@@ -1544,7 +1504,7 @@ final class EventStore {
     func restore(from url: URL) throws -> RestoreSummary {
         let backup = try LibraryBackup.read(at: url)
         if database.isBlocked { moveInLibraryFile() }
-        guard let context = database.context else { throw CocoaError(.fileReadNoPermission) }
+        let context = database.context
         let before = archive
         let after = before.restoring(backup.archive)
         try LibraryDatabase.apply(after, to: context)
@@ -1570,33 +1530,15 @@ final class EventStore {
 
     // MARK: - Favorites
 
-    /// Everything the reader has hearted, upcoming first and then most recent
-    /// past — the same ordering the library uses.
-    ///
-    /// A favorite can point at an event found in search and never added to the
-    /// library, so this resolves through ``event(id:)`` rather than ``library``.
-    var favoriteEvents: [Event] {
-        let events = rows.values.compactMap { $0.isFavorite ? event(id: $0.eventID) : nil }
-        let upcoming = events.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
-        let past = events.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
-        return upcoming + past
+    /// Everything the reader has hearted, for the halls worth placing.
+    private var favoriteEvents: [Event] {
+        rows.values.compactMap { $0.isFavorite ? event(id: $0.eventID) : nil }
     }
 
     // MARK: - Followed performers
 
     func isFollowing(_ performer: PerformerProfile) -> Bool {
         performerRows[performer.id]?.isFollowing == true
-    }
-
-    /// Everyone the reader follows, by name.
-    ///
-    /// Ordered rather than merely listed: this is a settled list the reader
-    /// returns to, and a dictionary's order would reshuffle the Me card and the
-    /// Following filters between launches.
-    var followedPerformers: [PerformerProfile] {
-        performerRows.values
-            .compactMap { $0.isFollowing ? $0.profile : nil }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// Follows a performer, or stops following them.
@@ -1610,7 +1552,7 @@ final class EventStore {
     /// from an actor id alone.
     func toggleFollow(_ performer: PerformerProfile) {
         let following = !isFollowing(performer)
-        guard let row = makePerformerRow(for: performer.id) else { return }
+        let row = makePerformerRow(for: performer.id)
         row.follow = Stamped(following)
         // Unfollowing leaves a tombstone but no profile, which is what keeps
         // the store from carrying people it no longer follows all the way to
@@ -1624,80 +1566,5 @@ final class EventStore {
     func unfollow(_ performer: PerformerProfile) {
         guard isFollowing(performer) else { return }
         toggleFollow(performer)
-    }
-
-    /// How many events in the library this performer is billed on and the
-    /// reader has already been to.
-    ///
-    /// Counted over the library rather than over the appearances a performer's
-    /// page has read so far, so the number is the whole of it however little of
-    /// that listing has been paged in.
-    func attendedCount(billing name: String) -> Int {
-        attendedEvents.filter { event in
-            event.performers.contains { $0.name == name }
-        }.count
-    }
-
-    /// How many events in the library at this hall the reader has already been
-    /// to, counted over the library for the reason above.
-    ///
-    /// Matched on the name the site printed, which is the only thing a listing
-    /// row publishes about a hall and so the only thing every event in the
-    /// library carries — an event imported from a search row has no place id
-    /// to match on.
-    func attendedCount(atVenue name: String) -> Int {
-        attendedEvents.filter { $0.venue == name }.count
-    }
-
-    // MARK: - Profile statistics
-
-    /// What the reader went to: the library's own past.
-    ///
-    /// Keeping an event is what says they mean to go, so an event still in the
-    /// library once its date has passed is one they went to. Nothing else is
-    /// recorded, and nothing else needs to be — an event they did not go to is
-    /// one they take out.
-    var attendedEvents: [Event] {
-        library.filter { !$0.isUpcoming }
-    }
-
-    var venuesVisited: Int {
-        Set(attendedEvents.map(\.venue)).count
-    }
-
-    var performersSeen: Int {
-        Set(attendedEvents.flatMap { $0.performers.map(\.name) }).count
-    }
-
-    /// How many nights the reader has stood at: the whole of the library's
-    /// past, and what the lottery count below is out of.
-    ///
-    /// The one thing the reader fills in by hand is only ever part-filled, so
-    /// it says what it is counted out of. A total over records nobody wrote is
-    /// not a total.
-    ///
-    /// It is also the first of the three figures on the Me tab's Passport
-    /// card. All three are read over ``attendedEvents`` and none of them is cut
-    /// to a year: three counts side by side are read as one reading of a
-    /// library, so one of them answering for this year alone while the other
-    /// two answer for all of it is a figure nobody can compare.
-    var eventsAttended: Int {
-        attendedEvents.count
-    }
-
-    /// How many lottery entries the reader put in for the nights they went to.
-    ///
-    /// The nights they went to, and not the ones still coming: an entry written
-    /// down for a lottery still open is kept, and joins this the day the event
-    /// passes — the same rule the venue and performer counts above already
-    /// follow, so the four numbers are four readings of one library.
-    var lotteryEntries: Int {
-        attendedEvents.reduce(0) { $0 + (tracking(for: $1).lotteryEntries ?? 0) }
-    }
-
-    /// How many of those nights have a lottery count at all. A blank is not a
-    /// zero, so it is left out of the total rather than counted as none.
-    var lotteryEntriesRecorded: Int {
-        attendedEvents.count { tracking(for: $0).lotteryEntries != nil }
     }
 }

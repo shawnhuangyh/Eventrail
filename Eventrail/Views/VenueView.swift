@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// How a venue page was reached, and so how much the app already knows about
@@ -37,6 +38,10 @@ nonisolated enum VenueLink: Hashable {
 /// for a picture of it.
 struct VenueView: View {
     @Environment(EventStore.self) private var store
+    /// The library, which "You attended" is counted over — matched on the name
+    /// the site printed, the one thing every row of a listing publishes about
+    /// a hall, since an event imported from a search row has no place id.
+    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
@@ -503,7 +508,7 @@ struct VenueView: View {
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
             StatTile(tint: .trackAttended,
-                     value: store.attendedCount(atVenue: link.name).formatted(),
+                     value: kept.events.attended.count { $0.venue == link.name }.formatted(),
                      label: "You attended")
             StatTile(tint: .trackTicket, value: feed.total.formatted(),
                      label: "Listed events")
@@ -639,5 +644,5 @@ struct VenueView: View {
     NavigationStack {
         VenueView(link: .place(PlaceListing(id: 3, name: "日本武道館")))
     }
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
 }

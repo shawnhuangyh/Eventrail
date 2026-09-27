@@ -388,5 +388,5 @@ struct WelcomeView: View {
 
 #Preview {
     WelcomeView()
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
 }

@@ -434,7 +434,7 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
         .environment(FollowedDates.preview)
         .environment(VenueRegions.preview)
 }

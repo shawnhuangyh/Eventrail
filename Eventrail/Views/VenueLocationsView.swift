@@ -201,5 +201,5 @@ private struct PlacingStep: View {
     NavigationStack {
         VenueLocationsView()
     }
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
 }

@@ -1294,5 +1294,5 @@ struct EventDetailView: View {
 
 #Preview {
     EventDetailView(event: PreviewData.events[0])
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
 }

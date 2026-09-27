@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import Playgrounds
 
@@ -100,7 +101,7 @@ struct RootView: View {
         .fullScreenCover(isPresented: $isWelcoming) {
             WelcomeView()
         }
-        .environment(store)
+        .library(store)
         .environment(followed)
         .environment(venues)
         .environment(notices)
@@ -127,7 +128,18 @@ struct RootView: View {
     RootView()
 }
 
+extension View {
+    /// The store, and the rows it writes for the screens to query — for the
+    /// root of the app and for a preview.
+    ///
+    /// Handed the container as it stands: turning iCloud Sync opens the store
+    /// again, and every `@Query` beneath follows the new one.
+    func library(_ store: EventStore) -> some View {
+        environment(store)
+            .modelContainer(store.database.container)
+    }
+}
+
 #Playground {
-    let store = EventStore.preview
-    _ = store.groups(filter: .upcoming, grouping: .date).map(\.label)
+    _ = EventGroup.groups(of: PreviewData.events, filter: .upcoming, grouping: .date).map(\.label)
 }

@@ -48,7 +48,7 @@ struct LibraryDatabaseTests {
 
     func database() throws -> (LibraryDatabase, ModelContext) {
         let database = LibraryDatabase(at: .memory, syncing: false)
-        return (database, try #require(database.context))
+        return (database, database.context)
     }
 
     func stored(_ archive: LibraryArchive, in context: ModelContext) throws {

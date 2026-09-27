@@ -24,8 +24,10 @@ import SwiftData
 ///
 /// **A file that will not open is never written over.** The store is created
 /// with the system's default protection, so before a device's first unlock it
-/// will not open at all; the container is then nil (``isBlocked``), nothing
-/// is written, and ``reopen()`` tries again.
+/// will not open at all. The library is then kept in memory instead
+/// (``isBlocked``), where the reader can go on using it, and ``reopen()``
+/// tries the file again — folding whatever was written meanwhile into what
+/// the file holds, by the ordinary merge, once it opens.
 @Observable
 final class LibraryDatabase {
     static let containerID = "iCloud.moe.shawn.Eventrail"
@@ -63,8 +65,9 @@ final class LibraryDatabase {
         return .file(directory.appending(path: "Library.store"))
     }
 
-    /// Nil while the store will not open — see ``isBlocked``.
-    private(set) var container: ModelContainer?
+    /// The store, or one held in memory while the file will not open — see
+    /// ``isBlocked``.
+    private(set) var container: ModelContainer
     /// Bumped whenever ``container`` is replaced, so a screen built on the old
     /// one is built again.
     private(set) var generation = 0
@@ -72,6 +75,12 @@ final class LibraryDatabase {
     private(set) var lastSynced: Date?
     /// Whether the store is open with CloudKit.
     private(set) var isSyncing: Bool
+    /// Whether the file would not open, so ``container`` is held in memory.
+    private(set) var isBlocked = false
+    /// The container this one replaced, kept until the next is opened so a
+    /// screen still drawing one of its rows is not left holding a row whose
+    /// store has gone.
+    @ObservationIgnored private var retired: ModelContainer?
 
     /// Run once another device's changes have landed and been folded in.
     @ObservationIgnored var onRemoteChanges: (() -> Void)?
@@ -82,6 +91,7 @@ final class LibraryDatabase {
     init(at location: Location = LibraryDatabase.defaultLocation, syncing: Bool) {
         self.location = location
         isSyncing = syncing && location != .memory
+        container = Self.memoryContainer()
         open()
         observeSyncEvents()
         if isSyncing { checkAccount() }
@@ -92,13 +102,9 @@ final class LibraryDatabase {
     }
 
     /// The context everything reads and writes through.
-    var context: ModelContext? { container?.mainContext }
+    var context: ModelContext { container.mainContext }
 
-    /// Whether the store could not be opened this launch — a device not yet
-    /// unlocked since it started, most likely.
-    var isBlocked: Bool { container == nil }
-
-    /// Tries the store again after it would not open. Answers whether it is
+    /// Tries the file again after it would not open. Answers whether it is
     /// open now.
     @discardableResult
     func reopen() -> Bool {
@@ -110,7 +116,7 @@ final class LibraryDatabase {
     /// Opens the store with CloudKit, or without it.
     func setSyncing(_ syncing: Bool) {
         guard location != .memory, syncing != isSyncing else { return }
-        try? context?.save()
+        try? context.save()
         isSyncing = syncing
         syncStatus = nil
         open()
@@ -118,25 +124,60 @@ final class LibraryDatabase {
     }
 
     private func open() {
-        // The old container goes first: two open on one file would be two
-        // coordinators writing it.
-        container = nil
+        // What was written while the file would not open, to be folded in.
+        let meanwhile = isBlocked ? try? Self.archive(in: context) : nil
+        try? context.save()
         do {
-            container = try Self.makeContainer(at: location, syncing: isSyncing)
+            let opened = try Self.makeContainer(at: location, syncing: isSyncing)
+            replace(with: opened)
+            isBlocked = false
         } catch where isSyncing {
             Self.log.error("Library could not be opened with CloudKit: \(error.localizedDescription, privacy: .public)")
             syncStatus = .notConfigured
-            container = try? Self.makeContainer(at: location, syncing: false)
+            if let opened = try? Self.makeContainer(at: location, syncing: false) {
+                replace(with: opened)
+                isBlocked = false
+            } else {
+                block()
+            }
         } catch {
             Self.log.error("Library could not be opened: \(error.localizedDescription, privacy: .public)")
+            block()
         }
-        generation += 1
-        guard let context else { return }
+        guard !isBlocked else { return }
         do {
+            if let meanwhile, !meanwhile.holdsNothing {
+                let held = try Self.archive(in: context)
+                try Self.apply(held.merging(meanwhile), to: context)
+                try context.save()
+            }
             try Self.deduplicate(in: context)
             try Self.prune(in: context)
         } catch {
             Self.log.error("Library could not be tidied: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Keeps the library in memory until the file will open. Only the first
+    /// refusal swaps the container: a second leaves what the reader wrote
+    /// meanwhile where it is.
+    private func block() {
+        guard !isBlocked else { return }
+        isBlocked = true
+        replace(with: Self.memoryContainer())
+    }
+
+    private func replace(with opened: ModelContainer) {
+        retired = container
+        container = opened
+        generation += 1
+    }
+
+    private static func memoryContainer() -> ModelContainer {
+        do {
+            return try makeContainer(at: .memory, syncing: false)
+        } catch {
+            fatalError("A library held in memory could not be made: \(error)")
         }
     }
 
@@ -196,7 +237,7 @@ final class LibraryDatabase {
         }
         syncStatus = .synced
         lastSynced = date
-        guard isImport, let context else { return }
+        guard isImport else { return }
         do {
             try Self.deduplicate(in: context)
         } catch {
@@ -361,10 +402,10 @@ final class LibraryDatabase {
     /// store that already holds records — synced in from another device —
     /// keeps whichever copy of each is newer.
     ///
-    /// Answers what the read found, or nil while the store is not open.
+    /// Answers what the read found, or nil while the file will not open.
     @discardableResult
     func moveIn(from file: LibraryFile) -> LibraryFile.Contents? {
-        guard let context else { return nil }
+        guard !isBlocked else { return nil }
         let contents = file.load()
         if !contents.archive.holdsNothing {
             do {

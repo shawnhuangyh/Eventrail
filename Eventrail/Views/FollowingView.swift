@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Every date Eventernote has published for the performers the reader follows.
@@ -46,7 +47,10 @@ struct FollowingView: View {
     @State private var isSelecting = false
     @State private var selection: Set<Event.ID> = []
 
-    private var performers: [PerformerProfile] { store.followedPerformers }
+    @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
+    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+
+    private var performers: [PerformerProfile] { followedRows.profiles }
 
     /// The performers the list is currently showing dates for.
     private var shown: [PerformerProfile] {
@@ -327,7 +331,7 @@ struct FollowingView: View {
         store.remember(dates)
         // The library is full of halls whose pages have already been read, and
         // a hall is the same hall whichever list it turned up in.
-        venues.learn(from: store.library)
+        venues.learn(from: kept.events)
         return dates
     }
 
@@ -957,7 +961,7 @@ private struct FollowedDateRow: View {
 
 #Preview {
     FollowingView()
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
         .environment(FollowedDates.preview)
         .environment(VenueRegions.preview)
 }

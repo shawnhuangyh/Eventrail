@@ -1,9 +1,11 @@
+import SwiftData
 import SwiftUI
 
 /// Searches publicly accessible Eventernote pages. Nothing tagged here is
 /// written back to Eventernote.
 struct SearchView: View {
     @Environment(EventStore.self) private var store
+    @Query private var settingsRows: [LibrarySettings]
 
     @State private var query = ""
     @State private var scope: SearchScope = .events
@@ -137,9 +139,11 @@ struct SearchView: View {
 
     // MARK: - Before a search
 
+    private var recentSearches: [String] { settingsRows.first?.recentSearches ?? [] }
+
     private var startingPoints: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !store.recentSearches.isEmpty {
+            if !recentSearches.isEmpty {
                 HStack {
                     // Not a ``SectionLabel``: that carries its own inset, and
                     // this one is set by the row it shares with Clear.
@@ -157,7 +161,7 @@ struct SearchView: View {
                 .padding(.horizontal, 4)
 
                 FlowLayout(spacing: 8) {
-                    ForEach(store.recentSearches, id: \.self) { recent in
+                    ForEach(recentSearches, id: \.self) { recent in
                         Button(recent) { query = recent }
                             .font(.system(size: 13, weight: .medium))
                             .buttonStyle(.plain)
@@ -319,5 +323,5 @@ struct SearchFailure: View {
 
 #Preview {
     SearchView()
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
 }

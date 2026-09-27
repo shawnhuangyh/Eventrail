@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Everything the reader has hearted, in full.
@@ -11,6 +12,7 @@ import SwiftUI
 /// a list is long enough to need its own screen it is long enough to need them.
 struct FavoriteEventsView: View {
     @Environment(EventStore.self) private var store
+    @Query(LibraryEvent.favorites) private var hearted: [LibraryEvent]
 
     @State private var filter: LibraryFilter = .upcoming
     @State private var grouping: Grouping = .date
@@ -20,10 +22,12 @@ struct FavoriteEventsView: View {
     @State private var selection: Set<Event.ID> = []
     @State private var isConfirmingRemoval = false
 
-    private var favorites: [Event] { store.favoriteEvents }
+    /// A favourite can be an event met in Search and never added, whose
+    /// facts are kept with the heart all the same.
+    private var favorites: [Event] { hearted.events.upcomingFirst() }
 
     private var groups: [EventGroup] {
-        store.groups(of: favorites, filter: filter, grouping: grouping)
+        EventGroup.groups(of: favorites, filter: filter, grouping: grouping)
     }
 
     /// Picking reaches what the filter is showing and no further.
@@ -61,7 +65,7 @@ struct FavoriteEventsView: View {
         .toolbar {
             EventListToolbar(filter: $filter, grouping: $grouping,
                              isSelecting: $isSelecting,
-                             counts: { store.events(in: favorites, matching: $0).count },
+                             counts: { $0.rows(of: favorites).count },
                              canSelect: !favorites.isEmpty)
             if isSelecting {
                 SelectionToolbar(
@@ -164,5 +168,5 @@ struct FavoriteEventsView: View {
     NavigationStack {
         FavoriteEventsView()
     }
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
 }

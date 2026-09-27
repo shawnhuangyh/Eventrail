@@ -154,5 +154,5 @@ struct ListingHalfView: View {
     NavigationStack {
         ListingHalfView(subject: .performer("水瀬いのり"), half: .past, feed: .preview)
     }
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
 }
