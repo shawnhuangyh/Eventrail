@@ -50,6 +50,10 @@ final class LibraryDatabase {
         case offline
         /// The reader's iCloud storage is full.
         case iCloudFull
+        /// The iCloud account the library synced with signed out or was
+        /// swapped for another, so syncing stopped — see
+        /// ``checkAccount()``. Said while the switch is off, since it is why.
+        case accountChanged
         case failed(String)
     }
 
@@ -85,9 +89,21 @@ final class LibraryDatabase {
 
     /// Run once another device's changes have landed and been folded in.
     @ObservationIgnored var onRemoteChanges: (() -> Void)?
+    /// Run when the iCloud account changes under the library, to turn the
+    /// switch off — which opens the store without CloudKit. Without it the
+    /// store is simply opened that way.
+    @ObservationIgnored var onAccountChanged: (() -> Void)?
 
     @ObservationIgnored private let location: Location
-    @ObservationIgnored private var observer: (any NSObjectProtocol)?
+    @ObservationIgnored private var observers: [any NSObjectProtocol] = []
+    /// The library as it stood when the import running now began — what
+    /// ``reconcile(_:in:)`` holds the import up against.
+    @ObservationIgnored private var beforeImport: LibraryArchive?
+
+    /// Which iCloud user this device's library syncs with (the container's
+    /// user record name), written the first time syncing finds one. Per
+    /// device, like the switch, and cleared when the switch goes off.
+    private static let accountKey = "iCloudSyncAccount"
 
     init(at location: Location = LibraryDatabase.defaultLocation, syncing: Bool) {
         self.location = location
@@ -99,7 +115,7 @@ final class LibraryDatabase {
     }
 
     isolated deinit {
-        if let observer { NotificationCenter.default.removeObserver(observer) }
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
     }
 
     /// The context everything reads and writes through.
@@ -120,6 +136,10 @@ final class LibraryDatabase {
         try? context.save()
         isSyncing = syncing
         syncStatus = nil
+        beforeImport = nil
+        // Turned on, it is whichever account is signed in now that the reader
+        // said yes to, so the record is written afresh.
+        UserDefaults.standard.removeObject(forKey: Self.accountKey)
         open()
         if syncing { checkAccount() }
     }
@@ -214,39 +234,93 @@ final class LibraryDatabase {
 
     // MARK: - Syncing
 
-    /// Says early what an import would only say by failing: no account, or
-    /// one iCloud cannot reach.
+    /// Says early what an import would only say by failing — no account, or
+    /// one iCloud cannot reach — and stops syncing when the account is no
+    /// longer the one the library synced with.
+    ///
+    /// Asked as syncing starts and whenever CloudKit says the account changed.
+    /// A store synced with one person's iCloud holds that person's library;
+    /// handed on to whoever signs in next it would be uploaded into their
+    /// private database. So a sign-out, or a different user, turns the switch
+    /// off, and syncing waits for the reader to say yes to the new account —
+    /// what the build before SwiftData did on the same news.
     private func checkAccount() {
         Task {
-            let status = try? await CKContainer(identifier: Self.containerID).accountStatus()
+            let container = CKContainer(identifier: Self.containerID)
+            let status = try? await container.accountStatus()
             guard isSyncing else { return }
+            let syncedWith = UserDefaults.standard.string(forKey: Self.accountKey)
             switch status {
-            case .noAccount: syncStatus = .signedOut
-            case .restricted, .temporarilyUnavailable: syncStatus = .unavailable
-            default: break
+            case .available:
+                // Offline, the user cannot be named; the next change asks again.
+                guard let user = try? await container.userRecordID().recordName, isSyncing else { return }
+                if let syncedWith, syncedWith != user {
+                    accountChanged()
+                } else if syncedWith == nil {
+                    UserDefaults.standard.set(user, forKey: Self.accountKey)
+                }
+            case .noAccount:
+                if syncedWith != nil { accountChanged() } else { syncStatus = .signedOut }
+            case .restricted, .temporarilyUnavailable:
+                syncStatus = .unavailable
+            default:
+                break
             }
         }
     }
 
+    private func accountChanged() {
+        Self.log.notice("The iCloud account changed; syncing stopped.")
+        if let onAccountChanged { onAccountChanged() } else { setSyncing(false) }
+        // After the switch, which clears the status on its way down.
+        syncStatus = .accountChanged
+    }
+
     private func observeSyncEvents() {
-        observer = NotificationCenter.default.addObserver(
+        observers.append(NotificationCenter.default.addObserver(
             forName: NSPersistentCloudKitContainer.eventChangedNotification, object: nil, queue: .main
         ) { [weak self] note in
             guard let event = note.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
-                    as? NSPersistentCloudKitContainer.Event,
-                  let ended = event.endDate
+                    as? NSPersistentCloudKitContainer.Event
             else { return }
             let isImport = event.type == .import
+            let ended = event.endDate
             let succeeded = event.succeeded
             let error = event.error
             MainActor.assumeIsolated {
-                self?.finished(isImport: isImport, at: ended, succeeded: succeeded, error: error)
+                guard let self else { return }
+                if let ended {
+                    self.finished(isImport: isImport, at: ended, succeeded: succeeded, error: error)
+                } else if isImport {
+                    self.importStarted()
+                }
             }
+        })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .CKAccountChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isSyncing else { return }
+                self.checkAccount()
+            }
+        })
+    }
+
+    /// Takes down the library as it stands before an import lands in it, so
+    /// the import can be held up against it when it ends.
+    private func importStarted() {
+        guard isSyncing else { return }
+        do {
+            beforeImport = try Self.archive(in: context)
+        } catch {
+            Self.log.error("Library could not be read before an import: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     private func finished(isImport: Bool, at date: Date, succeeded: Bool, error: (any Error)?) {
         guard isSyncing else { return }
+        let before = isImport ? beforeImport : nil
+        if isImport { beforeImport = nil }
         guard succeeded else {
             syncStatus = Self.status(for: error)
             return
@@ -256,8 +330,9 @@ final class LibraryDatabase {
         guard isImport else { return }
         do {
             try Self.deduplicate(in: context)
+            if let before { try Self.reconcile(before, in: context) }
         } catch {
-            Self.log.error("Library could not be deduplicated: \(error.localizedDescription, privacy: .public)")
+            Self.log.error("Library could not be settled after an import: \(error.localizedDescription, privacy: .public)")
         }
         onRemoteChanges?()
     }
@@ -374,6 +449,44 @@ final class LibraryDatabase {
             } else {
                 survivor.take(merged)
             }
+            changed = true
+        }
+        return changed
+    }
+
+    /// Puts back what an import overwrote with something older.
+    ///
+    /// CloudKit settles two devices' edits to one record by which reached it
+    /// last, not by when they were made: a note typed offline yesterday and
+    /// sent today lands over one typed this morning, and a removal can lose to
+    /// the yes it replaced. Every row still carries its stamps, so each one the
+    /// import touched is merged with what this device held before it —
+    /// `before` — by ``LibraryArchive``'s own rules, the import's copy kept
+    /// wherever the two tie. Only a row the merge changes is written, and that
+    /// write is sent on like any other, so the device that sent the older copy
+    /// takes the newer back and every device settles on the same answers.
+    ///
+    /// A row the import deleted is left deleted: another device prunes and
+    /// folds rows by the same rules this one does.
+    @discardableResult
+    static func reconcile(_ before: LibraryArchive, in context: ModelContext) throws -> Bool {
+        var changed = try reconcile(LibraryEvent.self, with: before, in: context)
+        changed = try reconcile(FollowedPerformer.self, with: before, in: context) || changed
+        changed = try reconcile(LibrarySettings.self, with: before, in: context) || changed
+        if changed { try context.save() }
+        return changed
+    }
+
+    private static func reconcile<Row: ArchiveRow>(
+        _ type: Row.Type, with before: LibraryArchive, in context: ModelContext
+    ) throws -> Bool {
+        var changed = false
+        for row in try context.fetch(FetchDescriptor<Row>()) {
+            guard let held = before.slice(for: row.key),
+                  let arrived = row.slice, arrived != held,
+                  let merged = arrived.merging(held).slice(for: row.key), merged != arrived
+            else { continue }
+            row.take(merged)
             changed = true
         }
         return changed

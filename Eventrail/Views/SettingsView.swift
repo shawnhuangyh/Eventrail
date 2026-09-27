@@ -208,9 +208,12 @@ struct SettingsView: View {
     }
 
     /// What syncing is doing right now, in as few words as will say it — never
-    /// a claim that it worked when it did not. Silent while it is off.
+    /// a claim that it worked when it did not. Silent while it is off, save
+    /// for why iCloud turned it off.
     private var syncStatus: Text? {
-        guard store.iCloudSyncEnabled else { return nil }
+        guard store.iCloudSyncEnabled else {
+            return store.syncStatus == .accountChanged ? CloudSyncStatus.text(for: store.syncStatus) : nil
+        }
         switch store.syncStatus {
         case .synced, .none:
             guard let lastSynced = store.lastSynced else { return nil }

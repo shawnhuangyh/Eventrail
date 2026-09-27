@@ -188,6 +188,98 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    // MARK: - An import
+
+    /// What CloudKit does to a row another device sent last: its copy lands
+    /// over this one's whole, whenever each was written.
+    private func imported(_ archive: LibraryArchive, over id: Event.ID, in context: ModelContext) throws {
+        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first { $0.eventID == id })
+        row.take(try #require(archive.slice(for: .event(id))))
+        try context.save()
+    }
+
+    private func tracked(_ tracking: Stamped<Tracking>) -> LibraryArchive {
+        var archive = LibraryArchive()
+        archive.events["1"] = Fixtures.event(id: "1")
+        archive.membership["1"] = Stamped(true, at: earlier)
+        archive.tracking["1"] = tracking
+        return archive
+    }
+
+    /// A note typed this morning, then yesterday's offline edit arriving
+    /// after it: the morning's stands.
+    @Test func anOlderAnswerAnImportLandsOverIsPutBack() throws {
+        let (database, context) = try database()
+        let base = Stamped(Tracking(note: "draft"), at: earlier.addingTimeInterval(-3600))
+        try stored(tracked(base.edited(to: Tracking(note: "this morning"), at: later)), in: context)
+        let before = try LibraryDatabase.archive(in: context)
+
+        try imported(tracked(base.edited(to: Tracking(note: "yesterday"), at: earlier)), over: "1", in: context)
+        #expect(try LibraryDatabase.reconcile(before, in: context))
+        #expect(try LibraryDatabase.archive(in: context).tracking["1"]?.value.note == "this morning")
+        withExtendedLifetime(database) {}
+    }
+
+    @Test func aNewerAnswerAnImportBringsStands() throws {
+        let (database, context) = try database()
+        let base = Stamped(Tracking(note: "draft"), at: earlier.addingTimeInterval(-3600))
+        try stored(tracked(base.edited(to: Tracking(note: "yesterday"), at: earlier)), in: context)
+        let before = try LibraryDatabase.archive(in: context)
+
+        try imported(tracked(base.edited(to: Tracking(note: "this morning"), at: later)), over: "1", in: context)
+        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
+        #expect(!context.hasChanges)
+        #expect(try LibraryDatabase.archive(in: context).tracking["1"]?.value.note == "this morning")
+        withExtendedLifetime(database) {}
+    }
+
+    /// The seat written here and the cost written there are different
+    /// answers, so both are kept though the import carried only the cost.
+    @Test func anImportIsSettledAnswerByAnswer() throws {
+        let (database, context) = try database()
+        let base = Stamped(Tracking(note: "front row"), at: earlier)
+        try stored(tracked(base.edited(to: Tracking(seat: "A12", note: "front row"), at: later)), in: context)
+        let before = try LibraryDatabase.archive(in: context)
+
+        try imported(tracked(base.edited(to: Tracking(cost: 9000, note: "front row"), at: later)), over: "1", in: context)
+        #expect(try LibraryDatabase.reconcile(before, in: context))
+        let tracking = try LibraryDatabase.archive(in: context).tracking["1"]?.value
+        #expect(tracking?.seat == "A12")
+        #expect(tracking?.cost == 9000)
+        withExtendedLifetime(database) {}
+    }
+
+    @Test func aRemovalAnOlderYesLandsOverStaysRemoved() throws {
+        let (database, context) = try database()
+        var removed = tracked(Stamped(Tracking(), at: earlier))
+        removed.membership["1"] = Stamped(false, at: later)
+        try stored(removed, in: context)
+        let before = try LibraryDatabase.archive(in: context)
+
+        var kept = removed
+        kept.events["1"] = Fixtures.event(id: "1")
+        kept.membership["1"] = Stamped(true, at: earlier)
+        try imported(kept, over: "1", in: context)
+        #expect(try LibraryDatabase.reconcile(before, in: context))
+        #expect(try LibraryDatabase.archive(in: context).isInLibrary("1") == false)
+        withExtendedLifetime(database) {}
+    }
+
+    /// Another device pruned or folded it by the same rules; putting it back
+    /// would only send it round again.
+    @Test func aRowAnImportDeletedStaysDeleted() throws {
+        let (database, context) = try database()
+        try stored(library(), in: context)
+        let before = try LibraryDatabase.archive(in: context)
+        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first { $0.eventID == "2" })
+        context.delete(row)
+        try context.save()
+
+        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
+        #expect(try context.fetch(FetchDescriptor<LibraryEvent>()).contains { $0.eventID == "2" } == false)
+        withExtendedLifetime(database) {}
+    }
+
     // MARK: - The library file
 
     private func file() throws -> LibraryFile {

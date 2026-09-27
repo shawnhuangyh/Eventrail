@@ -3413,6 +3413,28 @@
         }
       }
     },
+    "iCloud account changed — turn on again to sync" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudアカウントが変わりました。同期するにはもう一度オンにしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 账号已更改——重新开启以同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 帳號已更改——重新開啟以同步"
+          }
+        }
+      }
+    },
     "iCloud did not say why" : {
       "localizations" : {
         "ja" : {
