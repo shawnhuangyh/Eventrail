@@ -266,9 +266,10 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
-    /// Another device pruned or folded it by the same rules; putting it back
-    /// would only send it round again.
-    @Test func aRowAnImportDeletedStaysDeleted() throws {
+    /// One device pruned the row for a Following read whose night had gone,
+    /// while this one put the event in its library: the delete landed after
+    /// the add, and the add is put back.
+    @Test func aRowAnImportDeletedComesBackWhereThisDeviceKeepsSomething() throws {
         let (database, context) = try database()
         try stored(library(), in: context)
         let before = try LibraryDatabase.archive(in: context)
@@ -276,8 +277,29 @@ struct LibraryDatabaseTests {
         context.delete(row)
         try context.save()
 
+        #expect(try LibraryDatabase.reconcile(before, in: context))
+        let archive = try LibraryDatabase.archive(in: context)
+        #expect(archive.isInLibrary("2"))
+        #expect(archive.isFavorite("2"))
+        withExtendedLifetime(database) {}
+    }
+
+    /// Pruned there as it would be here: nothing is sent round again.
+    @Test func aRowAnImportDeletedStaysDeletedWherePruningLeavesNothing() throws {
+        let (database, context) = try database()
+        let over = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
+        var archive = LibraryArchive()
+        archive.followingReads = ["7": Stamped(FollowingRead(fingerprint: "x", day: over), at: earlier)]
+        let row = LibraryEvent(eventID: "7")
+        context.insert(row)
+        row.take(archive)
+        try context.save()
+        let before = try LibraryDatabase.archive(in: context)
+        context.delete(row)
+        try context.save()
+
         #expect(try LibraryDatabase.reconcile(before, in: context) == false)
-        #expect(try context.fetch(FetchDescriptor<LibraryEvent>()).contains { $0.eventID == "2" } == false)
+        #expect(try context.fetchCount(FetchDescriptor<LibraryEvent>()) == 0)
         withExtendedLifetime(database) {}
     }
 

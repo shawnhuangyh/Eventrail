@@ -562,22 +562,51 @@ final class LibraryDatabase {
     /// write is sent on like any other, so the device that sent the older copy
     /// takes the newer back and every device settles on the same answers.
     ///
-    /// A row the import deleted is left deleted: another device prunes and
-    /// folds rows by the same rules this one does.
+    /// A row the import deleted comes back where this device still holds
+    /// something in it that pruning keeps. CloudKit's delete is unconditional:
+    /// a device pruning a row whose Following read had gone deletes it even
+    /// when another device has just put the same event in its library, and
+    /// the removal would otherwise reach every device. Another device deletes
+    /// a row only when pruning leaves it nothing, or when folding it into a
+    /// twin whose key is still here — so what survives pruning in `before`
+    /// (already pruned, as ``archive(in:)`` makes it) is what was lost to the
+    /// race. The row made for it is sent like any other.
     @discardableResult
     static func reconcile(_ before: LibraryArchive, in context: ModelContext) throws -> Bool {
-        var changed = try reconcile(LibraryEvent.self, with: before, in: context)
-        changed = try reconcile(FollowedPerformer.self, with: before, in: context) || changed
-        changed = try reconcile(LibrarySettings.self, with: before, in: context) || changed
+        var present = Set<LibraryArchive.RecordKey>()
+        var changed = try reconcile(LibraryEvent.self, with: before, present: &present, in: context)
+        changed = try reconcile(FollowedPerformer.self, with: before, present: &present, in: context) || changed
+        changed = try reconcile(LibrarySettings.self, with: before, present: &present, in: context) || changed
+        for key in before.recordKeys.subtracting(present) {
+            guard let held = before.slice(for: key) else { continue }
+            switch key {
+            case .event(let id):
+                let row = LibraryEvent(eventID: id)
+                context.insert(row)
+                row.take(held)
+            case .performer(let id):
+                guard let actorID = Int(id) else { continue }
+                let row = FollowedPerformer(actorID: actorID)
+                context.insert(row)
+                row.take(held)
+            case .settings:
+                let row = LibrarySettings()
+                context.insert(row)
+                row.take(held)
+            }
+            changed = true
+        }
         if changed { try context.save() }
         return changed
     }
 
     private static func reconcile<Row: ArchiveRow>(
-        _ type: Row.Type, with before: LibraryArchive, in context: ModelContext
+        _ type: Row.Type, with before: LibraryArchive,
+        present: inout Set<LibraryArchive.RecordKey>, in context: ModelContext
     ) throws -> Bool {
         var changed = false
         for row in try context.fetch(FetchDescriptor<Row>()) {
+            present.insert(row.key)
             guard let held = before.slice(for: row.key),
                   let arrived = row.slice, arrived != held,
                   let merged = arrived.merging(held).slice(for: row.key), merged != arrived
