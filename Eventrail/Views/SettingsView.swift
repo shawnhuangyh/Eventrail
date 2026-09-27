@@ -248,11 +248,18 @@ struct SettingsView: View {
 
     /// Only what needs the reader: a mirror that is working says nothing.
     /// With the switch off the one thing left to say is that the calendar it
-    /// made could not be taken out again.
+    /// made could not be taken out again — including because calendar access
+    /// was taken back after it was made.
     private var calendarStatus: Text? {
         guard store.calendarSyncEnabled else {
-            if case .failed(let reason) = store.calendarStatus { return Text(verbatim: reason) }
-            return nil
+            switch store.calendarStatus {
+            case .failed(let reason):
+                return Text(verbatim: reason)
+            case .denied:
+                return Text("Calendar access is off, so the Eventrail calendar could not be removed")
+            case .mirrored, .none:
+                return nil
+            }
         }
         switch store.calendarStatus {
         case .denied:
@@ -265,9 +272,10 @@ struct SettingsView: View {
     }
 
     /// Denied is the one failure the reader can mend from here, so the row
-    /// carries the way to the switch that mends it.
+    /// carries the way to the switch that mends it — whether the mirror is
+    /// waiting to write or waiting to take its calendar out.
     private var calendarDenied: Bool {
-        guard store.calendarSyncEnabled, case .denied = store.calendarStatus else { return false }
+        guard case .denied = store.calendarStatus else { return false }
         return true
     }
 

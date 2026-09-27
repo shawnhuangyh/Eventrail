@@ -419,6 +419,28 @@
         }
       }
     },
+    "Calendar access is off, so the Eventrail calendar could not be removed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーへのアクセスがオフのため、Eventrail カレンダーを削除できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日历访问权限已关闭，无法移除 Eventrail 日历"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日曆存取權限已關閉，無法移除 Eventrail 日曆"
+          }
+        }
+      }
+    },
     "Eventrail's iCloud data was deleted — turn on again to sync" : {
       "localizations" : {
         "ja" : {
@@ -441,6 +463,28 @@
         }
       }
     },
+    "Fewer lottery entries" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選の応募回数を減らす"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "减少抽选次数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "減少抽選次數"
+          }
+        }
+      }
+    },
     "iCloud is unavailable right now — will retry" : {
       "localizations" : {
         "ja" : {
@@ -459,6 +503,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud 暫時無法使用 — 將重試"
+          }
+        }
+      }
+    },
+    "More lottery entries" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選の応募回数を増やす"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "增加抽选次数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "增加抽選次數"
           }
         }
       }

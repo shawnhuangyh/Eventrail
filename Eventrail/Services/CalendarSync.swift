@@ -139,12 +139,14 @@ final class CalendarSync {
     /// settles itself is the price of the alternative being two calendars of
     /// one name, each holding the whole library; see ``adoptableCalendar()``.
     ///
-    /// Answers only when the calendar is still there and could not be removed.
-    /// The identifier is kept then, so the next call — any edit, or the switch
-    /// turned again — tries once more rather than forgetting a calendar the
-    /// reader believes is gone.
+    /// Answers only when the calendar may still be there and could not be
+    /// removed — access taken back in Settings since it was made, or the
+    /// removal itself refused. The identifier is kept then, so the next call —
+    /// any edit, or the switch turned again — tries once more rather than
+    /// forgetting a calendar the reader believes is gone.
     func stop() async -> Outcome? {
-        guard let id = savedCalendarID, await requestAccess() else { return nil }
+        guard let id = savedCalendarID else { return nil }
+        guard await requestAccess() else { return .denied }
         guard let calendar = store.calendar(withIdentifier: id) else {
             savedCalendarID = nil
             return nil

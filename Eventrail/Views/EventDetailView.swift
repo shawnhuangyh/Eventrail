@@ -687,6 +687,9 @@ struct EventDetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+        // The glyph alone reads as "Add" and "Remove", which on this sheet is
+        // what the library button says.
+        .accessibilityLabel(delta < 0 ? Text("Fewer lottery entries") : Text("More lottery entries"))
     }
 
     /// What separates the count from the two ends that step it. Inset from the
