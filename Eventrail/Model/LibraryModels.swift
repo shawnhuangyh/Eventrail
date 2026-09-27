@@ -15,6 +15,13 @@ import SwiftData
 // removal is a value rather than a missing row: `inLibrary` false with a date
 // is the tombstone ``LibraryArchive`` has always kept, and an import or a
 // restore raises it by the same rules.
+//
+// What the reader writes themselves — the tracking answers, the linked
+// account, their searches — is `.allowsCloudEncryption`: CloudKit keeps it in
+// the record's encrypted values, as the sync before SwiftData kept its whole
+// payload. A field's encryption is fixed once CloudKit's schema has it, so a
+// field added here that the reader writes should be marked before it first
+// syncs, not after.
 
 /// One event the reader has a record about: in the library, favourited,
 /// written on, or read on the Following tab.
@@ -65,11 +72,11 @@ final class LibraryEvent {
     var favoriteChanged: Date?
     /// ``TicketStatus``'s raw value, so a status added later reads back as
     /// none rather than failing.
-    var ticket: String = TicketStatus.none.rawValue
-    var seat: String = ""
-    var cost: Int?
-    var lotteryEntries: Int?
-    var note: String = ""
+    @Attribute(.allowsCloudEncryption) var ticket: String = TicketStatus.none.rawValue
+    @Attribute(.allowsCloudEncryption) var seat: String = ""
+    @Attribute(.allowsCloudEncryption) var cost: Int?
+    @Attribute(.allowsCloudEncryption) var lotteryEntries: Int?
+    @Attribute(.allowsCloudEncryption) var note: String = ""
     var trackingChanged: Date?
     /// ``Tracking/edits``, keyed by ``Tracking/Field``'s raw value.
     var trackingEdits: [String: Date] = [:]
@@ -109,13 +116,13 @@ final class FollowedPerformer {
 @Model
 final class LibrarySettings {
     var uid: UUID = UUID()
-    var recentSearches: [String] = []
+    @Attribute(.allowsCloudEncryption) var recentSearches: [String] = []
     var recentSearchesChanged: Date = Date.distantPast
     /// The linked Eventernote handle; nil with a date is an unlink.
-    var account: String?
+    @Attribute(.allowsCloudEncryption) var account: String?
     var accountChanged: Date?
-    var profileName: String?
-    var profileAvatarURL: URL?
+    @Attribute(.allowsCloudEncryption) var profileName: String?
+    @Attribute(.allowsCloudEncryption) var profileAvatarURL: URL?
     var lastRefreshed: Date?
     var lastImported: Date?
 

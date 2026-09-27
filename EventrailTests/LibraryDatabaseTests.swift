@@ -281,6 +281,23 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// What the reader writes themselves is kept in CloudKit's encrypted
+    /// values, as the sync before SwiftData kept its whole payload — and a
+    /// field's encryption cannot be changed once CloudKit's schema has it.
+    @Test func whatTheReaderWritesIsEncryptedInICloud() {
+        let encrypted = Set(LibraryDatabase.schema.entities.flatMap { entity in
+            entity.attributes
+                .filter { $0.options.contains(.allowsCloudEncryption) }
+                .map { "\(entity.name).\($0.name)" }
+        })
+        #expect(encrypted == [
+            "LibraryEvent.ticket", "LibraryEvent.seat", "LibraryEvent.cost",
+            "LibraryEvent.lotteryEntries", "LibraryEvent.note",
+            "LibrarySettings.recentSearches", "LibrarySettings.account",
+            "LibrarySettings.profileName", "LibrarySettings.profileAvatarURL",
+        ])
+    }
+
     // MARK: - How sync stands
 
     @Test func deletingTheZoneFromICloudIsItsOwnStatus() {
