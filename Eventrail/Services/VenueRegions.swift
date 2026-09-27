@@ -40,15 +40,16 @@ final class VenueRegions {
     private var isSettlingClocks = false
 
     @ObservationIgnored private let client: EventernoteClient
-    /// Previews are handed their answers, and neither read this device's cache
-    /// nor write to it.
-    @ObservationIgnored private let persists: Bool
+    /// In Caches, and emptied by Clear Cache: every answer can be read from
+    /// Eventernote again. Nil in previews, which are handed their answers and
+    /// neither read this device's cache nor write to it.
+    @ObservationIgnored private let file: KeptFile<String, Answer>?
 
     /// ``Region`` is kept as its raw value rather than as itself: what is
     /// written here has to survive a case being renamed, and an unknown string
     /// reads back as an unplaced hall rather than as a decoding failure that
     /// would take the whole cache with it.
-    private struct Answer: Codable {
+    private nonisolated struct Answer: Codable, Sendable {
         var region: String?
         /// The address the hall's page published, kept so a hall is never
         /// looked up twice. Empty where the site files no hall under the name
@@ -69,8 +70,6 @@ final class VenueRegions {
         }
     }
 
-    private static let cacheKey = "venueRegions"
-
     /// How many halls one run may look up. Each is two requests — the venue
     /// search and then the hall's page — so a first run over a long Following
     /// list would otherwise fire off hundreds of them and be throttled for its
@@ -87,10 +86,11 @@ final class VenueRegions {
         self.client = client
         if let placed {
             answers = placed.mapValues { Answer(region: $0.rawValue, asked: .now) }
-            persists = false
+            file = nil
         } else {
-            answers = Self.stored
-            persists = true
+            let file = KeptFile<String, Answer>(named: "venueRegions.json", in: .caches, formerKey: "venueRegions")
+            self.file = file
+            answers = file.read()
         }
     }
 
@@ -215,7 +215,7 @@ final class VenueRegions {
     /// A settled clock is written down with the hall, since a hall does not
     /// move: the next run asks nothing about it.
     func settleClocks(for events: [Event]) async {
-        guard persists, !isSettlingClocks else { return }
+        guard file != nil, !isSettlingClocks else { return }
         var seen: Set<String> = []
         let halls: [(key: String, event: Event)] = events.compactMap { event in
             let key = Self.key(event)
@@ -292,19 +292,10 @@ final class VenueRegions {
     func clear() {
         guard !answers.isEmpty else { return }
         answers = [:]
-        guard persists else { return }
-        UserDefaults.standard.removeObject(forKey: Self.cacheKey)
-    }
-
-    // MARK: - Where the answers are kept
-
-    private static var stored: [String: Answer] {
-        guard let data = UserDefaults.standard.data(forKey: cacheKey) else { return [:] }
-        return (try? JSONDecoder().decode([String: Answer].self, from: data)) ?? [:]
+        file?.remove()
     }
 
     private func save() {
-        guard persists else { return }
-        UserDefaults.standard.set(try? JSONEncoder().encode(answers), forKey: Self.cacheKey)
+        file?.write(&answers)
     }
 }

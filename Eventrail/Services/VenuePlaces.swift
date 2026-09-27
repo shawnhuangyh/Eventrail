@@ -102,7 +102,7 @@ final class VenuePlaces {
     /// What Maps said about one venue, in plain fields rather than an archived
     /// `MKMapItem`: a coordinate, a name and an address survive any amount of
     /// OS churn, and they are all a calendar entry needs.
-    private struct Answer: Codable {
+    private nonisolated struct Answer: Codable, Sendable {
         var name: String?
         var address: String?
         var latitude: Double?
@@ -170,7 +170,10 @@ final class VenuePlaces {
             askedZone != true && wasFound && zone == nil
         }
 
-        var placing: Placing? {
+        /// On the main actor, like the two initialisers below: they read what
+        /// this launch learnt about Maps. The rest of an answer is plain data,
+        /// written to disk off the main actor.
+        @MainActor var placing: Placing? {
             guard let latitude, let longitude else { return nil }
             let source = self.source.flatMap(Source.init(rawValue:))
             // Kept in WGS-84 and shifted only as drawn, on the one provider
@@ -196,12 +199,12 @@ final class VenuePlaces {
             return Placing(item: item, uncertainty: (source ?? .register).uncertainty, timeZone: zone)
         }
 
-        init(_ found: Found?) {
+        @MainActor init(_ found: Found?) {
             self.init(found?.item, from: found?.source)
             country = found?.country
         }
 
-        init(_ found: MKMapItem?, from source: Source?) {
+        @MainActor init(_ found: MKMapItem?, from source: Source?) {
             name = found?.name
             address = found?.address?.fullAddress
             latitude = found?.location.coordinate.latitude
@@ -285,11 +288,6 @@ final class VenuePlaces {
 
     private static let buildingsKey = "venueBuildings"
 
-    /// Cached per device rather than in the archive: these are facts about the
-    /// world, not records the reader owns, and every device can look them up
-    /// for itself.
-    private static let cacheKey = "venuePlaces"
-
     /// Which reading of Maps' answers the kept ones were made under. Raised
     /// whenever that reading changes, and everything older is simply asked
     /// again — now that an answer is kept only where Maps files it at the
@@ -353,8 +351,7 @@ final class VenuePlaces {
     ///
     /// A hall the reader still goes to is asked about again a year later and
     /// found again in one search; a hall they met once in Search and never
-    /// kept stops taking up room. The alternative is a cache that only grows,
-    /// on a device where it lives in `UserDefaults`.
+    /// kept stops taking up room. The alternative is a cache that only grows.
     private static let keep: TimeInterval = 365 * 24 * 60 * 60
 
     /// Where a search looks first. Eventernote is a Japanese site publishing
@@ -396,17 +393,21 @@ final class VenuePlaces {
         of: Void.self, bufferingPolicy: .bufferingNewest(1)
     )
 
-    private var cache: [String: Answer] {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: Self.cacheKey) else { return [:] }
-            return (try? JSONDecoder().decode([String: Answer].self, from: data)) ?? [:]
-        }
-        set {
-            UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: Self.cacheKey)
-        }
-    }
+    /// Every answer, keyed by ``Venue/key``.
+    ///
+    /// Cached per device rather than in the archive: these are facts about the
+    /// world, not records the reader owns, and every device can look them up
+    /// for itself. In Application Support rather than Caches, because Clear
+    /// Cache leaves it alone and a device short of room should too: it took a
+    /// search or three per hall to gather.
+    private var cache: [String: Answer]
+    private let file: KeptFile<String, Answer>
 
     private init() {
+        let file = KeptFile<String, Answer>(named: "venuePlaces.json", in: .applicationSupport, formerKey: "venuePlaces")
+        self.file = file
+        cache = file.read()
+
         // The two caches this one replaced, on a device that ran those builds.
         // Nothing reads them any more. Safe to drop once no such device is left.
         UserDefaults.standard.removeObject(forKey: "venueCoordinates")
@@ -1098,12 +1099,11 @@ final class VenuePlaces {
     // MARK: - Keeping the answers
 
     /// Writes one answer down, and drops whatever nothing has wanted for a
-    /// year. Read afresh rather than written over: another sheet may have
-    /// looked up its own hall while this one was waiting.
+    /// year.
     private func remember(_ answer: Answer, for key: String) {
-        var kept = cache.filter { $0.value.asked.timeIntervalSinceNow > -Self.keep }
-        kept[key] = answer
-        cache = kept
+        cache = cache.filter { $0.value.asked.timeIntervalSinceNow > -Self.keep }
+        cache[key] = answer
+        file.write(&cache)
         zonesByName = nil
     }
 
