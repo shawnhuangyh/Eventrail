@@ -43,7 +43,7 @@ nonisolated struct LinkedProfile: Codable, Hashable, Sendable {
 /// is replaced wholesale by an import, while ``tracking``, ``membership`` and
 /// ``favorites`` are only ever written by the reader and are merged, never
 /// overwritten.
-nonisolated struct LibraryArchive: Codable, Sendable {
+nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
     /// Every event worth remembering, keyed by Eventernote's id — the library,
     /// plus anything favorited that is not in it.
     var events: [Event.ID: Event] = [:]
@@ -123,10 +123,7 @@ nonisolated struct LibraryArchive: Codable, Sendable {
     ///
     /// Not "the library is empty": a library emptied on purpose still holds the
     /// tombstones that say so, and those are worth syncing. This is the state a
-    /// fresh install is in before anything has been read into it — nothing to
-    /// hand another device, and so nothing worth writing over what iCloud may
-    /// still be in the middle of handing *this* one. See
-    /// ``EventStore/mayPushToCloud``.
+    /// fresh install is in before anything has been read into it.
     var holdsNothing: Bool {
         membership.isEmpty && tracking.isEmpty && favorites.isEmpty
             && (follows?.isEmpty ?? true) && (followingReads?.isEmpty ?? true)
@@ -168,6 +165,17 @@ nonisolated struct LibraryArchive: Codable, Sendable {
     /// facts are not the reader's, so the more complete import wins and no
     /// timestamp is needed for them.
     func merging(_ other: LibraryArchive) -> LibraryArchive {
+        combining(other).pruned()
+    }
+
+    /// Folds in a run of other copies at once — the records one fetch from
+    /// iCloud delivered, each a slice of somebody's archive — and prunes once
+    /// at the end rather than after every one.
+    func merging(contentsOf others: [LibraryArchive]) -> LibraryArchive {
+        others.reduce(self) { $0.combining($1) }.pruned()
+    }
+
+    private func combining(_ other: LibraryArchive) -> LibraryArchive {
         var merged = self
 
         for (id, event) in other.events {
@@ -197,7 +205,7 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         merged.lastRefreshed = [lastRefreshed, other.lastRefreshed].compactMap { $0 }.max()
         merged.lastImported = [lastImported, other.lastImported].compactMap { $0 }.max()
 
-        return merged.pruned()
+        return merged
     }
 
     /// Folds a backup the reader asked to restore into this archive.
@@ -290,15 +298,19 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         mine.merging(theirs) { $0.newer($1) }
     }
 
-    /// Drops what neither device needs to keep agreeing on: long-settled
-    /// tombstones, and events nothing points at any more.
+    /// Drops what neither device needs to keep agreeing on: events nothing
+    /// points at any more, and whatever was only ever about them.
+    ///
+    /// **Tombstones are never dropped.** A removal forgotten after some months
+    /// is a removal a device that slept through those months undoes: it still
+    /// holds the old yes, finds no no to lose to, and hands the record back.
+    /// Nothing a timestamp can say fixes that — the device has no way of
+    /// telling a key that was pruned from one that never existed — and a
+    /// tombstone is an id and a date, so keeping every one costs next to
+    /// nothing. The same goes for a tracking record cleared on purpose.
     func pruned() -> LibraryArchive {
         var pruned = self
-        let settled = Date.now.addingTimeInterval(-180 * 24 * 60 * 60)
 
-        pruned.membership = membership.filter { $0.value.value || $0.value.modified > settled }
-        pruned.favorites = favorites.filter { $0.value.value || $0.value.modified > settled }
-        pruned.follows = follows?.filter { $0.value.value || $0.value.modified > settled }
         // Who someone is only matters while they are followed — the same reason
         // an event nothing points at any more is dropped below.
         pruned.followedPerformers = followedPerformers?.filter { pruned.follows?[$0.key]?.value == true }
@@ -309,10 +321,6 @@ nonisolated struct LibraryArchive: Codable, Sendable {
         let over = Date.now.addingTimeInterval(-3 * 24 * 60 * 60)
         pruned.followingReads = followingReads?.filter { $0.value.value.day > over }
         pruned.events = events.filter { pruned.isInLibrary($0.key) || pruned.isFavorite($0.key) }
-        pruned.tracking = tracking.filter {
-            // A note survives its event leaving the library; an empty record does not.
-            !$0.value.value.isEmpty || $0.value.modified > settled
-        }
         return pruned
     }
 }

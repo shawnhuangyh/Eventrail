@@ -57,7 +57,7 @@ See the [feature overview](docs/overview.md) for how each of these works and how
 
 3. **Build and run** — pick a simulator or device and press `⌘R`.
 
-   A device build needs iCloud enabled on the App ID in your developer portal, since sync uses the iCloud key-value store entitlement. Simulator builds work as-is.
+   A device build needs iCloud (with the `iCloud.moe.shawn.Eventrail` CloudKit container) and Push Notifications enabled on the App ID in your developer portal, since sync runs on CloudKit. Simulator builds work as-is. Before a TestFlight build can sync, deploy the CloudKit schema to Production in the CloudKit Console.
 
 ### Common Commands
 

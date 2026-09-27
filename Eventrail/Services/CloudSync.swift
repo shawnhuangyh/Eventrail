@@ -1,180 +1,504 @@
+import CloudKit
 import Foundation
 import OSLog
 
-/// Mirrors the reader's library through their own iCloud.
+/// What ``CloudSync`` needs from the library it keeps in step.
+@MainActor
+protocol CloudSyncHost: AnyObject {
+    /// The archive as it stands, for the records about to be sent.
+    var archiveForCloud: LibraryArchive { get }
+    /// Records another device wrote, each a slice of an archive, to be folded
+    /// in by the ordinary merge.
+    func cloudDelivered(_ slices: [LibraryArchive])
+    /// How the last exchange with iCloud went.
+    func cloudReported(_ outcome: CloudSync.Outcome)
+    /// iCloud is no longer somewhere this device's library may go — a
+    /// different account, or the reader deleting the app's data from iCloud —
+    /// and syncing has to stop until they say otherwise.
+    func cloudStopped(_ outcome: CloudSync.Outcome)
+}
+
+/// Keeps the reader's library in step across their devices through the
+/// private database of their own iCloud.
 ///
-/// The key-value store fits what this is: one small document the reader owns,
-/// on their own devices, with no app-operated backend and no account to create.
-/// It brings a hard 1MB quota with it, so the archive is compressed and measured
-/// before it is written — a silent overflow would look exactly like syncing.
+/// Built on `CKSyncEngine`, which owns the change tokens, the queue, the
+/// retries and the pushes. What this adds is the library's side of it: which
+/// records the archive holds (``CloudRecord``), what changed since they were
+/// last sent, and folding what arrives back through
+/// ``LibraryArchive/merging(_:)``.
 ///
-/// Nothing imported from Eventernote is private, but the reader's notes are, and
-/// the key-value store is per-user and per-app: it is their iCloud, not a shared
-/// one.
-nonisolated struct CloudSync: Sendable {
+/// **One record per thing, merged, never overwritten.** A save that lands on
+/// a record another device changed first comes back refused with the
+/// server's copy; that copy is merged in and the result sent again. A write
+/// can only ever say something about the record it names, and a fresh install
+/// names nothing, so there is no library to overwrite.
+///
+/// **A deleted record says nothing about the library.** Every record the
+/// reader owns carries its own tombstone, so a removal is a save, not a
+/// delete; a record is only deleted once its slice has pruned to nothing —
+/// a Following read whose night has gone — and every device prunes the same
+/// way on its own.
+///
+/// Nothing imported from Eventernote is private, but the reader's notes are:
+/// the private database is theirs alone, and the payload goes in
+/// `encryptedValues`.
+@MainActor
+final class CloudSync: CKSyncEngineDelegate {
     static let shared = CloudSync()
 
-    /// One key holds the whole archive. It is merged, never replaced, so the
-    /// store arbitrating by last write does not decide anything on its own.
-    private static let key = "library.v1"
-
-    /// Apple's documented ceiling is 1MB for everything this app stores. The
-    /// margin leaves room for the store's own bookkeeping.
-    static let quota = 900_000
+    static let containerID = "iCloud.moe.shawn.Eventrail"
+    static let zoneID = CKRecordZone.ID(zoneName: "Library", ownerName: CKCurrentUserDefaultName)
 
     private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "sync")
 
-    /// What a push to iCloud did, in terms the Me screen can state plainly.
+    /// How syncing stands, in terms the Settings row can state plainly.
     enum Outcome: Sendable, Equatable {
         case synced
-        /// The build carries no `ubiquity-kvstore` entitlement, so the store
-        /// accepts writes and drops them. Without this case the screen would
-        /// report a sync that never happened.
+        /// This build carries no CloudKit entitlement, or the container is not
+        /// set up for it.
         case notConfigured
         /// No iCloud account on this device, so there is nowhere to sync to.
         case signedOut
-        /// The store took the value and then refused to hand it on. Distinct
-        /// from ``notConfigured``, which the entitlement settles before a byte
-        /// is written: a refusal at this point is iCloud's, not the build's,
-        /// and telling the reader to go and enable a capability would send them
-        /// after something that is already there.
+        /// Signed in, but iCloud cannot be reached for the moment — the account
+        /// is being set up, or its terms need accepting.
+        case unavailable
+        /// No connection. The engine sends what is waiting once there is one.
+        case offline
+        /// iCloud refused the records, and not for any reason above.
         case rejected
         /// This device was signed in to a different iCloud account, so what it
         /// holds is no longer this store's to hand over. Syncing stops until
-        /// the reader says otherwise — see ``EventStore/cloudAccountChanged()``.
+        /// the reader says otherwise — see ``EventStore/cloudStopped(_:)``.
         case accountChanged
-        /// iCloud holds a library this build cannot read — most likely one a
-        /// newer version wrote. Nothing is pushed while it stands, because a
-        /// push would replace it — see ``Copy/unreadable``.
+        /// The reader deleted Eventrail's data from iCloud (Settings › iCloud ›
+        /// Manage Storage). Sending the library straight back would undo what
+        /// they just did, so syncing stops here as well.
+        case cloudDataDeleted
+        /// iCloud holds records this build cannot read — most likely written
+        /// by a newer version. They are left as they are, never overwritten.
         case unreadableCopy
-        /// The library outgrew the key-value store's quota.
-        case tooLarge(bytes: Int)
+        /// The reader's iCloud storage is full.
+        case iCloudFull
         case failed(String)
     }
 
-    /// The archive as iCloud will hold it: encoded, compressed, and measured.
-    ///
-    /// Made apart from the write because it is the expensive half — a JSON
-    /// encode and a zlib pass over the whole library — and the write itself is
-    /// a moment on the main actor. A caller with a thread to spare packs there
-    /// and hands the result to ``save(_:)-(Payload)``.
-    enum Payload: Sendable {
-        case ready(Data)
-        case failed(String)
+    /// What this device remembers about iCloud between launches.
+    private nonisolated struct Memory: Codable {
+        /// The engine's own state: change tokens and what is waiting to go.
+        var engineState: CKSyncEngine.State.Serialization?
+        /// Each record's system fields as last seen, so a save is an update of
+        /// that record rather than a create that collides with it.
+        var systemFields: [String: Data] = [:]
+        /// A fingerprint of each record as last sent or received — see
+        /// ``CloudRecord/digests(of:)``.
+        var digests: [String: Data] = [:]
+        /// Records that arrived in a shape this build cannot read, kept
+        /// verbatim and tried again each launch, so an update of the app reads
+        /// them without their having to be fetched again. Never sent over.
+        var held: [String: Held] = [:]
+    }
 
-        var bytes: Int? {
-            if case .ready(let data) = self { return data.count }
-            return nil
+    private nonisolated struct Held: Codable {
+        var payload: Data
+        var format: Int
+    }
+
+    private weak var host: CloudSyncHost?
+    private var engine: CKSyncEngine?
+    private var memory: Memory
+    /// Bumped by ``stop()``, so a start still waiting on iCloud's account
+    /// status knows it has been overtaken.
+    private var generation = 0
+    private var diffing: Task<Void, Never>?
+    private var pendingWrite: Task<Void, Never>?
+    /// What went wrong in the exchange under way, reported when it finishes
+    /// in place of "synced".
+    private var problem: Outcome?
+
+    private let memoryURL: URL = {
+        let directory = URL.applicationSupportDirectory.appending(path: "Eventrail", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appending(path: "cloudkit.json")
+    }()
+
+    private init() {
+        memory = (try? Data(contentsOf: memoryURL))
+            .flatMap { try? JSONDecoder().decode(Memory.self, from: $0) } ?? Memory()
+    }
+
+    // MARK: - Starting and stopping
+
+    /// Starts syncing for `host`, or — already running — asks iCloud for
+    /// anything new and sends anything waiting.
+    func sync(for host: CloudSyncHost) async {
+        self.host = host
+        if let engine {
+            do {
+                try await engine.fetchChanges()
+                try await engine.sendChanges()
+            } catch {
+                report(Self.outcome(for: error))
+            }
+            return
+        }
+
+        let generation = generation
+        let container = CKContainer(identifier: Self.containerID)
+        let status: CKAccountStatus
+        do {
+            status = try await container.accountStatus()
+        } catch {
+            report(Self.outcome(for: error))
+            return
+        }
+        guard generation == self.generation, engine == nil else { return }
+        switch status {
+        case .available:
+            break
+        case .noAccount:
+            report(.signedOut)
+            return
+        case .temporarilyUnavailable, .couldNotDetermine:
+            report(.unavailable)
+            return
+        default:
+            report(.rejected)
+            return
+        }
+
+        let engine = CKSyncEngine(CKSyncEngine.Configuration(
+            database: container.privateCloudDatabase,
+            stateSerialization: memory.engineState,
+            delegate: self
+        ))
+        self.engine = engine
+        if memory.engineState == nil {
+            engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
+        }
+        deliverHeld()
+        // What iCloud holds is read before anything is sent, so a second
+        // device's first sync updates the records it finds rather than
+        // colliding with every one of them.
+        do {
+            try await engine.fetchChanges()
+        } catch {
+            report(Self.outcome(for: error))
+        }
+        await noteChanges()
+    }
+
+    /// Stops syncing on this device and forgets everything it knew about
+    /// iCloud, so turning it back on reads the whole store afresh — the
+    /// account behind it may not be the same one.
+    func stop() async {
+        generation += 1
+        let engine = self.engine
+        self.engine = nil
+        diffing?.cancel()
+        diffing = nil
+        problem = nil
+        await engine?.cancelOperations()
+        memory = Memory()
+        pendingWrite?.cancel()
+        try? FileManager.default.removeItem(at: memoryURL)
+    }
+
+    // MARK: - Sending
+
+    /// Compares the archive with what iCloud was last told and queues a save
+    /// for every record that differs. Calls are taken one at a time.
+    func noteChanges() async {
+        let previous = diffing
+        let task = Task { [weak self] in
+            await previous?.value
+            await self?.queueChanges()
+        }
+        diffing = task
+        await task.value
+    }
+
+    private func queueChanges() async {
+        guard let engine, let archive = host?.archiveForCloud else { return }
+        // Encoding every record is the expensive half, and owes the main
+        // thread nothing.
+        let digests = await Task.detached(priority: .utility) {
+            CloudRecord.digests(of: archive)
+        }.value
+        guard self.engine === engine, let current = host?.archiveForCloud else { return }
+
+        var changes: [CKSyncEngine.PendingRecordZoneChange] = []
+        for (name, digest) in digests where memory.digests[name] != digest && memory.held[name] == nil {
+            memory.digests[name] = digest
+            changes.append(.saveRecord(Self.recordID(name)))
+        }
+        for name in memory.digests.keys where digests[name] == nil && memory.held[name] == nil {
+            // Checked against the archive as it is now, not as it was when the
+            // digests were taken: a record may have arrived in between.
+            guard let key = CloudRecord.Key(recordName: name), current.slice(for: key) == nil else { continue }
+            memory.digests[name] = nil
+            changes.append(.deleteRecord(Self.recordID(name)))
+        }
+        guard !changes.isEmpty else { return }
+        engine.state.add(pendingRecordZoneChanges: changes)
+        writeMemory()
+    }
+
+    func nextRecordZoneChangeBatch(
+        _ context: CKSyncEngine.SendChangesContext, syncEngine: CKSyncEngine
+    ) async -> CKSyncEngine.RecordZoneChangeBatch? {
+        guard syncEngine === engine, let archive = host?.archiveForCloud else { return nil }
+        let pending = syncEngine.state.pendingRecordZoneChanges.filter { context.options.scope.contains($0) }
+
+        // A save for a record that has since pruned to nothing, or that is
+        // held unread, has nothing to send.
+        let moot = pending.filter { change in
+            guard case .saveRecord(let id) = change else { return false }
+            guard memory.held[id.recordName] == nil,
+                  let key = CloudRecord.Key(recordName: id.recordName)
+            else { return true }
+            return archive.slice(for: key) == nil
+        }
+        if !moot.isEmpty { syncEngine.state.remove(pendingRecordZoneChanges: moot) }
+        let sending = pending.filter { !moot.contains($0) }
+        guard !sending.isEmpty else { return nil }
+
+        let fields = memory.systemFields
+        return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: sending) { id in
+            Self.record(for: id, in: archive, systemFields: fields[id.recordName])
         }
     }
 
-    /// Whether this device is signed in to iCloud at all.
-    var isAvailable: Bool {
-        FileManager.default.ubiquityIdentityToken != nil
+    /// The record for one key as the archive now has it, on top of the system
+    /// fields last seen for it where there are any.
+    private nonisolated static func record(
+        for id: CKRecord.ID, in archive: LibraryArchive, systemFields: Data?
+    ) -> CKRecord? {
+        guard let key = CloudRecord.Key(recordName: id.recordName),
+              let slice = archive.slice(for: key),
+              let payload = try? CloudRecord.payload(for: slice)
+        else { return nil }
+        let record = systemFields.flatMap(restoreRecord(from:))
+            ?? CKRecord(recordType: CloudRecord.recordType, recordID: id)
+        record.encryptedValues[CloudRecord.payloadField] = payload
+        record[CloudRecord.formatField] = CloudRecord.currentFormat
+        return record
     }
 
-    /// Whether this build may use the key-value store at all.
-    ///
-    /// `synchronize()` is the only signal the framework offers: it returns false
-    /// when the entitlement is missing. Without the check a build signed without
-    /// iCloud would look like it was syncing, because `set(_:forKey:)` neither
-    /// fails nor throws — it just goes nowhere.
-    var isConfigured: Bool {
-        NSUbiquitousKeyValueStore.default.synchronize()
-    }
+    // MARK: - Events
 
-    /// What iCloud holds under the library's key.
-    enum Copy {
-        /// Nothing, or nothing yet — the store downloads after launch.
-        case absent
-        /// Something this build cannot unpack or decode. Not the same as
-        /// nothing: it is somebody's library, and the whole of it is replaced
-        /// by the next write.
-        case unreadable
-        case loaded(LibraryArchive)
-    }
+    func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+        guard syncEngine === engine else { return }
+        switch event {
+        case .stateUpdate(let update):
+            memory.engineState = update.stateSerialization
+            writeMemory()
 
-    /// Whatever iCloud currently holds.
-    func load() -> Copy {
-        guard isConfigured,
-              let data = NSUbiquitousKeyValueStore.default.data(forKey: Self.key)
-        else { return .absent }
-        do {
-            return .loaded(try Self.unpack(data))
-        } catch {
-            Self.log.error("iCloud copy could not be read: \(error.localizedDescription)")
-            return .unreadable
+        case .accountChange(let change):
+            switch change.changeType {
+            case .signIn:
+                // Only ever the first start: a sign-out or a switch stops
+                // syncing outright, so there is no later sign-in to catch up
+                // on. ``sync(for:)`` sends everything once it has read what
+                // iCloud already holds.
+                break
+            case .signOut, .switchAccounts:
+                host?.cloudStopped(.accountChanged)
+            @unknown default:
+                host?.cloudStopped(.accountChanged)
+            }
+
+        case .fetchedDatabaseChanges(let changes):
+            for deletion in changes.deletions where deletion.zoneID == Self.zoneID {
+                switch deletion.reason {
+                case .encryptedDataReset:
+                    // The keys were reset and the encrypted fields went with
+                    // them. The library is still whole on this device, so it
+                    // is sent again in full.
+                    memory.systemFields = [:]
+                    memory.digests = [:]
+                    syncEngine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
+                    writeMemory()
+                    await noteChanges()
+                default:
+                    host?.cloudStopped(.cloudDataDeleted)
+                }
+            }
+
+        case .fetchedRecordZoneChanges(let changes):
+            receive(changes.modifications.map(\.record))
+            // The record's content says nothing here — see the type's notes —
+            // but its system fields are stale. The digest stays, so the
+            // slice is not sent straight back before this device prunes it too.
+            for deletion in changes.deletions {
+                memory.systemFields[deletion.recordID.recordName] = nil
+            }
+            if !changes.deletions.isEmpty { writeMemory() }
+
+        case .sentRecordZoneChanges(let sent):
+            handleSent(sent, engine: syncEngine)
+
+        case .sentDatabaseChanges(let sent):
+            for failure in sent.failedZoneSaves {
+                Self.log.error("zone save failed: \(failure.error.localizedDescription, privacy: .public)")
+                problem = Self.outcome(for: failure.error)
+            }
+
+        case .willFetchChanges, .willSendChanges:
+            problem = nil
+
+        case .didFetchRecordZoneChanges(let fetched):
+            if let error = fetched.error { problem = Self.outcome(for: error) }
+
+        case .didFetchChanges, .didSendChanges:
+            // Records held unread are still unread, whatever else went well.
+            report(problem ?? (memory.held.isEmpty ? .synced : .unreadableCopy))
+
+        default:
+            break
         }
     }
 
-    /// Packs the archive for iCloud. Costly, and owed nothing by the main
-    /// thread: a caller on it does this elsewhere and hands over the result.
-    func payload(for archive: LibraryArchive) -> Payload {
-        do {
-            return .ready(try Self.pack(archive))
-        } catch {
-            Self.log.error("iCloud copy could not be written: \(error.localizedDescription)")
+    /// Records another device wrote, folded into the library.
+    private func receive(_ records: [CKRecord]) {
+        var slices: [LibraryArchive] = []
+        for record in records where record.recordID.zoneID == Self.zoneID {
+            let name = record.recordID.recordName
+            memory.systemFields[name] = Self.systemFields(of: record)
+            guard let payload = record.encryptedValues[CloudRecord.payloadField] as? Data else { continue }
+            let format = record[CloudRecord.formatField] as? Int ?? CloudRecord.currentFormat
+            guard format <= CloudRecord.currentFormat, let slice = try? CloudRecord.slice(from: payload) else {
+                Self.log.error("record \(name, privacy: .public) is in format \(format), unreadable here")
+                memory.held[name] = Held(payload: payload, format: format)
+                problem = .unreadableCopy
+                continue
+            }
+            memory.held[name] = nil
+            memory.digests[name] = CloudRecord.digest(of: slice)
+            slices.append(slice)
+        }
+        writeMemory()
+        if !slices.isEmpty { host?.cloudDelivered(slices) }
+    }
+
+    /// Records held unread on an earlier launch, tried again by this build.
+    private func deliverHeld() {
+        var slices: [LibraryArchive] = []
+        for (name, held) in memory.held where held.format <= CloudRecord.currentFormat {
+            guard let slice = try? CloudRecord.slice(from: held.payload) else { continue }
+            memory.held[name] = nil
+            memory.digests[name] = CloudRecord.digest(of: slice)
+            slices.append(slice)
+        }
+        if !memory.held.isEmpty { report(.unreadableCopy) }
+        guard !slices.isEmpty else { return }
+        writeMemory()
+        host?.cloudDelivered(slices)
+    }
+
+    private func handleSent(_ sent: CKSyncEngine.Event.SentRecordZoneChanges, engine: CKSyncEngine) {
+        for record in sent.savedRecords {
+            memory.systemFields[record.recordID.recordName] = Self.systemFields(of: record)
+        }
+        for id in sent.deletedRecordIDs {
+            memory.systemFields[id.recordName] = nil
+        }
+
+        var arrived: [CKRecord] = []
+        var retry: [CKSyncEngine.PendingRecordZoneChange] = []
+        for failure in sent.failedRecordSaves {
+            let id = failure.record.recordID
+            switch failure.error.code {
+            case .serverRecordChanged:
+                // Another device got there first. Its copy is merged in, and
+                // what the merge makes of the two is sent in its place.
+                if let server = failure.error.serverRecord { arrived.append(server) }
+                retry.append(.saveRecord(id))
+            case .zoneNotFound:
+                engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
+                memory.systemFields[id.recordName] = nil
+                retry.append(.saveRecord(id))
+            case .unknownItem:
+                memory.systemFields[id.recordName] = nil
+                retry.append(.saveRecord(id))
+            case .networkFailure, .networkUnavailable, .zoneBusy, .serviceUnavailable,
+                 .requestRateLimited, .notAuthenticated, .operationCancelled:
+                // The engine keeps these pending and tries again itself.
+                break
+            default:
+                Self.log.error("save of \(id.recordName, privacy: .public) failed: \(failure.error.localizedDescription, privacy: .public)")
+                problem = Self.outcome(for: failure.error)
+            }
+        }
+        for (id, error) in sent.failedRecordDeletes where error.code != .unknownItem {
+            Self.log.error("delete of \(id.recordName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
+
+        if !arrived.isEmpty { receive(arrived) }
+        if !retry.isEmpty { engine.state.add(pendingRecordZoneChanges: retry) }
+        writeMemory()
+    }
+
+    // MARK: - Reporting
+
+    private func report(_ outcome: Outcome) {
+        host?.cloudReported(outcome)
+    }
+
+    static func outcome(for error: Error) -> Outcome {
+        guard let error = error as? CKError else { return .failed(error.localizedDescription) }
+        switch error.code {
+        case .notAuthenticated:
+            return .signedOut
+        case .quotaExceeded:
+            return .iCloudFull
+        case .missingEntitlement, .badContainer, .permissionFailure:
+            return .notConfigured
+        case .networkFailure, .networkUnavailable:
+            return .offline
+        case .serviceUnavailable, .requestRateLimited, .zoneBusy, .accountTemporarilyUnavailable:
+            return .unavailable
+        case .userDeletedZone:
+            return .cloudDataDeleted
+        default:
             return .failed(error.localizedDescription)
         }
     }
 
-    /// How large the archive is once packed, or nil if it could not be.
-    func size(of archive: LibraryArchive) -> Int? {
-        payload(for: archive).bytes
-    }
+    // MARK: - Keeping what was learned
 
-    @discardableResult
-    func save(_ archive: LibraryArchive) -> Outcome {
-        save(payload(for: archive))
-    }
-
-    @discardableResult
-    func save(_ payload: Payload) -> Outcome {
-        guard isConfigured else { return .notConfigured }
-        guard isAvailable else { return .signedOut }
-        switch payload {
-        case .failed(let reason):
-            return .failed(reason)
-        case .ready(let packed):
-            guard packed.count <= Self.quota else {
-                Self.log.error("Library is \(packed.count) bytes, over the \(Self.quota) byte quota.")
-                return .tooLarge(bytes: packed.count)
-            }
-            let store = NSUbiquitousKeyValueStore.default
-            store.set(packed, forKey: Self.key)
-            guard store.synchronize() else {
-                Self.log.error("iCloud would not take the library.")
-                return .rejected
-            }
-            return .synced
+    /// Written a moment later rather than at once: a fetch of a whole library
+    /// updates a system field per record, and the file holds them all.
+    private func writeMemory() {
+        pendingWrite?.cancel()
+        let generation = generation
+        pendingWrite = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            // A stop in between has forgotten all of this on purpose.
+            guard !Task.isCancelled, let self, generation == self.generation else { return }
+            let memory = self.memory
+            let url = self.memoryURL
+            await Task.detached(priority: .utility) {
+                guard let data = try? JSONEncoder().encode(memory) else { return }
+                try? data.write(to: url, options: .atomic)
+            }.value
         }
     }
 
-    /// Asks iCloud for anything newer. Changes arrive as a notification, so this
-    /// only prompts the check.
-    func pull() {
-        NSUbiquitousKeyValueStore.default.synchronize()
+    private static func recordID(_ name: String) -> CKRecord.ID {
+        CKRecord.ID(recordName: name, zoneID: zoneID)
     }
 
-    /// Roughly how much of the quota the library is using, for the Me screen.
-    ///
-    /// It packs the whole library to answer, so the caller holds on to what it
-    /// gets rather than asking once a frame — see ``EventStore/cloudUsage``.
-    func usage(of archive: LibraryArchive) -> Double {
-        Double(size(of: archive) ?? 0) / Double(Self.quota)
+    private nonisolated static func systemFields(of record: CKRecord) -> Data {
+        let coder = NSKeyedArchiver(requiringSecureCoding: true)
+        record.encodeSystemFields(with: coder)
+        coder.finishEncoding()
+        return coder.encodedData
     }
 
-    // MARK: - Payload
-
-    /// Event titles, venues and notes are mostly Japanese text, which is bulky
-    /// as UTF-8 and compresses well — worth doing against a fixed quota.
-    private static func pack(_ archive: LibraryArchive) throws -> Data {
-        let json = try JSONEncoder().encode(archive)
-        return try (json as NSData).compressed(using: .zlib) as Data
-    }
-
-    private static func unpack(_ data: Data) throws -> LibraryArchive {
-        let json = try (data as NSData).decompressed(using: .zlib) as Data
-        return try JSONDecoder().decode(LibraryArchive.self, from: json)
+    private nonisolated static func restoreRecord(from systemFields: Data) -> CKRecord? {
+        guard let coder = try? NSKeyedUnarchiver(forReadingFrom: systemFields) else { return nil }
+        coder.requiresSecureCoding = true
+        defer { coder.finishDecoding() }
+        return CKRecord(coder: coder)
     }
 }

@@ -111,7 +111,7 @@ Event content is not rewritten. Titles, venue names and performer names come fro
 
 ## Platforms
 
-iPhone and iPad from a single SwiftUI target, deployment target iOS 26.0. macOS and visionOS were dropped deliberately. The library is a plain JSON file in Application Support, mirrored to iCloud key-value storage. It has not been moved to SwiftData or CloudKit.
+iPhone and iPad from a single SwiftUI target, deployment target iOS 26.0. macOS and visionOS were dropped deliberately. The library is a plain JSON file in Application Support, synced record by record through CloudKit (`CKSyncEngine`, the reader's private database). It has not been moved to SwiftData.
 
 ## A note on the integration
 

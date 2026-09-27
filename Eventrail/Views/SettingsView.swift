@@ -193,67 +193,39 @@ struct SettingsView: View {
     }
 
     private func iCloudRow(store: Bindable<EventStore>) -> some View {
-        VStack(spacing: 0) {
-            Toggle(isOn: store.iCloudSyncEnabled) {
-                SettingRowLabel("icloud", "iCloud Sync",
-                         status: syncStatus, needsAttention: syncNeedsAttention)
-            }
-            .settingRowPadding()
-
-            if self.store.iCloudSyncEnabled, self.store.cloudUsage > 0.8 {
-                quotaMeter
-            }
+        Toggle(isOn: store.iCloudSyncEnabled) {
+            SettingRowLabel("icloud", "iCloud Sync",
+                     status: syncStatus, needsAttention: syncNeedsAttention)
         }
+        .settingRowPadding()
     }
 
     /// Anything the reader has to act on is said in the colour used for
     /// attention, not buried in the same grey as the ordinary case.
     private var syncNeedsAttention: Bool {
-        guard store.iCloudSyncEnabled, let status = store.syncStatus else { return false }
+        guard let status = store.syncStatus else { return false }
         return status != .synced
     }
 
     /// What syncing is doing right now, in as few words as will say it — never
-    /// a claim that it worked when it did not. Silent while it is off.
+    /// a claim that it worked when it did not. Silent while it is off, save
+    /// for why iCloud turned it off.
     private var syncStatus: Text? {
-        guard store.iCloudSyncEnabled else { return nil }
+        guard store.iCloudSyncEnabled else {
+            switch store.syncStatus {
+            case .accountChanged, .cloudDataDeleted:
+                return CloudSyncStatus.text(for: store.syncStatus)
+            default:
+                return nil
+            }
+        }
         switch store.syncStatus {
-        case .notConfigured:
-            return Text("iCloud is not available in this build")
-        case .signedOut:
-            return Text("Sign in to iCloud to sync")
-        case .accountChanged:
-            return Text("iCloud account changed — turn on again to sync")
-        case .unreadableCopy:
-            return Text("iCloud holds a library this version cannot read — update the app to sync")
-        case .rejected:
-            return Text("iCloud refused the library — will retry")
-        case .tooLarge(let bytes):
-            return Text("Too large to sync (\(bytes.formatted(.byteCount(style: .file))))")
-        case .failed(let reason):
-            return Text(verbatim: reason)
         case .synced, .none:
             guard let lastSynced = store.lastSynced else { return nil }
             return Text("Synced \(lastSynced, format: .relative(presentation: .named))")
+        case let status:
+            return CloudSyncStatus.text(for: status)
         }
-    }
-
-    /// iCloud's key-value storage has a fixed ceiling, and a library that grows
-    /// past it stops syncing silently. The reader gets the warning before that.
-    private var quotaMeter: some View {
-        HStack(spacing: 10) {
-            ProgressView(value: min(store.cloudUsage, 1))
-                .tint(store.cloudUsage >= 1 ? Color.favorite : Color.trackTicket)
-            Text(min(store.cloudUsage, 1), format: .percent.precision(.fractionLength(0)))
-                .font(.system(size: 12))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-        }
-        .padding(.leading, 48)
-        .padding(.trailing, 16)
-        .padding(.bottom, 12)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("iCloud storage used")
     }
 
     /// Off until the reader turns it on — see ``EventStore/calendarSyncEnabled``.
