@@ -224,8 +224,7 @@ struct WelcomeView: View {
     /// panel's to say.
     private var cloudStatus: Text? {
         switch store.syncStatus {
-        case .notConfigured, .signedOut, .unavailable, .accountChanged, .cloudDataDeleted,
-             .unreadableCopy, .iCloudFull, .failed:
+        case .notConfigured, .signedOut, .unavailable, .iCloudFull, .failed:
             CloudSyncStatus.text(for: store.syncStatus)
         default:
             nil

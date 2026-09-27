@@ -185,10 +185,11 @@ struct FollowingReadTests {
 
     // MARK: - Through the store
 
-    /// A store with nothing behind it — no file, no iCloud, no calendar — the
-    /// way the previews build one.
+    /// A store with nothing behind it — a store in memory, no iCloud, no
+    /// calendar — the way the previews build one.
     @MainActor private func store() -> EventStore {
-        EventStore(file: nil, cloud: nil, calendar: nil, venues: nil, pageReads: nil)
+        EventStore(database: LibraryDatabase(at: .memory, syncing: false), libraryFile: nil,
+                   calendar: nil, venues: nil, pageReads: nil)
     }
 
     @MainActor @Test func markingInBulkLeavesTheRestAlone() {

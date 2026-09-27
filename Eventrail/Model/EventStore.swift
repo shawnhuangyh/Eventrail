@@ -1,4 +1,6 @@
 import Foundation
+import OSLog
+import SwiftData
 import SwiftUI
 
 /// Which slice of the library the Events tab shows.
@@ -107,27 +109,40 @@ struct EventGroup: Identifiable {
     }
 }
 
-/// The reader's library, and every write to it.
+/// Every write to the reader's library.
 ///
-/// Imported facts and the reader's own records are kept strictly apart: an
-/// import replaces ``LibraryArchive/events`` and never reads or writes tracking,
-/// membership or favorites. Every change is mirrored to ``LibraryFile`` so it
-/// survives the app closing, and — when the reader has it switched on — sent
-/// through ``CloudSync`` so their other devices see it.
+/// The library itself is ``LibraryDatabase``: one SwiftData row per record,
+/// which the screens read with `@Query` and SwiftData syncs when the reader
+/// has iCloud Sync on. This is where it is written, by the rules
+/// ``LibraryArchive`` has always kept — a removal is a tombstone, an import
+/// restores what the linked account still lists, a tracking record remembers
+/// when each answer changed. Imported facts and the reader's own records are
+/// kept strictly apart: an import writes membership and the event's facts,
+/// and never the reader's tracking or favorites.
 @Observable
 @MainActor
-final class EventStore: CloudSyncHost {
-    /// Everything the reader owns. Kept as one value so a merge from another
-    /// device is a single, reviewable operation rather than a dozen assignments.
-    private var archive: LibraryArchive
+final class EventStore {
+    private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "library")
+
+    /// Where the library is kept.
+    let database: LibraryDatabase
+
+    /// Every event row, by event id — how anything holding an event, kept or
+    /// not, finds the reader's record about it without a query of its own.
+    /// Rebuilt whenever the rows may have changed underneath: a launch,
+    /// another device's changes, a restore, the store opened again.
+    private var rows: [Event.ID: LibraryEvent] = [:]
+    private var performerRows: [Int: FollowedPerformer] = [:]
+    private var settingsRow: LibrarySettings?
 
     private(set) var isRefreshing = false
     /// Why the last import stopped short, if it did. A failed import keeps the
     /// previous snapshot and the timestamp that goes with it.
     private(set) var refreshFailure: String?
 
-    private(set) var syncStatus: CloudSync.Outcome?
-    private(set) var lastSynced: Date?
+    /// How syncing stands — see ``LibraryDatabase/SyncStatus``.
+    var syncStatus: LibraryDatabase.SyncStatus? { database.syncStatus }
+    var lastSynced: Date? { database.lastSynced }
 
     /// What a refresh is doing at this moment. Reading a nine-page history and
     /// re-reading nine hundred event pages take very different amounts of time,
@@ -172,12 +187,11 @@ final class EventStore: CloudSyncHost {
         didSet {
             guard iCloudSyncEnabled != oldValue else { return }
             UserDefaults.standard.set(iCloudSyncEnabled, forKey: Self.syncPreferenceKey)
-            if iCloudSyncEnabled {
-                Task { await syncNow() }
-            } else {
-                syncStatus = nil
-                Task { await cloud?.stop() }
-            }
+            // Written out first: the store is about to be opened again the
+            // other way, and the rows held here belong to the old container.
+            saveNow()
+            database.setSyncing(iCloudSyncEnabled)
+            reindex()
         }
     }
 
@@ -224,20 +238,17 @@ final class EventStore: CloudSyncHost {
     /// one has run.
     private(set) var calendarStatus: CalendarSync.Outcome?
 
-    /// How many library files this build found and could not read. Each was
-    /// set aside rather than written over — see ``LibraryFile/load()`` — and
-    /// Settings says so, since the library on screen is missing what they hold.
+    /// How many library files an older build set aside unread and this one
+    /// cannot read either — see ``LibraryFile/load()``. Settings says so,
+    /// since the library on screen is missing what they hold.
     private(set) var unreadableLibraryFiles = 0
 
-    /// Whether the library file on disk could not be read this launch and is
-    /// still where it was — see ``LibraryFile/Contents/isBlocked``. Nothing is
-    /// written to it meanwhile; each save tries the read again first
-    /// (``fileToWrite()``), and Settings says so while it lasts.
+    /// Whether the store would not open this launch, or the library file an
+    /// older build kept would not open to be moved in — a device not yet
+    /// unlocked since it started, most likely. Nothing is written over either
+    /// meanwhile; coming back to the app tries again (``syncNow()``), and
+    /// Settings says so while it lasts.
     private(set) var libraryFileIsBlocked = false
-
-    /// Set-aside files folded back in at launch, deleted once the library
-    /// holding them is on disk — see ``LibraryFile/discard(_:)``.
-    private var recoveredCopies: [URL] = []
 
     /// What a refresh of the venues is doing, or what the last one did. Nil
     /// until the reader asks for one.
@@ -254,8 +265,9 @@ final class EventStore: CloudSyncHost {
     /// reader's, so they are neither saved nor synced until one is kept.
     private var seen: [Event.ID: Event] = [:]
 
-    private let file: LibraryFile?
-    private let cloud: CloudSync?
+    /// The JSON library older builds kept, moved into ``database`` — see
+    /// ``LibraryDatabase/moveIn(from:)``.
+    private let libraryFile: LibraryFile?
     private let calendar: CalendarSync?
     private let venues: VenuePlaces?
     /// Which event pages this device has already read, so a refresh does not
@@ -276,13 +288,13 @@ final class EventStore: CloudSyncHost {
     /// middle of one — waits for it rather than asking for the page again.
     private var detailReads: [Event.ID: Task<PageRead, Never>] = [:]
 
-    /// The default store reads the reader's own library from disk and, if they
-    /// have sync on, merges whatever iCloud holds. Previews and the playground
-    /// pass events in and leave `file` and `cloud` nil, so nothing they do is
-    /// written or synced anywhere.
+    /// The default store opens the reader's own library, synced or not as
+    /// they last said. Previews and tests hand in a database held in memory
+    /// and leave the file, the calendar and the venues out, so nothing they
+    /// do is written or synced anywhere.
     init(
-        file: LibraryFile? = .shared,
-        cloud: CloudSync? = .shared,
+        database: LibraryDatabase? = nil,
+        libraryFile: LibraryFile? = .shared,
         calendar: CalendarSync? = .shared,
         venues: VenuePlaces? = .shared,
         pageReads: PageReads? = .shared,
@@ -291,50 +303,32 @@ final class EventStore: CloudSyncHost {
         tracking: [Event.ID: Tracking] = [:],
         follows: [PerformerProfile] = []
     ) {
-        self.file = file
-        self.cloud = cloud
+        // Off until the reader says otherwise, the same as the calendar. A
+        // store handed its database never syncs.
+        let syncing = database == nil && UserDefaults.standard.bool(forKey: Self.syncPreferenceKey)
+        self.database = database ?? LibraryDatabase(syncing: syncing)
+        self.libraryFile = libraryFile
         self.calendar = calendar
         self.venues = venues
         self.pageReads = pageReads
         self.client = client
 
-        // Off until the reader says otherwise, the same as the calendar. A
-        // preview has no file and never syncs.
-        iCloudSyncEnabled = file != nil
-            && UserDefaults.standard.bool(forKey: Self.syncPreferenceKey)
+        iCloudSyncEnabled = syncing
         calendarSyncEnabled = calendar != nil
             && UserDefaults.standard.bool(forKey: Self.calendarPreferenceKey)
         preciseVenuesEnabled = venues?.usesOpenStreetMap ?? false
 
-        let contents = file?.load()
-        unreadableLibraryFiles = contents?.unreadable ?? 0
-        libraryFileIsBlocked = contents?.isBlocked ?? false
-        recoveredCopies = contents?.recoveredCopies ?? []
-        var loaded = contents?.archive ?? LibraryArchive()
-        if loaded.membership.isEmpty, !library.isEmpty {
-            loaded.events = Dictionary(library.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            loaded.membership = library.reduce(into: [:]) { $0[$1.id] = Stamped(true) }
-            loaded.tracking = tracking.mapValues { Stamped($0) }
-        }
-        if loaded.follows == nil, !follows.isEmpty {
-            loaded.follows = follows.reduce(into: [:]) { $0[String($1.id)] = Stamped(true) }
-            loaded.followedPerformers = follows.reduce(into: [:]) { $0[String($1.id)] = $1 }
-        }
-        archive = loaded
+        moveInLibraryFile()
+        seed(library: library, tracking: tracking, follows: follows)
+        self.database.onRemoteChanges = { [weak self] in self?.remoteChangesArrived() }
 
-        // Before the merge below, which returns on a device that does not sync:
-        // a hall being placed is owed a mirror whether or not this one does.
+        // A hall being placed is owed a mirror whether or not this device syncs.
         observeVenuePlacings()
-
-        // What another device wrote arrives once the engine has started.
-        if iCloudSyncEnabled, cloud != nil {
-            Task { await self.syncNow() }
-        }
 
         // Written back rather than only held: what this corrects is a night
         // abroad imported before its hall was placed, and correcting it once a
         // launch would be correcting it forever.
-        if retimeEvents() || contents?.recovered == true { persist() }
+        if retimeEvents() { save() }
     }
 
     isolated deinit {
@@ -343,23 +337,121 @@ final class EventStore: CloudSyncHost {
         pendingSave?.cancel()
     }
 
+    /// Moves the JSON library an older build kept into the store, and folds
+    /// back any copy one set aside unread — see ``LibraryDatabase/moveIn(from:)``.
+    /// Tried again while either would not open.
+    private func moveInLibraryFile() {
+        database.reopen()
+        let contents = libraryFile.flatMap { database.moveIn(from: $0) }
+        unreadableLibraryFiles = contents?.unreadable ?? 0
+        libraryFileIsBlocked = database.isBlocked || contents?.isBlocked == true
+        reindex()
+    }
+
+    /// What a preview is handed, written into its empty store.
+    private func seed(library: [Event], tracking: [Event.ID: Tracking], follows: [PerformerProfile]) {
+        if rows.isEmpty {
+            for event in library {
+                guard let row = makeRow(for: event.id) else { continue }
+                row.facts = event
+                row.membership = Stamped(true)
+                row.tracking = tracking[event.id].map { Stamped($0) }
+            }
+        }
+        if performerRows.isEmpty {
+            for performer in follows {
+                guard let row = makePerformerRow(for: performer.id) else { continue }
+                row.follow = Stamped(true)
+                row.profile = performer
+            }
+        }
+        commit()
+    }
+
+    // MARK: - Rows
+
+    /// Reads every row into the index, after anything that may have changed
+    /// them underneath.
+    private func reindex() {
+        guard let context = database.context else {
+            rows = [:]
+            performerRows = [:]
+            settingsRow = nil
+            return
+        }
+        let events = (try? context.fetch(FetchDescriptor<LibraryEvent>())) ?? []
+        rows = Dictionary(events.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
+        let performers = (try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? []
+        performerRows = Dictionary(performers.map { ($0.actorID, $0) }, uniquingKeysWith: { first, _ in first })
+        settingsRow = (try? context.fetch(FetchDescriptor<LibrarySettings>()))?.first
+        revision += 1
+    }
+
+    /// The reader's record about an event, if they have one.
+    func record(for id: Event.ID) -> LibraryEvent? { rows[id] }
+
+    /// The row an event's record is written to, made where there is none.
+    /// Nil only while the store will not open.
+    private func makeRow(for id: Event.ID) -> LibraryEvent? {
+        if let row = rows[id] { return row }
+        if database.isBlocked { moveInLibraryFile() }
+        guard let context = database.context else { return nil }
+        let row = LibraryEvent(eventID: id)
+        context.insert(row)
+        rows[id] = row
+        return row
+    }
+
+    private func makePerformerRow(for id: Int) -> FollowedPerformer? {
+        if let row = performerRows[id] { return row }
+        if database.isBlocked { moveInLibraryFile() }
+        guard let context = database.context else { return nil }
+        let row = FollowedPerformer(actorID: id)
+        context.insert(row)
+        performerRows[id] = row
+        return row
+    }
+
+    private func makeSettingsRow() -> LibrarySettings? {
+        if let settingsRow { return settingsRow }
+        if database.isBlocked { moveInLibraryFile() }
+        guard let context = database.context else { return nil }
+        let row = LibrarySettings()
+        context.insert(row)
+        settingsRow = row
+        return row
+    }
+
+    /// Prunes one row the way ``LibraryArchive/pruned()`` would: an event
+    /// nothing keeps any more loses its facts, and a row with nothing left to
+    /// say goes. Tombstones stay.
+    private func settle(_ row: LibraryEvent) {
+        let slice = row.slice
+        let pruned = slice?.pruned().slice(for: row.key)
+        guard pruned != slice else { return }
+        if let pruned {
+            row.take(pruned)
+        } else {
+            rows[row.eventID] = nil
+            database.context?.delete(row)
+        }
+    }
+
     // MARK: - Reading
 
-    var library: [Event] { archive.libraryEvents }
+    var library: [Event] { rows.values.compactMap { $0.inLibrary ? $0.facts : nil } }
 
-    var recentSearches: [String] { archive.recentSearches.value }
+    var recentSearches: [String] { settingsRow?.recentSearches ?? [] }
 
-    var lastRefreshed: Date? { archive.lastRefreshed }
+    var lastRefreshed: Date? { settingsRow?.lastRefreshed }
 
     /// The Eventernote account the reader imports from, if they have named one.
-    var eventernoteHandle: String? { archive.eventernoteAccount?.value }
+    var eventernoteHandle: String? { settingsRow?.account }
 
     /// How the linked account presents itself, as of the last page read from it.
     var eventernoteProfile: LinkedProfile? {
-        // Guarded on the handle: an unlink leaves nothing to caption, and a
-        // profile merged in beside a handle this device does not hold would
-        // name an account the reader is not linked to.
-        isLinked ? archive.eventernoteProfile : nil
+        // Guarded on the handle: an unlink leaves nothing to caption.
+        isLinked ? settingsRow?.eventernoteProfile : nil
     }
 
     /// Whether an account has been named. ``refresh()`` needs one — it is the
@@ -367,7 +459,7 @@ final class EventStore: CloudSyncHost {
     var isLinked: Bool { eventernoteHandle != nil }
 
     func tracking(for event: Event) -> Tracking {
-        archive.tracking[event.id]?.value ?? Tracking()
+        rows[event.id]?.tracking?.value ?? Tracking()
     }
 
     /// The one badge a row wears, read from where the event stands.
@@ -385,9 +477,9 @@ final class EventStore: CloudSyncHost {
         return isKept ? .planned : .untracked
     }
 
-    func isInLibrary(_ event: Event) -> Bool { archive.isInLibrary(event.id) }
+    func isInLibrary(_ event: Event) -> Bool { rows[event.id]?.inLibrary == true }
 
-    func isFavorite(_ event: Event) -> Bool { archive.isFavorite(event.id) }
+    func isFavorite(_ event: Event) -> Bool { rows[event.id]?.isFavorite == true }
 
     /// Whether emptying the library would still take anything.
     ///
@@ -395,37 +487,38 @@ final class EventStore: CloudSyncHost {
     /// ticket status outlives the event it was written on, so this stays true
     /// while either is still held.
     var hasRecordsToDelete: Bool {
-        !library.isEmpty
-            || !favoriteEvents.isEmpty
-            || archive.tracking.contains { !$0.value.value.isEmpty }
+        rows.values.contains { $0.inLibrary || $0.isFavorite || !($0.tracking?.value.isEmpty ?? true) }
             || eventernoteHandle != nil
-            || (archive.follows ?? [:]).values.contains(where: \.value)
+            || performerRows.values.contains(where: \.isFollowing)
     }
 
     /// The freshest copy of an event this app holds, wherever it came from.
     func event(id: Event.ID) -> Event? {
-        archive.events[id] ?? seen[id]
+        rows[id]?.facts ?? seen[id]
     }
 
     // MARK: - Writing
 
     func setTracking(_ tracking: Tracking, for event: Event) {
+        guard let row = makeRow(for: event.id) else { return }
         // Written against the record as it stands, so that a merge can tell
         // which of the five answers this device actually changed — see
         // ``Stamped/edited(to:at:)``. A record this device has never held is
         // as old as a record can be: every answer in it is one the reader has
         // not given here, so the other device's copy of any of them outranks
         // it.
-        let held = archive.tracking[event.id] ?? Stamped(Tracking(), at: .distantPast)
-        archive.tracking[event.id] = held.edited(to: tracking)
-        keep(event)
-        persist()
+        let held = row.tracking ?? Stamped(Tracking(), at: .distantPast)
+        row.tracking = held.edited(to: tracking)
+        keep(event, in: row)
+        save()
     }
 
     func toggleFavorite(_ event: Event) {
-        archive.favorites[event.id] = Stamped(!isFavorite(event))
-        keep(event)
-        persist()
+        guard let row = makeRow(for: event.id) else { return }
+        row.favorite = Stamped(!row.isFavorite)
+        keep(event, in: row)
+        settle(row)
+        save()
     }
 
     /// Copying an event found in search into the library is always explicit: an
@@ -433,34 +526,38 @@ final class EventStore: CloudSyncHost {
     /// answers only for this device and the reader's other ones — an event the
     /// linked account still lists is imported again on the next refresh.
     func toggleLibraryMembership(_ event: Event) {
-        let wasIn = isInLibrary(event)
-        archive.membership[event.id] = Stamped(!wasIn)
+        guard let row = makeRow(for: event.id) else { return }
+        let wasIn = row.inLibrary
         if wasIn {
-            if archive.tracking[event.id]?.value.isEmpty ?? true { archive.tracking[event.id] = nil }
+            tombstone(row, at: .now)
         } else {
+            row.membership = Stamped(true)
             // Nothing to write down: being in the library is what says the
             // reader means to go, which is what a tracking record used to be
             // opened to say for it.
-            keep(event)
+            keep(event, in: row)
             placeAdded(event)
         }
-        persist()
+        save()
     }
 
     /// Takes events out of the library in one go.
     ///
     /// Each one is tombstoned rather than dropped, exactly as a single removal
-    /// is: the other device has to be told a removal happened, or the next merge
-    /// would hand all of them straight back. The tombstone answers for the
-    /// reader's devices and not for Eventernote — an event still on the linked
-    /// account is imported again by the next refresh.
+    /// is: the other device has to be told a removal happened, or it would
+    /// hand all of them straight back. The tombstone answers for the reader's
+    /// devices and not for Eventernote — an event still on the linked account
+    /// is imported again by the next refresh.
     ///
     /// Favorites are left alone. Hearting an event says "keep this in front of
     /// me", which is a separate answer from whether it is in the library.
     func remove(_ events: some Sequence<Event>) {
         let now = Date.now
-        for event in events { tombstone(event.id, at: now) }
-        persist()
+        for event in events {
+            guard let row = rows[event.id] else { continue }
+            tombstone(row, at: now)
+        }
+        save()
     }
 
     /// Empties the library, and with it the favorites, everything the reader
@@ -478,34 +575,33 @@ final class EventStore: CloudSyncHost {
     /// the reader thought they had just deleted.
     ///
     /// Each record is emptied rather than dropped, for the same reason a removal
-    /// is a tombstone: a dropped key would let the next merge hand the other
-    /// device's copy of the note straight back. An empty record is pruned once
-    /// it has settled, exactly as a tombstone is.
+    /// is a tombstone: a dropped record would let the other device's copy of
+    /// the note come straight back.
     func removeAllEvents() {
         let now = Date.now
-        for event in library { tombstone(event.id, at: now) }
-        for id in archive.favorites.filter(\.value.value).keys {
-            archive.favorites[id] = Stamped(false, at: now)
-        }
-        for (id, record) in archive.tracking where !record.value.isEmpty {
-            archive.tracking[id] = Stamped(Tracking(), at: now)
-        }
-        // Every Following date back to unread, on every device: written as a
-        // record with no fingerprint rather than dropped, or the other
-        // device's copy of each read would come straight back in the merge.
-        for (id, record) in archive.followingReads ?? [:] where record.value.fingerprint != nil {
-            archive.followingReads?[id] = Stamped(FollowingRead(fingerprint: nil, day: record.value.day),
-                                                  at: now)
+        for row in Array(rows.values) {
+            if row.inLibrary { tombstone(row, at: now) }
+            if row.isFavorite { row.favorite = Stamped(false, at: now) }
+            if let record = row.tracking, !record.value.isEmpty {
+                row.tracking = Stamped(Tracking(), at: now)
+            }
+            // Every Following date back to unread, on every device: written as
+            // a record with no fingerprint rather than dropped, or the other
+            // device's copy of each read would come straight back.
+            if let read = row.followingRead, read.value.fingerprint != nil {
+                row.followingRead = Stamped(FollowingRead(fingerprint: nil, day: read.value.day), at: now)
+            }
+            settle(row)
         }
         // Everyone followed goes too, as tombstones so the other device's
-        // follows are not merged back; `pruned()` drops their profiles.
-        for (id, record) in archive.follows ?? [:] where record.value {
-            archive.follows?[id] = Stamped(false, at: now)
+        // follows do not come back, and with them who they were.
+        for row in performerRows.values {
+            if row.isFollowing { row.follow = Stamped(false, at: now) }
+            row.profile = nil
         }
-        archive.followedPerformers = [:]
         // And the account, so the next refresh does not import it all back.
         unlinkAccount()
-        persist()
+        save()
     }
 
     // MARK: - What the reader has looked at on Following and My Events
@@ -513,42 +609,49 @@ final class EventStore: CloudSyncHost {
     /// Whether this copy of a Following row is one the reader has not seen —
     /// see ``FollowingRead``. My Events reads the same record for its
     /// upcoming rows, so a date read on one tab is read on the other.
-    func isUnread(_ event: Event) -> Bool { archive.isUnread(event) }
+    func isUnread(_ event: Event) -> Bool { unread(event) != nil }
 
     /// Why a Following row is unread — new, or changed since it was read —
     /// or nil where it is read.
-    func unread(_ event: Event) -> FollowingUnread? { archive.unread(event) }
+    func unread(_ event: Event) -> FollowingUnread? {
+        var read = LibraryArchive()
+        read.followingReads = rows[event.id]?.followingRead.map { [event.id: $0] }
+        return read.unread(event)
+    }
 
     /// Marks these rows read as the listing prints them now, or unread again.
     /// One write for the lot, however many there are — Select All then Mark
     /// is hundreds of them.
     func markRead(_ events: some Sequence<Event>, read: Bool) {
         let now = Date.now
-        var reads = archive.followingReads ?? [:]
         var changed = false
-        for event in events where archive.isUnread(event) == read {
-            reads[event.id] = Stamped(
+        for event in events where isUnread(event) == read {
+            guard let row = makeRow(for: event.id) else { continue }
+            row.followingRead = Stamped(
                 FollowingRead(fingerprint: read ? event.listingFingerprint : nil, day: event.date),
                 at: now)
             changed = true
         }
         guard changed else { return }
-        archive.followingReads = reads
-        persist()
+        save()
     }
 
     /// Marks one event as removed. A note the reader typed outlives its event,
     /// so that re-adding it later brings the note back; an empty record does not.
-    private func tombstone(_ id: Event.ID, at now: Date) {
-        archive.membership[id] = Stamped(false, at: now)
-        if archive.tracking[id]?.value.isEmpty ?? true {
-            archive.tracking[id] = nil
+    private func tombstone(_ row: LibraryEvent, at now: Date) {
+        // Held on to, so a sheet still open on it keeps resolving once its
+        // facts are pruned from the row.
+        if let facts = row.facts { seen[row.eventID] = facts }
+        row.membership = Stamped(false, at: now)
+        if row.tracking?.value.isEmpty ?? true {
+            row.tracking = nil
         }
+        settle(row)
     }
 
     /// Holds on to what a search turned up, without adding any of it.
     func remember(_ events: [Event]) {
-        for event in events where archive.events[event.id] == nil {
+        for event in events where rows[event.id]?.hasFacts != true {
             seen[event.id] = event
         }
     }
@@ -569,27 +672,28 @@ final class EventStore: CloudSyncHost {
 
     func remember(search term: String) {
         let term = term.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty else { return }
-        var recents = archive.recentSearches.value
+        guard !term.isEmpty, let settings = makeSettingsRow() else { return }
+        var recents = settings.recentSearches
         recents.removeAll { $0.caseInsensitiveCompare(term) == .orderedSame }
         recents.insert(term, at: 0)
-        archive.recentSearches = Stamped(Array(recents.prefix(8)))
-        persist()
+        settings.searches = Stamped(Array(recents.prefix(8)))
+        save()
     }
 
     func clearRecentSearches() {
-        archive.recentSearches = Stamped([])
-        persist()
+        guard let settings = makeSettingsRow() else { return }
+        settings.searches = Stamped([])
+        save()
     }
 
-    /// Moves an event out of the transient search results and into the archive,
-    /// which is what makes it worth saving and syncing.
-    private func keep(_ event: Event) {
-        let known = archive.events[event.id]
+    /// Writes an event's facts into its row, which is what makes them worth
+    /// saving and syncing.
+    private func keep(_ event: Event, in row: LibraryEvent) {
+        let known = row.facts
         let kept = known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event
-        archive.events[event.id] = kept
+        row.facts = kept
         // Also left in `seen`, so a sheet still open keeps resolving if the
-        // reader un-favorites it and pruning drops it from the archive.
+        // reader un-favorites it and pruning drops the facts from the row.
         seen[event.id] = kept
     }
 
@@ -601,8 +705,8 @@ final class EventStore: CloudSyncHost {
     /// cleared under is not stamped fresh on its way in.
     private func apply(_ imported: Event, asked: Date) {
         pageReads?.record(imported.id, asked: asked)
-        if archive.events[imported.id] != nil {
-            archive.events[imported.id] = imported
+        if let row = rows[imported.id], row.hasFacts {
+            row.facts = imported
         } else {
             seen[imported.id] = imported
         }
@@ -618,7 +722,7 @@ final class EventStore: CloudSyncHost {
         let asked = Date.now
         guard let imported = try? await client.detail(for: event) else { return event }
         apply(imported, asked: asked)
-        persist()
+        save()
         return imported
     }
 
@@ -669,7 +773,7 @@ final class EventStore: CloudSyncHost {
                 let asked = Date.now
                 let imported = try await client.detail(for: event)
                 apply(imported, asked: asked)
-                persist()
+                save()
                 return .updated
             } catch {
                 return .failed(error.localizedDescription)
@@ -729,8 +833,8 @@ final class EventStore: CloudSyncHost {
         // The timestamp moves only when something actually arrived, so a run
         // that reached nothing cannot pass itself off as a successful refresh.
         guard landed else { return true }
-        archive.lastRefreshed = .now
-        persist()
+        makeSettingsRow()?.lastRefreshed = .now
+        save()
         placeArrivedVenues()
         return true
     }
@@ -758,7 +862,7 @@ final class EventStore: CloudSyncHost {
             // Before the report and its early return: a run that placed
             // nothing new may still have settled which clock a hall abroad
             // keeps, and the events there are owed that.
-            if retimeEvents() { persist() }
+            if retimeEvents() { save() }
             // Nothing to ask about is nothing to report: a status here would
             // put "Placed 0 of 0 venues" under a Settings row that had done
             // no work, where nil correctly leaves it saying what it would do.
@@ -831,7 +935,7 @@ final class EventStore: CloudSyncHost {
         // something was actually placed: a hall already known is no news, and
         // neither is a hall nobody can find.
         if case .refreshed(let found, _) = outcome, found > 0 {
-            if retimeEvents() { persist() }
+            if retimeEvents() { save() }
             mirrorSoon()
         }
     }
@@ -855,11 +959,11 @@ final class EventStore: CloudSyncHost {
         else { return 0 }
 
         let profile = LinkedProfile(name: read.name, avatarURL: read.avatarURL)
-        let changedProfile = profile != archive.eventernoteProfile
-        if changedProfile { archive.eventernoteProfile = profile }
+        let changedProfile = profile != settingsRow?.eventernoteProfile
+        if changedProfile { makeSettingsRow()?.eventernoteProfile = profile }
 
         let follows = adoptFollows(read.favoritePerformers)
-        if changedProfile || follows.changed { persist() }
+        if changedProfile || follows.changed { save() }
         return follows.added
     }
 
@@ -891,32 +995,27 @@ final class EventStore: CloudSyncHost {
     ) -> (added: Int, changed: Bool) {
         guard !performers.isEmpty else { return (0, false) }
         let now = Date.now
-        var follows = archive.follows ?? [:]
-        var profiles = archive.followedPerformers ?? [:]
         var added = 0
         var changed = false
 
         for performer in performers {
-            let key = String(performer.id)
+            guard let row = makePerformerRow(for: performer.id) else { continue }
             // Anything but an existing `true` is written: a missing record is
             // the first read of them, and a tombstone is undone by the same act
             // that would have to undo it — asking Eventernote again.
-            if follows[key]?.value != true {
-                follows[key] = Stamped(true, at: now)
+            if row.follow?.value != true {
+                row.follow = Stamped(true, at: now)
                 added += 1
                 changed = true
             }
-            guard profiles[key] == nil else { continue }
+            guard row.profile == nil else { continue }
             // Also reaches a follow recorded before the app kept profiles, which
             // until now had an actor id and no way to name it.
-            profiles[key] = performer
+            row.profile = performer
             changed = true
         }
 
-        guard changed else { return (0, false) }
-        archive.follows = follows
-        archive.followedPerformers = profiles
-        return (added, true)
+        return changed ? (added, true) : (0, false)
     }
 
     /// The events whose own page is worth asking for.
@@ -1023,29 +1122,30 @@ final class EventStore: CloudSyncHost {
         // reader has just looked at a fresh copy of their page — it is the newest
         // the app will have until the next refresh, so it is kept either way.
         let isSameAccount = profile.handle == eventernoteHandle
-        archive.eventernoteProfile = LinkedProfile(name: profile.name, avatarURL: profile.avatarURL)
-        guard !isSameAccount else { return persist() }
+        guard let settings = makeSettingsRow() else { return }
+        settings.eventernoteProfile = LinkedProfile(name: profile.name, avatarURL: profile.avatarURL)
+        guard !isSameAccount else { return save() }
 
-        archive.eventernoteAccount = Stamped(profile.handle)
-        archive.lastImported = nil
+        settings.eventernoteAccount = Stamped<String?>(profile.handle)
+        settings.lastImported = nil
         importSummary = nil
         refreshFailure = nil
-        persist()
+        save()
     }
 
     /// Forgets the account. What it already imported stays: those events are in
     /// the library now, and unlinking is about where the app looks next, not
     /// about undoing what the reader has collected.
     func unlinkAccount() {
-        guard eventernoteHandle != nil else { return }
+        guard eventernoteHandle != nil, let settings = settingsRow else { return }
         // A nil inside the stamp rather than a dropped record, so the unlink
         // reaches the other device instead of being merged away.
-        archive.eventernoteAccount = Stamped(nil)
-        archive.eventernoteProfile = nil
-        archive.lastImported = nil
+        settings.eventernoteAccount = Stamped<String?>(nil)
+        settings.eventernoteProfile = nil
+        settings.lastImported = nil
         importSummary = nil
         refreshFailure = nil
-        persist()
+        save()
     }
 
     /// Imports every event the linked account is listed as attending.
@@ -1099,7 +1199,7 @@ final class EventStore: CloudSyncHost {
         var seen: Set<Event.ID> = []
         let distinct = imported.filter { seen.insert($0.id).inserted }
 
-        archive.lastImported = .now
+        makeSettingsRow()?.lastImported = .now
         importSummary = ImportSummary(read: distinct.count, added: adopt(distinct))
         return true
     }
@@ -1119,31 +1219,34 @@ final class EventStore: CloudSyncHost {
         var added = 0
 
         for event in imported {
+            guard let row = makeRow(for: event.id) else { continue }
             // A removal is not permanent. The account's history is what the
             // reader is asking for when they tap Refresh, so an event they took
             // out comes back if Eventernote still lists it — the same rule the
             // favourites follow. Taking one out for good means taking it off the
             // account, and an event that was never on it stays gone.
-            let isNew = !archive.isInLibrary(event.id)
-            if isNew {
-                archive.membership[event.id] = Stamped(true, at: now)
+            if !row.inLibrary {
+                row.membership = Stamped(true, at: now)
                 added += 1
             }
-            keep(event)
+            keep(event, in: row)
         }
         return added
     }
 
     // MARK: - Syncing
 
-    /// Asks iCloud for whatever another device wrote and sends whatever this
-    /// one has waiting — or, the first time, starts syncing at all.
+    /// Catches up on coming back to the app: tries the store again if it
+    /// would not open, and brings the calendar into line.
+    ///
+    /// iCloud needs nothing from here — SwiftData imports what another
+    /// device wrote and sends what this one has, by itself, and
+    /// ``remoteChangesArrived()`` picks up what lands.
     func syncNow() async {
         // A ticket bought on the other device is a calendar entry owed on this
         // one, so the mirror runs whether or not iCloud is in the picture.
         defer { Task { await mirrorCalendar() } }
-        guard iCloudSyncEnabled, let cloud else { return }
-        await cloud.sync(for: self)
+        if libraryFileIsBlocked { moveInLibraryFile() }
     }
 
     /// Flushes a pending write immediately.
@@ -1153,46 +1256,15 @@ final class EventStore: CloudSyncHost {
     func saveNow() {
         pendingSave?.cancel()
         pendingSave = nil
-        archive = archive.pruned()
-        writeFile()
-        if iCloudSyncEnabled, let cloud {
-            Task { await cloud.noteChanges() }
-        }
+        commit()
     }
 
-    /// This device's side of the exchange — see ``CloudSync``.
-    var archiveForCloud: LibraryArchive { archive }
-
-    /// Folds in what another device wrote. Merged rather than adopted: this
-    /// device may have edits of its own that have not gone out yet, and the
-    /// save behind this sends whatever the merge made of the two.
-    func cloudDelivered(_ slices: [LibraryArchive]) {
-        archive = archive.merging(contentsOf: slices)
-        retimeEvents()
-        lastSynced = .now
-        persist()
-    }
-
-    func cloudReported(_ outcome: CloudSync.Outcome) {
-        guard iCloudSyncEnabled else { return }
-        syncStatus = outcome
-        if outcome == .synced { lastSynced = .now }
-    }
-
-    /// iCloud stopped being somewhere this library may go.
-    ///
-    /// A different account signed in, or the reader deleted Eventrail's data
-    /// from iCloud. Syncing stops rather than carrying on quietly: in the
-    /// first case the library on this device was gathered under the account
-    /// that just left, and merging it into somebody else's would put one
-    /// reader's records in the other's iCloud; in the second, sending it all
-    /// straight back would undo what the reader just did. Turning the switch
-    /// back on is the reader saying otherwise.
-    func cloudStopped(_ outcome: CloudSync.Outcome) {
-        // The switch clears the status on its way down, so the reason is
-        // written after it rather than before.
-        iCloudSyncEnabled = false
-        syncStatus = outcome
+    /// Another device's changes have landed and been folded in — see
+    /// ``LibraryDatabase/onRemoteChanges``.
+    private func remoteChangesArrived() {
+        reindex()
+        if retimeEvents() { save() }
+        mirrorSoon()
     }
 
     /// The events a calendar entry is owed: everything in the library, upcoming
@@ -1259,7 +1331,7 @@ final class EventStore: CloudSyncHost {
         venueStatus = await venues.refresh(placeableEvents, includingMaps: includingMaps) { progress in
             self.venueStatus = progress
         }
-        if retimeEvents() { persist() }
+        if retimeEvents() { save() }
         await mirrorCalendar()
     }
 
@@ -1298,10 +1370,11 @@ final class EventStore: CloudSyncHost {
     private func retimeEvents() -> Bool {
         guard let venues else { return false }
         var moved = false
-        let zones = venues.timeZones(for: Array(archive.events.values) + Array(seen.values))
+        let held = rows.values.compactMap(\.facts)
+        let zones = venues.timeZones(for: held + Array(seen.values))
         for (id, zone) in zones {
-            if let event = archive.events[id], event.timeZone != zone {
-                archive.events[id] = event.published(in: zone)
+            if let row = rows[id], let event = row.facts, event.timeZone != zone {
+                row.facts = event.published(in: zone)
                 moved = true
             }
             // An event met in Search and not kept is held here and nowhere
@@ -1332,7 +1405,7 @@ final class EventStore: CloudSyncHost {
                 // A hall that has just been placed is also a hall whose clock
                 // has just been settled, and an event at it may owe its
                 // calendar entry a different hour as well as a map.
-                if self?.retimeEvents() == true { self?.persist() }
+                if self?.retimeEvents() == true { self?.save() }
                 self?.mirrorSoon()
             }
         }
@@ -1340,7 +1413,7 @@ final class EventStore: CloudSyncHost {
 
     /// Mirrors once the halls stop arriving.
     ///
-    /// Coalesced the way ``persist()`` coalesces a burst of edits, and for the
+    /// Coalesced the way ``save()`` coalesces a burst of edits, and for the
     /// same reason: a reader flicking through four events in a row places four
     /// halls, and that is one mirror's worth of work rather than four. The
     /// wait is long enough to cover reading a screen and short enough that the
@@ -1355,67 +1428,33 @@ final class EventStore: CloudSyncHost {
         }
     }
 
-    // MARK: - Persisting
+    // MARK: - Saving
 
-    /// Coalesces the writes a burst of edits produces — typing in a note field
-    /// should not touch the disk, or iCloud, on every keystroke.
-    private func persist() {
-        pendingSave?.cancel()
-        // Pruning here, not only on merge: an event the reader removed must stop
-        // being uploaded, not linger in iCloud until some other device syncs.
-        archive = archive.pruned()
+    /// Saves a moment from now, coalescing the writes a burst of edits
+    /// produces — typing in a note field should not reach the disk, or
+    /// iCloud, on every keystroke. The rows themselves change at once, so
+    /// every screen already shows the edit.
+    private func save() {
         revision += 1
-        guard file != nil || (iCloudSyncEnabled && cloud != nil) else { return }
-
+        pendingSave?.cancel()
         pendingSave = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled, let self else { return }
-            let file = self.fileToWrite()
-            let archive = self.archive
-            let copies = self.recoveredCopies
-            let saved = await Task.detached(priority: .utility) {
-                let saved = file?.save(archive) ?? false
-                if saved { file?.discard(copies) }
-                return saved
-            }.value
-            if saved { self.recoveredCopies.removeAll(where: copies.contains) }
-            guard !Task.isCancelled else { return }
-            // The records that changed are worked out against what iCloud was
-            // last told, so an edit sends the one record it touched.
-            if self.iCloudSyncEnabled, let cloud = self.cloud {
-                await cloud.noteChanges()
-            }
-            // The calendar follows the same pause as the disk write: a ticket
+            commit()
+            // The calendar follows the same pause as the save: a ticket
             // toggled twice while deciding should reach EventKit once.
-            await self.mirrorCalendar()
+            await mirrorCalendar()
         }
     }
 
-    /// Writes the library to disk now, where it is safe to.
-    private func writeFile() {
-        guard let file = fileToWrite(), file.save(archive) else { return }
-        file.discard(recoveredCopies)
-        recoveredCopies = []
-    }
-
-    /// The file to save to, or nil while the one on disk could not be read.
-    ///
-    /// A blocked file is read again first — it is usually a device that had
-    /// not been unlocked yet, and by the next edit it has — and what it holds
-    /// is folded into the library in memory before anything is written over
-    /// it, the same merge a launch would have made.
-    private func fileToWrite() -> LibraryFile? {
-        guard let file else { return nil }
-        guard libraryFileIsBlocked else { return file }
-        let contents = file.load()
-        guard !contents.isBlocked else { return nil }
-        libraryFileIsBlocked = false
-        unreadableLibraryFiles = contents.unreadable
-        recoveredCopies = Array(Set(recoveredCopies).union(contents.recoveredCopies))
-        archive = archive.merging(contents.archive).pruned()
-        revision += 1
-        retimeEvents()
-        return file
+    /// Writes whatever the rows hold that the store does not.
+    private func commit() {
+        guard let context = database.context, context.hasChanges else { return }
+        do {
+            try context.save()
+        } catch {
+            Self.log.error("Library could not be saved: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Grouping
@@ -1456,17 +1495,29 @@ final class EventStore: CloudSyncHost {
 
     /// Everything the reader owns, as one file they can keep outside the app.
     ///
-    /// Cheap to ask for — the archive is a value; writing it out is the
+    /// Read out of the store each time it is asked for; writing it out is the
     /// expensive part, and that is the caller's to do.
     var backup: LibraryBackup { LibraryBackup(archive: archive) }
 
-    /// Counts every write the reader has made this launch.
+    /// The whole store as one archive, including edits not yet saved.
+    private var archive: LibraryArchive {
+        guard let context = database.context else { return LibraryArchive() }
+        do {
+            return try LibraryDatabase.archive(in: context)
+        } catch {
+            Self.log.error("Library could not be read: \(error.localizedDescription, privacy: .public)")
+            return LibraryArchive()
+        }
+    }
+
+    /// Counts every write made to the library this launch, from here or from
+    /// another device.
     ///
-    /// A screen holding something derived from the whole archive — the export
+    /// A screen holding something derived from the whole library — the export
     /// file, which has to exist before the share sheet can preview it — watches
     /// this rather than trying to spot the change itself. Counting records
     /// would not do: a removal leaves a tombstone behind and an emptied note
-    /// keeps its key, so the archive can change without changing size.
+    /// keeps its record, so the library can change without changing size.
     private(set) var revision = 0
 
     /// What a restore put back, in the two numbers worth stating: what was
@@ -1492,11 +1543,16 @@ final class EventStore: CloudSyncHost {
     @discardableResult
     func restore(from url: URL) throws -> RestoreSummary {
         let backup = try LibraryBackup.read(at: url)
+        if database.isBlocked { moveInLibraryFile() }
+        guard let context = database.context else { throw CocoaError(.fileReadNoPermission) }
         let before = archive
-        archive = archive.restoring(backup.archive)
-        retimeEvents()
-        persist()
-        let held = Self.held(in: archive)
+        let after = before.restoring(backup.archive)
+        try LibraryDatabase.apply(after, to: context)
+        try context.save()
+        reindex()
+        if retimeEvents() { save() }
+        mirrorSoon()
+        let held = Self.held(in: after)
         let was = Self.held(in: before)
         return RestoreSummary(events: held.events - was.events,
                               follows: held.follows - was.follows,
@@ -1520,7 +1576,7 @@ final class EventStore: CloudSyncHost {
     /// A favorite can point at an event found in search and never added to the
     /// library, so this resolves through ``event(id:)`` rather than ``library``.
     var favoriteEvents: [Event] {
-        let events = archive.favorites.compactMap { $0.value.value ? event(id: $0.key) : nil }
+        let events = rows.values.compactMap { $0.isFavorite ? event(id: $0.eventID) : nil }
         let upcoming = events.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
         let past = events.filter { !$0.isUpcoming }.sorted { $0.sortDate > $1.sortDate }
         return upcoming + past
@@ -1529,7 +1585,7 @@ final class EventStore: CloudSyncHost {
     // MARK: - Followed performers
 
     func isFollowing(_ performer: PerformerProfile) -> Bool {
-        archive.isFollowing(performer.id)
+        performerRows[performer.id]?.isFollowing == true
     }
 
     /// Everyone the reader follows, by name.
@@ -1537,7 +1593,11 @@ final class EventStore: CloudSyncHost {
     /// Ordered rather than merely listed: this is a settled list the reader
     /// returns to, and a dictionary's order would reshuffle the Me card and the
     /// Following filters between launches.
-    var followedPerformers: [PerformerProfile] { archive.followedProfiles }
+    var followedPerformers: [PerformerProfile] {
+        performerRows.values
+            .compactMap { $0.isFollowing ? $0.profile : nil }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
 
     /// Follows a performer, or stops following them.
     ///
@@ -1550,18 +1610,13 @@ final class EventStore: CloudSyncHost {
     /// from an actor id alone.
     func toggleFollow(_ performer: PerformerProfile) {
         let following = !isFollowing(performer)
-        var follows = archive.follows ?? [:]
-        follows[String(performer.id)] = Stamped(following)
-        archive.follows = follows
-
-        var profiles = archive.followedPerformers ?? [:]
-        // Unfollowing leaves a tombstone but no profile — `pruned()` drops it,
-        // which is what keeps the archive from carrying people it no longer
-        // follows all the way to iCloud.
-        profiles[String(performer.id)] = following ? performer : nil
-        archive.followedPerformers = profiles
-
-        persist()
+        guard let row = makePerformerRow(for: performer.id) else { return }
+        row.follow = Stamped(following)
+        // Unfollowing leaves a tombstone but no profile, which is what keeps
+        // the store from carrying people it no longer follows all the way to
+        // iCloud.
+        row.profile = following ? performer : nil
+        save()
     }
 
     /// Stops following someone from a list that shows them, where the profile

@@ -2,7 +2,9 @@ import Foundation
 import Testing
 @testable import Eventrail
 
-struct CloudRecordsTests {
+/// How an archive is cut into the records the store keeps one row for each
+/// of — see ``LibraryArchive/RecordKey``.
+struct RecordSliceTests {
     let earlier = Date.now.addingTimeInterval(-3600)
     let later = Date.now.addingTimeInterval(-60)
     /// A night far enough ahead that pruning never reaches its read.
@@ -26,15 +28,6 @@ struct CloudRecordsTests {
         archive.recentSearches = Stamped(["A"], at: earlier)
         archive.lastImported = earlier
         return archive
-    }
-
-    @Test(arguments: [CloudRecord.Key.event("123"), .performer("45"), .settings])
-    func aKeySurvivesItsRecordName(_ key: CloudRecord.Key) {
-        #expect(CloudRecord.Key(recordName: key.recordName) == key)
-    }
-
-    @Test func aNameThisBuildDoesNotKnowIsNoKey() {
-        #expect(CloudRecord.Key(recordName: "venue.9") == nil)
     }
 
     /// Every record the archive holds, folded into an empty one, is the
@@ -69,26 +62,7 @@ struct CloudRecordsTests {
         #expect(LibraryArchive().recordKeys.isEmpty)
     }
 
-    @Test func aPayloadReadsBack() throws {
-        let slice = try #require(library().slice(for: .event("1")))
-        #expect(try CloudRecord.slice(from: CloudRecord.payload(for: slice)) == slice)
-    }
-
-    /// An edit changes the fingerprint of the one record it touched, and a
-    /// second pass over the same archive gives the same fingerprints.
-    @Test func anEditTouchesOneRecord() {
-        let before = library()
-        var after = before
-        after.tracking["2"] = Stamped(Tracking(note: "balcony"), at: later)
-
-        let old = CloudRecord.digests(of: before)
-        let new = CloudRecord.digests(of: after)
-        #expect(CloudRecord.digests(of: before) == old)
-        #expect(Set(new.keys) == Set(old.keys))
-        #expect(new.filter { old[$0.key] != $0.value }.map(\.key) == ["event.2"])
-    }
-
-    /// A record arriving from another device settles against this one's copy
+    /// Another device's row for the same event settles against this one's
     /// by the ordinary merge — here, one answer each.
     @Test func anArrivingRecordMergesAnswerByAnswer() throws {
         var phone = library()
@@ -102,29 +76,5 @@ struct CloudRecordsTests {
         let merged = phone.merging(contentsOf: [arriving]).tracking["1"]?.value
         #expect(merged?.seat == "A12")
         #expect(merged?.cost == 9000)
-    }
-
-    /// What a device checks when another deletes a record: whether anything
-    /// under that name outlives its own pruning. An expired Following read
-    /// does not, so it is not traded back; the same night added to the library
-    /// meanwhile does, so the delete does not take it off the server.
-    @Test func onlyWhatOutlivesPruningAnswersADelete() {
-        let past = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
-        let night = Fixtures.event(id: "7", date: past)
-        var archive = LibraryArchive()
-        archive.followingReads = ["7": Stamped(FollowingRead(fingerprint: night.listingFingerprint, day: past), at: earlier)]
-        #expect(archive.slice(for: .event("7")) != nil)
-        #expect(archive.pruned().slice(for: .event("7")) == nil)
-
-        archive.events["7"] = night
-        archive.membership["7"] = Stamped(true, at: later)
-        #expect(archive.pruned().slice(for: .event("7"))?.membership["7"]?.value == true)
-    }
-
-    /// A removal is a tombstone, and a tombstone is something to send back.
-    @Test func aTombstoneAnswersADelete() {
-        var archive = LibraryArchive()
-        archive.membership["7"] = Stamped(false, at: later)
-        #expect(archive.pruned().slice(for: .event("7")) != nil)
     }
 }
