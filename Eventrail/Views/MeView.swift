@@ -34,8 +34,8 @@ struct MeView: View {
     /// bottom as the library grows.
     private static let cardLimit = 5
 
-    private var library: [Event] { kept.events }
-    private var favorites: [Event] { hearted.events.upcomingFirst() }
+    private var library: [Event] { store.events(of: kept) }
+    private var favorites: [Event] { store.events(of: hearted).upcomingFirst() }
     private var performers: [PerformerProfile] { followedRows.profiles }
 
     /// The linked handle, and how the account presents itself — only while

@@ -331,7 +331,7 @@ struct FollowingView: View {
         store.remember(dates)
         // The library is full of halls whose pages have already been read, and
         // a hall is the same hall whichever list it turned up in.
-        venues.learn(from: kept.events)
+        venues.learn(from: store.events(of: kept))
         return dates
     }
 

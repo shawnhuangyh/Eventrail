@@ -409,7 +409,7 @@ struct PerformerView: View {
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
             StatTile(tint: .trackAttended,
-                     value: kept.events.attended.count { event in
+                     value: store.events(of: kept).attended.count { event in
                          event.performers.contains { $0.name == link.name }
                      }.formatted(),
                      label: "You attended")

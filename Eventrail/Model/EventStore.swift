@@ -381,11 +381,45 @@ final class EventStore {
         let performers = (try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? []
         performerRows = Dictionary(performers.map { ($0.actorID, $0) }, uniquingKeysWith: { first, _ in first })
         settingsRow = (try? context.fetch(FetchDescriptor<LibrarySettings>()))?.first
+        // Anything may have changed underneath, so no kept copy is trusted.
+        stale = nil
         revision += 1
     }
 
     /// The reader's record about an event, if they have one.
     func record(for id: Event.ID) -> LibraryEvent? { rows[id] }
+
+    /// The events these rows hold facts for — what a screen's `@Query` is
+    /// turned into.
+    ///
+    /// Read out of each row's columns once per ``revision`` and kept: a screen
+    /// asks for its list several times a redraw, every tab redraws when any
+    /// row changes, and reading nine hundred rows' forty columns each time
+    /// cost a tenth of a second a redraw. Every write here bumps `revision`
+    /// and names the rows it touched (``save()``), and every change that lands
+    /// from elsewhere bumps it and forgets them all (``reindex()``), so a kept
+    /// copy never outlives what its row says. Reading `revision` here is also
+    /// what redraws a screen served from the kept copies.
+    func events(of rows: some Sequence<LibraryEvent>) -> [Event] {
+        if convertedAt != revision {
+            if let stale {
+                for row in stale { converted[row] = nil }
+            } else {
+                converted.removeAll(keepingCapacity: true)
+            }
+            stale = []
+            convertedAt = revision
+        }
+        return rows.compactMap { row in
+            let key = ObjectIdentifier(row)
+            if let kept = converted[key] { return kept.event }
+            let event = row.facts
+            // The row is held with its copy, so its identifier cannot be
+            // handed to another row while the copy is kept.
+            converted[key] = (row, event)
+            return event
+        }
+    }
 
     /// The row an event's record is written to, made where there is none.
     private func makeRow(for id: Event.ID) -> LibraryEvent {
@@ -1433,6 +1467,14 @@ final class EventStore {
     /// iCloud, on every keystroke. The rows themselves change at once, so
     /// every screen already shows the edit.
     private func save() {
+        // A note writes on every keystroke: only the rows written go stale,
+        // not the nine hundred beside them.
+        if stale != nil {
+            let context = database.context
+            for model in context.changedModelsArray + context.insertedModelsArray + context.deletedModelsArray {
+                if let row = model as? LibraryEvent { stale?.insert(ObjectIdentifier(row)) }
+            }
+        }
         revision += 1
         pendingSave?.cancel()
         pendingSave = Task { [weak self] in
@@ -1483,6 +1525,11 @@ final class EventStore {
     /// would not do: a removal leaves a tombstone behind and an emptied note
     /// keeps its record, so the library can change without changing size.
     private(set) var revision = 0
+    @ObservationIgnored private var converted: [ObjectIdentifier: (row: LibraryEvent, event: Event?)] = [:]
+    @ObservationIgnored private var convertedAt = -1
+    /// The rows written since the kept copies were last checked, or nil where
+    /// every one of them is to be read again.
+    @ObservationIgnored private var stale: Set<ObjectIdentifier>? = nil
 
     /// What a restore put back, in the two numbers worth stating: what was
     /// missing and came back, and what was already here.

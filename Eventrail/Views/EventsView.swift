@@ -16,7 +16,7 @@ struct EventsView: View {
     @State private var selection: Set<Event.ID> = []
     @State private var isConfirmingRemoval = false
 
-    private var library: [Event] { kept.events }
+    private var library: [Event] { store.events(of: kept) }
 
     private var groups: [EventGroup] {
         EventGroup.groups(of: library, filter: filter, grouping: grouping)
