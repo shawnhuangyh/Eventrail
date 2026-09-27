@@ -325,6 +325,75 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
     }
 }
 
+/// The archive cut into records, one per thing the reader keeps a record
+/// *about*: an event (whether it is in the library, its tracking, the
+/// favourite, the Following read, and the facts that go with it), a performer
+/// (the follow and who they are), and one for the settings that belong to the
+/// whole library.
+///
+/// Each record is a slice — an ordinary archive holding only that one thing —
+/// so records are folded back together by the same ``merging(_:)`` a whole
+/// archive always was, and every rule written there holds record by record
+/// without being written twice. It is how the library is stored: one row per
+/// record — see ``LibraryEvent``, ``FollowedPerformer`` and
+/// ``LibrarySettings``.
+nonisolated extension LibraryArchive {
+    /// What one record is about.
+    enum RecordKey: Hashable, Sendable {
+        case event(Event.ID)
+        case performer(String)
+        case settings
+    }
+
+    /// Every record this archive has something to say in.
+    var recordKeys: Set<RecordKey> {
+        var keys = Set<RecordKey>()
+        for id in events.keys { keys.insert(.event(id)) }
+        for id in membership.keys { keys.insert(.event(id)) }
+        for id in tracking.keys { keys.insert(.event(id)) }
+        for id in favorites.keys { keys.insert(.event(id)) }
+        for id in (followingReads ?? [:]).keys { keys.insert(.event(id)) }
+        for id in (follows ?? [:]).keys { keys.insert(.performer(id)) }
+        if slice(for: .settings) != nil { keys.insert(.settings) }
+        return keys
+    }
+
+    /// The part of this archive one record carries, or nil where it holds
+    /// nothing about that key — which is a record to delete rather than one
+    /// to save empty.
+    func slice(for key: RecordKey) -> LibraryArchive? {
+        var slice = LibraryArchive()
+        switch key {
+        case .event(let id):
+            slice.events[id] = events[id]
+            slice.membership[id] = membership[id]
+            slice.tracking[id] = tracking[id]
+            slice.favorites[id] = favorites[id]
+            if let read = followingReads?[id] { slice.followingReads = [id: read] }
+            let holdsSomething = slice.events[id] != nil || slice.membership[id] != nil
+                || slice.tracking[id] != nil || slice.favorites[id] != nil
+                || slice.followingReads != nil
+            return holdsSomething ? slice : nil
+        case .performer(let id):
+            guard let follow = follows?[id] else { return nil }
+            slice.follows = [id: follow]
+            if let profile = followedPerformers?[id] { slice.followedPerformers = [id: profile] }
+            return slice
+        case .settings:
+            slice.recentSearches = recentSearches
+            slice.eventernoteAccount = eventernoteAccount
+            slice.eventernoteProfile = eventernoteProfile
+            slice.lastRefreshed = lastRefreshed
+            slice.lastImported = lastImported
+            // A fresh install's defaults are not a setting anybody made.
+            let holdsSomething = recentSearches.modified != .distantPast
+                || eventernoteAccount != nil || eventernoteProfile != nil
+                || lastRefreshed != nil || lastImported != nil
+            return holdsSomething ? slice : nil
+        }
+    }
+}
+
 /// Keeps the archive in a JSON file inside the app's container.
 ///
 /// Not SwiftData: the project defers that schema until it is settled, and this
@@ -411,6 +480,24 @@ nonisolated struct LibraryFile: Sendable {
     func discard(_ copies: [URL]) {
         for copy in copies {
             try? FileManager.default.removeItem(at: copy)
+        }
+    }
+
+    /// Where ``retire()`` leaves the last library this file held.
+    var retiredURL: URL {
+        url.deletingLastPathComponent().appending(path: "library.pre-swiftdata.json")
+    }
+
+    /// Moves the file out of the way once ``LibraryDatabase`` holds what it
+    /// did, under a name nothing reads — the last copy of the library in this
+    /// format, kept rather than deleted.
+    func retire() {
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return }
+        try? FileManager.default.removeItem(at: retiredURL)
+        do {
+            try FileManager.default.moveItem(at: url, to: retiredURL)
+        } catch {
+            Self.log.error("Library file could not be moved aside: \(error.localizedDescription, privacy: .public)")
         }
     }
 

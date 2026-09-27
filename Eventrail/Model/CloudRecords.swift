@@ -33,32 +33,8 @@ nonisolated enum CloudRecord {
     /// ``CloudSync``.
     static let currentFormat = 1
 
-    /// What one record is about.
-    enum Key: Hashable, Sendable {
-        case event(Event.ID)
-        case performer(String)
-        case settings
-
-        var recordName: String {
-            switch self {
-            case .event(let id): "event.\(id)"
-            case .performer(let id): "performer.\(id)"
-            case .settings: "settings"
-            }
-        }
-
-        init?(recordName: String) {
-            if recordName == "settings" {
-                self = .settings
-            } else if recordName.hasPrefix("event.") {
-                self = .event(String(recordName.dropFirst("event.".count)))
-            } else if recordName.hasPrefix("performer.") {
-                self = .performer(String(recordName.dropFirst("performer.".count)))
-            } else {
-                return nil
-            }
-        }
-    }
+    /// What one record is about — see ``LibraryArchive/RecordKey``.
+    typealias Key = LibraryArchive.RecordKey
 
     /// A slice as a record carries it.
     static func payload(for slice: LibraryArchive) throws -> Data {
@@ -78,7 +54,7 @@ nonisolated enum CloudRecord {
     /// seeded afresh every run.
     static func digests(of archive: LibraryArchive) -> [String: Data] {
         var digests: [String: Data] = [:]
-        for key in archive.cloudKeys {
+        for key in archive.recordKeys {
             guard let slice = archive.slice(for: key), let digest = digest(of: slice) else { continue }
             digests[key.recordName] = digest
         }
@@ -97,52 +73,24 @@ nonisolated enum CloudRecord {
     }
 }
 
-nonisolated extension LibraryArchive {
-    /// Every record this archive has something to say in.
-    var cloudKeys: Set<CloudRecord.Key> {
-        var keys = Set<CloudRecord.Key>()
-        for id in events.keys { keys.insert(.event(id)) }
-        for id in membership.keys { keys.insert(.event(id)) }
-        for id in tracking.keys { keys.insert(.event(id)) }
-        for id in favorites.keys { keys.insert(.event(id)) }
-        for id in (followingReads ?? [:]).keys { keys.insert(.event(id)) }
-        for id in (follows ?? [:]).keys { keys.insert(.performer(id)) }
-        if slice(for: .settings) != nil { keys.insert(.settings) }
-        return keys
+nonisolated extension LibraryArchive.RecordKey {
+    var recordName: String {
+        switch self {
+        case .event(let id): "event.\(id)"
+        case .performer(let id): "performer.\(id)"
+        case .settings: "settings"
+        }
     }
 
-    /// The part of this archive one record carries, or nil where it holds
-    /// nothing about that key — which is a record to delete rather than one
-    /// to save empty.
-    func slice(for key: CloudRecord.Key) -> LibraryArchive? {
-        var slice = LibraryArchive()
-        switch key {
-        case .event(let id):
-            slice.events[id] = events[id]
-            slice.membership[id] = membership[id]
-            slice.tracking[id] = tracking[id]
-            slice.favorites[id] = favorites[id]
-            if let read = followingReads?[id] { slice.followingReads = [id: read] }
-            let holdsSomething = slice.events[id] != nil || slice.membership[id] != nil
-                || slice.tracking[id] != nil || slice.favorites[id] != nil
-                || slice.followingReads != nil
-            return holdsSomething ? slice : nil
-        case .performer(let id):
-            guard let follow = follows?[id] else { return nil }
-            slice.follows = [id: follow]
-            if let profile = followedPerformers?[id] { slice.followedPerformers = [id: profile] }
-            return slice
-        case .settings:
-            slice.recentSearches = recentSearches
-            slice.eventernoteAccount = eventernoteAccount
-            slice.eventernoteProfile = eventernoteProfile
-            slice.lastRefreshed = lastRefreshed
-            slice.lastImported = lastImported
-            // A fresh install's defaults are not a setting anybody made.
-            let holdsSomething = recentSearches.modified != .distantPast
-                || eventernoteAccount != nil || eventernoteProfile != nil
-                || lastRefreshed != nil || lastImported != nil
-            return holdsSomething ? slice : nil
+    init?(recordName: String) {
+        if recordName == "settings" {
+            self = .settings
+        } else if recordName.hasPrefix("event.") {
+            self = .event(String(recordName.dropFirst("event.".count)))
+        } else if recordName.hasPrefix("performer.") {
+            self = .performer(String(recordName.dropFirst("performer.".count)))
+        } else {
+            return nil
         }
     }
 }

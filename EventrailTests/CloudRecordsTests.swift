@@ -41,12 +41,12 @@ struct CloudRecordsTests {
     /// archive again — nothing lost in the cutting.
     @Test func theRecordsAddUpToTheArchive() {
         let archive = library().pruned()
-        let slices = archive.cloudKeys.compactMap(archive.slice(for:))
+        let slices = archive.recordKeys.compactMap(archive.slice(for:))
         #expect(LibraryArchive().merging(contentsOf: slices) == archive)
     }
 
     @Test func eachThingIsOneRecord() {
-        #expect(library().cloudKeys == [
+        #expect(library().recordKeys == [
             .event("1"), .event("2"), .event("3"), .event("gone"),
             .performer("10"), .performer("11"), .settings,
         ])
@@ -66,7 +66,7 @@ struct CloudRecordsTests {
         #expect(library().slice(for: .performer("99")) == nil)
         // A fresh install's defaults are not a setting anybody made.
         #expect(LibraryArchive().slice(for: .settings) == nil)
-        #expect(LibraryArchive().cloudKeys.isEmpty)
+        #expect(LibraryArchive().recordKeys.isEmpty)
     }
 
     @Test func aPayloadReadsBack() throws {
