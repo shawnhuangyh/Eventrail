@@ -441,28 +441,6 @@
         }
       }
     },
-    "Eventrail's iCloud data was deleted — turn on again to sync" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud上のEventrailのデータが削除されました — 同期するには再度オンにしてください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventrail 的 iCloud 数据已被删除 — 重新打开以同步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventrail 的 iCloud 資料已被刪除 — 重新開啟以同步"
-          }
-        }
-      }
-    },
     "Fewer lottery entries" : {
       "localizations" : {
         "ja" : {
@@ -3653,24 +3631,24 @@
         }
       }
     },
-    "iCloud account changed — turn on again to sync" : {
+    "iCloud did not say why" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloudアカウントが変わりました。同期するにはもう一度オンにしてください"
+            "value" : "iCloudから理由が返されませんでした"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 账号已更改——重新开启以同步"
+            "value" : "iCloud 未说明原因"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 帳號已更改——重新開啟以同步"
+            "value" : "iCloud 未說明原因"
           }
         }
       }
@@ -3693,28 +3671,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此版本無法使用 iCloud"
-          }
-        }
-      }
-    },
-    "iCloud refused the library — will retry" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloudがライブラリを受け付けませんでした。後でもう一度試します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 拒绝了资料库——稍后会重试"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 拒絕了資料庫——稍後會重試"
           }
         }
       }
@@ -8819,28 +8775,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "資料庫的一部分無法讀取，已另行保存。請從備份恢復，或更新 App。"
-          }
-        }
-      }
-    },
-    "iCloud holds a library this version cannot read — update the app to sync" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloudにこのバージョンでは読み込めないライブラリがあります。同期するにはアプリをアップデートしてください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 中的资料库无法被此版本读取——更新 App 以同步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 中的資料庫無法被此版本讀取——更新 App 以同步"
           }
         }
       }

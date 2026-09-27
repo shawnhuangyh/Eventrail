@@ -36,8 +36,10 @@ nonisolated struct LinkedProfile: Codable, Hashable, Sendable {
     var avatarURL: URL?
 }
 
-/// Everything the reader has accumulated, in the form it is written to disk and
-/// handed to iCloud.
+/// Everything the reader has accumulated, as one value: the form a backup is
+/// written in, the form an older build's library file was, and the form every
+/// merge is made in. The library itself is kept as rows — see
+/// ``LibraryDatabase``, which turns the one into the other.
 ///
 /// Imported event facts and the reader's own records are kept apart: ``events``
 /// is replaced wholesale by an import, while ``tracking``, ``membership`` and
@@ -394,11 +396,9 @@ nonisolated extension LibraryArchive {
     }
 }
 
-/// Keeps the archive in a JSON file inside the app's container.
-///
-/// Not SwiftData: the project defers that schema until it is settled, and this
-/// keeps what the reader adds across launches in the meantime without
-/// committing to a store.
+/// The JSON file older builds kept the library in, read now only to be moved
+/// into ``LibraryDatabase`` — see ``LibraryDatabase/moveIn(from:)`` — and
+/// written only by the tests that make one.
 nonisolated struct LibraryFile: Sendable {
     static let shared = LibraryFile()
 
