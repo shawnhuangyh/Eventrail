@@ -119,6 +119,9 @@ final class LibraryDatabase {
     /// user record name), written the first time syncing finds one. Per
     /// device, like the switch, and cleared when the switch goes off.
     private static let accountKey = "iCloudSyncAccount"
+    /// Where this device last read the old sync's zone up to — see
+    /// ``LegacyCloudZone``. Cleared with the account, since it belongs to one.
+    private static let legacyTokenKey = "iCloudLegacyZoneToken"
 
     init(at location: Location = LibraryDatabase.defaultLocation, syncing: Bool) {
         self.location = location
@@ -159,6 +162,7 @@ final class LibraryDatabase {
         // Turned on, it is whichever account is signed in now that the reader
         // said yes to, so the record is written afresh.
         UserDefaults.standard.removeObject(forKey: Self.accountKey)
+        UserDefaults.standard.removeObject(forKey: Self.legacyTokenKey)
         if syncing {
             checkAccount()
         } else if isSyncing {
@@ -181,6 +185,36 @@ final class LibraryDatabase {
         isSyncing = true
         syncStatus = nil
         open()
+        if isSyncing { readLegacyZone() }
+    }
+
+    /// Merges in what the sync before SwiftData left in iCloud, or what a
+    /// device still on it has written there since — see ``LegacyCloudZone``.
+    private func readLegacyZone() {
+        Task {
+            let defaults = UserDefaults.standard
+            let token = defaults.data(forKey: Self.legacyTokenKey).flatMap {
+                try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
+            }
+            let database = CKContainer(identifier: Self.containerID).privateCloudDatabase
+            do {
+                guard let (legacy, next) = try await LegacyCloudZone.changes(in: database, since: token),
+                      isSyncing
+                else { return }
+                if !legacy.holdsNothing {
+                    let held = try Self.archive(in: context)
+                    if try Self.apply(held.merging(legacy), to: context) {
+                        try context.save()
+                        Self.log.notice("Merged in what the old iCloud zone held.")
+                        onRemoteChanges?()
+                    }
+                }
+                let saved = try NSKeyedArchiver.archivedData(withRootObject: next, requiringSecureCoding: true)
+                defaults.set(saved, forKey: Self.legacyTokenKey)
+            } catch {
+                Self.log.error("The old iCloud zone could not be read: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func open() {
