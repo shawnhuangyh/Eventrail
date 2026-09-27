@@ -185,10 +185,11 @@ struct FollowingReadTests {
 
     // MARK: - Through the store
 
-    /// A store with nothing behind it — no file, no iCloud, no calendar — the
-    /// way the previews build one.
+    /// A store with nothing behind it — a store in memory, no iCloud, no
+    /// calendar — the way the previews build one.
     @MainActor private func store() -> EventStore {
-        EventStore(file: nil, cloud: nil, calendar: nil, venues: nil, pageReads: nil)
+        EventStore(database: LibraryDatabase(at: .memory, syncing: false), libraryFile: nil,
+                   calendar: nil, venues: nil, pageReads: nil)
     }
 
     @MainActor @Test func markingInBulkLeavesTheRestAlone() {
@@ -214,5 +215,16 @@ struct FollowingReadTests {
         store.removeAllEvents()
         #expect(store.unread(one) == .new)
         #expect(store.unread(two) == .new)
+    }
+
+    @MainActor @Test func deleteAllUnfollowsEveryoneAndUnlinksTheAccount() {
+        let store = store()
+        let performer = PerformerProfile(id: 1, name: "A", reading: nil, fanCount: nil, slug: "a")
+        store.toggleFollow(performer)
+        store.link(EventernoteProfile(handle: "someone", name: "Someone", bio: nil, eventCount: nil,
+                                      favoritePerformers: [], avatarURL: nil))
+        store.removeAllEvents()
+        #expect(!store.isFollowing(performer))
+        #expect(store.eventernoteHandle == nil)
     }
 }

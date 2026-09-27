@@ -1,4 +1,5 @@
 import Foundation
+import Translation
 
 /// Which language an event's 概要 is translated into — see
 /// ``EventDetailView``'s description card and ``LanguageSettingsView``.
@@ -32,6 +33,15 @@ enum TranslationTarget {
     /// Japanese it is already in.
     static func isWorthOffering(_ target: Locale.Language) -> Bool {
         target.languageCode != source.languageCode
+    }
+
+    /// Every language the system translates into.
+    ///
+    /// Made and asked off the main actor in one place, because
+    /// `LanguageAvailability` is not `Sendable`: one made on the main actor
+    /// may not be handed to the nonisolated property that answers.
+    @concurrent nonisolated static func supportedLanguages() async -> [Locale.Language] {
+        await LanguageAvailability().supportedLanguages
     }
 
     /// A language's name in the language the app is drawn in, so the list

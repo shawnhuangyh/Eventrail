@@ -2,7 +2,9 @@ import Foundation
 import Testing
 @testable import Eventrail
 
-struct CloudRecordsTests {
+/// How an archive is cut into the records the store keeps one row for each
+/// of — see ``LibraryArchive/RecordKey``.
+struct RecordSliceTests {
     let earlier = Date.now.addingTimeInterval(-3600)
     let later = Date.now.addingTimeInterval(-60)
     /// A night far enough ahead that pruning never reaches its read.
@@ -28,25 +30,16 @@ struct CloudRecordsTests {
         return archive
     }
 
-    @Test(arguments: [CloudRecord.Key.event("123"), .performer("45"), .settings])
-    func aKeySurvivesItsRecordName(_ key: CloudRecord.Key) {
-        #expect(CloudRecord.Key(recordName: key.recordName) == key)
-    }
-
-    @Test func aNameThisBuildDoesNotKnowIsNoKey() {
-        #expect(CloudRecord.Key(recordName: "venue.9") == nil)
-    }
-
     /// Every record the archive holds, folded into an empty one, is the
     /// archive again — nothing lost in the cutting.
     @Test func theRecordsAddUpToTheArchive() {
         let archive = library().pruned()
-        let slices = archive.cloudKeys.compactMap(archive.slice(for:))
+        let slices = archive.recordKeys.compactMap(archive.slice(for:))
         #expect(LibraryArchive().merging(contentsOf: slices) == archive)
     }
 
     @Test func eachThingIsOneRecord() {
-        #expect(library().cloudKeys == [
+        #expect(library().recordKeys == [
             .event("1"), .event("2"), .event("3"), .event("gone"),
             .performer("10"), .performer("11"), .settings,
         ])
@@ -66,29 +59,10 @@ struct CloudRecordsTests {
         #expect(library().slice(for: .performer("99")) == nil)
         // A fresh install's defaults are not a setting anybody made.
         #expect(LibraryArchive().slice(for: .settings) == nil)
-        #expect(LibraryArchive().cloudKeys.isEmpty)
+        #expect(LibraryArchive().recordKeys.isEmpty)
     }
 
-    @Test func aPayloadReadsBack() throws {
-        let slice = try #require(library().slice(for: .event("1")))
-        #expect(try CloudRecord.slice(from: CloudRecord.payload(for: slice)) == slice)
-    }
-
-    /// An edit changes the fingerprint of the one record it touched, and a
-    /// second pass over the same archive gives the same fingerprints.
-    @Test func anEditTouchesOneRecord() {
-        let before = library()
-        var after = before
-        after.tracking["2"] = Stamped(Tracking(note: "balcony"), at: later)
-
-        let old = CloudRecord.digests(of: before)
-        let new = CloudRecord.digests(of: after)
-        #expect(CloudRecord.digests(of: before) == old)
-        #expect(Set(new.keys) == Set(old.keys))
-        #expect(new.filter { old[$0.key] != $0.value }.map(\.key) == ["event.2"])
-    }
-
-    /// A record arriving from another device settles against this one's copy
+    /// Another device's row for the same event settles against this one's
     /// by the ordinary merge — here, one answer each.
     @Test func anArrivingRecordMergesAnswerByAnswer() throws {
         var phone = library()

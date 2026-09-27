@@ -1,8 +1,10 @@
+import SwiftData
 import SwiftUI
 
 /// The reader's own library: everything they have tracked, grouped and filtered.
 struct EventsView: View {
     @Environment(EventStore.self) private var store
+    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
 
     @State private var filter: LibraryFilter = .upcoming
     @State private var grouping: Grouping = .date
@@ -14,12 +16,14 @@ struct EventsView: View {
     @State private var selection: Set<Event.ID> = []
     @State private var isConfirmingRemoval = false
 
+    private var library: [Event] { kept.events }
+
     private var groups: [EventGroup] {
-        store.groups(filter: filter, grouping: grouping)
+        EventGroup.groups(of: library, filter: filter, grouping: grouping)
     }
 
     private var eventCount: Int {
-        store.events(matching: filter).count
+        filter.rows(of: library).count
     }
 
     /// Selecting reaches what the filter is showing and no further — "Upcoming"
@@ -51,7 +55,7 @@ struct EventsView: View {
             .toolbar {
                 EventListToolbar(filter: $filter, grouping: $grouping,
                                  isSelecting: $isSelecting,
-                                 counts: { store.events(matching: $0).count },
+                                 counts: { $0.rows(of: library).count },
                                  canSelect: eventCount > 0)
                 if isSelecting {
                     SelectionToolbar(
@@ -216,5 +220,5 @@ struct EventsView: View {
 
 #Preview {
     EventsView()
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
 }

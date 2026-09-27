@@ -133,4 +133,33 @@ struct PassportStatsTests {
         #expect(PassportStats(events: [newYear]) { _ in Tracking() }
             .tally(by: .year).map(\.value) == [2026])
     }
+
+    /// A finish typed earlier than the start is read as the next morning, and
+    /// a night that long is a typo, not the longest night on record.
+    @Test func leavesOutANightThatWrappedRoundTheClock() {
+        let nights = [
+            Fixtures.event(id: "typo", date: Fixtures.date(2024, 5, 1),
+                           startsAt: Fixtures.date(2024, 5, 1, 18, 0),
+                           endsAt: Fixtures.date(2024, 5, 2, 17, 30)),
+            Fixtures.event(id: "allnight", date: Fixtures.date(2024, 6, 1),
+                           startsAt: Fixtures.date(2024, 6, 1, 22, 0),
+                           endsAt: Fixtures.date(2024, 6, 2, 5, 0)),
+        ]
+        let stats = PassportStats(events: nights) { _ in Tracking() }
+        #expect(stats.timedEvents == 1)
+        #expect(stats.totalDuration == 7 * 3600)
+        #expect(stats.longest.map(\.event.id) == ["allnight"])
+    }
+
+    /// Nights of equal length keep one order: by the night, then the id.
+    @Test func ordersNightsOfEqualLengthByDate() {
+        let nights = ["x", "w", "v", "u"].enumerated().map { index, id in
+            Fixtures.event(id: id, date: Fixtures.date(2024, 1, 1 + index),
+                           startsAt: Fixtures.date(2024, 1, 1 + index, 18, 0),
+                           endsAt: Fixtures.date(2024, 1, 1 + index, 20, 0))
+        }
+        let stats = PassportStats(events: nights) { _ in Tracking() }
+        #expect(stats.shortest.map(\.event.id) == ["x", "w"])
+        #expect(stats.longest.map(\.event.id) == ["u", "v"])
+    }
 }

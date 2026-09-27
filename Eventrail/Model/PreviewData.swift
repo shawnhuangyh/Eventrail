@@ -120,9 +120,10 @@ enum PreviewData {
 }
 
 extension EventStore {
-    /// A store holding the preview fixtures, with no file behind it.
+    /// A store holding the preview fixtures in memory, with no file behind it.
     @MainActor static var preview: EventStore {
-        EventStore(file: nil, cloud: nil, calendar: nil, venues: nil, pageReads: nil,
+        EventStore(database: LibraryDatabase(at: .memory, syncing: false), libraryFile: nil,
+                   calendar: nil, venues: nil, pageReads: nil,
                    library: PreviewData.events, tracking: PreviewData.tracking,
                    follows: PreviewData.performers)
     }
@@ -154,10 +155,11 @@ extension Feed where Item == Event {
     /// that is handed one rather than loading its own.
     @MainActor static var preview: Feed<Event> {
         let feed = Feed<Event>()
+        let events = PreviewData.events
         Task {
             await feed.load { page in
-                EventernotePage(items: PreviewData.events, total: PreviewData.events.count,
-                                page: page, pageSize: PreviewData.events.count)
+                EventernotePage(items: events, total: events.count,
+                                page: page, pageSize: events.count)
             }
         }
         return feed

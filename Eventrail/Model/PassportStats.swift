@@ -191,7 +191,13 @@ nonisolated struct PassportStats {
 
         // Sorted once, read from both ends: the briefest nights are the front
         // of this and the longest are the back.
-        let spans = events.compactMap(Self.span(of:)).sorted { $0.duration < $1.duration }
+        // Equal lengths fall back on the night and then the id, so a redraw
+        // never swaps two of them.
+        let spans = events.compactMap(Self.span(of:)).sorted {
+            if $0.duration != $1.duration { return $0.duration < $1.duration }
+            if $0.event.sortDate != $1.event.sortDate { return $0.event.sortDate < $1.event.sortDate }
+            return $0.event.id < $1.event.id
+        }
         timedEvents = spans.count
         totalDuration = spans.reduce(0) { $0 + $1.duration }
         // Five at most, which is what the sheet behind each See All shows, and
@@ -307,10 +313,23 @@ nonisolated struct PassportStats {
     /// short event, it is an event nobody has published the end of, and
     /// guessing a length for it would put a made-up number into every total on
     /// the screen.
+    ///
+    /// Nor anything past ``longestNight``. The page prints a clock and no
+    /// date, so an end earlier than the start is read as the next morning
+    /// (``Event/inOrder(_:_:_:)``) — right for 22:00 to 05:00, and a finish
+    /// typed as 17:30 under an 18:00 start becomes a night of twenty-three
+    /// and a half hours, at the top of Longest and in every total.
     private static func span(of event: Event) -> Span? {
         guard let start = event.startsAt, let end = event.endsAt, end > start else { return nil }
-        return Span(event: event, duration: end.timeIntervalSince(start))
+        let duration = end.timeIntervalSince(start)
+        guard duration <= longestNight else { return nil }
+        return Span(event: event, duration: duration)
     }
+
+    /// The longest a published start and end are believed to be apart. Past
+    /// any all-nighter or day-long festival, well short of the day a mistyped
+    /// finish wraps round to.
+    static let longestNight: TimeInterval = 16 * 60 * 60
 
     /// Counts into rows, most first and then by name, so a screen redrawn
     /// after an edit does not reshuffle everything that happens to be tied.

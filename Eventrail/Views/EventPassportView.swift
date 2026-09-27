@@ -1,5 +1,6 @@
 import Charts
 import MapKit
+import SwiftData
 import SwiftUI
 
 /// The way onto the Passport from the Me tab.
@@ -101,7 +102,9 @@ struct EventPassportView: View {
     /// reason.
     private static let cardLimit = 5
 
-    private var attended: [Event] { store.attendedEvents }
+    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+
+    private var attended: [Event] { kept.events.attended }
 
     private var stats: PassportStats {
         PassportStats(events: PassportStats.events(attended, in: scope)) {
@@ -1014,13 +1017,14 @@ private struct PassportExtremesSheet: View {
 /// longer see behind it.
 private struct PassportRankingSheet: View {
     @Environment(EventStore.self) private var store
+    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
 
     let ranking: PassportRanking
 
     /// Read here rather than handed in, for the reason the screen reads it:
     /// one slice, derived from the library, so nothing can be stale.
     private var stats: PassportStats {
-        PassportStats(events: PassportStats.events(store.attendedEvents, in: ranking.scope)) {
+        PassportStats(events: PassportStats.events(kept.events.attended, in: ranking.scope)) {
             store.tracking(for: $0)
         }
     }
@@ -1272,5 +1276,5 @@ private struct PassportBar: View {
     NavigationStack {
         EventPassportView()
     }
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
 }

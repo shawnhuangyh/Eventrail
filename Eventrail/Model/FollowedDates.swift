@@ -442,10 +442,10 @@ final class FollowedDates {
         var readAt: [PerformerProfile.ID: Date] = [:]
     }
 
-    /// In Caches rather than Application Support, and rather than
-    /// `UserDefaults` where the venue answers live: this is a few hundred
-    /// events rather than a line per hall, it is all re-readable, and a device
-    /// short of room is welcome to take it back.
+    /// In Caches rather than Application Support, where the venue answers
+    /// live: it is all re-readable, and a device short of room is welcome to
+    /// take it back. Its own file rather than a ``KeptFile``, because it is
+    /// two dictionaries written as one.
     private static let cacheURL: URL = {
         let directory = URL.cachesDirectory.appending(path: "Eventrail", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

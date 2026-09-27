@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// How a performer page was reached, and so how much the app already knows
@@ -36,6 +37,10 @@ nonisolated enum PerformerLink: Hashable {
 /// the name instead of dressing one up as the other.
 struct PerformerView: View {
     @Environment(EventStore.self) private var store
+    /// The library, which "You attended" is counted over rather than over the
+    /// appearances this page has read so far, so the number is the whole of
+    /// it however little of the listing has been paged in.
+    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -404,7 +409,9 @@ struct PerformerView: View {
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
             StatTile(tint: .trackAttended,
-                     value: store.attendedCount(billing: link.name).formatted(),
+                     value: kept.events.attended.count { event in
+                         event.performers.contains { $0.name == link.name }
+                     }.formatted(),
                      label: "You attended")
             StatTile(tint: .trackTicket, value: feed.total.formatted(),
                      label: "Listed appearances")
@@ -546,5 +553,5 @@ struct PerformerView: View {
             )
         )
     }
-    .environment(EventStore.preview)
+    .library(EventStore.preview)
 }

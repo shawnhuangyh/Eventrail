@@ -248,11 +248,18 @@ struct SettingsView: View {
 
     /// Only what needs the reader: a mirror that is working says nothing.
     /// With the switch off the one thing left to say is that the calendar it
-    /// made could not be taken out again.
+    /// made could not be taken out again — including because calendar access
+    /// was taken back after it was made.
     private var calendarStatus: Text? {
         guard store.calendarSyncEnabled else {
-            if case .failed(let reason) = store.calendarStatus { return Text(verbatim: reason) }
-            return nil
+            switch store.calendarStatus {
+            case .failed(let reason):
+                return Text(verbatim: reason)
+            case .denied:
+                return Text("Calendar access is off, so the Eventrail calendar could not be removed")
+            case .mirrored, .none:
+                return nil
+            }
         }
         switch store.calendarStatus {
         case .denied:
@@ -265,9 +272,10 @@ struct SettingsView: View {
     }
 
     /// Denied is the one failure the reader can mend from here, so the row
-    /// carries the way to the switch that mends it.
+    /// carries the way to the switch that mends it — whether the mirror is
+    /// waiting to write or waiting to take its calendar out.
     private var calendarDenied: Bool {
-        guard store.calendarSyncEnabled, case .denied = store.calendarStatus else { return false }
+        guard case .denied = store.calendarStatus else { return false }
         return true
     }
 
@@ -425,27 +433,16 @@ struct SettingsView: View {
         }
     }
 
-    /// Says what actually goes, and what does not come back.
-    ///
-    /// Spelled out rather than inflected, for the reason ``EventsView``'s own
-    /// removal gives: a dialog's words reach UIKit as plain text, and the
-    /// `^[…](inflect:)` markup arrives there unprocessed.
+    /// Says what goes, and that the settings stay. No counts: the reader
+    /// asked for all of it.
     private var deleteAllDetail: Text {
-        let events = store.library.count
-        let favorites = store.favoriteEvents.count
-        let what = events == 1 ? Text("1 event") : Text("\(events) events")
-        let all: Text = switch favorites {
-        case 0: what
-        case 1: Text("\(what) and 1 favorite")
-        default: Text("\(what) and \(favorites) favorites")
-        }
-        return Text("\(all) will go from this device and from your other devices, along with everything you wrote on them — your notes, your seats, and what the tickets cost. Anything your Eventernote account still lists comes back on the next refresh, but what you wrote does not; the rest you can add again from Search.")
+        Text("Every event, favorite and followed performer goes from all your devices, along with the notes you wrote on them, and your Eventernote account is unlinked. Your settings are kept.")
     }
 }
 
 #Preview {
     SettingsView()
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
         .environment(FollowedDates.preview)
         .environment(VenueRegions.preview)
 }

@@ -323,6 +323,6 @@ struct AccountAvatar: View {
     Color.clear
         .sheet(isPresented: .constant(true)) {
             EventernoteAccountSheet()
-                .environment(EventStore.preview)
+                .library(EventStore.preview)
         }
 }

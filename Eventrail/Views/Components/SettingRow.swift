@@ -140,7 +140,7 @@ extension View {
 /// share — never a claim that it worked when it did not. Nil for the
 /// ordinary case, which each screen words for itself.
 enum CloudSyncStatus {
-    static func text(for status: CloudSync.Outcome?) -> Text? {
+    static func text(for status: LibraryDatabase.SyncStatus?) -> Text? {
         switch status {
         case .notConfigured:
             Text("iCloud is not available in this build")
@@ -150,16 +150,12 @@ enum CloudSyncStatus {
             Text("iCloud is unavailable right now — will retry")
         case .offline:
             Text("Offline — will sync when connected")
-        case .rejected:
-            Text("iCloud refused the library — will retry")
+        case .iCloudFull:
+            Text("Your iCloud storage is full")
         case .accountChanged:
             Text("iCloud account changed — turn on again to sync")
         case .cloudDataDeleted:
             Text("Eventrail's iCloud data was deleted — turn on again to sync")
-        case .unreadableCopy:
-            Text("iCloud holds a library this version cannot read — update the app to sync")
-        case .iCloudFull:
-            Text("Your iCloud storage is full")
         case .failed(let reason):
             Text(verbatim: reason)
         case .synced, .none:

@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Which of the Me tab's two lists has been opened in full.
@@ -17,6 +18,11 @@ struct MeView: View {
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
 
+    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+    @Query(LibraryEvent.favorites) private var hearted: [LibraryEvent]
+    @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
+    @Query private var settingsRows: [LibrarySettings]
+
     @State private var openEvent: Event?
     @State private var isLinking = false
     @State private var isConfirmingUnlink = false
@@ -27,6 +33,15 @@ struct MeView: View {
     /// that the two cards below the account cannot push each other off the
     /// bottom as the library grows.
     private static let cardLimit = 5
+
+    private var library: [Event] { kept.events }
+    private var favorites: [Event] { hearted.events.upcomingFirst() }
+    private var performers: [PerformerProfile] { followedRows.profiles }
+
+    /// The linked handle, and how the account presents itself — only while
+    /// one is linked, since an unlink leaves nothing to caption.
+    private var handle: String? { settingsRows.first?.account }
+    private var profile: LinkedProfile? { handle == nil ? nil : settingsRows.first?.eventernoteProfile }
 
     var body: some View {
         NavigationStack {
@@ -65,7 +80,7 @@ struct MeView: View {
             // The same read the Following tab does, and the same object holds
             // it — whichever screen the reader opens first pays for it, and
             // only when what it holds is stale.
-            .task(id: followed.loadKey(for: store.followedPerformers)) { await loadFollowed() }
+            .task(id: followed.loadKey(for: performers)) { await loadFollowed() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await loadFollowed() } }
             }
@@ -84,15 +99,14 @@ struct MeView: View {
     private var accountCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                AccountAvatar(url: store.eventernoteProfile?.avatarURL, width: 58)
+                AccountAvatar(url: profile?.avatarURL, width: 58)
 
                 VStack(alignment: .leading, spacing: 5) {
                     accountTitle
                         .font(.system(size: 16, weight: .semibold))
                         .lineLimit(1)
                     VStack(alignment: .leading, spacing: 3) {
-                        if let handle = store.eventernoteProfile != nil
-                            ? store.eventernoteHandle : nil {
+                        if let handle = profile != nil ? handle : nil {
                             Text(verbatim: "@\(handle)")
                                 .lineLimit(1)
                         }
@@ -115,7 +129,7 @@ struct MeView: View {
                 }
                 .buttonStyle(.plain)
                 .glassCapsule(interactive: true)
-                .disabled(store.isRefreshing || !store.isLinked)
+                .disabled(store.isRefreshing || handle == nil)
                 .frame(maxHeight: .infinity, alignment: .top)
             }
             .padding(16)
@@ -135,7 +149,7 @@ struct MeView: View {
                     .padding(.bottom, 14)
             }
 
-            if store.eventernoteHandle == nil {
+            if handle == nil {
                 accountRow("Link Eventernote Account") { isLinking = true }
             } else {
                 accountRow("Change Account") { isLinking = true }
@@ -160,9 +174,9 @@ struct MeView: View {
     /// how the reader knows themselves there; the handle alone otherwise, which
     /// is all a library linked before the app read the page has.
     private var accountTitle: Text {
-        if let name = store.eventernoteProfile?.name {
+        if let name = profile?.name {
             Text(verbatim: name)
-        } else if let handle = store.eventernoteHandle {
+        } else if let handle {
             Text(verbatim: "@\(handle)")
         } else {
             Text("Eventernote")
@@ -185,20 +199,20 @@ struct MeView: View {
     /// "following" is not inflected: a count of them is still "following",
     /// never "followings".
     private var accountCounts: Text {
-        Text("^[\(store.library.count) event](inflect: true) · \(store.followedPerformers.count) following")
+        Text("^[\(library.count) event](inflect: true) · \(performers.count) following")
     }
 
     /// The honest wording: the app reports when it last *succeeded*, never that
     /// the data is current.
     /// Whatever followed listings have gone stale, and nothing else.
     private func loadFollowed() async {
-        if let outcome = await followed.load(for: store.followedPerformers) {
+        if let outcome = await followed.load(for: performers) {
             notices?.report(.following(outcome), byHand: false)
         }
         // The card counts what is still ahead, and a night abroad is ahead
         // until its own hall's clock says otherwise.
-        venues.learn(from: store.library)
-        await venues.settle(followed.events(for: store.followedPerformers))
+        venues.learn(from: library)
+        await venues.settle(followed.events(for: performers))
     }
 
     /// Refresh, and then say how it went — over the top of the screen, as well
@@ -211,7 +225,7 @@ struct MeView: View {
     private var refreshDetail: Text {
         // Said before anything else: with no account there is nothing to
         // refresh from, and a stale timestamp would only be confusing.
-        guard store.isLinked else {
+        guard handle != nil else {
             return Text("Link your account to bring your library up to date")
         }
         if store.isRefreshing {
@@ -226,7 +240,7 @@ struct MeView: View {
         if let failure = store.refreshFailure {
             return Text(verbatim: failure)
         }
-        if let lastRefreshed = store.lastRefreshed {
+        if let lastRefreshed = settingsRows.first?.lastRefreshed {
             return Text("Refreshed \(lastRefreshed, format: .relative(presentation: .named))")
         }
         return Text("Never refreshed")
@@ -317,12 +331,13 @@ struct MeView: View {
                 CardHeader(title: "Event Passport") { SeeAllLabel() }
 
                 HStack(spacing: 0) {
-                    passportTile(store.eventsAttended, tint: .trackInterest,
+                    let attended = library.attended
+                    passportTile(attended.count, tint: .trackInterest,
                                  label: "Events attended", isFirst: true)
-                    passportTile(store.venuesVisited, tint: .trackTicket,
+                    passportTile(Set(attended.map(\.venue)).count, tint: .trackTicket,
                                  label: "Venues visited", isFirst: false)
-                    passportTile(store.performersSeen, tint: .trackAttended,
-                                 label: "Performers seen", isFirst: false)
+                    passportTile(Set(attended.flatMap { $0.performers.map(\.name) }).count,
+                                 tint: .trackAttended, label: "Performers seen", isFirst: false)
                 }
             }
             .padding(16)
@@ -386,16 +401,16 @@ struct MeView: View {
     private var favoritesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             CardHeader(title: "Favorite Events",
-                       count: store.favoriteEvents.isEmpty ? nil : store.favoriteEvents.count) {
-                if !store.favoriteEvents.isEmpty {
+                       count: favorites.isEmpty ? nil : favorites.count) {
+                if !favorites.isEmpty {
                     seeAll(.favorites)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
-            .padding(.bottom, store.favoriteEvents.isEmpty ? 6 : 12)
+            .padding(.bottom, favorites.isEmpty ? 6 : 12)
 
-            if store.favoriteEvents.isEmpty {
+            if favorites.isEmpty {
                 Text(FavoriteEventRow.emptyNote)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -405,7 +420,7 @@ struct MeView: View {
                     .padding(.bottom, 16)
             } else {
                 VStack(spacing: 0) {
-                    let shown = Array(store.favoriteEvents.prefix(Self.cardLimit))
+                    let shown = Array(favorites.prefix(Self.cardLimit))
                     ForEach(Array(shown.enumerated()), id: \.element.id) { index, event in
                         FavoriteEventRow(event: event, showsDivider: index > 0) {
                             openEvent = event
@@ -429,17 +444,17 @@ struct MeView: View {
     private var followingCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             CardHeader(title: "Following Performers",
-                       count: store.followedPerformers.isEmpty
-                           ? nil : store.followedPerformers.count) {
-                if !store.followedPerformers.isEmpty {
+                       count: performers.isEmpty
+                           ? nil : performers.count) {
+                if !performers.isEmpty {
                     seeAll(.following)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
-            .padding(.bottom, store.followedPerformers.isEmpty ? 6 : 12)
+            .padding(.bottom, performers.isEmpty ? 6 : 12)
 
-            if store.followedPerformers.isEmpty {
+            if performers.isEmpty {
                 Text(FollowedPerformerRow.emptyNote)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -449,7 +464,7 @@ struct MeView: View {
                     .padding(.bottom, 16)
             } else {
                 VStack(spacing: 0) {
-                    let shown = Array(store.followedPerformers.prefix(Self.cardLimit))
+                    let shown = Array(performers.prefix(Self.cardLimit))
                     ForEach(Array(shown.enumerated()), id: \.element.id) { index, performer in
                         FollowedPerformerRow(performer: performer, showsDivider: index > 0)
                     }
@@ -472,7 +487,7 @@ struct MeView: View {
 
 #Preview {
     MeView()
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
         .environment(FollowedDates.preview)
         .environment(VenueRegions.preview)
 }

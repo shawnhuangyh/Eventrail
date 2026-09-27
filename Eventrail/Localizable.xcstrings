@@ -23,6 +23,28 @@
         }
       }
     },
+    "%@ · %@ · %lld unread" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@・%2$@・未読%3$lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ · %3$lld 条未读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ · %3$lld 則未讀"
+          }
+        }
+      }
+    },
     "%@ %@" : {
       "localizations" : {
         "ja" : {
@@ -68,6 +90,7 @@
       }
     },
     "%@ and %lld favorites" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -90,6 +113,7 @@
       }
     },
     "%@ and 1 favorite" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -221,50 +245,6 @@
         }
       }
     },
-    "%@ will go from this device and from your other devices, along with everything you wrote on them — your notes, your seats, and what the tickets cost. Anything your Eventernote account still lists comes back on the next refresh, but what you wrote does not; the rest you can add again from Search." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@をこのデバイスとほかのデバイスから削除します。メモ、座席、チケット代など、自分で入力した内容も削除されます。Eventernoteアカウントに残っているものは次回の更新で復元されますが、自分で入力した内容は戻りません。それ以外は「検索」から追加し直せます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 将从此设备及你的其他设备中移除，包括你添加的所有内容——备注、座位和票价。Eventernote 账号中仍列出的内容会在下次刷新时恢复，但你添加的内容不会恢复；其余内容可从“搜索”重新添加。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 將從此裝置及你的其他裝置中移除，包括你新增的所有內容——備註、座位和票價。Eventernote 帳號中仍列出的內容會在下次重新整理時恢復，但你新增的內容不會恢復；其餘內容可從“搜尋”重新新增。"
-          }
-        }
-      }
-    },
-    "%@ · %@ · %lld unread" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@・%2$@・未読%3$lld件"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · %2$@ · %3$lld 条未读"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · %2$@ · %3$lld 則未讀"
-          }
-        }
-      }
-    },
     "%@, %@ and %@" : {
       "localizations" : {
         "ja" : {
@@ -353,6 +333,28 @@
         }
       }
     },
+    "%lld of %lld event pages could not be read. Those events keep what was read before." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントページ%2$lld件のうち%1$lld件を読み込めませんでした。これらのイベントは前回読み込んだ内容のままです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld 个活动页面中有 %1$lld 个未能读取。这些活动保留上次读取的内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld 個活動頁面中有 %1$lld 個未能讀取。這些活動保留上次讀取的內容。"
+          }
+        }
+      }
+    },
     "%lld of 47 prefectures" : {
       "localizations" : {
         "ja" : {
@@ -415,270 +417,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 條跟蹤記錄"
-          }
-        }
-      }
-    },
-    "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block, and a hall elsewhere abroad is not placed at all. Turn on Refine with OpenStreetMap to narrow a block to its building and to place halls abroad." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple マップが現地の地図提供元から配信され、中国本土以外の会場はほとんど収録されていないため、日本の会場を検索しても見つからないことがよくあります。その場合は住所検索に回り、街区の位置までしか分かりません。日本・中国本土以外の会場は位置が特定されません。「OpenStreetMap で位置を絞り込む」をオンにすると、建物まで絞り込み、海外の会場の位置も特定します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地图由本地服务商提供，几乎不收录境外场馆，因此搜索日本的场馆常常一无所获。这类场馆会转由地址检索定位，但只能精确到街区；日本和中国大陆以外的场馆则不会被定位。开启「用 OpenStreetMap 细化位置」后，会定位到具体建筑，也会定位这些海外场馆。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；日本和中國大陸以外的場館則不會被定位。開啟「用 OpenStreetMap 細化位置」後，會定位到具體建築，也會定位這些海外場館。"
-          }
-        }
-      }
-    },
-    "Eventrail's iCloud data was deleted — turn on again to sync" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud上のEventrailのデータが削除されました — 同期するには再度オンにしてください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventrail 的 iCloud 数据已被删除 — 重新打开以同步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventrail 的 iCloud 資料已被刪除 — 重新開啟以同步"
-          }
-        }
-      }
-    },
-    "iCloud is unavailable right now — will retry" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloudに現在接続できません — 再試行します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 暂时不可用 — 将重试"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 暫時無法使用 — 將重試"
-          }
-        }
-      }
-    },
-    "Offline — will sync when connected" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "オフライン — 接続後に同期します"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "离线 — 联网后将同步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "離線 — 連線後將同步"
-          }
-        }
-      }
-    },
-    "Only while Refine with OpenStreetMap is on. Narrows a block to its building, and in mainland China places halls outside Japan and the mainland." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「OpenStreetMap で位置を絞り込む」がオンのときだけ使います。街区から建物まで絞り込み、中国本土では日本・中国本土以外の会場の位置も特定します。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅在开启「用 OpenStreetMap 细化位置」时使用。从街区细化到建筑；在中国大陆时，也用它定位日本和中国大陆以外的场馆。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "僅在開啟「用 OpenStreetMap 細化位置」時使用。從街區細化到建築；在中國大陸時，也用它定位日本和中國大陸以外的場館。"
-          }
-        }
-      }
-    },
-    "Time Zone" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "タイムゾーン"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "时区"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時區"
-          }
-        }
-      }
-    },
-    "Venue Time" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "现地时间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間"
-          }
-        }
-      }
-    },
-    "My Time" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末の時間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地时间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地時間"
-          }
-        }
-      }
-    },
-    "My time · %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末の時間・%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地时间 · %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地時間 · %@"
-          }
-        }
-      }
-    },
-    "Times shown in your own time, %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時刻は端末の時間（%@）で表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "时间以本地时间显示，%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時間以本地時間顯示，%@"
-          }
-        }
-      }
-    },
-    "Your iCloud storage is full" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloudストレージがいっぱいです"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的 iCloud 储存空间已满"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的 iCloud 儲存空間已滿"
-          }
-        }
-      }
-    },
-    "Your library could not be read from this device's storage, so nothing is being saved over it. Close and reopen the app." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このデバイスのストレージからライブラリを読み込めなかったため、上書き保存を止めています。アプリを閉じて開き直してください。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法从此设备的存储中读取资料库，因此暂不保存以免将其覆盖。请关闭并重新打开 App。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法從此裝置的儲存空間讀取資料庫，因此暫不儲存以免將其覆寫。請關閉並重新開啟 App。"
           }
         }
       }
@@ -1585,6 +1323,28 @@
         }
       }
     },
+    "Apple Maps is served by a local provider that carries few venues outside the mainland, so a search for a hall in Japan often finds nothing. Such a hall falls through to the address register, which places only its block, and a hall elsewhere abroad is not placed at all. Turn on Refine with OpenStreetMap to narrow a block to its building and to place halls abroad." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple マップが現地の地図提供元から配信され、中国本土以外の会場はほとんど収録されていないため、日本の会場を検索しても見つからないことがよくあります。その場合は住所検索に回り、街区の位置までしか分かりません。日本・中国本土以外の会場は位置が特定されません。「OpenStreetMap で位置を絞り込む」をオンにすると、建物まで絞り込み、海外の会場の位置も特定します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地图由本地服务商提供，几乎不收录境外场馆，因此搜索日本的场馆常常一无所获。这类场馆会转由地址检索定位，但只能精确到街区；日本和中国大陆以外的场馆则不会被定位。开启「用 OpenStreetMap 细化位置」后，会定位到具体建筑，也会定位这些海外场馆。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；日本和中國大陸以外的場館則不會被定位。開啟「用 OpenStreetMap 細化位置」後，會定位到具體建築，也會定位這些海外場館。"
+          }
+        }
+      }
+    },
     "Artist" : {
       "localizations" : {
         "ja" : {
@@ -1757,6 +1517,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已在「設定」中關閉日曆存取權限"
+          }
+        }
+      }
+    },
+    "Calendar access is off, so the Eventrail calendar could not be removed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーへのアクセスがオフのため、Eventrail カレンダーを削除できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日历访问权限已关闭，无法移除 Eventrail 日历"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日曆存取權限已關閉，無法移除 Eventrail 日曆"
           }
         }
       }
@@ -2971,6 +2753,28 @@
         }
       }
     },
+    "Eventrail's iCloud data was deleted — turn on again to sync" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud上のEventrailのデータが削除されました — 同期するには再度オンにしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 的 iCloud 数据已被删除 — 重新打开以同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 的 iCloud 資料已被刪除 — 重新開啟以同步"
+          }
+        }
+      }
+    },
     "Events" : {
       "localizations" : {
         "ja" : {
@@ -3081,6 +2885,28 @@
         }
       }
     },
+    "Every event, favorite and followed performer goes from all your devices, along with the notes you wrote on them, and your Eventernote account is unlinked. Your settings are kept." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのイベント、お気に入り、フォロー中の出演者が、書き込んだメモとともにすべてのデバイスから削除され、Eventernoteアカウントの連携も解除されます。設定はそのまま残ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有活动、收藏和关注的艺人将从你的所有设备中移除，连同你写的备注，Eventernote 账号也会解除关联。你的设置会保留。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有活動、收藏和關注的藝人將從你的所有裝置中移除，連同你寫的備註，Eventernote 帳號也會解除連結。你的設定會保留。"
+          }
+        }
+      }
+    },
     "Everything already imported stays in your library, whichever account you name. Only where Eventrail reads next changes." : {
       "localizations" : {
         "ja" : {
@@ -3187,6 +3013,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收藏的活動"
+          }
+        }
+      }
+    },
+    "Fewer lottery entries" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選の応募回数を減らす"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "减少抽选次数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "減少抽選次數"
           }
         }
       }
@@ -3609,6 +3457,28 @@
         }
       }
     },
+    "iCloud did not say why" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudから理由が返されませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 未说明原因"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 未說明原因"
+          }
+        }
+      }
+    },
     "iCloud is not available in this build" : {
       "localizations" : {
         "ja" : {
@@ -3631,24 +3501,24 @@
         }
       }
     },
-    "iCloud refused the library — will retry" : {
+    "iCloud is unavailable right now — will retry" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloudがライブラリを受け付けませんでした。後でもう一度試します"
+            "value" : "iCloudに現在接続できません — 再試行します"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 拒绝了资料库——稍后会重试"
+            "value" : "iCloud 暂时不可用 — 将重试"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iCloud 拒絕了資料庫——稍後會重試"
+            "value" : "iCloud 暫時無法使用 — 將重試"
           }
         }
       }
@@ -4379,6 +4249,28 @@
         }
       }
     },
+    "More lottery entries" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選の応募回数を増やす"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "增加抽选次数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "增加抽選次數"
+          }
+        }
+      }
+    },
     "Most in One" : {
       "localizations" : {
         "ja" : {
@@ -4419,6 +4311,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我的活動"
+          }
+        }
+      }
+    },
+    "My Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末の時間"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地時間"
+          }
+        }
+      }
+    },
+    "My time · %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末の時間・%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地时间 · %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地時間 · %@"
           }
         }
       }
@@ -5105,6 +5041,28 @@
         }
       }
     },
+    "Offline — will sync when connected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフライン — 接続後に同期します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线 — 联网后将同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離線 — 連線後將同步"
+          }
+        }
+      }
+    },
     "Often on the same bill" : {
       "localizations" : {
         "ja" : {
@@ -5189,6 +5147,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只會取消收藏——活動仍保留在資料庫中，你可以隨時再次收藏。"
+          }
+        }
+      }
+    },
+    "Only while Refine with OpenStreetMap is on. Narrows a block to its building, and in mainland China places halls outside Japan and the mainland." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「OpenStreetMap で位置を絞り込む」がオンのときだけ使います。街区から建物まで絞り込み、中国本土では日本・中国本土以外の会場の位置も特定します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在开启「用 OpenStreetMap 细化位置」时使用。从街区细化到建筑；在中国大陆时，也用它定位日本和中国大陆以外的场馆。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅在開啟「用 OpenStreetMap 細化位置」時使用。從街區細化到建築；在中國大陸時，也用它定位日本和中國大陸以外的場館。"
           }
         }
       }
@@ -5453,6 +5433,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "概覽"
+          }
+        }
+      }
+    },
+    "Part of your library could not be read and was set aside. Restore a backup, or update the app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリの一部を読み込めなかったため、別に保管しました。バックアップから復元するか、アプリをアップデートしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库的一部分无法读取，已另行保存。请从备份恢复，或更新 App。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料庫的一部分無法讀取，已另行保存。請從備份恢復，或更新 App。"
           }
         }
       }
@@ -7349,6 +7351,28 @@
         }
       }
     },
+    "The Eventrail calendar could not be removed: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrailカレンダーを削除できませんでした：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法移除 Eventrail 日历：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法移除 Eventrail 日曆：%@"
+          }
+        }
+      }
+    },
     "The events already imported stay in your library." : {
       "localizations" : {
         "ja" : {
@@ -7525,6 +7549,28 @@
         }
       }
     },
+    "Time Zone" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイムゾーン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时区"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時區"
+          }
+        }
+      }
+    },
     "Times shown in the venue's own time" : {
       "localizations" : {
         "ja" : {
@@ -7565,6 +7611,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間以現地時間顯示，%@"
+          }
+        }
+      }
+    },
+    "Times shown in your own time, %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時刻は端末の時間（%@）で表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间以本地时间显示，%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間以本地時間顯示，%@"
           }
         }
       }
@@ -8229,6 +8297,28 @@
         }
       }
     },
+    "Venue Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現地時間"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现地时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現地時間"
+          }
+        }
+      }
+    },
     "Venue time · %@" : {
       "localizations" : {
         "ja" : {
@@ -8669,6 +8759,50 @@
         }
       }
     },
+    "Your iCloud storage is full" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudストレージがいっぱいです"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 iCloud 储存空间已满"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 iCloud 儲存空間已滿"
+          }
+        }
+      }
+    },
+    "Your library could not be read from this device's storage, so nothing is being saved over it. Close and reopen the app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このデバイスのストレージからライブラリを読み込めなかったため、上書き保存を止めています。アプリを閉じて開き直してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从此设备的存储中读取资料库，因此暂不保存以免将其覆盖。请关闭并重新打开 App。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法從此裝置的儲存空間讀取資料庫，因此暫不儲存以免將其覆寫。請關閉並重新開啟 App。"
+          }
+        }
+      }
+    },
     "Your notes, seats and costs stay on this device and, with iCloud Sync on, in your own iCloud — there is no Eventrail server. Event details are read from Eventernote's public pages and never written back; Eventrail is not affiliated with Eventernote. Venues are placed by Apple Maps, the address search of the Geospatial Information Authority of Japan (国土地理院) and OpenStreetMap — © OpenStreetMap contributors, ODbL." : {
       "localizations" : {
         "ja" : {
@@ -8687,94 +8821,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的備註、座位和票價儲存在此裝置上；開啟 iCloud 同步後，也會存入你自己的 iCloud——Eventrail 沒有伺服器。活動詳情讀取自 Eventernote 的公開頁面，絕不會寫回；Eventrail 與 Eventernote 無關聯。場館位置由 Apple 地圖、日本國土地理院（國土地理院）的地址搜尋和 OpenStreetMap 確定——© OpenStreetMap 貢獻者，ODbL。"
-          }
-        }
-      }
-    },
-    "%lld of %lld event pages could not be read. Those events keep what was read before." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イベントページ%2$lld件のうち%1$lld件を読み込めませんでした。これらのイベントは前回読み込んだ内容のままです。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%2$lld 个活动页面中有 %1$lld 个未能读取。这些活动保留上次读取的内容。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%2$lld 個活動頁面中有 %1$lld 個未能讀取。這些活動保留上次讀取的內容。"
-          }
-        }
-      }
-    },
-    "The Eventrail calendar could not be removed: %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventrailカレンダーを削除できませんでした：%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法移除 Eventrail 日历：%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法移除 Eventrail 日曆：%@"
-          }
-        }
-      }
-    },
-    "Part of your library could not be read and was set aside. Restore a backup, or update the app." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライブラリの一部を読み込めなかったため、別に保管しました。バックアップから復元するか、アプリをアップデートしてください。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "资料库的一部分无法读取，已另行保存。请从备份恢复，或更新 App。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "資料庫的一部分無法讀取，已另行保存。請從備份恢復，或更新 App。"
-          }
-        }
-      }
-    },
-    "iCloud holds a library this version cannot read — update the app to sync" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloudにこのバージョンでは読み込めないライブラリがあります。同期するにはアプリをアップデートしてください"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 中的资料库无法被此版本读取——更新 App 以同步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud 中的資料庫無法被此版本讀取——更新 App 以同步"
           }
         }
       }

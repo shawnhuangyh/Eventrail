@@ -687,6 +687,9 @@ struct EventDetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+        // The glyph alone reads as "Add" and "Remove", which on this sheet is
+        // what the library button says.
+        .accessibilityLabel(delta < 0 ? Text("Fewer lottery entries") : Text("More lottery entries"))
     }
 
     /// What separates the count from the two ends that step it. Inset from the
@@ -844,8 +847,13 @@ struct EventDetailView: View {
                 dropTranslation(unlessFor: translationTargetID)
                 await checkTranslation()
             }
-            .translationTask(translationRequest) { session in
-                await translate(summary, with: session)
+            // Off the main actor from the start: the session is not
+            // `Sendable`, so one that ever sat on the main actor could not be
+            // handed to its own nonisolated methods. Only text crosses back.
+            .translationTask(translationRequest) { @concurrent session in
+                let target = await translationTargetID
+                let outcome = await Self.translation(of: summary, with: session)
+                await finishTranslating(summary, into: target, outcome)
             }
         }
     }
@@ -943,25 +951,30 @@ struct EventDetailView: View {
         canTranslate = status != .unsupported
     }
 
+    /// What a run of the translator came to, as far as the card is concerned.
+    private nonisolated enum TranslationOutcome: Sendable {
+        case translated(String)
+        /// Nothing to show and nothing to say: no line needed translating, or
+        /// the reader declined the model download, which is an answer rather
+        /// than a failure.
+        case nothing
+        case failed
+    }
+
     /// Translates line by line, so the description keeps its line breaks — the
     /// ticket terms in it are laid out as lists — and a line that is only an
     /// address is carried over as it stands rather than handed to a model that
     /// may "translate" it into a link to nowhere.
-    private func translate(_ summary: String, with session: TranslationSession) async {
-        // The target this run was started for; a change while it runs leaves
-        // the result filed under the old one, which ``hasTranslation(of:)``
-        // then declines to show.
-        let target = translationTargetID
+    @concurrent private nonisolated static func translation(
+        of summary: String, with session: TranslationSession
+    ) async -> TranslationOutcome {
         let lines = summary.components(separatedBy: "\n")
         let requests = lines.indices.compactMap { index -> TranslationSession.Request? in
-            Self.needsTranslating(lines[index])
+            needsTranslating(lines[index])
                 ? .init(sourceText: lines[index], clientIdentifier: String(index))
                 : nil
         }
-        guard !requests.isEmpty else {
-            isTranslating = false
-            return
-        }
+        guard !requests.isEmpty else { return .nothing }
         do {
             var translated = lines
             for response in try await session.translations(from: requests) {
@@ -969,24 +982,36 @@ struct EventDetailView: View {
                     translated[index] = response.targetText
                 }
             }
-            translatedSummary = (summary, target, translated.joined(separator: "\n"))
-            showsTranslation = true
+            return .translated(translated.joined(separator: "\n"))
         } catch {
-            // Declining the model download lands here too, and is an answer
-            // rather than a failure — it says nothing.
             switch error {
             case is CancellationError, TranslationError.alreadyCancelled, TranslationError.notInstalled:
-                break
+                return .nothing
             default:
-                translationFailed = true
+                return .failed
             }
+        }
+    }
+
+    /// Files a run's result under the target it was started for; a change
+    /// while it ran leaves the result under the old one, which
+    /// ``hasTranslation(of:)`` then declines to show.
+    private func finishTranslating(_ summary: String, into target: String, _ outcome: TranslationOutcome) {
+        switch outcome {
+        case .translated(let text):
+            translatedSummary = (summary, target, text)
+            showsTranslation = true
+        case .failed:
+            translationFailed = true
+        case .nothing:
+            break
         }
         isTranslating = false
     }
 
     /// Whether a line has words in it to translate — not blank, and not an
     /// address standing alone.
-    private static func needsTranslating(_ line: String) -> Bool {
+    private nonisolated static func needsTranslating(_ line: String) -> Bool {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return false }
         if let url = URL(string: trimmed), url.scheme?.hasPrefix("http") == true { return false }
@@ -1269,5 +1294,5 @@ struct EventDetailView: View {
 
 #Preview {
     EventDetailView(event: PreviewData.events[0])
-        .environment(EventStore.preview)
+        .library(EventStore.preview)
 }
