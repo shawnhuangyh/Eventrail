@@ -13,14 +13,14 @@ enum AppTab: Hashable {
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var store: EventStore
+    private let store = Launch.shared.store
     /// Read from Eventernote rather than from the library, and shared by the
     /// two screens that show it — the Following tab and the Me card — so a
     /// followed performer's listing is asked for once per launch.
-    @State private var followed: FollowedDates
+    private let followed = Launch.shared.followed
     /// Where each hall is, read from Eventernote's own venue pages and kept for
     /// the life of the launch beside the dates it places.
-    @State private var venues: VenueRegions
+    private let venues = Launch.shared.venues
     /// What the last refresh said, wherever it was started from — see
     /// ``RefreshNotices``.
     @State private var notices = RefreshNotices()
@@ -39,31 +39,6 @@ struct RootView: View {
     /// Closing it early costs them this launch's showing; it does not spend
     /// the only one they get.
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
-
-    /// Made together, so the dates know which clock each hall keeps before
-    /// any screen reads them — see ``FollowedDates/hallZone``. Four answers,
-    /// none of them asked for here: a hall ``VenueRegions`` places in one of
-    /// the site's areas is in Japan; the library's own copy of the night
-    /// carries its hall's clock once a placing retimed it; a hall abroad
-    /// whose clock ``VenueRegions/settleClocks(for:)`` settled from its
-    /// address keeps that; and a hall placed under any address — the reader
-    /// opening the night places it — answers by its name.
-    init() {
-        let store = EventStore()
-        let followed = FollowedDates()
-        let venues = VenueRegions()
-        followed.hallZone = { event in
-            if venues.region(of: event) != nil { return Event.publishedZone }
-            if let kept = store.event(id: event.id), kept.timeZone != Event.publishedZone {
-                return kept.timeZone
-            }
-            if let zone = venues.timeZone(of: event) { return zone }
-            return VenuePlaces.shared.timeZone(ofHallNamed: event.venue)
-        }
-        _store = State(initialValue: store)
-        _followed = State(initialValue: followed)
-        _venues = State(initialValue: venues)
-    }
 
     var body: some View {
         TabView(selection: $selection) {
@@ -126,6 +101,49 @@ struct RootView: View {
 
 #Preview {
     RootView()
+}
+
+/// What the app keeps for the life of the process: the library, the followed
+/// performers' dates and where their halls are.
+///
+/// Made once, here, and never in a view's initializer. SwiftUI makes a view
+/// value as often as it likes and keeps only the first `@State` it was given;
+/// every other `EventStore` a `RootView()` made still opened the library —
+/// with iCloud Sync on, a second CloudKit mirror of the same file, which Core
+/// Data refuses and goes on retrying. That kept the app busy for as long as
+/// syncing was on.
+@MainActor
+final class Launch {
+    static let shared = Launch()
+
+    let store: EventStore
+    let followed: FollowedDates
+    let venues: VenueRegions
+
+    /// Made together, so the dates know which clock each hall keeps before
+    /// any screen reads them — see ``FollowedDates/hallZone``. Four answers,
+    /// none of them asked for here: a hall ``VenueRegions`` places in one of
+    /// the site's areas is in Japan; the library's own copy of the night
+    /// carries its hall's clock once a placing retimed it; a hall abroad
+    /// whose clock ``VenueRegions/settleClocks(for:)`` settled from its
+    /// address keeps that; and a hall placed under any address — the reader
+    /// opening the night places it — answers by its name.
+    private init() {
+        let store = EventStore()
+        let followed = FollowedDates()
+        let venues = VenueRegions()
+        followed.hallZone = { event in
+            if venues.region(of: event) != nil { return Event.publishedZone }
+            if let kept = store.event(id: event.id), kept.timeZone != Event.publishedZone {
+                return kept.timeZone
+            }
+            if let zone = venues.timeZone(of: event) { return zone }
+            return VenuePlaces.shared.timeZone(ofHallNamed: event.venue)
+        }
+        self.store = store
+        self.followed = followed
+        self.venues = venues
+    }
 }
 
 extension View {
