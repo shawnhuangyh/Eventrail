@@ -137,6 +137,7 @@ final class LibraryDatabase {
 
     isolated deinit {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
+        if isSyncing { releaseFile() }
     }
 
     /// The context everything reads and writes through.
@@ -167,8 +168,16 @@ final class LibraryDatabase {
             checkAccount()
         } else if isSyncing {
             isSyncing = false
+            releaseFile()
             open()
         }
+    }
+
+    /// Which files a database in this process is mirroring to CloudKit.
+    private static var syncingFiles: Set<URL> = []
+
+    private func releaseFile() {
+        if case .file(let url) = location { Self.syncingFiles.remove(url) }
     }
 
     /// Asks again whether syncing can start, where the switch is on and the
@@ -182,6 +191,14 @@ final class LibraryDatabase {
     /// reader said yes to.
     private func startSyncing() {
         guard wantsSyncing, !isSyncing, !isBlocked else { return }
+        // Core Data refuses a second CloudKit mirror of one file in a process,
+        // and goes on retrying it.
+        if case .file(let url) = location {
+            guard Self.syncingFiles.insert(url).inserted else {
+                Self.log.fault("The library is already syncing in this process; not mirroring it twice.")
+                return
+            }
+        }
         isSyncing = true
         syncStatus = nil
         open()
@@ -239,6 +256,7 @@ final class LibraryDatabase {
         } catch where isSyncing {
             Self.log.error("Library could not be opened with CloudKit: \(error.localizedDescription, privacy: .public)")
             isSyncing = false
+            releaseFile()
             syncStatus = .notConfigured
             if let opened = try? Self.makeContainer(at: location, syncing: false) {
                 replace(with: opened)
