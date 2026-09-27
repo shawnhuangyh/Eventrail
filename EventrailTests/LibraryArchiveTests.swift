@@ -130,23 +130,42 @@ struct LibraryArchiveTests {
 
     // MARK: - Pruning
 
-    @Test func pruningDropsSettledTombstonesAndOrphanedEvents() {
-        let longAgo = Date.now.addingTimeInterval(-200 * 24 * 60 * 60)
+    @Test func pruningDropsOrphanedEventsAndKeepsEveryTombstone() {
+        let longAgo = Date.now.addingTimeInterval(-400 * 24 * 60 * 60)
         var archive = self.archive(with: [Fixtures.event(id: "kept")], at: earlier)
         archive.events["gone"] = Fixtures.event(id: "gone")
         archive.membership["gone"] = Stamped(false, at: longAgo)
         archive.events["favorite"] = Fixtures.event(id: "favorite")
         archive.favorites["favorite"] = Stamped(true, at: earlier)
+        archive.favorites["unfavorited"] = Stamped(false, at: longAgo)
+        archive.follows = ["7": Stamped(false, at: longAgo)]
 
         let pruned = archive.pruned()
-        #expect(pruned.membership["gone"] == nil)
         #expect(pruned.events["gone"] == nil)
         #expect(pruned.events["kept"] != nil)
         // Not in the library, but favorited: still worth keeping.
         #expect(pruned.events["favorite"] != nil)
+        // However old, a removal is still a removal.
+        #expect(pruned.membership["gone"]?.value == false)
+        #expect(pruned.favorites["unfavorited"]?.value == false)
+        #expect(pruned.follows?["7"]?.value == false)
     }
 
-    @Test func aNoteOutlivesItsEventLeavingTheLibrary() {
+    /// A device asleep for longer than tombstones used to last comes back
+    /// holding the old yes. The removal it slept through still wins.
+    @Test func aDeviceAsleepForMonthsDoesNotUndoARemoval() {
+        let longAgo = Date.now.addingTimeInterval(-400 * 24 * 60 * 60)
+        let asleep = archive(with: [Fixtures.event(id: "1")], at: longAgo)
+        var awake = asleep
+        awake.membership["1"] = Stamped(false, at: Date.now.addingTimeInterval(-300 * 24 * 60 * 60))
+        awake.favorites["1"] = Stamped(false, at: Date.now.addingTimeInterval(-300 * 24 * 60 * 60))
+        awake = awake.pruned()
+
+        #expect(!awake.merging(asleep).isInLibrary("1"))
+        #expect(!asleep.merging(awake).isInLibrary("1"))
+    }
+
+    @Test func aClearedRecordOutlivesItsEvent() {
         var archive = self.archive(with: [Fixtures.event(id: "1")], at: earlier)
         archive.tracking["1"] = Stamped(Tracking(note: "keep me"), at: .distantPast)
         archive.tracking["2"] = Stamped(Tracking(), at: .distantPast)
@@ -154,7 +173,8 @@ struct LibraryArchiveTests {
 
         let pruned = archive.pruned()
         #expect(pruned.tracking["1"]?.value.note == "keep me")
-        #expect(pruned.tracking["2"] == nil)
+        // Cleared on purpose: the empty record is what says so.
+        #expect(pruned.tracking["2"]?.value.isEmpty == true)
     }
 
     // MARK: - Restoring a backup

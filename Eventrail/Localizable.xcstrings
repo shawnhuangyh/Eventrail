@@ -441,6 +441,72 @@
         }
       }
     },
+    "Eventrail's iCloud data was deleted — turn on again to sync" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud上のEventrailのデータが削除されました — 同期するには再度オンにしてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 的 iCloud 数据已被删除 — 重新打开以同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 的 iCloud 資料已被刪除 — 重新開啟以同步"
+          }
+        }
+      }
+    },
+    "iCloud is unavailable right now — will retry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudに現在接続できません — 再試行します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 暂时不可用 — 将重试"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 暫時無法使用 — 將重試"
+          }
+        }
+      }
+    },
+    "Offline — will sync when connected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフライン — 接続後に同期します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线 — 联网后将同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離線 — 連線後將同步"
+          }
+        }
+      }
+    },
     "Only while Refine with OpenStreetMap is on. Narrows a block to its building, and in mainland China places halls outside Japan and the mainland." : {
       "localizations" : {
         "ja" : {
@@ -569,6 +635,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間以本地時間顯示，%@"
+          }
+        }
+      }
+    },
+    "Your iCloud storage is full" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloudストレージがいっぱいです"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 iCloud 储存空间已满"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 iCloud 儲存空間已滿"
           }
         }
       }
@@ -3561,28 +3649,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud 拒絕了資料庫——稍後會重試"
-          }
-        }
-      }
-    },
-    "iCloud storage used" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloudの使用容量"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已用 iCloud 空间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已用 iCloud 空間"
           }
         }
       }
@@ -7565,28 +7631,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "東京及周邊六縣"
-          }
-        }
-      }
-    },
-    "Too large to sync (%@)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "大きすぎるため同期できません（%@）"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "过大，无法同步（%@）"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "過大，無法同步（%@）"
           }
         }
       }

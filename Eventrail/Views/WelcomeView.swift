@@ -224,16 +224,9 @@ struct WelcomeView: View {
     /// panel's to say.
     private var cloudStatus: Text? {
         switch store.syncStatus {
-        case .notConfigured:
-            Text("iCloud is not available in this build")
-        case .signedOut:
-            Text("Sign in to iCloud to sync")
-        case .accountChanged:
-            Text("iCloud account changed — turn on again to sync")
-        case .unreadableCopy:
-            Text("iCloud holds a library this version cannot read — update the app to sync")
-        case .failed(let reason):
-            Text(verbatim: reason)
+        case .notConfigured, .signedOut, .unavailable, .accountChanged, .cloudDataDeleted,
+             .unreadableCopy, .iCloudFull, .failed:
+            CloudSyncStatus.text(for: store.syncStatus)
         default:
             nil
         }
