@@ -48,7 +48,7 @@ struct FollowingView: View {
     @State private var selection: Set<Event.ID> = []
 
     @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
-    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
+    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     private var performers: [PerformerProfile] { followedRows.profiles }
 
@@ -331,7 +331,7 @@ struct FollowingView: View {
         store.remember(dates)
         // The library is full of halls whose pages have already been read, and
         // a hall is the same hall whichever list it turned up in.
-        venues.learn(from: store.events(of: kept))
+        venues.learn(from: store.events(of: kept, where: \.inLibrary))
         return dates
     }
 

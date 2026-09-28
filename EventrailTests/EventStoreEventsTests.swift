@@ -3,8 +3,8 @@ import SwiftData
 import Testing
 @testable import Eventrail
 
-/// The events a screen's rows are turned into are kept between redraws, and
-/// must never be kept past a write to their row.
+/// What the reader decides about an event goes into its entry, and the events
+/// a screen's entries are turned into must never be kept past a write to them.
 @MainActor
 struct EventStoreEventsTests {
     func store() -> EventStore {
@@ -12,91 +12,144 @@ struct EventStoreEventsTests {
                    calendar: nil, venues: nil, pageReads: nil)
     }
 
-    func kept(in store: EventStore) throws -> [LibraryMembership] {
-        try store.database.context.fetch(LibraryMembership.library)
+    func kept(in store: EventStore) throws -> [LibraryEntry] {
+        try store.database.context.fetch(LibraryEntry.library)
     }
 
-    @Test func aWriteToARowIsReadOnTheNextAsk() throws {
+    func entries(in store: EventStore) throws -> [LibraryEntry] {
+        try store.database.context.fetch(FetchDescriptor<LibraryEntry>())
+    }
+
+    @Test func aWriteToAnEventIsReadOnTheNextAsk() throws {
         let store = store()
         // Read from its own page, so a later copy's answers are taken over it.
         store.toggleLibraryMembership(Fixtures.event(id: "1", title: "Before", isDetailed: true))
         store.toggleLibraryMembership(Fixtures.event(id: "2", title: "Beside"))
         let rows = try kept(in: store)
-        #expect(Set(store.events(of: rows).map(\.title)) == ["Before", "Beside"])
+        #expect(Set(store.events(of: rows, where: \.inLibrary).map(\.title)) == ["Before", "Beside"])
 
         store.setTracking(Tracking(note: "front row"), for: Fixtures.event(id: "1", title: "After", isDetailed: true))
-        #expect(store.record(for: "1")?.facts?.title == "After")
-        #expect(Set(store.events(of: rows).map(\.title)) == ["After", "Beside"])
+        #expect(store.event(id: "1")?.title == "After")
+        #expect(Set(store.events(of: rows, where: \.inLibrary).map(\.title)) == ["After", "Beside"])
     }
 
-    @Test func aRowTakenOutIsNotListed() throws {
+    @Test func anEventTakenOutIsNotListed() throws {
         let store = store()
         let event = Fixtures.event(id: "1")
         store.toggleLibraryMembership(event)
-        #expect(store.events(of: try kept(in: store)).map(\.id) == ["1"])
+        #expect(store.events(of: try kept(in: store), where: \.inLibrary).map(\.id) == ["1"])
 
         store.toggleLibraryMembership(event)
-        #expect(store.events(of: try kept(in: store)).isEmpty)
+        #expect(store.events(of: try kept(in: store), where: \.inLibrary).isEmpty)
     }
 
-    /// A read is a record apart from the event: marking one sends nothing
-    /// about whether the event is in the library, so a device that has not
-    /// yet heard of a removal cannot undo it by opening the event.
-    @Test func markingADateReadLeavesTheEventsRowAlone() throws {
+    /// CloudKit sends an entry and the facts beside it as two records, in
+    /// whichever order it likes. An entry whose facts have not arrived was
+    /// left off My Events while every other screen said it was kept.
+    @Test func anEntryWhoseFactsHaveNotArrivedIsStillListed() throws {
+        let store = store()
+        let entry = LibraryEntry(eventID: "7")
+        store.database.context.insert(entry)
+        entry.inLibrary = true
+        entry.modified = .now
+        entry.kept = Fixtures.event(id: "7", title: "Arrived first")
+        try store.database.context.save()
+
+        #expect(store.events(of: try kept(in: store), where: \.inLibrary).map(\.title) == ["Arrived first"])
+    }
+
+    /// Between an import and its fold, two entries for one event list it once,
+    /// as the one written last says.
+    @Test func twoEntriesForOneEventAnswerAsTheNewerSays() throws {
+        let store = store()
+        let context = store.database.context
+        for (inLibrary, ago) in [(true, 60.0), (false, 1.0)] {
+            let entry = LibraryEntry(eventID: "1")
+            context.insert(entry)
+            entry.inLibrary = inLibrary
+            entry.modified = .now.addingTimeInterval(-ago)
+            entry.kept = Fixtures.event(id: "1")
+        }
+        try context.save()
+        // What an import from iCloud landing tells the store.
+        store.database.onRemoteChanges?()
+
+        #expect(store.events(of: try entries(in: store), where: \.inLibrary).isEmpty)
+        #expect(!store.isInLibrary(Fixtures.event(id: "1")))
+
+        // And the fold after it keeps that one.
+        try LibraryDatabase.deduplicate(in: context)
+        #expect(try entries(in: store).map(\.inLibrary) == [false])
+    }
+
+    /// An entry is only sent with an answer somebody gave: the same answer
+    /// again is not a write.
+    @Test func theSameAnswerAgainWritesNothing() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.setTracking(Tracking(note: "front row"), for: event)
+        store.saveNow()
+        let entry = try #require(try entries(in: store).first)
+        let written = entry.modified
+
+        store.setTracking(Tracking(note: "front row"), for: event)
+        #expect(!entry.hasChanges)
+        #expect(entry.modified == written)
+        // And an event nobody said anything about has no entry at all.
+        store.setTracking(Tracking(), for: Fixtures.event(id: "2"))
+        #expect(try entries(in: store).map(\.eventID) == ["1"])
+    }
+
+    /// A read is a record apart from the event: marking one writes neither
+    /// the reader's entry nor the event's facts.
+    @Test func markingADateReadWritesOnlyTheMark() throws {
         let store = store()
         let event = Fixtures.event(id: "1", date: Date.now.addingTimeInterval(7 * 24 * 60 * 60))
         store.toggleLibraryMembership(event)
         store.saveNow()
-        let row = try #require(store.record(for: "1"))
+        let context = store.database.context
+        let entry = try #require(try entries(in: store).first)
+        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first)
 
         store.markRead([event], read: true)
         #expect(!store.isUnread(event))
+        #expect(!entry.hasChanges)
         #expect(!row.hasChanges)
-        #expect(store.database.context.insertedModelsArray.contains { $0 is FollowingReadMark })
+        #expect(context.insertedModelsArray.contains { $0 is FollowingReadMark })
         store.saveNow()
-        #expect(try store.database.context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
     }
 
-    /// Whether an event is in the library is a record apart from the event:
-    /// a note, a heart or a read of its page sends nothing about it, so a
-    /// device that has not yet heard of a removal cannot undo it by writing
-    /// to the event.
-    @Test func writingToAnEventLeavesWhetherItIsKeptAlone() throws {
-        let store = store()
-        let event = Fixtures.event(id: "1", isDetailed: true)
-        store.toggleLibraryMembership(event)
-        store.saveNow()
-        let membership = try #require(try kept(in: store).first)
-
-        store.setTracking(Tracking(note: "front row"), for: event)
-        store.toggleFavorite(event)
-        #expect(!membership.hasChanges)
-        #expect(store.record(for: "1")?.hasChanges == true)
-        store.saveNow()
-
-        store.toggleLibraryMembership(event)
-        #expect(membership.inLibrary == false)
-        #expect(!store.isInLibrary(event))
-    }
-
-    /// Taken out and not hearted, an event's facts go from its row; the
-    /// tombstone stays, in its own record.
-    @Test func aRemovedEventKeepsItsTombstoneAndDropsItsFacts() throws {
+    /// Taken out, an event keeps its facts: a row emptied on one device lands
+    /// empty on every other, and an entry arriving there has nothing to show.
+    @Test func anEventTakenOutKeepsItsFacts() throws {
         let store = store()
         let event = Fixtures.event(id: "1")
         store.toggleLibraryMembership(event)
         store.toggleLibraryMembership(event)
         store.saveNow()
-        #expect(store.record(for: "1")?.hasFacts != true)
-        let memberships = try store.database.context.fetch(FetchDescriptor<LibraryMembership>())
-        #expect(memberships.map(\.inLibrary) == [false])
-        #expect(memberships.first?.changed != nil)
+        let context = store.database.context
+        #expect(try context.fetch(FetchDescriptor<LibraryEvent>()).map(\.facts?.id) == ["1"])
+        let entry = try #require(try entries(in: store).first)
+        #expect(entry.inLibrary == false)
+        #expect(entry.modified > .distantPast)
+    }
+
+    /// A note outlives its event, so adding it back brings the note back.
+    @Test func aRemovalKeepsTheNote() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.toggleLibraryMembership(event)
+        store.setTracking(Tracking(note: "front row"), for: event)
+        store.remove([event])
+        #expect(!store.isInLibrary(event))
+        #expect(store.tracking(for: event).note == "front row")
     }
 
     @Test func askingTwiceGivesTheSame() throws {
         let store = store()
         for id in ["1", "2", "3"] { store.toggleLibraryMembership(Fixtures.event(id: id)) }
         let rows = try kept(in: store)
-        #expect(store.events(of: rows) == store.events(of: rows))
+        #expect(store.events(of: rows, where: \.inLibrary) == store.events(of: rows, where: \.inLibrary))
     }
 }

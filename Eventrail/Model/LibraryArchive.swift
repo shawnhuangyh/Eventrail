@@ -184,15 +184,11 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
         return merged.pruned()
     }
 
-    /// Folds in other copies of the same records — two rows for one thing, or
-    /// what an import landed over what this device held — without pruning.
-    ///
-    /// A record cannot be pruned on its own: an event's facts are kept by
-    /// whether the event is in the library or favourited, and whether it is in
-    /// the library is a record of its own (``LibraryMembership``), so pruning
-    /// an event's record alone would take the facts of every event it did not
-    /// say was kept. ``LibraryDatabase/prune(in:)`` prunes with the whole
-    /// library in view.
+    /// Folds in other copies of the same records without pruning — what an
+    /// older build kept on each row, gathered up to be taken into entries
+    /// (``LibraryDatabase/adoptLegacyRecords(in:)``). Pruned there, an event's
+    /// facts would go wherever the row they came from did not also say it was
+    /// kept.
     func merging(records others: [LibraryArchive]) -> LibraryArchive {
         var merged = self
         for other in others { merged.combine(other) }
@@ -352,144 +348,6 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
         pruned.events = events.filter { pruned.isInLibrary($0.key) || pruned.isFavorite($0.key) }
         return pruned
     }
-}
-
-/// The archive cut into records, one per thing the reader keeps a record
-/// *about*: an event (its facts, its tracking and the favourite), whether it
-/// is in the library, whether its Following date was read, a performer (the
-/// follow and who they are), and one for the settings that belong to the
-/// whole library.
-///
-/// Whether an event is in the library, and whether its date was read, are
-/// records apart from the event because CloudKit settles a record whole: a
-/// device that wrote anything to the event — read its page, marked it read,
-/// typed a note — while it still held the event as kept sent the event back
-/// into the library with it.
-///
-/// Each record is a slice — an ordinary archive holding only that one thing —
-/// so records are folded back together by the same rules a whole archive
-/// always was (``merging(records:)``, which leaves pruning to the whole
-/// library), and every rule holds record by record without being written
-/// twice. It is how the library is stored: one row per record — see
-/// ``LibraryEvent``, ``LibraryMembership``, ``FollowingReadMark``,
-/// ``FollowedPerformer`` and ``LibrarySettings``.
-nonisolated extension LibraryArchive {
-    /// What one record is about.
-    enum RecordKey: Hashable, Sendable {
-        case event(Event.ID)
-        /// Whether the event is in the library — see ``LibraryMembership``.
-        case membership(Event.ID)
-        /// Whether the Following date of this event was read — see
-        /// ``FollowingReadMark``.
-        case read(Event.ID)
-        case performer(String)
-        case settings
-    }
-
-    /// Every record this archive has something to say in.
-    var recordKeys: Set<RecordKey> {
-        var keys = Set<RecordKey>()
-        for id in events.keys { keys.insert(.event(id)) }
-        for id in membership.keys { keys.insert(.membership(id)) }
-        for id in tracking.keys { keys.insert(.event(id)) }
-        for id in favorites.keys { keys.insert(.event(id)) }
-        for id in (followingReads ?? [:]).keys { keys.insert(.read(id)) }
-        for id in (follows ?? [:]).keys { keys.insert(.performer(id)) }
-        if slice(for: .settings) != nil { keys.insert(.settings) }
-        return keys
-    }
-
-    /// The part of this archive one record carries, or nil where it holds
-    /// nothing about that key — which is a record to delete rather than one
-    /// to save empty.
-    func slice(for key: RecordKey) -> LibraryArchive? {
-        var slice = LibraryArchive()
-        switch key {
-        case .event(let id):
-            slice.events[id] = events[id]
-            slice.tracking[id] = tracking[id]
-            slice.favorites[id] = favorites[id]
-            let holdsSomething = slice.events[id] != nil || slice.tracking[id] != nil
-                || slice.favorites[id] != nil
-            return holdsSomething ? slice : nil
-        case .membership(let id):
-            guard let record = membership[id] else { return nil }
-            slice.membership[id] = record
-            return slice
-        case .read(let id):
-            guard let read = followingReads?[id] else { return nil }
-            slice.followingReads = [id: read]
-            return slice
-        case .performer(let id):
-            guard let follow = follows?[id] else { return nil }
-            slice.follows = [id: follow]
-            if let profile = followedPerformers?[id] { slice.followedPerformers = [id: profile] }
-            return slice
-        case .settings:
-            slice.recentSearches = recentSearches
-            slice.eventernoteAccount = eventernoteAccount
-            slice.eventernoteProfile = eventernoteProfile
-            slice.lastRefreshed = lastRefreshed
-            slice.lastImported = lastImported
-            // A fresh install's defaults are not a setting anybody made.
-            let holdsSomething = recentSearches.modified != .distantPast
-                || eventernoteAccount != nil || eventernoteProfile != nil
-                || lastRefreshed != nil || lastImported != nil
-            return holdsSomething ? slice : nil
-        }
-    }
-}
-
-nonisolated extension Date {
-    /// This moment cut to the millisecond, as CloudKit keeps a date.
-    var toTheMillisecond: Date {
-        Date(timeIntervalSinceReferenceDate: (timeIntervalSinceReferenceDate * 1000).rounded(.down) / 1000)
-    }
-}
-
-nonisolated extension LibraryArchive {
-    /// This archive with every date in it cut to the millisecond.
-    ///
-    /// What two copies of a record are compared by before one is written over
-    /// the other. CloudKit keeps a date to the millisecond, so a record this
-    /// device sent comes back a fraction older than it went; read as a
-    /// different answer, it was written back and sent again, and came back cut
-    /// short again, for as long as syncing was on.
-    var toTheMillisecond: LibraryArchive {
-        var cut = self
-        cut.events = events.mapValues { event in
-            var event = event
-            event.date = event.date.toTheMillisecond
-            event.doorsOpen = event.doorsOpen?.toTheMillisecond
-            event.startsAt = event.startsAt?.toTheMillisecond
-            event.endsAt = event.endsAt?.toTheMillisecond
-            event.editedAt = event.editedAt?.toTheMillisecond
-            event.readAt = event.readAt?.toTheMillisecond
-            return event
-        }
-        cut.membership = membership.mapValues(\.toTheMillisecond)
-        cut.favorites = favorites.mapValues(\.toTheMillisecond)
-        cut.tracking = tracking.mapValues { record in
-            var record = record.toTheMillisecond
-            record.value.edits = record.value.edits.mapValues(\.toTheMillisecond)
-            return record
-        }
-        cut.follows = follows?.mapValues(\.toTheMillisecond)
-        cut.followingReads = followingReads?.mapValues { record in
-            var record = record.toTheMillisecond
-            record.value.day = record.value.day.toTheMillisecond
-            return record
-        }
-        cut.recentSearches = recentSearches.toTheMillisecond
-        cut.eventernoteAccount = eventernoteAccount?.toTheMillisecond
-        cut.lastRefreshed = lastRefreshed?.toTheMillisecond
-        cut.lastImported = lastImported?.toTheMillisecond
-        return cut
-    }
-}
-
-nonisolated extension Stamped {
-    var toTheMillisecond: Stamped { Stamped(value, at: modified.toTheMillisecond) }
 }
 
 /// The JSON file older builds kept the library in, read now only to be moved

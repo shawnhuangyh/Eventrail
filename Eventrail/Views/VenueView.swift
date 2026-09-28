@@ -41,7 +41,7 @@ struct VenueView: View {
     /// The library, which "You attended" is counted over — matched on the name
     /// the site printed, the one thing every row of a listing publishes about
     /// a hall, since an event imported from a search row has no place id.
-    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
+    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
@@ -508,7 +508,7 @@ struct VenueView: View {
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
             StatTile(tint: .trackAttended,
-                     value: store.events(of: kept).attended.count { $0.venue == link.name }.formatted(),
+                     value: store.events(of: kept, where: \.inLibrary).attended.count { $0.venue == link.name }.formatted(),
                      label: "You attended")
             StatTile(tint: .trackTicket, value: feed.total.formatted(),
                      label: "Listed events")

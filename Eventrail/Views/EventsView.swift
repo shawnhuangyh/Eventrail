@@ -4,7 +4,7 @@ import SwiftUI
 /// The reader's own library: everything they have tracked, grouped and filtered.
 struct EventsView: View {
     @Environment(EventStore.self) private var store
-    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
+    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     @State private var filter: LibraryFilter = .upcoming
     @State private var grouping: Grouping = .date
@@ -16,7 +16,7 @@ struct EventsView: View {
     @State private var selection: Set<Event.ID> = []
     @State private var isConfirmingRemoval = false
 
-    private var library: [Event] { store.events(of: kept) }
+    private var library: [Event] { store.events(of: kept, where: \.inLibrary) }
 
     private var groups: [EventGroup] {
         EventGroup.groups(of: library, filter: filter, grouping: grouping)

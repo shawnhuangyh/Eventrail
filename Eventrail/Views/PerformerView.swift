@@ -40,7 +40,7 @@ struct PerformerView: View {
     /// The library, which "You attended" is counted over rather than over the
     /// appearances this page has read so far, so the number is the whole of
     /// it however little of the listing has been paged in.
-    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
+    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -409,7 +409,7 @@ struct PerformerView: View {
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
             StatTile(tint: .trackAttended,
-                     value: store.events(of: kept).attended.count { event in
+                     value: store.events(of: kept, where: \.inLibrary).attended.count { event in
                          event.performers.contains { $0.name == link.name }
                      }.formatted(),
                      label: "You attended")

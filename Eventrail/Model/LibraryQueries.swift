@@ -4,17 +4,17 @@ import SwiftData
 // What the screens ask the store for with `@Query`, named once so that "the
 // library" means the same rows on every screen that shows it.
 
-extension LibraryMembership {
+extension LibraryEntry {
     /// Every event in the library — turned into events through
-    /// ``EventStore/events(of:)``, which reads each one's facts from its row.
-    static var library: FetchDescriptor<LibraryMembership> {
+    /// ``EventStore/events(of:where:)`` with `\.inLibrary`, which settles two
+    /// entries for one event and reads each one's facts.
+    static var library: FetchDescriptor<LibraryEntry> {
         FetchDescriptor(predicate: #Predicate { $0.inLibrary == true })
     }
-}
 
-extension LibraryEvent {
-    /// Every event the reader has hearted, in the library or not.
-    static var favorites: FetchDescriptor<LibraryEvent> {
+    /// Every event the reader has hearted, in the library or not — turned
+    /// into events the same way, with `\.isFavorite`.
+    static var favorites: FetchDescriptor<LibraryEntry> {
         FetchDescriptor(predicate: #Predicate { $0.isFavorite == true })
     }
 }
@@ -32,11 +32,6 @@ extension FollowedPerformer {
             sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
         )
     }
-}
-
-extension Sequence where Element == LibraryEvent {
-    /// The events these rows hold facts for.
-    var events: [Event] { compactMap(\.facts) }
 }
 
 extension Sequence where Element == FollowedPerformer {

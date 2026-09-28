@@ -18,8 +18,8 @@ struct MeView: View {
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
 
-    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
-    @Query(LibraryEvent.favorites) private var hearted: [LibraryEvent]
+    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
+    @Query(LibraryEntry.favorites) private var hearted: [LibraryEntry]
     @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
     @Query private var settingsRows: [LibrarySettings]
 
@@ -34,8 +34,8 @@ struct MeView: View {
     /// bottom as the library grows.
     private static let cardLimit = 5
 
-    private var library: [Event] { store.events(of: kept) }
-    private var favorites: [Event] { store.events(of: hearted).upcomingFirst() }
+    private var library: [Event] { store.events(of: kept, where: \.inLibrary) }
+    private var favorites: [Event] { store.events(of: hearted, where: \.isFavorite).upcomingFirst() }
     private var performers: [PerformerProfile] { followedRows.profiles }
 
     /// The linked handle, and how the account presents itself — only while

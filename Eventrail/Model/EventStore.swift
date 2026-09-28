@@ -113,12 +113,12 @@ struct EventGroup: Identifiable {
 ///
 /// The library itself is ``LibraryDatabase``: one SwiftData row per record,
 /// which the screens read with `@Query` and SwiftData syncs when the reader
-/// has iCloud Sync on. This is where it is written, by the rules
-/// ``LibraryArchive`` has always kept — a removal is a tombstone, an import
-/// restores what the linked account still lists, a tracking record remembers
-/// when each answer changed. Imported facts and the reader's own records are
-/// kept strictly apart: an import writes membership and the event's facts,
-/// and never the reader's tracking or favorites.
+/// has iCloud Sync on. This is where it is written. What the reader decides
+/// about an event goes into its ``LibraryEntry`` and nowhere else, and only
+/// when they decide it — a removal is `inLibrary` false rather than a deleted
+/// row, and an import of their account adds what it still lists. What
+/// Eventernote says about it goes into its ``LibraryEvent``, which any read
+/// of its page may rewrite, and which never says whether the reader kept it.
 @Observable
 @MainActor
 final class EventStore {
@@ -127,13 +127,15 @@ final class EventStore {
     /// Where the library is kept.
     let database: LibraryDatabase
 
-    /// Every event row, by event id — how anything holding an event, kept or
-    /// not, finds the reader's record about it without a query of its own.
-    /// Rebuilt whenever the rows may have changed underneath: a launch,
-    /// another device's changes, a restore, the store opened again.
+    /// Every event's facts, by event id — how anything holding an event finds
+    /// the freshest copy of it without a query of its own. Rebuilt whenever
+    /// the rows may have changed underneath: a launch, another device's
+    /// changes, a restore, the store opened again. Where two rows are about
+    /// one event, it holds the one ``LibraryDatabase/deduplicate(in:)`` keeps.
     private var rows: [Event.ID: LibraryEvent] = [:]
-    /// Whether each event is in the library, by event id, kept the same way.
-    private var memberships: [Event.ID: LibraryMembership] = [:]
+    /// What the reader has said about each event, by event id, kept the same
+    /// way.
+    private var entries: [Event.ID: LibraryEntry] = [:]
     /// Every Following date's read, by event id, kept the same way.
     private var readMarks: [Event.ID: FollowingReadMark] = [:]
     private var performerRows: [Int: FollowedPerformer] = [:]
@@ -356,12 +358,12 @@ final class EventStore {
 
     /// What a preview is handed, written into its empty store.
     private func seed(library: [Event], tracking: [Event.ID: Tracking], follows: [PerformerProfile]) {
-        if rows.isEmpty {
+        if entries.isEmpty {
             for event in library {
-                let row = makeRow(for: event.id)
-                row.facts = event
-                setMembership(Stamped(true), for: event.id)
-                row.tracking = tracking[event.id].map { Stamped($0) }
+                edit(event) { answers in
+                    answers.inLibrary = true
+                    answers.tracking = tracking[event.id] ?? Tracking()
+                }
             }
         }
         if performerRows.isEmpty {
@@ -380,63 +382,65 @@ final class EventStore {
     /// them underneath.
     private func reindex() {
         let context = database.context
-        let events = (try? context.fetch(FetchDescriptor<LibraryEvent>())) ?? []
-        rows = Dictionary(events.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
-        let kept = (try? context.fetch(FetchDescriptor<LibraryMembership>())) ?? []
-        memberships = Dictionary(kept.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
-        let marks = (try? context.fetch(FetchDescriptor<FollowingReadMark>())) ?? []
-        readMarks = Dictionary(marks.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
-        let performers = (try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? []
-        performerRows = Dictionary(performers.map { ($0.actorID, $0) }, uniquingKeysWith: { first, _ in first })
-        settingsRow = (try? context.fetch(FetchDescriptor<LibrarySettings>()))?.first
+        rows = LibraryDatabase.index((try? context.fetch(FetchDescriptor<LibraryEvent>())) ?? [],
+                                     by: \.eventID, preferring: LibraryEvent.isPreferred)
+        entries = LibraryDatabase.index((try? context.fetch(FetchDescriptor<LibraryEntry>())) ?? [],
+                                        by: \.eventID, preferring: LibraryEntry.isPreferred)
+        readMarks = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowingReadMark>())) ?? [],
+                                          by: \.eventID, preferring: FollowingReadMark.isPreferred)
+        performerRows = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? [],
+                                              by: \.actorID, preferring: FollowedPerformer.isPreferred)
+        settingsRow = (try? context.fetch(FetchDescriptor<LibrarySettings>()))?
+            .sorted(by: LibrarySettings.isPreferred).first
         // Anything may have changed underneath, so no kept copy is trusted.
         stale = nil
         revision += 1
     }
 
-    /// The reader's record about an event, if they have one.
-    func record(for id: Event.ID) -> LibraryEvent? { rows[id] }
-
-    /// The events these rows hold facts for — what a screen's `@Query` is
-    /// turned into.
+    /// The events these entries stand for — what a screen's `@Query` of
+    /// ``LibraryEntry/library`` or ``LibraryEntry/favorites`` is turned into,
+    /// with the flag that query asked for.
     ///
-    /// Read out of each row's columns once per ``revision`` and kept: a screen
-    /// asks for its list several times a redraw, every tab redraws when any
-    /// row changes, and reading nine hundred rows' forty columns each time
-    /// cost a tenth of a second a redraw. Every write here bumps `revision`
-    /// and names the rows it touched (``save()``), and every change that lands
-    /// from elsewhere bumps it and forgets them all (``reindex()``), so a kept
-    /// copy never outlives what its row says. Reading `revision` here is also
-    /// what redraws a screen served from the kept copies.
-    func events(of rows: some Sequence<LibraryEvent>) -> [Event] {
+    /// Each entry answers through the one kept for its event, so two entries
+    /// for one event — there for the moment between an import and its fold —
+    /// list it once, and as the one written last says. Its facts come from its
+    /// ``LibraryEvent``, or from the copy the entry carries where that has not
+    /// arrived: an event the reader kept is always listed.
+    ///
+    /// Read once per ``revision`` and kept: a screen asks for its list several
+    /// times a redraw, every tab redraws when any row changes, and reading
+    /// nine hundred rows' forty columns each time cost a tenth of a second a
+    /// redraw. Every write here bumps `revision` and names the events it
+    /// touched (``save()``), and every change that lands from elsewhere bumps
+    /// it and forgets them all (``reindex()``), so a kept copy never outlives
+    /// what its rows say. Reading `revision` here is also what redraws a
+    /// screen served from the kept copies.
+    func events(of entries: some Sequence<LibraryEntry>, where flag: KeyPath<LibraryEntry, Bool>) -> [Event] {
         if convertedAt != revision {
             if let stale {
-                for row in stale { converted[row] = nil }
+                for id in stale { converted[id] = nil }
             } else {
                 converted.removeAll(keepingCapacity: true)
             }
             stale = []
             convertedAt = revision
         }
-        return rows.compactMap { row in
-            let key = ObjectIdentifier(row)
-            if let kept = converted[key] { return kept.event }
-            let event = row.facts
-            // The row is held with its copy, so its identifier cannot be
-            // handed to another row while the copy is kept.
-            converted[key] = (row, event)
+        var listed = Set<Event.ID>()
+        return entries.compactMap { queried in
+            let id = queried.eventID
+            guard listed.insert(id).inserted else { return nil }
+            // The index can be a moment behind a query that has just seen an
+            // import land; the entry in hand stands until it catches up.
+            let entry = self.entries[id] ?? queried
+            guard entry[keyPath: flag] else { return nil }
+            if let kept = converted[id] { return kept }
+            let event = rows[id]?.facts ?? entry.kept
+            converted[id] = .some(event)
             return event
         }
     }
 
-    /// The events in the library these records name — what a screen's
-    /// `@Query` of ``LibraryMembership/library`` is turned into, through the
-    /// rows that hold their facts.
-    func events(of memberships: some Sequence<LibraryMembership>) -> [Event] {
-        events(of: memberships.compactMap { rows[$0.eventID] })
-    }
-
-    /// The row an event's record is written to, made where there is none.
+    /// The row an event's facts are written to, made where there is none.
     private func makeRow(for id: Event.ID) -> LibraryEvent {
         if let row = rows[id] { return row }
         let row = LibraryEvent(eventID: id)
@@ -445,20 +449,32 @@ final class EventStore {
         return row
     }
 
-    /// Says whether an event is in the library: in its ``LibraryMembership``,
-    /// and mirrored onto its row for a device still on a build that reads it
-    /// there.
-    private func setMembership(_ membership: Stamped<Bool>, for id: Event.ID) {
-        let record: LibraryMembership
-        if let held = memberships[id] {
-            record = held
-        } else {
-            record = LibraryMembership(eventID: id)
-            database.context.insert(record)
-            memberships[id] = record
+    /// Writes what the reader has just said about an event into its entry.
+    ///
+    /// Nothing is written where nothing changed, so an entry is only ever sent
+    /// with an answer somebody gave. Where something did, the entry takes the
+    /// moment — which is what keeps it over an older copy — and the event as
+    /// it now stands, so a device its facts have not reached can still list
+    /// it.
+    ///
+    /// `keepingFacts` writes the event into its ``LibraryEvent`` too, for a
+    /// change that is about the event as the reader sees it; a removal leaves
+    /// the facts where they are.
+    private func edit(_ event: Event, keepingFacts: Bool = true, _ change: (inout LibraryEntry.Answers) -> Void) {
+        let held = entries[event.id]
+        var answers = held?.answers ?? LibraryEntry.Answers()
+        change(&answers)
+        answers.tracking.edits = [:]
+        guard answers != (held?.answers ?? LibraryEntry.Answers()) else { return }
+        if keepingFacts { keep(event, in: makeRow(for: event.id)) }
+        let entry = held ?? LibraryEntry(eventID: event.id)
+        if held == nil {
+            database.context.insert(entry)
+            entries[event.id] = entry
         }
-        record.membership = membership
-        rows[id]?.mirror(membership)
+        entry.answers = answers
+        entry.modified = Date.now.toTheMillisecond
+        entry.kept = rows[event.id]?.facts ?? event
     }
 
     private func makeMark(for id: Event.ID) -> FollowingReadMark {
@@ -485,19 +501,6 @@ final class EventStore {
         return row
     }
 
-    /// Prunes one row the way ``LibraryArchive/pruned()`` would: an event
-    /// nothing keeps any more — out of the library and not hearted — loses its
-    /// facts, and a row with nothing left to say goes. Tombstones stay, in
-    /// ``LibraryMembership``.
-    private func settle(_ row: LibraryEvent) {
-        if row.hasFacts, memberships[row.eventID]?.inLibrary != true, !row.isFavorite {
-            row.facts = nil
-        }
-        guard row.slice == nil, !row.holdsLegacyRecord else { return }
-        rows[row.eventID] = nil
-        database.context.delete(row)
-    }
-
     // MARK: - Reading
 
     // Lists are the screens' own `@Query` — see ``LibraryMembership/library``.
@@ -508,7 +511,7 @@ final class EventStore {
     /// The library, for the work done here rather than on a screen: the
     /// calendar, the halls, a refresh.
     private var library: [Event] {
-        memberships.values.compactMap { $0.inLibrary ? rows[$0.eventID]?.facts : nil }
+        entries.values.compactMap { $0.inLibrary ? event(id: $0.eventID) : nil }
     }
 
     var lastRefreshed: Date? { settingsRow?.lastRefreshed }
@@ -527,7 +530,7 @@ final class EventStore {
     var isLinked: Bool { eventernoteHandle != nil }
 
     func tracking(for event: Event) -> Tracking {
-        rows[event.id]?.tracking?.value ?? Tracking()
+        entries[event.id]?.tracking ?? Tracking()
     }
 
     /// The one badge a row wears, read from where the event stands.
@@ -545,9 +548,9 @@ final class EventStore {
         return isKept ? .planned : .untracked
     }
 
-    func isInLibrary(_ event: Event) -> Bool { memberships[event.id]?.inLibrary == true }
+    func isInLibrary(_ event: Event) -> Bool { entries[event.id]?.inLibrary == true }
 
-    func isFavorite(_ event: Event) -> Bool { rows[event.id]?.isFavorite == true }
+    func isFavorite(_ event: Event) -> Bool { entries[event.id]?.isFavorite == true }
 
     /// Whether emptying the library would still take anything.
     ///
@@ -555,38 +558,25 @@ final class EventStore {
     /// ticket status outlives the event it was written on, so this stays true
     /// while either is still held.
     var hasRecordsToDelete: Bool {
-        memberships.values.contains(where: \.inLibrary)
-            || rows.values.contains { $0.isFavorite || !($0.tracking?.value.isEmpty ?? true) }
+        entries.values.contains { !$0.answers.isEmpty }
             || eventernoteHandle != nil
             || performerRows.values.contains(where: \.isFollowing)
     }
 
     /// The freshest copy of an event this app holds, wherever it came from.
     func event(id: Event.ID) -> Event? {
-        rows[id]?.facts ?? seen[id]
+        rows[id]?.facts ?? entries[id]?.kept ?? seen[id]
     }
 
     // MARK: - Writing
 
     func setTracking(_ tracking: Tracking, for event: Event) {
-        let row = makeRow(for: event.id)
-        // Written against the record as it stands, so that a merge can tell
-        // which of the five answers this device actually changed — see
-        // ``Stamped/edited(to:at:)``. A record this device has never held is
-        // as old as a record can be: every answer in it is one the reader has
-        // not given here, so the other device's copy of any of them outranks
-        // it.
-        let held = row.tracking ?? Stamped(Tracking(), at: .distantPast)
-        row.tracking = held.edited(to: tracking)
-        keep(event, in: row)
+        edit(event) { $0.tracking = tracking }
         save()
     }
 
     func toggleFavorite(_ event: Event) {
-        let row = makeRow(for: event.id)
-        row.favorite = Stamped(!row.isFavorite)
-        keep(event, in: row)
-        settle(row)
+        edit(event) { $0.isFavorite.toggle() }
         save()
     }
 
@@ -596,13 +586,12 @@ final class EventStore {
     /// linked account still lists is imported again on the next refresh.
     func toggleLibraryMembership(_ event: Event) {
         if isInLibrary(event) {
-            tombstone(event.id, at: .now)
+            edit(event, keepingFacts: false) { $0.inLibrary = false }
         } else {
             // Nothing to write down: being in the library is what says the
             // reader means to go, which is what a tracking record used to be
             // opened to say for it.
-            keep(event, in: makeRow(for: event.id))
-            setMembership(Stamped(true), for: event.id)
+            edit(event) { $0.inLibrary = true }
             placeAdded(event)
         }
         save()
@@ -610,18 +599,18 @@ final class EventStore {
 
     /// Takes events out of the library in one go.
     ///
-    /// Each one is tombstoned rather than dropped, exactly as a single removal
-    /// is: the other device has to be told a removal happened, or it would
-    /// hand all of them straight back. The tombstone answers for the reader's
-    /// devices and not for Eventernote — an event still on the linked account
-    /// is imported again by the next refresh.
+    /// Each one's entry says so rather than going, exactly as a single removal
+    /// does: the other device has to be told a removal happened, or it would
+    /// hand all of them straight back. It answers for the reader's devices and
+    /// not for Eventernote — an event still on the linked account is imported
+    /// again by the next refresh. A note written on one outlives it, so that
+    /// adding it back brings the note back.
     ///
     /// Favorites are left alone. Hearting an event says "keep this in front of
     /// me", which is a separate answer from whether it is in the library.
     func remove(_ events: some Sequence<Event>) {
-        let now = Date.now
-        for event in events where rows[event.id] != nil || memberships[event.id] != nil {
-            tombstone(event.id, at: now)
+        for event in events {
+            edit(event, keepingFacts: false) { $0.inLibrary = false }
         }
         save()
     }
@@ -641,19 +630,12 @@ final class EventStore {
     /// the reader thought they had just deleted.
     ///
     /// Each record is emptied rather than dropped, for the same reason a removal
-    /// is a tombstone: a dropped record would let the other device's copy of
-    /// the note come straight back.
+    /// is: a dropped record would let the other device's copy come straight back.
     func removeAllEvents() {
         let now = Date.now
-        for membership in Array(memberships.values) where membership.inLibrary {
-            tombstone(membership.eventID, at: now)
-        }
-        for row in Array(rows.values) {
-            if row.isFavorite { row.favorite = Stamped(false, at: now) }
-            if let record = row.tracking, !record.value.isEmpty {
-                row.tracking = Stamped(Tracking(), at: now)
-            }
-            settle(row)
+        for entry in entries.values where !entry.answers.isEmpty {
+            entry.answers = LibraryEntry.Answers()
+            entry.modified = now.toTheMillisecond
         }
         // Every Following date back to unread, on every device: written as a
         // record with no fingerprint rather than dropped, or the other
@@ -709,23 +691,9 @@ final class EventStore {
         save()
     }
 
-    /// Marks one event as removed. A note the reader typed outlives its event,
-    /// so that re-adding it later brings the note back; an empty record does not.
-    private func tombstone(_ id: Event.ID, at now: Date) {
-        setMembership(Stamped(false, at: now), for: id)
-        guard let row = rows[id] else { return }
-        // Held on to, so a sheet still open on it keeps resolving once its
-        // facts are pruned from the row.
-        if let facts = row.facts { seen[id] = facts }
-        if row.tracking?.value.isEmpty ?? true {
-            row.tracking = nil
-        }
-        settle(row)
-    }
-
     /// Holds on to what a search turned up, without adding any of it.
     func remember(_ events: [Event]) {
-        for event in events where rows[event.id]?.hasFacts != true {
+        for event in events where rows[event.id]?.facts == nil {
             seen[event.id] = event
         }
     }
@@ -765,11 +733,7 @@ final class EventStore {
     /// saving and syncing.
     private func keep(_ event: Event, in row: LibraryEvent) {
         let known = row.facts
-        let kept = known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event
-        row.facts = kept
-        // Also left in `seen`, so a sheet still open keeps resolving if the
-        // reader un-favorites it and pruning drops the facts from the row.
-        seen[event.id] = kept
+        row.write(known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event)
     }
 
     /// Folds a freshly imported copy of an event back in, wherever it is held.
@@ -785,7 +749,7 @@ final class EventStore {
         pageReads?.record(imported.id, asked: asked)
         if let row = rows[imported.id], let held = row.facts {
             guard !imported.isSameRead(as: held) else { return }
-            row.facts = imported
+            row.write(imported)
         } else {
             seen[imported.id] = imported
         }
@@ -1294,19 +1258,17 @@ final class EventStore {
     /// themselves was never an import's to touch and still is not.
     @discardableResult
     private func adopt(_ imported: [Event]) -> Int {
-        let now = Date.now
         var added = 0
 
         for event in imported {
-            let row = makeRow(for: event.id)
             // A removal is not permanent. The account's history is what the
             // reader is asking for when they tap Refresh, so an event they took
             // out comes back if Eventernote still lists it — the same rule the
             // favourites follow. Taking one out for good means taking it off the
             // account, and an event that was never on it stays gone.
-            keep(event, in: row)
-            if memberships[event.id]?.inLibrary != true {
-                setMembership(Stamped(true, at: now), for: event.id)
+            keep(event, in: makeRow(for: event.id))
+            if !isInLibrary(event) {
+                edit(event) { $0.inLibrary = true }
                 added += 1
             }
         }
@@ -1455,7 +1417,7 @@ final class EventStore {
         let zones = venues.timeZones(for: held + Array(seen.values))
         for (id, zone) in zones {
             if let row = rows[id], let event = row.facts, event.timeZone != zone {
-                row.facts = event.published(in: zone)
+                row.write(event.published(in: zone))
                 moved = true
             }
             // An event met in Search and not kept is held here and nowhere
@@ -1520,8 +1482,9 @@ final class EventStore {
         // not the nine hundred beside them.
         if stale != nil {
             let context = database.context
-            for model in context.changedModelsArray + context.insertedModelsArray + context.deletedModelsArray {
-                if let row = model as? LibraryEvent { stale?.insert(ObjectIdentifier(row)) }
+            for model in context.changedModelsArray + context.insertedModelsArray {
+                if let row = model as? LibraryEvent { stale?.insert(row.eventID) }
+                if let entry = model as? LibraryEntry { stale?.insert(entry.eventID) }
             }
         }
         revision += 1
@@ -1574,11 +1537,11 @@ final class EventStore {
     /// would not do: a removal leaves a tombstone behind and an emptied note
     /// keeps its record, so the library can change without changing size.
     private(set) var revision = 0
-    @ObservationIgnored private var converted: [ObjectIdentifier: (row: LibraryEvent, event: Event?)] = [:]
+    @ObservationIgnored private var converted: [Event.ID: Event?] = [:]
     @ObservationIgnored private var convertedAt = -1
-    /// The rows written since the kept copies were last checked, or nil where
-    /// every one of them is to be read again.
-    @ObservationIgnored private var stale: Set<ObjectIdentifier>? = nil
+    /// The events written since the kept copies were last checked, or nil
+    /// where every one of them is to be read again.
+    @ObservationIgnored private var stale: Set<Event.ID>? = nil
 
     /// What a restore put back, in the two numbers worth stating: what was
     /// missing and came back, and what was already here.
@@ -1632,7 +1595,7 @@ final class EventStore {
 
     /// Everything the reader has hearted, for the halls worth placing.
     private var favoriteEvents: [Event] {
-        rows.values.compactMap { $0.isFavorite ? event(id: $0.eventID) : nil }
+        entries.values.compactMap { $0.isFavorite ? event(id: $0.eventID) : nil }
     }
 
     // MARK: - Followed performers

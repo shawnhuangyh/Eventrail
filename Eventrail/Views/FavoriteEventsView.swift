@@ -12,7 +12,7 @@ import SwiftUI
 /// a list is long enough to need its own screen it is long enough to need them.
 struct FavoriteEventsView: View {
     @Environment(EventStore.self) private var store
-    @Query(LibraryEvent.favorites) private var hearted: [LibraryEvent]
+    @Query(LibraryEntry.favorites) private var hearted: [LibraryEntry]
 
     @State private var filter: LibraryFilter = .upcoming
     @State private var grouping: Grouping = .date
@@ -24,7 +24,7 @@ struct FavoriteEventsView: View {
 
     /// A favourite can be an event met in Search and never added, whose
     /// facts are kept with the heart all the same.
-    private var favorites: [Event] { store.events(of: hearted).upcomingFirst() }
+    private var favorites: [Event] { store.events(of: hearted, where: \.isFavorite).upcomingFirst() }
 
     private var groups: [EventGroup] {
         EventGroup.groups(of: favorites, filter: filter, grouping: grouping)
