@@ -3017,6 +3017,28 @@
         }
       }
     },
+    "Fetched from iCloud %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@にiCloudから取得"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@从 iCloud 拉取"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@從 iCloud 拉取"
+          }
+        }
+      }
+    },
     "Fewer lottery entries" : {
       "localizations" : {
         "ja" : {
@@ -7197,28 +7219,6 @@
         }
       }
     },
-    "Synced %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@に同期"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已同步于 %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已同步於 %@"
-          }
-        }
-      }
-    },
     "System" : {
       "localizations" : {
         "ja" : {
@@ -8777,6 +8777,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 iCloud 儲存空間已滿"
+          }
+        }
+      }
+    },
+    "Your latest changes could not be saved on this device (%@). Export a backup to keep them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新の変更をこのデバイスに保存できませんでした（%@）。失わないように、バックアップを書き出してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近的更改未能保存到此设备（%@）。请导出备份以保留这些更改。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近的變更未能儲存到此裝置（%@）。請匯出備份以保留這些變更。"
           }
         }
       }

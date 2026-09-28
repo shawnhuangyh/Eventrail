@@ -63,6 +63,41 @@ final class LibraryDatabase {
         /// straight back. Said while the switch is off, like ``accountChanged``.
         case cloudDataDeleted
         case failed(String)
+
+        /// Whether it passes by itself once iCloud can be reached again, so any
+        /// setup, import or export that succeeds has shown it over.
+        var isPassing: Bool { self == .offline || self == .unavailable }
+    }
+
+    /// How the last setup, import and export each ended, and so how syncing
+    /// stands.
+    ///
+    /// Kept apart because each answers for itself: an export that succeeds
+    /// says nothing about the import that failed before it, and an import
+    /// arriving from the other device says nothing about this one's changes
+    /// that iCloud refused for want of space — which is how iCloud Full used
+    /// to read as synced the moment the other device wrote anything.
+    struct SyncOutcomes: Equatable {
+        enum Kind: Hashable { case setup, `import`, export }
+
+        private var failures: [Kind: SyncStatus] = [:]
+
+        /// How syncing stands: what went wrong last, sending before fetching
+        /// before setting up, or synced where nothing did.
+        var status: SyncStatus {
+            [.export, .import, .setup].lazy.compactMap { failures[$0] }.first ?? .synced
+        }
+
+        /// One setup, import or export has ended — failed with `failure`, or
+        /// succeeded where that is nil.
+        mutating func record(_ kind: Kind, failure: SyncStatus?) {
+            if let failure {
+                failures[kind] = failure
+            } else {
+                failures[kind] = nil
+                failures = failures.filter { !$0.value.isPassing }
+            }
+        }
     }
 
     enum Location: Equatable {
@@ -84,7 +119,20 @@ final class LibraryDatabase {
     /// one is built again.
     private(set) var generation = 0
     private(set) var syncStatus: SyncStatus?
-    private(set) var lastSynced: Date?
+    /// What ``syncStatus`` is worked out from while syncing — see
+    /// ``SyncOutcomes``.
+    @ObservationIgnored private var outcomes = SyncOutcomes()
+    /// When this device last fetched from iCloud: the end of the last import
+    /// that succeeded, kept across launches.
+    ///
+    /// Not an export. Every launch and every return to the app sends
+    /// whatever is waiting, usually nothing, and a time that moved with those
+    /// said "just now" on a device that had not heard from the other one in
+    /// minutes. What the reader wants to know from it is whether this device
+    /// has the other one's changes, and only an import answers that.
+    private(set) var lastFetched: Date? = UserDefaults.standard.object(forKey: LibraryDatabase.lastFetchedKey) as? Date {
+        didSet { UserDefaults.standard.set(lastFetched, forKey: Self.lastFetchedKey) }
+    }
     /// Whether the store is open with CloudKit. Not the switch: with the
     /// switch on, the store is opened without CloudKit until the iCloud user
     /// has been checked (``checkAccount()``).
@@ -94,8 +142,16 @@ final class LibraryDatabase {
     /// The container this one replaced, kept for a moment so a screen still
     /// drawing one of its rows is not left holding a row whose store has gone
     /// — and only for a moment, since a CloudKit container kept alive goes on
-    /// mirroring the file the new one writes to (``replace(with:)``).
+    /// mirroring the file the new one writes to (``replace(with:mirroring:)``).
     @ObservationIgnored private var retired: ModelContainer?
+    /// Whether ``container`` and ``retired`` were opened with CloudKit. A
+    /// retired one goes on mirroring the file until it is let go, and holds
+    /// this process's claim on the file until then (``syncingFiles``).
+    @ObservationIgnored private var containerMirrors = false
+    @ObservationIgnored private var retiredMirrors = false
+    /// Whether syncing was turned on again while the container it was turned
+    /// off from was still being let go, and waits for that.
+    @ObservationIgnored private var startsWhenLetGo = false
 
     /// Run once another device's changes have landed and been folded in.
     @ObservationIgnored var onRemoteChanges: (() -> Void)?
@@ -123,9 +179,9 @@ final class LibraryDatabase {
     /// Where this device last read the old sync's zone up to — see
     /// ``LegacyCloudZone``. Cleared with the account, since it belongs to one.
     private static let legacyTokenKey = "iCloudLegacyZoneToken"
-    /// Whether this device has taken what builds before ``LibraryEntry`` kept
-    /// into entries — see ``adoptLegacyRecords(in:)``.
-    private static let adoptedKey = "libraryEntriesAdopted"
+    /// ``lastFetched``, per device. Cleared with the account, since it says
+    /// when this device last heard from that account's iCloud.
+    private static let lastFetchedKey = "iCloudLastFetched"
 
     init(at location: Location = LibraryDatabase.defaultLocation, syncing: Bool) {
         self.location = location
@@ -141,7 +197,7 @@ final class LibraryDatabase {
 
     isolated deinit {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
-        if isSyncing { releaseFile() }
+        if containerMirrors || retiredMirrors { releaseFile() }
     }
 
     /// The context everything reads and writes through.
@@ -162,16 +218,21 @@ final class LibraryDatabase {
         guard location != .memory, syncing != wantsSyncing else { return }
         wantsSyncing = syncing
         syncStatus = nil
+        outcomes = SyncOutcomes()
         retry?.cancel()
         // Turned on, it is whichever account is signed in now that the reader
         // said yes to, so the record is written afresh.
         UserDefaults.standard.removeObject(forKey: Self.accountKey)
         UserDefaults.standard.removeObject(forKey: Self.legacyTokenKey)
+        lastFetched = nil
         if syncing {
             checkAccount()
-        } else if isSyncing {
+        } else {
+            startsWhenLetGo = false
+            guard isSyncing else { return }
+            // The file stays claimed until the container that mirrored it is
+            // let go (``replace(with:mirroring:)``), not until now.
             isSyncing = false
-            releaseFile()
             open()
         }
     }
@@ -194,6 +255,13 @@ final class LibraryDatabase {
     /// reader said yes to.
     private func startSyncing() {
         guard wantsSyncing, !isSyncing, !isBlocked else { return }
+        // Turned off and on again within ``retiredHold``: the container it
+        // was turned off from mirrors the file until it is let go, and a
+        // second mirror now would be refused — so this waits for it.
+        if retiredMirrors {
+            startsWhenLetGo = true
+            return
+        }
         // Core Data refuses a second CloudKit mirror of one file in a process,
         // and goes on retrying it.
         if case .file(let url) = location {
@@ -204,6 +272,7 @@ final class LibraryDatabase {
         }
         isSyncing = true
         syncStatus = nil
+        outcomes = SyncOutcomes()
         open()
         if isSyncing { readLegacyZone() }
     }
@@ -254,7 +323,7 @@ final class LibraryDatabase {
         }
         do {
             let opened = try Self.makeContainer(at: location, syncing: isSyncing)
-            replace(with: opened)
+            replace(with: opened, mirroring: isSyncing)
             isBlocked = false
         } catch where isSyncing {
             Self.log.error("Library could not be opened with CloudKit: \(error.localizedDescription, privacy: .public)")
@@ -262,7 +331,7 @@ final class LibraryDatabase {
             releaseFile()
             syncStatus = .notConfigured
             if let opened = try? Self.makeContainer(at: location, syncing: false) {
-                replace(with: opened)
+                replace(with: opened, mirroring: false)
                 isBlocked = false
             } else {
                 block()
@@ -279,14 +348,7 @@ final class LibraryDatabase {
                 try Self.apply(held.merging(meanwhile), to: context)
                 try context.save()
             }
-            // Once per device, on what this device held when it first ran a
-            // build with entries: every other device takes in its own, and
-            // the entries meet in the fold below.
-            if location == .memory || !UserDefaults.standard.bool(forKey: Self.adoptedKey) {
-                try Self.adoptLegacyRecords(in: context)
-                if location != .memory { UserDefaults.standard.set(true, forKey: Self.adoptedKey) }
-            }
-            try Self.deduplicate(in: context)
+            try Self.settle(in: context)
             try Self.pruneReads(in: context)
         } catch {
             // A merge that would not save stays in the context, to be written
@@ -301,13 +363,17 @@ final class LibraryDatabase {
     private func block() {
         guard !isBlocked else { return }
         isBlocked = true
-        replace(with: Self.memoryContainer())
+        replace(with: Self.memoryContainer(), mirroring: false)
     }
 
-    private func replace(with opened: ModelContainer) {
+    private func replace(with opened: ModelContainer, mirroring: Bool) {
         let outgoing = container
+        // One still held from the last swap goes now.
+        letGoOfRetired()
         retired = outgoing
+        retiredMirrors = containerMirrors
         container = opened
+        containerMirrors = mirroring
         generation += 1
         // Let go once the screens have drawn on the new one. The store keeps
         // its rows and the screens re-read it at once, but a container opened
@@ -317,8 +383,21 @@ final class LibraryDatabase {
         Task { [weak self] in
             try? await Task.sleep(for: Self.retiredHold)
             guard let self, retired === outgoing else { return }
-            retired = nil
+            letGoOfRetired()
         }
+    }
+
+    /// Drops the replaced container, and with a mirror its claim on the file
+    /// — then starts syncing, if it was turned on again meanwhile.
+    private func letGoOfRetired() {
+        retired = nil
+        guard retiredMirrors else { return }
+        retiredMirrors = false
+        if !containerMirrors { releaseFile() }
+        guard startsWhenLetGo else { return }
+        startsWhenLetGo = false
+        // Not from here, which may be the middle of a swap.
+        Task { [weak self] in self?.startSyncing() }
     }
 
     /// How long a replaced container is held: past the redraw that moves the
@@ -434,12 +513,16 @@ final class LibraryDatabase {
             guard let event = note.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
                     as? NSPersistentCloudKitContainer.Event
             else { return }
-            let isImport = event.type == .import
+            let kind: SyncOutcomes.Kind = switch event.type {
+            case .import: .import
+            case .export: .export
+            default: .setup
+            }
             let succeeded = event.succeeded
             let error = event.error
             guard let ended = event.endDate else { return }
             MainActor.assumeIsolated {
-                self?.finished(isImport: isImport, at: ended, succeeded: succeeded, error: error)
+                self?.finished(kind, at: ended, succeeded: succeeded, error: error)
             }
         })
         observers.append(NotificationCenter.default.addObserver(
@@ -453,24 +536,26 @@ final class LibraryDatabase {
     }
 
     /// An import or an export has ended. After an import, what landed is
-    /// taken as it landed: the only thing done to it is folding two rows for
-    /// one thing into one (``deduplicate(in:)``). Then the screens and the
-    /// calendar are told, whatever the import brought — even a failed one may
-    /// have landed part of what it read.
-    private func finished(isImport: Bool, at date: Date, succeeded: Bool, error: (any Error)?) {
+    /// taken as it landed: the only things done to it are taking in what an
+    /// older build left there and folding two rows for one thing into one
+    /// (``settle(in:)``). Then the screens and the calendar are told, whatever
+    /// the import brought — even a failed one may have landed part of what it
+    /// read.
+    private func finished(_ kind: SyncOutcomes.Kind, at date: Date, succeeded: Bool, error: (any Error)?) {
         guard isSyncing else { return }
-        if succeeded {
-            syncStatus = .synced
-            lastSynced = date
-        } else {
-            let status = Self.status(for: error)
+        let failure = succeeded ? nil : Self.status(for: error)
+        if succeeded, kind == .import { lastFetched = date }
+        if failure == .cloudDataDeleted {
             // Left syncing, SwiftData would make the zone again and send the
             // whole library back into it, undoing what the reader just did.
-            if status == .cloudDataDeleted { stopSyncing(status) } else { syncStatus = status }
+            stopSyncing(.cloudDataDeleted)
+        } else {
+            outcomes.record(kind, failure: failure)
+            syncStatus = outcomes.status
         }
-        guard isImport else { return }
+        guard kind == .import else { return }
         do {
-            try Self.deduplicate(in: context)
+            try Self.settle(in: context)
         } catch {
             Self.log.error("Library could not be folded after an import: \(error.localizedDescription, privacy: .public)")
         }
@@ -495,18 +580,35 @@ final class LibraryDatabase {
 
     // MARK: - Tidying
 
+    /// What is done to the store every time it opens and after every import
+    /// from iCloud: what an older build left is taken in where nothing answers
+    /// for it yet (``adoptLegacyRecords(in:)``), then two rows for one thing
+    /// are folded into one (``deduplicate(in:)``).
+    static func settle(in context: ModelContext) throws {
+        try adoptLegacyRecords(in: context)
+        try deduplicate(in: context)
+    }
+
     /// Keeps one row of every set about one thing, and deletes the rest.
     ///
     /// Which one is kept is up to each model's `isPreferred` — the entry the
     /// reader wrote last, the fullest copy of an event's page, the mark or
     /// follow written last — with the lower `uid` breaking a tie, so every
-    /// device keeps the same row and none deletes the one another kept. The
-    /// settings are the exception: two rows of those are ordinary, and are
-    /// folded field by field (``LibrarySettings/absorb(_:)``).
+    /// device keeps the same row and none deletes the one another kept.
+    ///
+    /// Two kinds are folded rather than dropped. An entry kept takes from the
+    /// others every part they gave later (``LibraryEntry/absorb(_:)``): each
+    /// was written by a device that had not seen the other's, so the one
+    /// written last is not the reader's word on the parts it never gave — an
+    /// import that added an event before the entry holding its note had
+    /// arrived would otherwise have deleted the note on every device. And the
+    /// settings, two rows of which are ordinary, are folded field by field
+    /// (``LibrarySettings/absorb(_:)``).
     @discardableResult
     static func deduplicate(in context: ModelContext) throws -> Bool {
         var changed = try keepOne(of: LibraryEntry.self, by: \.eventID,
-                                  preferring: LibraryEntry.isPreferred, in: context)
+                                  preferring: LibraryEntry.isPreferred,
+                                  folding: { $0.absorb($1) }, in: context)
         changed = try keepOne(of: LibraryEvent.self, by: \.eventID,
                               preferring: LibraryEvent.isPreferred, in: context) || changed
         changed = try keepOne(of: FollowingReadMark.self, by: \.eventID,
@@ -527,12 +629,15 @@ final class LibraryDatabase {
     }
 
     private static func keepOne<Row: PersistentModel, Key: Hashable>(
-        of type: Row.Type, by key: (Row) -> Key, preferring: (Row, Row) -> Bool, in context: ModelContext
+        of type: Row.Type, by key: (Row) -> Key, preferring: (Row, Row) -> Bool,
+        folding fold: ((_ kept: Row, _ extra: Row) -> Void)? = nil, in context: ModelContext
     ) throws -> Bool {
         let rows = try context.fetch(FetchDescriptor<Row>())
         var changed = false
         for group in Dictionary(grouping: rows, by: key).values where group.count > 1 {
-            for extra in group.sorted(by: preferring).dropFirst() {
+            let sorted = group.sorted(by: preferring)
+            for extra in sorted.dropFirst() {
+                fold?(sorted[0], extra)
                 context.delete(extra)
                 changed = true
             }
@@ -570,25 +675,34 @@ final class LibraryDatabase {
     /// the Following read on the row before ``FollowingReadMark`` — into the
     /// records this build keeps, wherever there is none yet.
     ///
-    /// Run once per device, on what it holds as it first opens with entries.
-    /// Each device takes in its own copy, so the entries two of them make for
-    /// one event meet in ``deduplicate(in:)``, which keeps the one written
-    /// last. A device still on an older build is not listened to after that:
-    /// every device is to run this build.
+    /// Run every time the store opens and after every import, not once per
+    /// device: what an older build left in iCloud reaches a device reinstalled
+    /// or newly set up only after the store has first opened, empty. Never
+    /// over an entry or a mark already there — those are this build's answers
+    /// — so after the first run it usually finds nothing to do. Each device
+    /// takes in its own copy, so the entries two of them make for one event
+    /// meet in ``deduplicate(in:)``.
     @discardableResult
     static func adoptLegacyRecords(in context: ModelContext) throws -> Bool {
-        let rows = try context.fetch(FetchDescriptor<LibraryEvent>())
+        let entries = Set(try context.fetch(FetchDescriptor<LibraryEntry>()).map(\.eventID))
+        let marks = Set(try context.fetch(FetchDescriptor<FollowingReadMark>()).map(\.eventID))
+        // Only rows something here does not already answer for.
+        let rows = try context.fetch(FetchDescriptor<LibraryEvent>()).filter { row in
+            (!entries.contains(row.eventID)
+                && (row.inLibraryChanged != nil || row.favoriteChanged != nil || row.trackingChanged != nil))
+                || (!marks.contains(row.eventID) && row.readChanged != nil)
+        }
         let memberships = try context.fetch(FetchDescriptor<LibraryMembership>()).compactMap { membership in
-            membership.changed.map { changed in
+            membership.changed.flatMap { changed -> LibraryArchive? in
+                guard !entries.contains(membership.eventID) else { return nil }
                 var slice = LibraryArchive()
                 slice.membership[membership.eventID] = Stamped(membership.inLibrary, at: changed)
                 return slice
             }
         }
+        guard !rows.isEmpty || !memberships.isEmpty else { return false }
         // Folded in one pass: a merge per row copies the whole archive.
         let legacy = LibraryArchive().merging(records: rows.map(\.legacyRecords) + memberships)
-        let entries = Set(try context.fetch(FetchDescriptor<LibraryEntry>()).map(\.eventID))
-        let marks = Set(try context.fetch(FetchDescriptor<FollowingReadMark>()).map(\.eventID))
         // No facts: those are on the rows already, and every row written here
         // would be sent again for nothing. An entry takes its copy of the
         // event from its row (``apply(_:to:)``).
@@ -616,8 +730,8 @@ final class LibraryDatabase {
 
     /// The whole store as one archive — for a backup, a restore, and the
     /// files and zones older builds left, all of which are settled by
-    /// ``LibraryArchive``'s rules. An entry's one date stands for all three of
-    /// its records.
+    /// ``LibraryArchive``'s rules. Each of an entry's three records carries
+    /// its own part's date (``LibraryEntry/changed(_:)``).
     static func archive(in context: ModelContext) throws -> LibraryArchive {
         var archive = LibraryArchive()
         let rows = index(try context.fetch(FetchDescriptor<LibraryEvent>()), by: \.eventID,
@@ -628,9 +742,9 @@ final class LibraryDatabase {
         let entries = index(try context.fetch(FetchDescriptor<LibraryEntry>()), by: \.eventID,
                             preferring: LibraryEntry.isPreferred)
         for (id, entry) in entries {
-            archive.membership[id] = Stamped(entry.inLibrary, at: entry.modified)
-            archive.favorites[id] = Stamped(entry.isFavorite, at: entry.modified)
-            archive.tracking[id] = Stamped(entry.tracking, at: entry.modified)
+            archive.membership[id] = Stamped(entry.inLibrary, at: entry.changed(.inLibrary))
+            archive.favorites[id] = Stamped(entry.isFavorite, at: entry.changed(.favorite))
+            archive.tracking[id] = Stamped(entry.tracking, at: entry.changed(.tracking))
             if archive.events[id] == nil { archive.events[id] = entry.kept }
         }
         let marks = index(try context.fetch(FetchDescriptor<FollowingReadMark>()), by: \.eventID,
@@ -660,8 +774,9 @@ final class LibraryDatabase {
     /// alone, since every caller hands in the library merged with what it is
     /// taking in — a restore adds, it never erases.
     ///
-    /// An entry written here takes the newest of its archive's three dates, so
-    /// what a restore raises as of now outranks every device's older copy.
+    /// Each part of an entry written here takes its own record's date, and
+    /// the entry the newest of them, so what a restore raises as of now
+    /// outranks every device's older copy.
     ///
     /// Not saved; the caller saves.
     @discardableResult
@@ -703,9 +818,16 @@ final class LibraryDatabase {
             guard held != nil || !answers.isEmpty else { continue }
             let entry = held ?? LibraryEntry(eventID: id)
             if held == nil { context.insert(entry) }
-            entry.answers = answers
-            let written = [archive.membership[id]?.modified, archive.favorites[id]?.modified,
-                           archive.tracking[id]?.modified].compactMap { $0 }.max() ?? .now
+            let records: [LibraryEntry.Part: Date?] = [.inLibrary: archive.membership[id]?.modified,
+                                                       .favorite: archive.favorites[id]?.modified,
+                                                       .tracking: archive.tracking[id]?.modified]
+            // A new entry is dated by every record the archive holds for it —
+            // a removal is an answer too — and one already here only by the
+            // parts that move.
+            let moved = Set(answers.parts(differingFrom: held?.answers ?? LibraryEntry.Answers()))
+            let dates = records.compactMapValues { $0 }.filter { held == nil || moved.contains($0.key) }
+            entry.give(answers, dated: dates)
+            let written = dates.values.max() ?? .now
             // Never older than it was, or another device's older copy would
             // outrank it in the fold.
             entry.modified = max(entry.modified, written.toTheMillisecond)

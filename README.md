@@ -26,7 +26,7 @@ Eventrail is in **beta testing** through TestFlight. It is not on the App Store 
 - **🗺️ Event Passport** — A map of the halls you have been to, with the numbers behind your nights
 - **📅 Calendar mirror** — Write your library into a calendar of the app's own, with an alert when the doors open
 - **📥 Profile import** — Import a public Eventernote profile's attendance history and favorites (read-only, no password)
-- **☁️ iCloud sync** — Keep your records in step across iPhone and iPad through your private iCloud storage
+- **☁️ iCloud sync** — Keep your records in step across iPhone and iPad through your private iCloud storage, with no server of the app's own
 - **💾 Backup & restore** — Export your library to a `.eventrail` file and restore it any time
 - **🌍 Multi-language** — English, Japanese, Simplified Chinese and Traditional Chinese, with on-device translation of event overviews
 
@@ -57,7 +57,7 @@ See the [feature overview](docs/overview.md) for how each of these works and how
 
 3. **Build and run** — pick a simulator or device and press `⌘R`.
 
-   A device build needs iCloud (with the `iCloud.moe.shawn.Eventrail` CloudKit container) and Push Notifications enabled on the App ID in your developer portal, since sync runs on CloudKit. Simulator builds work as-is. Before a TestFlight build can sync, deploy the CloudKit schema to Production in the CloudKit Console.
+   A device build needs iCloud (with the `iCloud.moe.shawn.Eventrail` CloudKit container) and Push Notifications enabled on the App ID in your developer portal, since sync runs on CloudKit. Simulator builds work as-is. Before a TestFlight build can sync, deploy the CloudKit schema to Production in the CloudKit Console, and again whenever a model gains a type or a field: run a development build with iCloud Sync on first, so the Development schema has it to deploy.
 
 ### Common Commands
 

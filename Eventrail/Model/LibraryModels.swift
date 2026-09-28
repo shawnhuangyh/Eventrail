@@ -23,7 +23,10 @@ import SwiftData
 // CloudKit's rules shape every property here: each one has a default or is
 // optional, and nothing is `.unique` — two devices each writing a row for the
 // same event is expected, and ``LibraryDatabase/deduplicate(in:)`` keeps one,
-// the same one on every device.
+// the same one on every device. Two entries are the exception to keeping one
+// whole: the one kept first takes whatever the other gave later
+// (``LibraryEntry/absorb(_:)``), since each was written by a device that had
+// never seen the other.
 
 /// Eventernote's facts about one event — a copy of its page, kept so the
 /// library can be drawn and synced without asking the site again.
@@ -115,6 +118,14 @@ final class LibraryEvent {
 /// entry and the facts beside it as two records, in whichever order it likes,
 /// and an entry drawn from its facts alone was invisible on a device the facts
 /// had not reached yet.
+///
+/// Each of its three parts — whether it is in the library, the heart, the
+/// tracking record — is dated on its own (``changed(_:)``), because two
+/// entries for one event are two devices' answers and neither saw the other:
+/// a device whose import added the event before the entry with the reader's
+/// note had reached it wrote a second entry saying only "in the library", and
+/// keeping the newer entry whole dropped the note, the ticket and the heart on
+/// every device.
 @Model
 final class LibraryEntry {
     /// Which of two entries for one event is kept, where they tie.
@@ -134,6 +145,12 @@ final class LibraryEntry {
     /// event is kept. Written to the millisecond, as CloudKit keeps it — see
     /// ``Foundation/Date/toTheMillisecond``.
     var modified: Date = Date.distantPast
+    /// When each part was last given, to the millisecond — see
+    /// ``changed(_:)``. All three nil on an entry written before parts were
+    /// dated.
+    var inLibraryChanged: Date?
+    var favoriteChanged: Date?
+    var trackingChanged: Date?
     /// The event as it stood when the reader last wrote here, as JSON.
     var snapshot: Data?
 
@@ -326,15 +343,102 @@ extension LibraryEntry {
         /// Whether the reader has said nothing — the state of an event they
         /// never touched.
         var isEmpty: Bool { !inLibrary && !isFavorite && tracking.isEmpty }
+
+        /// The parts in which these answers say something other than `other`.
+        func parts(differingFrom other: Answers) -> [Part] {
+            Part.allCases.filter { part in
+                switch part {
+                case .inLibrary: inLibrary != other.inLibrary
+                case .favorite: isFavorite != other.isFavorite
+                case .tracking: tracking != other.tracking
+                }
+            }
+        }
+
+        /// Takes `part` as `other` answers it.
+        mutating func take(_ part: Part, from other: Answers) {
+            switch part {
+            case .inLibrary: inLibrary = other.inLibrary
+            case .favorite: isFavorite = other.isFavorite
+            case .tracking: tracking = other.tracking
+            }
+        }
+    }
+
+    /// The three answers an entry holds, each dated on its own.
+    enum Part: CaseIterable {
+        case inLibrary, favorite, tracking
     }
 
     var answers: Answers {
-        get { Answers(inLibrary: inLibrary, isFavorite: isFavorite, tracking: tracking) }
-        set {
-            update(\.inLibrary, to: newValue.inLibrary)
-            update(\.isFavorite, to: newValue.isFavorite)
-            tracking = newValue.tracking
+        Answers(inLibrary: inLibrary, isFavorite: isFavorite, tracking: tracking)
+    }
+
+    /// When this entry last gave `part`, or `.distantPast` where it never did.
+    ///
+    /// An entry written before parts were dated says only when it was last
+    /// written as a whole, so each of its parts is dated then — the way two
+    /// such entries were always settled.
+    func changed(_ part: Part) -> Date {
+        guard isDatedByPart else { return modified }
+        let given = switch part {
+        case .inLibrary: inLibraryChanged
+        case .favorite: favoriteChanged
+        case .tracking: trackingChanged
         }
+        return given ?? .distantPast
+    }
+
+    private var isDatedByPart: Bool {
+        inLibraryChanged != nil || favoriteChanged != nil || trackingChanged != nil
+    }
+
+    /// Writes `answers`, dating each part `dates` names as it says. A part it
+    /// does not name keeps its answer's date, so the caller names only the
+    /// parts the reader — or the archive being taken in — actually gave.
+    ///
+    /// Leaves ``modified`` to the caller.
+    func give(_ answers: Answers, dated dates: [Part: Date]) {
+        // An entry an older build wrote is dated part by part first, so the
+        // parts left alone keep the date the whole entry had rather than
+        // reading as never given once another part is dated.
+        if !dates.isEmpty, !isDatedByPart, modified != .distantPast {
+            for part in Part.allCases { setChanged(part, to: modified) }
+        }
+        update(\.inLibrary, to: answers.inLibrary)
+        update(\.isFavorite, to: answers.isFavorite)
+        tracking = answers.tracking
+        for (part, when) in dates { setChanged(part, to: when.toTheMillisecond) }
+    }
+
+    private func setChanged(_ part: Part, to when: Date) {
+        switch part {
+        case .inLibrary: update(\.inLibraryChanged, to: when)
+        case .favorite: update(\.favoriteChanged, to: when)
+        case .tracking: update(\.trackingChanged, to: when)
+        }
+    }
+
+    /// Takes from a second entry for the same event every part it gave later
+    /// than this one — what ``LibraryDatabase/deduplicate(in:)`` does before
+    /// deleting it.
+    ///
+    /// Two entries for one event were written by two devices that had not seen
+    /// each other's, so a part one of them never gave says nothing against the
+    /// other. Settled part by part, the same way on every device, so they all
+    /// end on the same answers; a tie keeps this one's.
+    func absorb(_ other: LibraryEntry) {
+        var answers = self.answers
+        var dates: [Part: Date] = [:]
+        for part in Part.allCases
+        where other.changed(part).toTheMillisecond > changed(part).toTheMillisecond {
+            answers.take(part, from: other.answers)
+            dates[part] = other.changed(part)
+        }
+        guard !dates.isEmpty else { return }
+        give(answers, dated: dates)
+        update(\.modified, to: max(modified, other.modified.toTheMillisecond))
+        if snapshot == nil { update(\.snapshot, to: other.snapshot) }
     }
 
     var tracking: Tracking {
