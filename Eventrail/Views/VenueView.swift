@@ -41,7 +41,7 @@ struct VenueView: View {
     /// The library, which "You attended" is counted over — matched on the name
     /// the site printed, the one thing every row of a listing publishes about
     /// a hall, since an event imported from a search row has no place id.
-    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL

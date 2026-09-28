@@ -16,9 +16,10 @@ import SwiftData
 // is the tombstone ``LibraryArchive`` has always kept, and an import or a
 // restore raises it by the same rules.
 
-/// One event the reader has a record about: in the library, favourited or
-/// written on. Whether its Following date was read is a record of its own —
-/// see ``FollowingReadMark``.
+/// One event the reader has a record about: its facts, whether it is
+/// favourited, and what the reader wrote on it. Whether it is in the library
+/// and whether its Following date was read are records of their own — see
+/// ``LibraryMembership`` and ``FollowingReadMark``.
 @Model
 final class LibraryEvent {
     /// Which of two rows for one event is kept — the lowest, on every device.
@@ -59,6 +60,12 @@ final class LibraryEvent {
 
     // MARK: The reader's records
 
+    /// Whether the event is in the library, as builds before
+    /// ``LibraryMembership`` kept it — and still read it. Mirrored here by
+    /// every change made on this device (``mirror(_:)``), read back only where
+    /// an older build wrote something newer (``legacyMembership``), and never
+    /// the answer: a copy of this row sent by a device that had not yet heard
+    /// of a removal carries the old yes.
     var inLibrary: Bool = false
     /// When ``inLibrary`` was last written; nil where it never was.
     var inLibraryChanged: Date?
@@ -84,6 +91,32 @@ final class LibraryEvent {
     var readFingerprint: String?
     var readDay: Date?
     var readChanged: Date?
+
+    init(eventID: String) {
+        self.eventID = eventID
+    }
+}
+
+/// Whether one event is in the library — a `false` with a date is the
+/// tombstone a removal leaves.
+///
+/// A record of its own rather than two columns on the event's row, where
+/// builds before this kept it. CloudKit keeps one record per row and settles
+/// two devices' copies of it whole, so anything written to the event's row —
+/// a read of its page, a note, a ticket, a heart — was sent with whether the
+/// event is in the library as that device last knew it, and a device that had
+/// not yet heard of a removal put the event back everywhere. Apart, only
+/// adding or removing the event says whether it is kept.
+@Model
+final class LibraryMembership {
+    /// Which of two records for one event is kept — the lowest, on every
+    /// device.
+    var uid: UUID = UUID()
+    /// Eventernote's id for the event, and what two records for it share.
+    var eventID: String = ""
+    var inLibrary: Bool = false
+    /// When ``inLibrary`` was last written; nil where it never was.
+    var changed: Date?
 
     init(eventID: String) {
         self.eventID = eventID
@@ -208,12 +241,11 @@ extension LibraryEvent {
         }
     }
 
-    var membership: Stamped<Bool>? {
-        get { inLibraryChanged.map { Stamped(inLibrary, at: $0) } }
-        set {
-            update(\.inLibrary, to: newValue?.value ?? false)
-            update(\.inLibraryChanged, to: newValue?.modified)
-        }
+    /// Keeps the columns an older build reads membership from in step with
+    /// a change made here, so a device not yet updated still sees it.
+    func mirror(_ membership: Stamped<Bool>) {
+        update(\.inLibrary, to: membership.value)
+        update(\.inLibraryChanged, to: membership.modified)
     }
 
     var favorite: Stamped<Bool>? {
@@ -254,17 +286,16 @@ extension LibraryEvent {
     var slice: LibraryArchive? {
         var archive = LibraryArchive()
         archive.events[eventID] = facts
-        archive.membership[eventID] = membership
         archive.tracking[eventID] = tracking
         archive.favorites[eventID] = favorite
         return archive.slice(for: key)
     }
 
-    /// Takes on what `archive` says about this row's event. The Following
-    /// read is not this row's to take — see ``FollowingReadMark``.
+    /// Takes on what `archive` says about this row's event. Whether it is in
+    /// the library and whether its date was read are not this row's to take —
+    /// see ``LibraryMembership`` and ``FollowingReadMark``.
     func take(_ archive: LibraryArchive) {
         facts = archive.events[eventID]
-        membership = archive.membership[eventID]
         tracking = archive.tracking[eventID]
         favorite = archive.favorites[eventID]
     }
@@ -279,12 +310,45 @@ extension LibraryEvent {
         return archive.slice(for: .read(eventID))
     }
 
-    /// Whether this row still carries a read an older build may be using: one
-    /// whose night pruning has not reached. Such a row is not deleted for
-    /// having nothing else to say, or the device still on that build would
-    /// lose the read and send the row straight back.
-    var holdsLegacyRead: Bool {
-        legacyRead?.pruned().followingReads?.isEmpty == false
+    /// Whether the event is in the library as this row's own columns say —
+    /// what an older build wrote, or what this device mirrored there — as the
+    /// part of an archive it stands for.
+    var legacyMembership: LibraryArchive? {
+        guard let inLibraryChanged else { return nil }
+        var archive = LibraryArchive()
+        archive.membership[eventID] = Stamped(inLibrary, at: inLibraryChanged)
+        return archive.slice(for: .membership(eventID))
+    }
+
+    /// Whether this row still carries something an older build reads from it:
+    /// whether the event is in the library, or a read whose night pruning has
+    /// not reached. Such a row is not deleted for having nothing else to say,
+    /// or the device still on that build would lose it and send the row
+    /// straight back — the same reason a tombstone was never pruned.
+    var holdsLegacyRecord: Bool {
+        inLibraryChanged != nil || legacyRead?.pruned().followingReads?.isEmpty == false
+    }
+}
+
+extension LibraryMembership {
+    var key: LibraryArchive.RecordKey { .membership(eventID) }
+
+    var membership: Stamped<Bool>? {
+        get { changed.map { Stamped(inLibrary, at: $0) } }
+        set {
+            update(\.inLibrary, to: newValue?.value ?? false)
+            update(\.changed, to: newValue?.modified)
+        }
+    }
+
+    var slice: LibraryArchive? {
+        var archive = LibraryArchive()
+        archive.membership[eventID] = membership
+        return archive.slice(for: key)
+    }
+
+    func take(_ archive: LibraryArchive) {
+        membership = archive.membership[eventID]
     }
 }
 
@@ -413,3 +477,4 @@ extension LibraryEvent: ChangeAvoidingModel {}
 extension FollowedPerformer: ChangeAvoidingModel {}
 extension LibrarySettings: ChangeAvoidingModel {}
 extension FollowingReadMark: ChangeAvoidingModel {}
+extension LibraryMembership: ChangeAvoidingModel {}

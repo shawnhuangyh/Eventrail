@@ -40,7 +40,7 @@ struct RecordSliceTests {
 
     @Test func eachThingIsOneRecord() {
         #expect(library().recordKeys == [
-            .event("1"), .event("2"), .read("3"), .event("gone"),
+            .event("1"), .membership("1"), .event("2"), .membership("2"), .read("3"), .membership("gone"),
             .performer("10"), .performer("11"), .settings,
         ])
     }
@@ -49,6 +49,7 @@ struct RecordSliceTests {
         let slice = try #require(library().slice(for: .event("1")))
         #expect(slice.events.keys.sorted() == ["1"])
         #expect(slice.tracking["1"]?.value.note == "front row")
+        #expect(slice.membership.isEmpty)
         #expect(slice.favorites.isEmpty)
         #expect(slice.follows == nil)
         #expect(slice.eventernoteAccount == nil)
