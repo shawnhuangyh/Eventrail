@@ -132,6 +132,8 @@ final class EventStore {
     /// Rebuilt whenever the rows may have changed underneath: a launch,
     /// another device's changes, a restore, the store opened again.
     private var rows: [Event.ID: LibraryEvent] = [:]
+    /// Every Following date's read, by event id, kept the same way.
+    private var readMarks: [Event.ID: FollowingReadMark] = [:]
     private var performerRows: [Int: FollowedPerformer] = [:]
     private var settingsRow: LibrarySettings?
 
@@ -378,6 +380,8 @@ final class EventStore {
         let context = database.context
         let events = (try? context.fetch(FetchDescriptor<LibraryEvent>())) ?? []
         rows = Dictionary(events.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
+        let marks = (try? context.fetch(FetchDescriptor<FollowingReadMark>())) ?? []
+        readMarks = Dictionary(marks.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
         let performers = (try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? []
         performerRows = Dictionary(performers.map { ($0.actorID, $0) }, uniquingKeysWith: { first, _ in first })
         settingsRow = (try? context.fetch(FetchDescriptor<LibrarySettings>()))?.first
@@ -430,6 +434,14 @@ final class EventStore {
         return row
     }
 
+    private func makeMark(for id: Event.ID) -> FollowingReadMark {
+        if let mark = readMarks[id] { return mark }
+        let mark = FollowingReadMark(eventID: id)
+        database.context.insert(mark)
+        readMarks[id] = mark
+        return mark
+    }
+
     private func makePerformerRow(for id: Int) -> FollowedPerformer {
         if let row = performerRows[id] { return row }
         let row = FollowedPerformer(actorID: id)
@@ -455,6 +467,8 @@ final class EventStore {
         guard pruned != slice else { return }
         if let pruned {
             row.take(pruned)
+        } else if row.holdsLegacyRead {
+            row.take(LibraryArchive())
         } else {
             rows[row.eventID] = nil
             database.context.delete(row)
@@ -614,13 +628,15 @@ final class EventStore {
             if let record = row.tracking, !record.value.isEmpty {
                 row.tracking = Stamped(Tracking(), at: now)
             }
-            // Every Following date back to unread, on every device: written as
-            // a record with no fingerprint rather than dropped, or the other
-            // device's copy of each read would come straight back.
-            if let read = row.followingRead, read.value.fingerprint != nil {
-                row.followingRead = Stamped(FollowingRead(fingerprint: nil, day: read.value.day), at: now)
-            }
             settle(row)
+        }
+        // Every Following date back to unread, on every device: written as a
+        // record with no fingerprint rather than dropped, or the other
+        // device's copy of each read would come straight back.
+        for mark in readMarks.values {
+            if let read = mark.read, read.value.fingerprint != nil {
+                mark.read = Stamped(FollowingRead(fingerprint: nil, day: read.value.day), at: now)
+            }
         }
         // Everyone followed goes too, as tombstones so the other device's
         // follows do not come back, and with them who they were.
@@ -644,19 +660,22 @@ final class EventStore {
     /// or nil where it is read.
     func unread(_ event: Event) -> FollowingUnread? {
         var read = LibraryArchive()
-        read.followingReads = rows[event.id]?.followingRead.map { [event.id: $0] }
+        read.followingReads = readMarks[event.id]?.read.map { [event.id: $0] }
         return read.unread(event)
     }
 
     /// Marks these rows read as the listing prints them now, or unread again.
     /// One write for the lot, however many there are — Select All then Mark
     /// is hundreds of them.
+    ///
+    /// Written to each date's ``FollowingReadMark`` and never to the event's
+    /// own row, so opening an event on a device that has not yet heard it was
+    /// removed does not send it back into the library.
     func markRead(_ events: some Sequence<Event>, read: Bool) {
         let now = Date.now
         var changed = false
         for event in events where isUnread(event) == read {
-            let row = makeRow(for: event.id)
-            row.followingRead = Stamped(
+            makeMark(for: event.id).read = Stamped(
                 FollowingRead(fingerprint: read ? event.listingFingerprint : nil, day: event.date),
                 at: now)
             changed = true

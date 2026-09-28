@@ -39,6 +39,24 @@ struct EventStoreEventsTests {
         #expect(store.events(of: try kept(in: store)).isEmpty)
     }
 
+    /// A read is a record apart from the event: marking one sends nothing
+    /// about whether the event is in the library, so a device that has not
+    /// yet heard of a removal cannot undo it by opening the event.
+    @Test func markingADateReadLeavesTheEventsRowAlone() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1", date: Date.now.addingTimeInterval(7 * 24 * 60 * 60))
+        store.toggleLibraryMembership(event)
+        store.saveNow()
+        let row = try #require(try kept(in: store).first)
+
+        store.markRead([event], read: true)
+        #expect(!store.isUnread(event))
+        #expect(!row.hasChanges)
+        #expect(store.database.context.insertedModelsArray.contains { $0 is FollowingReadMark })
+        store.saveNow()
+        #expect(try store.database.context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
+    }
+
     @Test func askingTwiceGivesTheSame() throws {
         let store = store()
         for id in ["1", "2", "3"] { store.toggleLibraryMembership(Fixtures.event(id: id)) }

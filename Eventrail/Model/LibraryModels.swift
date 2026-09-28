@@ -16,8 +16,9 @@ import SwiftData
 // is the tombstone ``LibraryArchive`` has always kept, and an import or a
 // restore raises it by the same rules.
 
-/// One event the reader has a record about: in the library, favourited,
-/// written on, or read on the Following tab.
+/// One event the reader has a record about: in the library, favourited or
+/// written on. Whether its Following date was read is a record of its own —
+/// see ``FollowingReadMark``.
 @Model
 final class LibraryEvent {
     /// Which of two rows for one event is kept — the lowest, on every device.
@@ -73,9 +74,41 @@ final class LibraryEvent {
     var trackingChanged: Date?
     /// ``Tracking/edits``, keyed by ``Tracking/Field``'s raw value.
     var trackingEdits: [String: Date] = [:]
+
+    // MARK: Where builds before ``FollowingReadMark`` kept the Following read
+
+    // Read and never written: a device still on one of those builds writes
+    // here, and ``LibraryDatabase/adoptLegacyReads(in:)`` takes what it wrote
+    // into the marks. Kept rather than dropped, since CloudKit's schema only
+    // ever grows and an older build still reads them.
     var readFingerprint: String?
     var readDay: Date?
     var readChanged: Date?
+
+    init(eventID: String) {
+        self.eventID = eventID
+    }
+}
+
+/// Whether the reader has read one date on the Following tab, or My Events —
+/// see ``FollowingRead``.
+///
+/// A record of its own rather than three columns on the event's row, where
+/// builds before this kept it. CloudKit keeps one record per row and settles
+/// two devices' copies of it whole, so marking a date read sent the event's
+/// entire row, its membership included — and a device that had not yet heard
+/// the event was removed put it back in the library everywhere by opening it.
+/// Apart, a read carries nothing but itself.
+@Model
+final class FollowingReadMark {
+    /// Which of two marks for one date is kept — the lowest, on every device.
+    var uid: UUID = UUID()
+    /// Eventernote's id for the event, and what two marks for it share.
+    var eventID: String = ""
+    var fingerprint: String?
+    var day: Date = Date.distantPast
+    /// When the mark was last written; nil where it never was.
+    var changed: Date?
 
     init(eventID: String) {
         self.eventID = eventID
@@ -216,17 +249,6 @@ extension LibraryEvent {
         }
     }
 
-    var followingRead: Stamped<FollowingRead>? {
-        get {
-            readChanged.map { Stamped(FollowingRead(fingerprint: readFingerprint, day: readDay ?? .distantPast), at: $0) }
-        }
-        set {
-            update(\.readFingerprint, to: newValue?.value.fingerprint)
-            update(\.readDay, to: newValue?.value.day)
-            update(\.readChanged, to: newValue?.modified)
-        }
-    }
-
     /// This row as the part of an archive it stands for, or nil where it
     /// records nothing at all.
     var slice: LibraryArchive? {
@@ -235,17 +257,57 @@ extension LibraryEvent {
         archive.membership[eventID] = membership
         archive.tracking[eventID] = tracking
         archive.favorites[eventID] = favorite
-        if let followingRead { archive.followingReads = [eventID: followingRead] }
         return archive.slice(for: key)
     }
 
-    /// Takes on what `archive` says about this row's event.
+    /// Takes on what `archive` says about this row's event. The Following
+    /// read is not this row's to take — see ``FollowingReadMark``.
     func take(_ archive: LibraryArchive) {
         facts = archive.events[eventID]
         membership = archive.membership[eventID]
         tracking = archive.tracking[eventID]
         favorite = archive.favorites[eventID]
-        followingRead = archive.followingReads?[eventID]
+    }
+
+    /// The Following read a build before ``FollowingReadMark`` wrote on this
+    /// row, as the part of an archive it stands for.
+    var legacyRead: LibraryArchive? {
+        guard let readChanged else { return nil }
+        var archive = LibraryArchive()
+        archive.followingReads = [eventID: Stamped(FollowingRead(fingerprint: readFingerprint, day: readDay ?? .distantPast),
+                                                   at: readChanged)]
+        return archive.slice(for: .read(eventID))
+    }
+
+    /// Whether this row still carries a read an older build may be using: one
+    /// whose night pruning has not reached. Such a row is not deleted for
+    /// having nothing else to say, or the device still on that build would
+    /// lose the read and send the row straight back.
+    var holdsLegacyRead: Bool {
+        legacyRead?.pruned().followingReads?.isEmpty == false
+    }
+}
+
+extension FollowingReadMark {
+    var key: LibraryArchive.RecordKey { .read(eventID) }
+
+    var read: Stamped<FollowingRead>? {
+        get { changed.map { Stamped(FollowingRead(fingerprint: fingerprint, day: day), at: $0) } }
+        set {
+            update(\.fingerprint, to: newValue?.value.fingerprint)
+            update(\.day, to: newValue?.value.day ?? .distantPast)
+            update(\.changed, to: newValue?.modified)
+        }
+    }
+
+    var slice: LibraryArchive? {
+        var archive = LibraryArchive()
+        if let read { archive.followingReads = [eventID: read] }
+        return archive.slice(for: key)
+    }
+
+    func take(_ archive: LibraryArchive) {
+        read = archive.followingReads?[eventID]
     }
 }
 
@@ -350,3 +412,4 @@ nonisolated extension ChangeAvoidingModel {
 extension LibraryEvent: ChangeAvoidingModel {}
 extension FollowedPerformer: ChangeAvoidingModel {}
 extension LibrarySettings: ChangeAvoidingModel {}
+extension FollowingReadMark: ChangeAvoidingModel {}

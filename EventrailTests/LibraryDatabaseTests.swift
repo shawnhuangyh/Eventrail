@@ -67,7 +67,8 @@ struct LibraryDatabaseTests {
     @Test func eachRecordIsOneRow() throws {
         let (database, context) = try database()
         try stored(library(), in: context)
-        #expect(try context.fetchCount(FetchDescriptor<LibraryEvent>()) == 5)
+        #expect(try context.fetchCount(FetchDescriptor<LibraryEvent>()) == 4)
+        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<FollowedPerformer>()) == 2)
         #expect(try context.fetchCount(FetchDescriptor<LibrarySettings>()) == 1)
         withExtendedLifetime(database) {}
@@ -90,6 +91,7 @@ struct LibraryDatabaseTests {
         try stored(fewer, in: context)
         let ids = try context.fetch(FetchDescriptor<LibraryEvent>()).map(\.eventID).sorted()
         #expect(ids == ["1", "2", "4", "gone"])
+        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 0)
         withExtendedLifetime(database) {}
     }
 
@@ -161,13 +163,13 @@ struct LibraryDatabaseTests {
         let past = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
         var archive = LibraryArchive()
         archive.followingReads = ["7": Stamped(FollowingRead(fingerprint: "x", day: past), at: earlier)]
-        let row = LibraryEvent(eventID: "7")
-        context.insert(row)
-        row.take(archive)
+        let mark = FollowingReadMark(eventID: "7")
+        context.insert(mark)
+        mark.take(archive)
         try context.save()
 
         #expect(try LibraryDatabase.prune(in: context))
-        #expect(try context.fetchCount(FetchDescriptor<LibraryEvent>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 0)
         withExtendedLifetime(database) {}
     }
 
@@ -291,16 +293,16 @@ struct LibraryDatabaseTests {
         let over = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
         var archive = LibraryArchive()
         archive.followingReads = ["7": Stamped(FollowingRead(fingerprint: "x", day: over), at: earlier)]
-        let row = LibraryEvent(eventID: "7")
-        context.insert(row)
-        row.take(archive)
+        let mark = FollowingReadMark(eventID: "7")
+        context.insert(mark)
+        mark.take(archive)
         try context.save()
         let before = try LibraryDatabase.archive(in: context)
-        context.delete(row)
+        context.delete(mark)
         try context.save()
 
         #expect(try LibraryDatabase.reconcile(before, in: context) == false)
-        #expect(try context.fetchCount(FetchDescriptor<LibraryEvent>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 0)
         withExtendedLifetime(database) {}
     }
 
@@ -334,7 +336,8 @@ struct LibraryDatabaseTests {
         row.inLibraryChanged = cut(row.inLibraryChanged)
         row.favoriteChanged = cut(row.favoriteChanged)
         row.trackingChanged = cut(row.trackingChanged)
-        row.readChanged = cut(row.readChanged)
+        let mark = try #require(try context.fetch(FetchDescriptor<FollowingReadMark>()).first)
+        mark.changed = cut(mark.changed)
         try context.save()
 
         #expect(try LibraryDatabase.reconcile(before, in: context) == false)
@@ -342,6 +345,76 @@ struct LibraryDatabaseTests {
         // Nothing landed either, so nothing is read again or redrawn.
         let outcome = try LibraryDatabase.settleImport(against: before, in: context)
         #expect(!outcome.wrote && !outcome.landed)
+        withExtendedLifetime(database) {}
+    }
+
+    // MARK: - The Following read an older build keeps on the event's row
+
+    /// A row as a build before the marks leaves it: the read in three columns
+    /// beside the event.
+    @discardableResult
+    private func legacyRow(_ id: Event.ID, read day: Date, at when: Date, in context: ModelContext) -> LibraryEvent {
+        let row = LibraryEvent(eventID: id)
+        context.insert(row)
+        row.readFingerprint = "x"
+        row.readDay = day
+        row.readChanged = when
+        return row
+    }
+
+    private func mark(_ id: Event.ID, in context: ModelContext) throws -> FollowingReadMark? {
+        try context.fetch(FetchDescriptor<FollowingReadMark>()).first { $0.eventID == id }
+    }
+
+    @Test func aReadAnOlderBuildWroteIsTakenIntoItsMark() throws {
+        let (database, context) = try database()
+        legacyRow("3", read: ahead, at: earlier, in: context)
+        try context.save()
+
+        #expect(try LibraryDatabase.adoptLegacyReads(in: context))
+        let read = try #require(try mark("3", in: context)?.read)
+        #expect(read == Stamped(FollowingRead(fingerprint: "x", day: ahead), at: earlier))
+        // Taken in once, it is not taken in again.
+        #expect(try LibraryDatabase.adoptLegacyReads(in: context) == false)
+        #expect(!context.hasChanges)
+        withExtendedLifetime(database) {}
+    }
+
+    /// Marked unread here after an older build read it: the later answer
+    /// stands, and a later one from that build stands over it in turn.
+    @Test func theNewerOfAMarkAndAnOlderBuildsReadStands() throws {
+        let (database, context) = try database()
+        let row = legacyRow("3", read: ahead, at: earlier, in: context)
+        let mark = FollowingReadMark(eventID: "3")
+        context.insert(mark)
+        mark.read = Stamped(FollowingRead(fingerprint: nil, day: ahead), at: later)
+        try context.save()
+
+        #expect(try LibraryDatabase.adoptLegacyReads(in: context) == false)
+        #expect(mark.read?.value.fingerprint == nil)
+
+        row.readChanged = .now
+        try context.save()
+        #expect(try LibraryDatabase.adoptLegacyReads(in: context))
+        #expect(mark.read?.value.fingerprint == "x")
+        withExtendedLifetime(database) {}
+    }
+
+    /// A device still on an older build reads the Following read from the
+    /// event's row, so the row stays while its night is ahead — deleted, that
+    /// device would send it straight back.
+    @Test func aRowAnOlderBuildStillReadsFromIsKept() throws {
+        let (database, context) = try database()
+        legacyRow("3", read: ahead, at: earlier, in: context)
+        legacyRow("7", read: Date.now.addingTimeInterval(-30 * 24 * 60 * 60), at: earlier, in: context)
+        try context.save()
+
+        try LibraryDatabase.apply(try LibraryDatabase.archive(in: context), to: context)
+        try context.save()
+        try LibraryDatabase.prune(in: context)
+        let left = try context.fetch(FetchDescriptor<LibraryEvent>()).map(\.eventID)
+        #expect(left == ["3"])
+        #expect(try mark("3", in: context) != nil)
         withExtendedLifetime(database) {}
     }
 

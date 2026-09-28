@@ -341,20 +341,27 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
 
 /// The archive cut into records, one per thing the reader keeps a record
 /// *about*: an event (whether it is in the library, its tracking, the
-/// favourite, the Following read, and the facts that go with it), a performer
-/// (the follow and who they are), and one for the settings that belong to the
-/// whole library.
+/// favourite, and the facts that go with it), whether a Following date was
+/// read, a performer (the follow and who they are), and one for the settings
+/// that belong to the whole library.
+///
+/// The read is a record apart from its event because CloudKit settles a
+/// record whole: a device that marked a date read while it still held the
+/// event as kept sent the event back into the library with the mark.
 ///
 /// Each record is a slice — an ordinary archive holding only that one thing —
 /// so records are folded back together by the same ``merging(_:)`` a whole
 /// archive always was, and every rule written there holds record by record
 /// without being written twice. It is how the library is stored: one row per
-/// record — see ``LibraryEvent``, ``FollowedPerformer`` and
+/// record — see ``LibraryEvent``, ``FollowingReadMark``, ``FollowedPerformer`` and
 /// ``LibrarySettings``.
 nonisolated extension LibraryArchive {
     /// What one record is about.
     enum RecordKey: Hashable, Sendable {
         case event(Event.ID)
+        /// Whether the Following date of this event was read — see
+        /// ``FollowingReadMark``.
+        case read(Event.ID)
         case performer(String)
         case settings
     }
@@ -366,7 +373,7 @@ nonisolated extension LibraryArchive {
         for id in membership.keys { keys.insert(.event(id)) }
         for id in tracking.keys { keys.insert(.event(id)) }
         for id in favorites.keys { keys.insert(.event(id)) }
-        for id in (followingReads ?? [:]).keys { keys.insert(.event(id)) }
+        for id in (followingReads ?? [:]).keys { keys.insert(.read(id)) }
         for id in (follows ?? [:]).keys { keys.insert(.performer(id)) }
         if slice(for: .settings) != nil { keys.insert(.settings) }
         return keys
@@ -383,11 +390,13 @@ nonisolated extension LibraryArchive {
             slice.membership[id] = membership[id]
             slice.tracking[id] = tracking[id]
             slice.favorites[id] = favorites[id]
-            if let read = followingReads?[id] { slice.followingReads = [id: read] }
             let holdsSomething = slice.events[id] != nil || slice.membership[id] != nil
                 || slice.tracking[id] != nil || slice.favorites[id] != nil
-                || slice.followingReads != nil
             return holdsSomething ? slice : nil
+        case .read(let id):
+            guard let read = followingReads?[id] else { return nil }
+            slice.followingReads = [id: read]
+            return slice
         case .performer(let id):
             guard let follow = follows?[id] else { return nil }
             slice.follows = [id: follow]

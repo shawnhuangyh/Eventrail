@@ -7,7 +7,7 @@ import SwiftData
 /// Where the reader's library is kept, and how it reaches their other devices.
 ///
 /// A SwiftData store in Application Support, holding one row per record —
-/// ``LibraryEvent``, ``FollowedPerformer`` and ``LibrarySettings``. With
+/// ``LibraryEvent``, ``FollowingReadMark``, ``FollowedPerformer`` and ``LibrarySettings``. With
 /// iCloud Sync on, SwiftData mirrors it into the reader's private CloudKit
 /// database by itself; off, the same store is opened with no CloudKit at all.
 /// The switch is per device, so turning it opens the store again the other
@@ -34,7 +34,7 @@ final class LibraryDatabase {
 
     private static let log = Logger(subsystem: "moe.shawn.Eventrail", category: "library")
 
-    static let schema = Schema([LibraryEvent.self, FollowedPerformer.self, LibrarySettings.self])
+    static let schema = Schema([LibraryEvent.self, FollowingReadMark.self, FollowedPerformer.self, LibrarySettings.self])
 
     /// How syncing stands, in terms the Settings row can state plainly.
     enum SyncStatus: Equatable, Sendable {
@@ -276,6 +276,7 @@ final class LibraryDatabase {
                 try Self.apply(held.merging(meanwhile), to: context)
                 try context.save()
             }
+            try Self.adoptLegacyReads(in: context)
             try Self.deduplicate(in: context)
             try Self.prune(in: context)
         } catch {
@@ -475,12 +476,15 @@ final class LibraryDatabase {
         lastSynced = date
         guard isImport else { return }
         do {
+            // First, so a read an older build wrote on a row is in its mark
+            // before that row can be folded away.
+            let adopted = try Self.adoptLegacyReads(in: context)
             let folded = try Self.deduplicate(in: context)
             let outcome = try before.map { try Self.settleImport(against: $0, in: context) }
             // This device's own records coming back, cut to the millisecond:
             // nothing to read again, redraw or mirror. Left to go on, every save
             // cost a pass over the whole library a few seconds after it.
-            if !folded, let outcome, !outcome.wrote, !outcome.landed { return }
+            if !adopted, !folded, let outcome, !outcome.wrote, !outcome.landed { return }
         } catch {
             Self.log.error("Library could not be settled after an import: \(error.localizedDescription, privacy: .public)")
         }
@@ -509,7 +513,12 @@ final class LibraryDatabase {
     /// else that settles the library by ``LibraryArchive``'s rules.
     static func archive(in context: ModelContext) throws -> LibraryArchive {
         var slices: [LibraryArchive] = []
-        slices += try context.fetch(FetchDescriptor<LibraryEvent>()).compactMap(\.slice)
+        let events = try context.fetch(FetchDescriptor<LibraryEvent>())
+        slices += events.compactMap(\.slice)
+        slices += try context.fetch(FetchDescriptor<FollowingReadMark>()).compactMap(\.slice)
+        // After the marks, so a mark and the read it was taken from, alike to
+        // the moment, settle on the mark.
+        slices += events.compactMap(\.legacyRead)
         slices += try context.fetch(FetchDescriptor<FollowedPerformer>()).compactMap(\.slice)
         slices += try context.fetch(FetchDescriptor<LibrarySettings>()).compactMap(\.slice)
         return LibraryArchive().merging(contentsOf: slices)
@@ -524,12 +533,15 @@ final class LibraryDatabase {
     static func apply(_ archive: LibraryArchive, to context: ModelContext) throws -> Bool {
         let events = Dictionary(try context.fetch(FetchDescriptor<LibraryEvent>()).map { ($0.eventID, $0) },
                                 uniquingKeysWith: { first, _ in first })
+        let marks = Dictionary(try context.fetch(FetchDescriptor<FollowingReadMark>()).map { ($0.eventID, $0) },
+                               uniquingKeysWith: { first, _ in first })
         let performers = Dictionary(try context.fetch(FetchDescriptor<FollowedPerformer>()).map { (String($0.actorID), $0) },
                                     uniquingKeysWith: { first, _ in first })
         let settings = try context.fetch(FetchDescriptor<LibrarySettings>()).first
 
         var keys = archive.recordKeys
         keys.formUnion(events.keys.map { .event($0) })
+        keys.formUnion(marks.keys.map { .read($0) })
         keys.formUnion(performers.keys.map { .performer($0) })
         if settings != nil { keys.insert(.settings) }
 
@@ -539,6 +551,8 @@ final class LibraryDatabase {
             switch key {
             case .event(let id):
                 changed = write(wanted, into: events[id], in: context) { LibraryEvent(eventID: id) } || changed
+            case .read(let id):
+                changed = write(wanted, into: marks[id], in: context) { FollowingReadMark(eventID: id) } || changed
             case .performer(let id):
                 guard let actorID = Int(id) else {
                     log.error("A follow under \(id, privacy: .public) is no actor id; left out.")
@@ -559,7 +573,12 @@ final class LibraryDatabase {
         case (nil, nil):
             return false
         case (nil, let row?):
-            context.delete(row)
+            guard row.holdsLegacyRead else {
+                context.delete(row)
+                return true
+            }
+            guard row.slice != nil else { return false }
+            row.take(LibraryArchive())
             return true
         case (let wanted?, let row?):
             guard row.slice?.toTheMillisecond != wanted.toTheMillisecond else { return false }
@@ -582,6 +601,7 @@ final class LibraryDatabase {
     @discardableResult
     static func deduplicate(in context: ModelContext) throws -> Bool {
         var changed = try fold(LibraryEvent.self, by: \.eventID, in: context)
+        changed = try fold(FollowingReadMark.self, by: \.eventID, in: context) || changed
         changed = try fold(FollowedPerformer.self, by: \.actorID, in: context) || changed
         changed = try fold(LibrarySettings.self, by: { _ in 0 }, in: context) || changed
         if changed { try context.save() }
@@ -598,7 +618,7 @@ final class LibraryDatabase {
             let merged = LibraryArchive().merging(contentsOf: ordered.compactMap(\.slice))
             for extra in ordered.dropFirst() { context.delete(extra) }
             let survivor = ordered[0]
-            if merged.slice(for: survivor.key) == nil {
+            if merged.slice(for: survivor.key) == nil, !survivor.holdsLegacyRead {
                 context.delete(survivor)
             } else {
                 survivor.take(merged)
@@ -647,6 +667,7 @@ final class LibraryDatabase {
         var present = Set<LibraryArchive.RecordKey>()
         var outcome = ImportOutcome()
         try reconcile(LibraryEvent.self, with: before, present: &present, outcome: &outcome, in: context)
+        try reconcile(FollowingReadMark.self, with: before, present: &present, outcome: &outcome, in: context)
         try reconcile(FollowedPerformer.self, with: before, present: &present, outcome: &outcome, in: context)
         try reconcile(LibrarySettings.self, with: before, present: &present, outcome: &outcome, in: context)
         var changed = outcome.wrote
@@ -656,6 +677,10 @@ final class LibraryDatabase {
             switch key {
             case .event(let id):
                 let row = LibraryEvent(eventID: id)
+                context.insert(row)
+                row.take(held)
+            case .read(let id):
+                let row = FollowingReadMark(eventID: id)
                 context.insert(row)
                 row.take(held)
             case .performer(let id):
@@ -721,14 +746,31 @@ final class LibraryDatabase {
     static func prune(in context: ModelContext) throws -> Bool {
         var changed = false
         for row in try context.fetch(FetchDescriptor<LibraryEvent>()) {
-            guard let slice = row.slice else { continue }
+            guard let slice = row.slice else {
+                // Nothing left but a read an older build wrote, whose night
+                // has gone: pruned there as it would be here.
+                if row.readChanged != nil, !row.holdsLegacyRead {
+                    context.delete(row)
+                    changed = true
+                }
+                continue
+            }
             let pruned = slice.pruned().slice(for: row.key)
             guard pruned != slice else { continue }
             if let pruned {
                 row.take(pruned)
+            } else if row.holdsLegacyRead {
+                row.take(LibraryArchive())
             } else {
                 context.delete(row)
             }
+            changed = true
+        }
+        for row in try context.fetch(FetchDescriptor<FollowingReadMark>()) {
+            guard let slice = row.slice else { continue }
+            let pruned = slice.pruned().slice(for: row.key)
+            guard pruned != slice else { continue }
+            if let pruned { row.take(pruned) } else { context.delete(row) }
             changed = true
         }
         for row in try context.fetch(FetchDescriptor<FollowedPerformer>()) {
@@ -736,6 +778,37 @@ final class LibraryDatabase {
             let pruned = slice.pruned().slice(for: row.key)
             guard pruned != slice else { continue }
             if let pruned { row.take(pruned) } else { context.delete(row) }
+            changed = true
+        }
+        if changed { try context.save() }
+        return changed
+    }
+
+    /// Takes the Following reads written on event rows — by this device before
+    /// it kept them in ``FollowingReadMark``, or by another still on a build
+    /// that does — into the marks, where the newer of the two stands.
+    ///
+    /// Run as the store opens and after every import from iCloud, since a
+    /// device on an older build goes on writing them. Only a read newer than
+    /// its mark by more than the millisecond CloudKit keeps is written, so one
+    /// taken in once is not taken in again.
+    @discardableResult
+    static func adoptLegacyReads(in context: ModelContext) throws -> Bool {
+        let rows = try context.fetch(FetchDescriptor<LibraryEvent>(predicate: #Predicate { $0.readChanged != nil }))
+        guard !rows.isEmpty else { return false }
+        var marks = Dictionary(try context.fetch(FetchDescriptor<FollowingReadMark>()).map { ($0.eventID, $0) },
+                               uniquingKeysWith: { first, _ in first })
+        var changed = false
+        for row in rows {
+            guard let read = row.legacyRead?.pruned().followingReads?[row.eventID] else { continue }
+            if let held = marks[row.eventID]?.read,
+               held.modified.toTheMillisecond >= read.modified.toTheMillisecond { continue }
+            let mark = marks[row.eventID] ?? FollowingReadMark(eventID: row.eventID)
+            if marks[row.eventID] == nil {
+                context.insert(mark)
+                marks[row.eventID] = mark
+            }
+            mark.read = read
             changed = true
         }
         if changed { try context.save() }
@@ -790,9 +863,17 @@ protocol ArchiveRow: PersistentModel {
     var key: LibraryArchive.RecordKey { get }
     var slice: LibraryArchive? { get }
     func take(_ archive: LibraryArchive)
+    /// Whether the row stays though its record says nothing — see
+    /// ``LibraryEvent/holdsLegacyRead``.
+    var holdsLegacyRead: Bool { get }
+}
+
+extension ArchiveRow {
+    var holdsLegacyRead: Bool { false }
 }
 
 extension LibraryEvent: ArchiveRow {}
+extension FollowingReadMark: ArchiveRow {}
 extension FollowedPerformer: ArchiveRow {}
 extension LibrarySettings: ArchiveRow {
     var key: LibraryArchive.RecordKey { .settings }
