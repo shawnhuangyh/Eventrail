@@ -256,6 +256,13 @@ final class EventStore {
     /// Settings says so while it lasts.
     private(set) var libraryFileIsBlocked = false
 
+    /// Why the last save did not reach the file, while nothing has been saved
+    /// since. The edits stay in the rows, and every screen shows them; they
+    /// are written with the next save, and tried again on coming back to the
+    /// app (``syncNow()``). Settings says so meanwhile, since an app closed
+    /// now would lose them.
+    private(set) var saveFailure: String?
+
     /// What a refresh of the venues is doing, or what the last one did. Nil
     /// until the reader asks for one.
     private(set) var venueStatus: VenuePlaces.Refresh?
@@ -465,15 +472,19 @@ final class EventStore {
         var answers = held?.answers ?? LibraryEntry.Answers()
         change(&answers)
         answers.tracking.edits = [:]
-        guard answers != (held?.answers ?? LibraryEntry.Answers()) else { return }
+        let given = answers.parts(differingFrom: held?.answers ?? LibraryEntry.Answers())
+        guard !given.isEmpty else { return }
         if keepingFacts { keep(event, in: makeRow(for: event.id)) }
         let entry = held ?? LibraryEntry(eventID: event.id)
         if held == nil {
             database.context.insert(entry)
             entries[event.id] = entry
         }
-        entry.answers = answers
-        entry.modified = Date.now.toTheMillisecond
+        // Only the parts given now are dated now: an import adding the event
+        // says nothing about a heart or a note another device's entry holds.
+        let now = Date.now
+        entry.give(answers, dated: Dictionary(uniqueKeysWithValues: given.map { ($0, now) }))
+        entry.modified = now.toTheMillisecond
         entry.kept = rows[event.id]?.facts ?? event
     }
 
@@ -634,7 +645,10 @@ final class EventStore {
     func removeAllEvents() {
         let now = Date.now
         for entry in entries.values where !entry.answers.isEmpty {
-            entry.answers = LibraryEntry.Answers()
+            // Every part, given or not: an answer another device gave before
+            // this is one the reader asked to be rid of too.
+            entry.give(LibraryEntry.Answers(),
+                       dated: Dictionary(uniqueKeysWithValues: LibraryEntry.Part.allCases.map { ($0, now) }))
             entry.modified = now.toTheMillisecond
         }
         // Every Following date back to unread, on every device: written as a
@@ -1289,6 +1303,7 @@ final class EventStore {
         // one, so the mirror runs whether or not iCloud is in the picture.
         defer { Task { await mirrorCalendar() } }
         if libraryFileIsBlocked { moveInLibraryFile() }
+        if saveFailure != nil { commit() }
         database.resumeSyncing()
     }
 
@@ -1502,11 +1517,18 @@ final class EventStore {
     /// Writes whatever the rows hold that the store does not.
     private func commit() {
         let context = database.context
-        guard context.hasChanges else { return }
+        // Cleared only where it was set: every assignment redraws whatever
+        // reads it, and this runs after every edit.
+        guard context.hasChanges else {
+            if saveFailure != nil { saveFailure = nil }
+            return
+        }
         do {
             try context.save()
+            if saveFailure != nil { saveFailure = nil }
         } catch {
             Self.log.error("Library could not be saved: \(error.localizedDescription, privacy: .public)")
+            saveFailure = error.localizedDescription
         }
     }
 

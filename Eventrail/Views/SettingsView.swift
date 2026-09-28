@@ -282,7 +282,8 @@ struct SettingsView: View {
     // MARK: - Backup
 
     @ViewBuilder private var exportRow: some View {
-        let row = SettingRowLabel("square.and.arrow.up", "Export Backup")
+        let row = SettingRowLabel("square.and.arrow.up", "Export Backup",
+                                  status: unsavedStatus, needsAttention: true)
             .settingRowPadding()
         if let exported {
             ShareLink(item: exported) { row }
@@ -292,6 +293,13 @@ struct SettingsView: View {
             // removed, so the card does not change height under a thumb.
             row.opacity(0.4)
         }
+    }
+
+    /// Said under Export because exporting is what keeps them: a backup is
+    /// written from the library as it is held, saved or not.
+    private var unsavedStatus: Text? {
+        guard let reason = store.saveFailure else { return nil }
+        return Text("Your latest changes could not be saved on this device (\(reason)). Export a backup to keep them.")
     }
 
     private var restoreRow: some View {

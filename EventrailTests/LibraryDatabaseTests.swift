@@ -154,7 +154,8 @@ struct LibraryDatabaseTests {
     // MARK: - Two rows for one thing
 
     /// Two devices each wrote an entry for the same event before hearing of
-    /// the other's: the one written last is the reader's answer.
+    /// the other's, on a build that dated only the whole entry: the one
+    /// written last is the reader's answer, as it always was.
     @Test func twoEntriesForOneEventKeepTheOneWrittenLast() throws {
         let (database, context) = try database()
         for (inLibrary, when) in [(true, earlier), (false, later)] {
@@ -184,6 +185,156 @@ struct LibraryDatabaseTests {
 
         try LibraryDatabase.deduplicate(in: context)
         #expect(try entries("1", in: context).map(\.uid) == [made.min { $0.uuidString < $1.uuidString }])
+        withExtendedLifetime(database) {}
+    }
+
+    /// An entry giving the parts `dates` names, as this build writes one.
+    @discardableResult
+    func entry(_ id: Event.ID, _ answers: LibraryEntry.Answers, dated dates: [LibraryEntry.Part: Date],
+               in context: ModelContext) -> LibraryEntry {
+        let entry = LibraryEntry(eventID: id)
+        context.insert(entry)
+        entry.give(answers, dated: dates)
+        entry.modified = (dates.values.max() ?? .distantPast).toTheMillisecond
+        return entry
+    }
+
+    /// Everything the reader wrote on an event.
+    let written = LibraryEntry.Answers(
+        inLibrary: true, isFavorite: true,
+        tracking: Tracking(ticket: .purchased, seat: "A12", cost: 9000, note: "front row"))
+
+    /// A device set up afresh imports the linked account before iCloud has
+    /// brought it the entry holding the reader's note: its own entry says
+    /// only "in the library", and is the newer. Kept whole, it deleted the
+    /// note, the ticket and the heart on every device.
+    @Test func anImportAheadOfTheEntryWithTheNoteKeepsTheNote() throws {
+        let (database, context) = try database()
+        // Written by the build before parts were dated.
+        let held = LibraryEntry(eventID: "1")
+        context.insert(held)
+        held.give(written, dated: [:])
+        held.modified = earlier.toTheMillisecond
+        entry("1", LibraryEntry.Answers(inLibrary: true), dated: [.inLibrary: later], in: context)
+        try context.save()
+
+        #expect(try LibraryDatabase.deduplicate(in: context))
+        let kept = try entries("1", in: context)
+        #expect(kept.map(\.answers) == [written])
+        withExtendedLifetime(database) {}
+    }
+
+    @Test func anImportAheadOfADatedEntryKeepsItsAnswersToo() throws {
+        let (database, context) = try database()
+        entry("1", written, dated: [.inLibrary: earlier, .favorite: earlier, .tracking: earlier], in: context)
+        entry("1", LibraryEntry.Answers(inLibrary: true), dated: [.inLibrary: later], in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        let kept = try #require(try entries("1", in: context).first)
+        #expect(kept.answers == written)
+        #expect(kept.changed(.inLibrary) == later.toTheMillisecond)
+        #expect(kept.changed(.tracking) == earlier.toTheMillisecond)
+        withExtendedLifetime(database) {}
+    }
+
+    /// Two devices answering different parts of one event on entries of their
+    /// own: both answers stand.
+    @Test func aRemovalOnOneEntryAndANoteOnAnotherBothStand() throws {
+        let (database, context) = try database()
+        entry("1", LibraryEntry.Answers(inLibrary: false), dated: [.inLibrary: later], in: context)
+        entry("1", LibraryEntry.Answers(inLibrary: true, tracking: Tracking(note: "front row")),
+              dated: [.inLibrary: earlier, .tracking: earlier], in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        let kept = try #require(try entries("1", in: context).first)
+        #expect(!kept.inLibrary)
+        #expect(kept.tracking.note == "front row")
+        withExtendedLifetime(database) {}
+    }
+
+    @Test func aHeartOnOneEntryAndACostOnAnotherBothStand() throws {
+        let (database, context) = try database()
+        entry("1", LibraryEntry.Answers(isFavorite: true), dated: [.favorite: earlier], in: context)
+        entry("1", LibraryEntry.Answers(tracking: Tracking(cost: 9000)), dated: [.tracking: later], in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        let kept = try #require(try entries("1", in: context).first)
+        #expect(kept.isFavorite)
+        #expect(kept.tracking.cost == 9000)
+        withExtendedLifetime(database) {}
+    }
+
+    /// The tracking record is one part: a ticket on one entry and a seat on
+    /// another are two copies of it, and the later copy stands.
+    @Test func twoTrackingRecordsKeepTheLaterOne() throws {
+        let (database, context) = try database()
+        entry("1", LibraryEntry.Answers(tracking: Tracking(ticket: .purchased)), dated: [.tracking: earlier], in: context)
+        entry("1", LibraryEntry.Answers(tracking: Tracking(seat: "A12")), dated: [.tracking: later], in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        #expect(try entries("1", in: context).map(\.tracking) == [Tracking(seat: "A12")])
+        withExtendedLifetime(database) {}
+    }
+
+    /// Delete All dates every part, so an older answer on an entry it never
+    /// saw goes too — and one given after it stays.
+    @Test func deleteAllOutranksOlderAnswersOnAnotherEntry() throws {
+        let (database, context) = try database()
+        // Between ``earlier`` and ``later``.
+        let emptied = Date.now.addingTimeInterval(-120)
+        entry("1", LibraryEntry.Answers(), dated: [.inLibrary: emptied, .favorite: emptied, .tracking: emptied],
+              in: context)
+        entry("1", written, dated: [.inLibrary: earlier, .favorite: earlier, .tracking: earlier], in: context)
+        entry("2", LibraryEntry.Answers(), dated: [.inLibrary: emptied, .favorite: emptied, .tracking: emptied],
+              in: context)
+        entry("2", LibraryEntry.Answers(tracking: Tracking(note: "after")), dated: [.tracking: later], in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        #expect(try entries("1", in: context).map(\.answers) == [LibraryEntry.Answers()])
+        #expect(try entries("2", in: context).map(\.tracking.note) == ["after"])
+        withExtendedLifetime(database) {}
+    }
+
+    /// An entry an older build wrote keeps its date for the parts left alone
+    /// once another part is given.
+    @Test func anUndatedEntryKeepsItsDateForThePartsLeftAlone() throws {
+        let (database, context) = try database()
+        let held = LibraryEntry(eventID: "1")
+        context.insert(held)
+        held.give(LibraryEntry.Answers(inLibrary: true, tracking: Tracking(note: "front row")), dated: [:])
+        held.modified = earlier.toTheMillisecond
+        #expect(held.changed(.favorite) == earlier.toTheMillisecond)
+
+        var hearted = held.answers
+        hearted.isFavorite = true
+        held.give(hearted, dated: [.favorite: later])
+        #expect(held.changed(.favorite) == later.toTheMillisecond)
+        #expect(held.changed(.tracking) == earlier.toTheMillisecond)
+        #expect(held.changed(.inLibrary) == earlier.toTheMillisecond)
+        withExtendedLifetime(database) {}
+    }
+
+    /// Each record an archive holds dates its own part, and a part it holds
+    /// nothing for was never given.
+    @Test func anArchiveDatesEachPartOfAnEntry() throws {
+        let (database, context) = try database()
+        var archive = LibraryArchive()
+        archive.membership["1"] = Stamped(true, at: earlier)
+        archive.tracking["1"] = Stamped(Tracking(note: "front row"), at: later)
+        try stored(archive, in: context)
+        let entry = try #require(try entries("1", in: context).first)
+        #expect(entry.changed(.inLibrary) == earlier.toTheMillisecond)
+        #expect(entry.changed(.tracking) == later.toTheMillisecond)
+        #expect(entry.changed(.favorite) == .distantPast)
+
+        let out = try LibraryDatabase.archive(in: context)
+        #expect(out.membership["1"]?.modified == earlier.toTheMillisecond)
+        #expect(out.tracking["1"]?.modified == later.toTheMillisecond)
         withExtendedLifetime(database) {}
     }
 
@@ -279,8 +430,34 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
-    /// Taken in once: an entry already there is the reader's answer, whatever
-    /// an older build left beside it.
+    /// A device reinstalled, or newly set up, opens its store empty and only
+    /// then hears from iCloud what an older build left there. Taken in once
+    /// per device, on that first empty open, it was never taken in at all.
+    @Test func whatAnOlderBuildLeftIsTakenInWhenItLandsLater() throws {
+        let (database, context) = try database()
+        let row = legacyRow("1", in: context)
+        row.inLibrary = true
+        row.inLibraryChanged = earlier
+        let membership = LibraryMembership(eventID: "2")
+        context.insert(membership)
+        membership.inLibrary = true
+        membership.changed = earlier
+        try context.save()
+
+        // What every import from iCloud is followed by.
+        try LibraryDatabase.settle(in: context)
+        let entry = try #require(try entries("1", in: context).first)
+        #expect(entry.inLibrary)
+        #expect(entry.tracking.note == "front row")
+        #expect(try entries("2", in: context).map(\.inLibrary) == [true])
+
+        // And the next import finds nothing more to do.
+        #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
+        withExtendedLifetime(database) {}
+    }
+
+    /// An entry already there is the reader's answer, whatever an older build
+    /// left beside it.
     @Test func anEntryAlreadyThereIsLeftAlone() throws {
         let (database, context) = try database()
         _ = legacyRow("1", in: context)
@@ -338,6 +515,38 @@ struct LibraryDatabaseTests {
         #expect(LibraryDatabase.status(for: error) == .cloudDataDeleted)
     }
 
+    typealias Outcomes = LibraryDatabase.SyncOutcomes
+
+    /// An export that succeeds says nothing about the import that failed.
+    @Test func anImportThatFailedStaysSaidPastAnExport() {
+        var outcomes = Outcomes()
+        outcomes.record(.import, failure: .failed("refused"))
+        outcomes.record(.export, failure: nil)
+        #expect(outcomes.status == .failed("refused"))
+        outcomes.record(.import, failure: nil)
+        #expect(outcomes.status == .synced)
+    }
+
+    /// The other device's writes keep arriving while this one's are refused:
+    /// iCloud Full stays said until an export gets through.
+    @Test func iCloudFullStaysSaidPastAnImport() {
+        var outcomes = Outcomes()
+        outcomes.record(.export, failure: .iCloudFull)
+        outcomes.record(.import, failure: nil)
+        #expect(outcomes.status == .iCloudFull)
+        outcomes.record(.export, failure: nil)
+        #expect(outcomes.status == .synced)
+    }
+
+    /// Offline is over once anything gets through.
+    @Test func beingOfflineEndsWithAnySuccess() {
+        var outcomes = Outcomes()
+        outcomes.record(.import, failure: .offline)
+        #expect(outcomes.status == .offline)
+        outcomes.record(.export, failure: nil)
+        #expect(outcomes.status == .synced)
+    }
+
     @Test func otherErrorsKeepTheirStatus() {
         #expect(LibraryDatabase.status(for: CKError(.quotaExceeded)) == .iCloudFull)
         #expect(LibraryDatabase.status(for: CKError(.networkUnavailable)) == .offline)
@@ -386,8 +595,9 @@ struct LibraryDatabaseTests {
         kept.membership["1"] = Stamped(true, at: earlier)
         try stored(kept, in: context)
         let entry = try #require(try entries("1", in: context).first)
-        entry.inLibrary = false
-        entry.modified = Date.now.toTheMillisecond
+        let now = Date.now
+        entry.give(LibraryEntry.Answers(inLibrary: false), dated: [.inLibrary: now])
+        entry.modified = now.toTheMillisecond
         try context.save()
 
         database.moveIn(from: file)

@@ -82,6 +82,47 @@ struct EventStoreEventsTests {
         #expect(try entries(in: store).map(\.inLibrary) == [false])
     }
 
+    /// An event added on a device the entry holding its note had not reached
+    /// yet: once that entry lands and the two are folded, the note, the ticket
+    /// and the heart are all still there.
+    @Test func anEventAddedBeforeItsNoteArrivedKeepsTheNote() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.toggleLibraryMembership(event)
+        store.saveNow()
+        let context = store.database.context
+        // From a build that dated only the whole entry, written an hour ago.
+        let arrived = LibraryEntry(eventID: "1")
+        context.insert(arrived)
+        arrived.give(LibraryEntry.Answers(inLibrary: true, isFavorite: true,
+                                          tracking: Tracking(ticket: .purchased, note: "front row")),
+                     dated: [:])
+        arrived.modified = Date.now.addingTimeInterval(-3600).toTheMillisecond
+        try context.save()
+
+        // What an import from iCloud landing does.
+        try LibraryDatabase.settle(in: context)
+        store.database.onRemoteChanges?()
+
+        #expect(try entries(in: store).count == 1)
+        #expect(store.isInLibrary(event))
+        #expect(store.isFavorite(event))
+        #expect(store.tracking(for: event).note == "front row")
+        #expect(store.tracking(for: event).ticket == .purchased)
+    }
+
+    /// Only the part given is dated: adding an event says nothing about its
+    /// heart or its note.
+    @Test func aWriteDatesOnlyThePartItGives() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.toggleLibraryMembership(event)
+        let entry = try #require(try entries(in: store).first)
+        #expect(entry.changed(.inLibrary) > .distantPast)
+        #expect(entry.changed(.favorite) == .distantPast)
+        #expect(entry.changed(.tracking) == .distantPast)
+    }
+
     /// An entry is only sent with an answer somebody gave: the same answer
     /// again is not a write.
     @Test func theSameAnswerAgainWritesNothing() throws {

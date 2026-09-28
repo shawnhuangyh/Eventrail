@@ -8781,6 +8781,28 @@
         }
       }
     },
+    "Your latest changes could not be saved on this device (%@). Export a backup to keep them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新の変更をこのデバイスに保存できませんでした（%@）。失わないように、バックアップを書き出してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近的更改未能保存到此设备（%@）。请导出备份以保留这些更改。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近的變更未能儲存到此裝置（%@）。請匯出備份以保留這些變更。"
+          }
+        }
+      }
+    },
     "Your library could not be read from this device's storage, so nothing is being saved over it. Close and reopen the app." : {
       "localizations" : {
         "ja" : {
