@@ -10,7 +10,7 @@ struct LibraryDatabaseTests {
     /// A night far enough ahead that pruning never reaches its read.
     let ahead = Date.now.addingTimeInterval(30 * 24 * 60 * 60)
 
-    /// Something in every part of the archive a row can carry, and one night
+    /// Something in every part of the archive the store keeps, and one night
     /// abroad with every field its page publishes.
     func library() -> LibraryArchive {
         var archive = LibraryArchive()
@@ -47,6 +47,38 @@ struct LibraryDatabaseTests {
         return LibraryArchive().merging(archive)
     }
 
+    /// What an archive says, leaving out when: an entry keeps one date for
+    /// its three answers, so the dates do not come back as they went in.
+    struct Answers: Equatable {
+        var events: [Event.ID: Event]
+        var library: Set<Event.ID>
+        var favorites: Set<Event.ID>
+        var tracking: [Event.ID: Tracking]
+        var reads: [Event.ID: FollowingRead]
+        var follows: [String: Bool]
+        var performers: [String: PerformerProfile]
+        var account: String?
+        var profile: LinkedProfile?
+        var searches: [String]
+
+        init(_ archive: LibraryArchive) {
+            events = archive.events
+            library = Set(archive.membership.filter(\.value.value).keys)
+            favorites = Set(archive.favorites.filter(\.value.value).keys)
+            tracking = archive.tracking.compactMapValues { record in
+                var tracking = record.value
+                tracking.edits = [:]
+                return tracking.isEmpty ? nil : tracking
+            }
+            reads = (archive.followingReads ?? [:]).mapValues(\.value)
+            follows = (archive.follows ?? [:]).mapValues(\.value)
+            performers = archive.followedPerformers ?? [:]
+            account = archive.eventernoteAccount?.value ?? nil
+            profile = archive.eventernoteProfile
+            searches = archive.recentSearches.value
+        }
+    }
+
     func database() throws -> (LibraryDatabase, ModelContext) {
         let database = LibraryDatabase(at: .memory, syncing: false)
         return (database, database.context)
@@ -57,21 +89,31 @@ struct LibraryDatabaseTests {
         try context.save()
     }
 
-    @Test func anArchiveComesBackOutAsItWentIn() throws {
+    func entries(_ id: Event.ID, in context: ModelContext) throws -> [LibraryEntry] {
+        try context.fetch(FetchDescriptor<LibraryEntry>(predicate: #Predicate { $0.eventID == id }))
+    }
+
+    // MARK: - Rows and the archive
+
+    @Test func anArchiveComesBackOutSayingWhatItSaid() throws {
         let (database, context) = try database()
         try stored(library(), in: context)
-        #expect(try LibraryDatabase.archive(in: context) == library())
+        #expect(Answers(try LibraryDatabase.archive(in: context)) == Answers(library()))
         withExtendedLifetime(database) {}
     }
 
-    @Test func eachRecordIsOneRow() throws {
+    /// What the reader said about an event is one record, and what Eventernote
+    /// says about it another. An event the archive only says is out — "gone" —
+    /// needs no entry to say so.
+    @Test func eachEventIsOneEntryAndOneRowOfFacts() throws {
         let (database, context) = try database()
         try stored(library(), in: context)
+        #expect(try context.fetchCount(FetchDescriptor<LibraryEntry>()) == 3)
         #expect(try context.fetchCount(FetchDescriptor<LibraryEvent>()) == 3)
-        #expect(try context.fetchCount(FetchDescriptor<LibraryMembership>()) == 4)
         #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<FollowedPerformer>()) == 2)
         #expect(try context.fetchCount(FetchDescriptor<LibrarySettings>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<LibraryMembership>()) == 0)
         withExtendedLifetime(database) {}
     }
 
@@ -84,492 +126,201 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
-    @Test func aRecordTheArchiveNoLongerHoldsLosesItsRow() throws {
+    /// A restore adds: a row the archive says nothing about is left alone.
+    @Test func applyingLessDeletesNothing() throws {
         let (database, context) = try database()
         try stored(library(), in: context)
         var fewer = library()
         fewer.followingReads = [:]
+        fewer.membership["2"] = nil
         try stored(fewer, in: context)
-        let ids = try context.fetch(FetchDescriptor<LibraryEvent>()).map(\.eventID).sorted()
-        #expect(ids == ["1", "2", "4"])
-        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
+        #expect(try LibraryDatabase.archive(in: context).isInLibrary("2"))
         withExtendedLifetime(database) {}
     }
 
-    /// Two devices each moved their own library in, so each wrote a row for
-    /// the same event: one answer each survives the fold.
-    @Test func twoRowsForOneEventFoldIntoOneAnswerByAnswer() throws {
+    /// An entry written from an archive takes the newest of its dates, so a
+    /// restore raised as of now outranks every device's older copy.
+    @Test func anEntryTakesTheNewestOfItsDates() throws {
         let (database, context) = try database()
-        let base = Stamped(Tracking(note: "front row"), at: earlier)
-        var phone = LibraryArchive()
-        phone.tracking["1"] = base.edited(to: Tracking(seat: "A12", note: "front row"), at: later)
-        var iPad = LibraryArchive()
-        iPad.tracking["1"] = base.edited(to: Tracking(cost: 9000, note: "front row"), at: later)
+        var archive = LibraryArchive()
+        archive.membership["1"] = Stamped(true, at: earlier)
+        archive.tracking["1"] = Stamped(Tracking(note: "front row"), at: later)
+        try stored(archive, in: context)
+        #expect(try entries("1", in: context).map(\.modified) == [later.toTheMillisecond])
+        withExtendedLifetime(database) {}
+    }
 
-        let rows = [phone, iPad].map { archive in
-            let row = LibraryEvent(eventID: "1")
-            context.insert(row)
-            row.take(archive)
-            return row
+    // MARK: - Two rows for one thing
+
+    /// Two devices each wrote an entry for the same event before hearing of
+    /// the other's: the one written last is the reader's answer.
+    @Test func twoEntriesForOneEventKeepTheOneWrittenLast() throws {
+        let (database, context) = try database()
+        for (inLibrary, when) in [(true, earlier), (false, later)] {
+            let entry = LibraryEntry(eventID: "1")
+            context.insert(entry)
+            entry.inLibrary = inLibrary
+            entry.modified = when
         }
-        let survivor = rows.map(\.uid).min { $0.uuidString < $1.uuidString }
         try context.save()
 
         #expect(try LibraryDatabase.deduplicate(in: context))
-        let left = try context.fetch(FetchDescriptor<LibraryEvent>())
-        #expect(left.map(\.uid) == [survivor])
-        #expect(left.first?.tracking?.value.seat == "A12")
-        #expect(left.first?.tracking?.value.cost == 9000)
-        #expect(left.first?.tracking?.value.note == "front row")
+        #expect(try entries("1", in: context).map(\.inLibrary) == [false])
         withExtendedLifetime(database) {}
     }
 
-    @Test func aRemovalOnOneRowOutranksAnOlderYesOnTheOther() throws {
+    /// Written in the same instant, every device keeps the same one, so none
+    /// deletes the entry another kept.
+    @Test func twoEntriesWrittenAtOnceKeepTheLowerUID() throws {
         let (database, context) = try database()
-        for membership in [Stamped(true, at: earlier), Stamped(false, at: later)] {
-            let row = LibraryMembership(eventID: "1")
-            context.insert(row)
-            row.membership = membership
+        let made = (0 ..< 2).map { _ in
+            let entry = LibraryEntry(eventID: "1")
+            context.insert(entry)
+            entry.modified = later
+            return entry.uid
         }
         try context.save()
 
         try LibraryDatabase.deduplicate(in: context)
-        #expect(try LibraryDatabase.archive(in: context).isInLibrary("1") == false)
+        #expect(try entries("1", in: context).map(\.uid) == [made.min { $0.uuidString < $1.uuidString }])
         withExtendedLifetime(database) {}
     }
 
-    @Test func twoSettingsRowsFoldIntoTheNewerLink() throws {
+    @Test func twoRowsOfFactsKeepTheLaterReadOfThePage() throws {
         let (database, context) = try database()
-        for (handle, when) in [("old", earlier), ("new", later)] {
-            var archive = LibraryArchive()
-            archive.eventernoteAccount = Stamped(handle, at: when)
-            let row = LibrarySettings()
+        for (title, read) in [("Moved to the big hall", later), ("Live", earlier)] {
+            var event = Fixtures.event(id: "1", title: title, isDetailed: true)
+            event.readAt = read
+            let row = LibraryEvent(eventID: "1")
             context.insert(row)
-            row.take(archive)
+            row.write(event)
         }
         try context.save()
 
         try LibraryDatabase.deduplicate(in: context)
+        let rows = try context.fetch(FetchDescriptor<LibraryEvent>())
+        #expect(rows.map(\.facts?.title) == ["Moved to the big hall"])
+        withExtendedLifetime(database) {}
+    }
+
+    /// A device writes its settings row the first time the reader searches,
+    /// whether or not the other device's has reached it: neither the link nor
+    /// the searches may be lost to the fold.
+    @Test func twoSettingsRowsKeepWhatEachWroteLast() throws {
+        let (database, context) = try database()
+        let linked = LibrarySettings()
+        context.insert(linked)
+        linked.eventernoteAccount = Stamped("reader", at: earlier)
+        linked.eventernoteProfile = LinkedProfile(name: "Reader")
+        let searched = LibrarySettings()
+        context.insert(searched)
+        searched.searches = Stamped(["MyGO"], at: later)
+        try context.save()
+
+        #expect(try LibraryDatabase.deduplicate(in: context))
         let rows = try context.fetch(FetchDescriptor<LibrarySettings>())
         #expect(rows.count == 1)
-        #expect(rows.first?.account == "new")
+        #expect(rows.first?.account == "reader")
+        #expect(rows.first?.eventernoteProfile?.name == "Reader")
+        #expect(rows.first?.recentSearches == ["MyGO"])
         withExtendedLifetime(database) {}
     }
 
-    @Test func aReadWhoseNightHasGoneLeavesNoRow() throws {
+    @Test func aReadWhoseNightHasGoneIsDeleted() throws {
         let (database, context) = try database()
         let past = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
-        var archive = LibraryArchive()
-        archive.followingReads = ["7": Stamped(FollowingRead(fingerprint: "x", day: past), at: earlier)]
-        let mark = FollowingReadMark(eventID: "7")
-        context.insert(mark)
-        mark.take(archive)
-        try context.save()
-
-        #expect(try LibraryDatabase.prune(in: context))
-        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 0)
-        withExtendedLifetime(database) {}
-    }
-
-    /// Pruned with the whole library in view: the facts go because the
-    /// event's own membership record says it is out, and the tombstone stays.
-    @Test func aTombstoneStaysAndTheEventsFactsGo() throws {
-        let (database, context) = try database()
-        let membership = LibraryMembership(eventID: "7")
-        context.insert(membership)
-        membership.membership = Stamped(false, at: later)
-        let row = LibraryEvent(eventID: "7")
-        context.insert(row)
-        row.facts = Fixtures.event(id: "7")
-        try context.save()
-
-        try LibraryDatabase.prune(in: context)
-        #expect(try context.fetch(FetchDescriptor<LibraryMembership>()).map(\.membership) == [Stamped(false, at: later)])
-        #expect(try context.fetch(FetchDescriptor<LibraryEvent>()).allSatisfy { !$0.hasFacts })
-        withExtendedLifetime(database) {}
-    }
-
-    /// An event in the library keeps its facts though its own row says
-    /// nothing about whether it is kept — pruning reads that from the
-    /// membership record, and a fold of two rows does not prune at all.
-    @Test func anEventInTheLibraryKeepsItsFactsThroughAFoldAndAPrune() throws {
-        let (database, context) = try database()
-        let membership = LibraryMembership(eventID: "1")
-        context.insert(membership)
-        membership.membership = Stamped(true, at: earlier)
-        for title in ["Phone", "iPad"] {
-            let row = LibraryEvent(eventID: "1")
-            context.insert(row)
-            row.facts = Fixtures.event(id: "1", title: title)
+        for (id, day) in [("gone", past), ("ahead", ahead)] {
+            let mark = FollowingReadMark(eventID: id)
+            context.insert(mark)
+            mark.read = Stamped(FollowingRead(fingerprint: "x", day: day), at: earlier)
         }
         try context.save()
 
-        try LibraryDatabase.deduplicate(in: context)
-        try LibraryDatabase.prune(in: context)
-        let rows = try context.fetch(FetchDescriptor<LibraryEvent>())
-        #expect(rows.count == 1)
-        #expect(rows.first?.hasFacts == true)
+        #expect(try LibraryDatabase.pruneReads(in: context))
+        #expect(try context.fetch(FetchDescriptor<FollowingReadMark>()).map(\.eventID) == ["ahead"])
         withExtendedLifetime(database) {}
     }
 
-    // MARK: - An import
+    // MARK: - What older builds kept
 
-    /// What CloudKit does to a row another device sent last: its copy lands
-    /// over this one's whole, whenever each was written.
-    private func imported(_ archive: LibraryArchive, over id: Event.ID, in context: ModelContext) throws {
-        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first { $0.eventID == id })
-        row.take(try #require(archive.slice(for: .event(id))))
-        try context.save()
-    }
-
-    /// The same, for whether the event is in the library.
-    private func importedMembership(_ record: Stamped<Bool>, of id: Event.ID, in context: ModelContext) throws {
-        let row = try #require(try context.fetch(FetchDescriptor<LibraryMembership>()).first { $0.eventID == id })
-        row.membership = record
-        try context.save()
-    }
-
-    private func tracked(_ tracking: Stamped<Tracking>) -> LibraryArchive {
-        var archive = LibraryArchive()
-        archive.events["1"] = Fixtures.event(id: "1")
-        archive.membership["1"] = Stamped(true, at: earlier)
-        archive.tracking["1"] = tracking
-        return archive
-    }
-
-    /// A note typed this morning, then yesterday's offline edit arriving
-    /// after it: the morning's stands.
-    @Test func anOlderAnswerAnImportLandsOverIsPutBack() throws {
-        let (database, context) = try database()
-        let base = Stamped(Tracking(note: "draft"), at: earlier.addingTimeInterval(-3600))
-        try stored(tracked(base.edited(to: Tracking(note: "this morning"), at: later)), in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        try imported(tracked(base.edited(to: Tracking(note: "yesterday"), at: earlier)), over: "1", in: context)
-        #expect(try LibraryDatabase.reconcile(before, in: context))
-        #expect(try LibraryDatabase.archive(in: context).tracking["1"]?.value.note == "this morning")
-        withExtendedLifetime(database) {}
-    }
-
-    @Test func aNewerAnswerAnImportBringsStands() throws {
-        let (database, context) = try database()
-        let base = Stamped(Tracking(note: "draft"), at: earlier.addingTimeInterval(-3600))
-        try stored(tracked(base.edited(to: Tracking(note: "yesterday"), at: earlier)), in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        try imported(tracked(base.edited(to: Tracking(note: "this morning"), at: later)), over: "1", in: context)
-        let outcome = try LibraryDatabase.settleImport(against: before, in: context)
-        #expect(!outcome.wrote && outcome.landed)
-        #expect(!context.hasChanges)
-        #expect(try LibraryDatabase.archive(in: context).tracking["1"]?.value.note == "this morning")
-        withExtendedLifetime(database) {}
-    }
-
-    /// The seat written here and the cost written there are different
-    /// answers, so both are kept though the import carried only the cost.
-    @Test func anImportIsSettledAnswerByAnswer() throws {
-        let (database, context) = try database()
-        let base = Stamped(Tracking(note: "front row"), at: earlier)
-        try stored(tracked(base.edited(to: Tracking(seat: "A12", note: "front row"), at: later)), in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        try imported(tracked(base.edited(to: Tracking(cost: 9000, note: "front row"), at: later)), over: "1", in: context)
-        #expect(try LibraryDatabase.reconcile(before, in: context))
-        let tracking = try LibraryDatabase.archive(in: context).tracking["1"]?.value
-        #expect(tracking?.seat == "A12")
-        #expect(tracking?.cost == 9000)
-        withExtendedLifetime(database) {}
-    }
-
-    @Test func aRemovalAnOlderYesLandsOverStaysRemoved() throws {
-        let (database, context) = try database()
-        var removed = tracked(Stamped(Tracking(), at: earlier))
-        removed.membership["1"] = Stamped(false, at: later)
-        try stored(removed, in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        try importedMembership(Stamped(true, at: earlier), of: "1", in: context)
-        #expect(try LibraryDatabase.reconcile(before, in: context))
-        #expect(try LibraryDatabase.archive(in: context).isInLibrary("1") == false)
-        withExtendedLifetime(database) {}
-    }
-
-    /// What undid a removal before: a device that had not yet heard of it
-    /// wrote to the event — read its page — and its copy of the whole row
-    /// landed, with the old yes in the columns it used to be kept in. The
-    /// removal is a record of its own now, and the old yes is older than it.
-    @Test func aWriteToTheEventFromADeviceBehindLeavesARemovalStanding() throws {
-        let (database, context) = try database()
-        var removed = tracked(Stamped(Tracking(), at: earlier))
-        removed.membership["1"] = Stamped(false, at: later)
-        try stored(removed, in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first { $0.eventID == "1" })
-        var reread = Fixtures.event(id: "1", isDetailed: true)
-        reread.readAt = .now
-        row.facts = reread
-        row.inLibrary = true
-        row.inLibraryChanged = earlier
-        try context.save()
-
-        try LibraryDatabase.adoptLegacyRecords(in: context)
-        try LibraryDatabase.reconcile(before, in: context)
-        #expect(try LibraryDatabase.archive(in: context).isInLibrary("1") == false)
-        #expect(try context.fetch(FetchDescriptor<LibraryMembership>()).first?.membership == Stamped(false, at: later))
-        withExtendedLifetime(database) {}
-    }
-
-    /// One device pruned the row for a Following read whose night had gone,
-    /// while this one put the event in its library: the delete landed after
-    /// the add, and the add is put back.
-    @Test func aRowAnImportDeletedComesBackWhereThisDeviceKeepsSomething() throws {
-        let (database, context) = try database()
-        try stored(library(), in: context)
-        let before = try LibraryDatabase.archive(in: context)
-        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first { $0.eventID == "2" })
-        context.delete(row)
-        try context.save()
-
-        #expect(try LibraryDatabase.reconcile(before, in: context))
-        let archive = try LibraryDatabase.archive(in: context)
-        #expect(archive.isInLibrary("2"))
-        #expect(archive.isFavorite("2"))
-        withExtendedLifetime(database) {}
-    }
-
-    /// Pruned there as it would be here: nothing is sent round again.
-    @Test func aRowAnImportDeletedStaysDeletedWherePruningLeavesNothing() throws {
-        let (database, context) = try database()
-        let over = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
-        var archive = LibraryArchive()
-        archive.followingReads = ["7": Stamped(FollowingRead(fingerprint: "x", day: over), at: earlier)]
-        let mark = FollowingReadMark(eventID: "7")
-        context.insert(mark)
-        mark.take(archive)
-        try context.save()
-        let before = try LibraryDatabase.archive(in: context)
-        context.delete(mark)
-        try context.save()
-
-        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
-        #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 0)
-        withExtendedLifetime(database) {}
-    }
-
-    /// CloudKit keeps a date to the millisecond, so what this device sent
-    /// comes back a fraction older than it went. Taken for an older copy
-    /// landing over a newer one, it was written back, sent, cut short again
-    /// and brought back — for as long as syncing was on.
-    @Test func anEchoCutToTheMillisecondIsNotWrittenBack() throws {
-        let (database, context) = try database()
-        let precise = Date(timeIntervalSinceReferenceDate: 812_345_678.123_456)
-        var archive = LibraryArchive()
-        var event = Fixtures.event(id: "1", isDetailed: true)
-        event.readAt = precise
-        event.editedAt = precise
-        archive.events["1"] = event
-        archive.membership["1"] = Stamped(true, at: precise)
-        archive.favorites["1"] = Stamped(true, at: precise)
-        archive.tracking["1"] = Stamped(Tracking(seat: "A12", note: "front row"), at: precise)
-            .edited(to: Tracking(seat: "A12", cost: 9000, note: "front row"), at: precise.addingTimeInterval(0.000_7))
-        archive.followingReads = ["1": Stamped(FollowingRead(fingerprint: "x", day: ahead), at: precise)]
-        try stored(archive, in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        // What an import of this device's own record writes back.
-        let row = try #require(try context.fetch(FetchDescriptor<LibraryEvent>()).first)
-        func cut(_ date: Date?) -> Date? {
-            date.map { Date(timeIntervalSinceReferenceDate: ($0.timeIntervalSinceReferenceDate * 1000).rounded(.down) / 1000) }
-        }
-        row.readAt = cut(row.readAt)
-        row.editedAt = cut(row.editedAt)
-        let membership = try #require(try context.fetch(FetchDescriptor<LibraryMembership>()).first)
-        membership.changed = cut(membership.changed)
-        row.favoriteChanged = cut(row.favoriteChanged)
-        row.trackingChanged = cut(row.trackingChanged)
-        let mark = try #require(try context.fetch(FetchDescriptor<FollowingReadMark>()).first)
-        mark.changed = cut(mark.changed)
-        try context.save()
-
-        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
-        #expect(!context.hasChanges)
-        // Nothing landed either, so nothing is read again or redrawn.
-        let outcome = try LibraryDatabase.settleImport(against: before, in: context)
-        #expect(!outcome.wrote && !outcome.landed)
-        withExtendedLifetime(database) {}
-    }
-
-    // MARK: - What an older build keeps on the event's row
-
-    /// A device still on a build before ``LibraryMembership`` adds or removes
-    /// an event in the columns of its row; that change is taken into the
-    /// record, and one older than the record is not.
-    @Test func whetherAnOlderBuildKeptAnEventIsTakenInWhereItIsNewer() throws {
-        let (database, context) = try database()
-        let row = LibraryEvent(eventID: "1")
-        context.insert(row)
-        row.facts = Fixtures.event(id: "1")
-        row.inLibrary = true
-        row.inLibraryChanged = earlier
-        try context.save()
-
-        #expect(try LibraryDatabase.adoptLegacyRecords(in: context))
-        let membership = try #require(try context.fetch(FetchDescriptor<LibraryMembership>()).first)
-        #expect(membership.membership == Stamped(true, at: earlier))
-        #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
-
-        // Removed here since: the older copy on the row does not undo it.
-        membership.membership = Stamped(false, at: later)
-        try context.save()
-        #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
-        #expect(membership.inLibrary == false)
-
-        // Added again on the older build, later still: that stands.
-        row.inLibraryChanged = .now
-        try context.save()
-        #expect(try LibraryDatabase.adoptLegacyRecords(in: context))
-        #expect(membership.inLibrary)
-        withExtendedLifetime(database) {}
-    }
-
-    /// A row this build wrote — hearted, nothing mirrored on it — folded with
-    /// a twin a device still on an older build wrote with the event in its
-    /// library and a date read: the survivor goes on telling that device both,
-    /// whichever row survives.
-    @Test(arguments: [true, false])
-    func aFoldKeepsWhatAnOlderBuildReadsFromTheRow(newRowSurvives: Bool) throws {
-        let (database, context) = try database()
-        let hearted = LibraryEvent(eventID: "1")
-        context.insert(hearted)
-        hearted.favorite = Stamped(true, at: later)
-        let older = LibraryEvent(eventID: "1")
-        context.insert(older)
-        older.facts = Fixtures.event(id: "1")
-        older.inLibrary = true
-        older.inLibraryChanged = earlier
-        older.readFingerprint = "x"
-        older.readDay = ahead
-        older.readChanged = earlier
-        let low = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-        let high = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-        hearted.uid = newRowSurvives ? low : high
-        older.uid = newRowSurvives ? high : low
-        try context.save()
-
-        #expect(try LibraryDatabase.deduplicate(in: context))
-        let left = try context.fetch(FetchDescriptor<LibraryEvent>())
-        #expect(left.count == 1)
-        let survivor = try #require(left.first)
-        #expect(survivor.uid == low)
-        #expect(survivor.inLibrary)
-        #expect(survivor.inLibraryChanged == earlier)
-        #expect(survivor.readChanged == earlier && survivor.readFingerprint == "x" && survivor.readDay == ahead)
-        #expect(survivor.isFavorite)
-        withExtendedLifetime(database) {}
-    }
-
-    // MARK: - The Following read an older build keeps on the event's row
-
-    /// A row as a build before the marks leaves it: the read in three columns
-    /// beside the event.
-    @discardableResult
-    private func legacyRow(_ id: Event.ID, read day: Date, at when: Date, in context: ModelContext) -> LibraryEvent {
+    /// A row as the builds before entries left it: the heart and the tracking
+    /// record on the event's own row.
+    private func legacyRow(_ id: Event.ID, in context: ModelContext) -> LibraryEvent {
         let row = LibraryEvent(eventID: id)
         context.insert(row)
-        row.readFingerprint = "x"
-        row.readDay = day
-        row.readChanged = when
+        row.write(Fixtures.event(id: id))
+        row.isFavorite = true
+        row.favoriteChanged = earlier
+        row.note = "front row"
+        row.trackingChanged = earlier
         return row
     }
 
-    private func mark(_ id: Event.ID, in context: ModelContext) throws -> FollowingReadMark? {
-        try context.fetch(FetchDescriptor<FollowingReadMark>()).first { $0.eventID == id }
-    }
-
-    @Test func aReadAnOlderBuildWroteIsTakenIntoItsMark() throws {
+    @Test func whatAnOlderBuildKeptBecomesAnEntry() throws {
         let (database, context) = try database()
-        legacyRow("3", read: ahead, at: earlier, in: context)
+        let row = legacyRow("1", in: context)
+        // On the row as the first builds kept it, and newer in its own record.
+        row.inLibrary = true
+        row.inLibraryChanged = earlier
+        let membership = LibraryMembership(eventID: "1")
+        context.insert(membership)
+        membership.inLibrary = false
+        membership.changed = later
         try context.save()
 
         #expect(try LibraryDatabase.adoptLegacyRecords(in: context))
-        let read = try #require(try mark("3", in: context)?.read)
-        #expect(read == Stamped(FollowingRead(fingerprint: "x", day: ahead), at: earlier))
-        // Taken in once, it is not taken in again.
-        #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
-        #expect(!context.hasChanges)
+        let entry = try #require(try entries("1", in: context).first)
+        #expect(entry.inLibrary == false)
+        #expect(entry.isFavorite)
+        #expect(entry.tracking.note == "front row")
+        #expect(entry.modified == later.toTheMillisecond)
+        #expect(entry.kept?.title == "Live")
         withExtendedLifetime(database) {}
     }
 
-    /// Marked unread here after an older build read it: the later answer
-    /// stands, and a later one from that build stands over it in turn.
-    @Test func theNewerOfAMarkAndAnOlderBuildsReadStands() throws {
+    /// Taken in once: an entry already there is the reader's answer, whatever
+    /// an older build left beside it.
+    @Test func anEntryAlreadyThereIsLeftAlone() throws {
         let (database, context) = try database()
-        let row = legacyRow("3", read: ahead, at: earlier, in: context)
-        let mark = FollowingReadMark(eventID: "3")
-        context.insert(mark)
-        mark.read = Stamped(FollowingRead(fingerprint: nil, day: ahead), at: later)
+        _ = legacyRow("1", in: context)
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.inLibrary = true
+        entry.modified = earlier
         try context.save()
 
         #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
-        #expect(mark.read?.value.fingerprint == nil)
+        #expect(try entries("1", in: context).map(\.isFavorite) == [false])
+        withExtendedLifetime(database) {}
+    }
 
-        row.readChanged = .now
+    @Test func aReadAnOlderBuildKeptOnTheRowBecomesAMark() throws {
+        let (database, context) = try database()
+        let row = LibraryEvent(eventID: "3")
+        context.insert(row)
+        row.readFingerprint = "x"
+        row.readDay = ahead
+        row.readChanged = earlier
         try context.save()
+
         #expect(try LibraryDatabase.adoptLegacyRecords(in: context))
-        #expect(mark.read?.value.fingerprint == "x")
+        let marks = try context.fetch(FetchDescriptor<FollowingReadMark>())
+        #expect(marks.map(\.read?.value.fingerprint) == ["x"])
         withExtendedLifetime(database) {}
     }
 
-    /// A device still on an older build reads the Following read from the
-    /// event's row, so the row stays while its night is ahead — deleted, that
-    /// device would send it straight back.
-    @Test func aRowAnOlderBuildStillReadsFromIsKept() throws {
+    /// The builds before entries dropped the facts of an event nothing kept by
+    /// clearing a flag, and left the columns: an event taken out there and
+    /// kept again here still has something to show.
+    @Test func factsAnOlderBuildDroppedAreReadBack() throws {
         let (database, context) = try database()
-        legacyRow("3", read: ahead, at: earlier, in: context)
-        legacyRow("7", read: Date.now.addingTimeInterval(-30 * 24 * 60 * 60), at: earlier, in: context)
-        try context.save()
-
-        try LibraryDatabase.apply(try LibraryDatabase.archive(in: context), to: context)
-        try context.save()
-        try LibraryDatabase.prune(in: context)
-        let left = try context.fetch(FetchDescriptor<LibraryEvent>()).map(\.eventID)
-        #expect(left == ["3"])
-        #expect(try mark("3", in: context) != nil)
-        withExtendedLifetime(database) {}
-    }
-
-    func placed(in zone: TimeZone, read: Date, title: String = "Live") -> LibraryArchive {
-        var archive = LibraryArchive()
-        var event = Fixtures.event(id: "1", title: title, startsAt: Fixtures.date(2027, 5, 9, 18, in: zone),
-                                   timeZone: zone, isDetailed: true)
-        event.readAt = read
-        archive.events["1"] = event
-        archive.membership["1"] = Stamped(true, at: earlier)
-        return archive
-    }
-
-    /// Two devices holding different copies of one page read at the same
-    /// moment each kept their own, and sent it back over the other's for good.
-    @Test func factsReadAtTheSameMomentLeaveTheArrivedCopy() throws {
-        let (database, context) = try database()
-        try stored(placed(in: Fixtures.tokyo, read: earlier), in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        try imported(placed(in: Fixtures.taipei, read: earlier), over: "1", in: context)
-        #expect(try LibraryDatabase.reconcile(before, in: context) == false)
-        #expect(try LibraryDatabase.archive(in: context).events["1"]?.timeZone == Fixtures.taipei)
-        withExtendedLifetime(database) {}
-    }
-
-    @Test func aLaterReadOfThePageHereIsPutBack() throws {
-        let (database, context) = try database()
-        try stored(placed(in: Fixtures.tokyo, read: later, title: "Moved to the big hall"), in: context)
-        let before = try LibraryDatabase.archive(in: context)
-
-        try imported(placed(in: Fixtures.tokyo, read: earlier), over: "1", in: context)
-        #expect(try LibraryDatabase.reconcile(before, in: context))
-        #expect(try LibraryDatabase.archive(in: context).events["1"]?.title == "Moved to the big hall")
+        let row = LibraryEvent(eventID: "1")
+        context.insert(row)
+        row.write(Fixtures.event(id: "1", title: "Live"))
+        row.hasFacts = false
+        #expect(row.facts?.title == "Live")
+        #expect(LibraryEvent(eventID: "2").facts == nil)
         withExtendedLifetime(database) {}
     }
 
@@ -615,13 +366,13 @@ struct LibraryDatabaseTests {
         let (database, context) = try database()
 
         database.moveIn(from: file)
-        #expect(try LibraryDatabase.archive(in: context) == library())
+        #expect(Answers(try LibraryDatabase.archive(in: context)) == Answers(library()))
         #expect(!exists(file.url))
         #expect(exists(file.retiredURL))
 
         let again = database.moveIn(from: file)
         #expect(again?.archive.holdsNothing == true)
-        #expect(try LibraryDatabase.archive(in: context) == library())
+        #expect(Answers(try LibraryDatabase.archive(in: context)) == Answers(library()))
     }
 
     /// A store that already holds a newer answer — synced in from another
@@ -631,9 +382,13 @@ struct LibraryDatabaseTests {
         defer { try? FileManager.default.removeItem(at: file.url.deletingLastPathComponent()) }
         file.save(library())
         let (database, context) = try database()
-        var removed = LibraryArchive()
-        removed.membership["1"] = Stamped(false, at: .now)
-        try stored(removed, in: context)
+        var kept = LibraryArchive()
+        kept.membership["1"] = Stamped(true, at: earlier)
+        try stored(kept, in: context)
+        let entry = try #require(try entries("1", in: context).first)
+        entry.inLibrary = false
+        entry.modified = Date.now.toTheMillisecond
+        try context.save()
 
         database.moveIn(from: file)
         let archive = try LibraryDatabase.archive(in: context)

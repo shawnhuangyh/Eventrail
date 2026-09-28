@@ -102,9 +102,9 @@ struct EventPassportView: View {
     /// reason.
     private static let cardLimit = 5
 
-    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
+    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
-    private var attended: [Event] { store.events(of: kept).attended }
+    private var attended: [Event] { store.events(of: kept, where: \.inLibrary).attended }
 
     private var stats: PassportStats {
         PassportStats(events: PassportStats.events(attended, in: scope)) {
@@ -1017,14 +1017,14 @@ private struct PassportExtremesSheet: View {
 /// longer see behind it.
 private struct PassportRankingSheet: View {
     @Environment(EventStore.self) private var store
-    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
+    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     let ranking: PassportRanking
 
     /// Read here rather than handed in, for the reason the screen reads it:
     /// one slice, derived from the library, so nothing can be stale.
     private var stats: PassportStats {
-        PassportStats(events: PassportStats.events(store.events(of: kept).attended, in: ranking.scope)) {
+        PassportStats(events: PassportStats.events(store.events(of: kept, where: \.inLibrary).attended, in: ranking.scope)) {
             store.tracking(for: $0)
         }
     }
