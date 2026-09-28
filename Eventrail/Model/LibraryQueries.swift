@@ -4,12 +4,15 @@ import SwiftData
 // What the screens ask the store for with `@Query`, named once so that "the
 // library" means the same rows on every screen that shows it.
 
-extension LibraryEvent {
-    /// Every event in the library.
-    static var library: FetchDescriptor<LibraryEvent> {
+extension LibraryMembership {
+    /// Every event in the library — turned into events through
+    /// ``EventStore/events(of:)``, which reads each one's facts from its row.
+    static var library: FetchDescriptor<LibraryMembership> {
         FetchDescriptor(predicate: #Predicate { $0.inLibrary == true })
     }
+}
 
+extension LibraryEvent {
     /// Every event the reader has hearted, in the library or not.
     static var favorites: FetchDescriptor<LibraryEvent> {
         FetchDescriptor(predicate: #Predicate { $0.isFavorite == true })

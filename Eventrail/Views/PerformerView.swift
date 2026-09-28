@@ -40,7 +40,7 @@ struct PerformerView: View {
     /// The library, which "You attended" is counted over rather than over the
     /// appearances this page has read so far, so the number is the whole of
     /// it however little of the listing has been paged in.
-    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
 

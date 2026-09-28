@@ -18,7 +18,7 @@ struct MeView: View {
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.scenePhase) private var scenePhase
 
-    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
     @Query(LibraryEvent.favorites) private var hearted: [LibraryEvent]
     @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
     @Query private var settingsRows: [LibrarySettings]

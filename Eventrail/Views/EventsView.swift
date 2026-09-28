@@ -4,7 +4,7 @@ import SwiftUI
 /// The reader's own library: everything they have tracked, grouped and filtered.
 struct EventsView: View {
     @Environment(EventStore.self) private var store
-    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
 
     @State private var filter: LibraryFilter = .upcoming
     @State private var grouping: Grouping = .date

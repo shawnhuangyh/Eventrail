@@ -132,6 +132,10 @@ final class EventStore {
     /// Rebuilt whenever the rows may have changed underneath: a launch,
     /// another device's changes, a restore, the store opened again.
     private var rows: [Event.ID: LibraryEvent] = [:]
+    /// Whether each event is in the library, by event id, kept the same way.
+    private var memberships: [Event.ID: LibraryMembership] = [:]
+    /// Every Following date's read, by event id, kept the same way.
+    private var readMarks: [Event.ID: FollowingReadMark] = [:]
     private var performerRows: [Int: FollowedPerformer] = [:]
     private var settingsRow: LibrarySettings?
 
@@ -356,7 +360,7 @@ final class EventStore {
             for event in library {
                 let row = makeRow(for: event.id)
                 row.facts = event
-                row.membership = Stamped(true)
+                setMembership(Stamped(true), for: event.id)
                 row.tracking = tracking[event.id].map { Stamped($0) }
             }
         }
@@ -378,6 +382,10 @@ final class EventStore {
         let context = database.context
         let events = (try? context.fetch(FetchDescriptor<LibraryEvent>())) ?? []
         rows = Dictionary(events.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
+        let kept = (try? context.fetch(FetchDescriptor<LibraryMembership>())) ?? []
+        memberships = Dictionary(kept.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
+        let marks = (try? context.fetch(FetchDescriptor<FollowingReadMark>())) ?? []
+        readMarks = Dictionary(marks.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
         let performers = (try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? []
         performerRows = Dictionary(performers.map { ($0.actorID, $0) }, uniquingKeysWith: { first, _ in first })
         settingsRow = (try? context.fetch(FetchDescriptor<LibrarySettings>()))?.first
@@ -421,6 +429,13 @@ final class EventStore {
         }
     }
 
+    /// The events in the library these records name — what a screen's
+    /// `@Query` of ``LibraryMembership/library`` is turned into, through the
+    /// rows that hold their facts.
+    func events(of memberships: some Sequence<LibraryMembership>) -> [Event] {
+        events(of: memberships.compactMap { rows[$0.eventID] })
+    }
+
     /// The row an event's record is written to, made where there is none.
     private func makeRow(for id: Event.ID) -> LibraryEvent {
         if let row = rows[id] { return row }
@@ -428,6 +443,30 @@ final class EventStore {
         database.context.insert(row)
         rows[id] = row
         return row
+    }
+
+    /// Says whether an event is in the library: in its ``LibraryMembership``,
+    /// and mirrored onto its row for a device still on a build that reads it
+    /// there.
+    private func setMembership(_ membership: Stamped<Bool>, for id: Event.ID) {
+        let record: LibraryMembership
+        if let held = memberships[id] {
+            record = held
+        } else {
+            record = LibraryMembership(eventID: id)
+            database.context.insert(record)
+            memberships[id] = record
+        }
+        record.membership = membership
+        rows[id]?.mirror(membership)
+    }
+
+    private func makeMark(for id: Event.ID) -> FollowingReadMark {
+        if let mark = readMarks[id] { return mark }
+        let mark = FollowingReadMark(eventID: id)
+        database.context.insert(mark)
+        readMarks[id] = mark
+        return mark
     }
 
     private func makePerformerRow(for id: Int) -> FollowedPerformer {
@@ -447,30 +486,30 @@ final class EventStore {
     }
 
     /// Prunes one row the way ``LibraryArchive/pruned()`` would: an event
-    /// nothing keeps any more loses its facts, and a row with nothing left to
-    /// say goes. Tombstones stay.
+    /// nothing keeps any more — out of the library and not hearted — loses its
+    /// facts, and a row with nothing left to say goes. Tombstones stay, in
+    /// ``LibraryMembership``.
     private func settle(_ row: LibraryEvent) {
-        let slice = row.slice
-        let pruned = slice?.pruned().slice(for: row.key)
-        guard pruned != slice else { return }
-        if let pruned {
-            row.take(pruned)
-        } else {
-            rows[row.eventID] = nil
-            database.context.delete(row)
+        if row.hasFacts, memberships[row.eventID]?.inLibrary != true, !row.isFavorite {
+            row.facts = nil
         }
+        guard row.slice == nil, !row.holdsLegacyRecord else { return }
+        rows[row.eventID] = nil
+        database.context.delete(row)
     }
 
     // MARK: - Reading
 
-    // Lists are the screens' own `@Query` — see ``LibraryEvent/library``.
+    // Lists are the screens' own `@Query` — see ``LibraryMembership/library``.
     // What is here answers for one event, one performer or the account, for
     // anything holding one; each reads the row itself, so a screen showing it
     // is drawn again when that row changes and not when another does.
 
     /// The library, for the work done here rather than on a screen: the
     /// calendar, the halls, a refresh.
-    private var library: [Event] { rows.values.compactMap { $0.inLibrary ? $0.facts : nil } }
+    private var library: [Event] {
+        memberships.values.compactMap { $0.inLibrary ? rows[$0.eventID]?.facts : nil }
+    }
 
     var lastRefreshed: Date? { settingsRow?.lastRefreshed }
 
@@ -506,7 +545,7 @@ final class EventStore {
         return isKept ? .planned : .untracked
     }
 
-    func isInLibrary(_ event: Event) -> Bool { rows[event.id]?.inLibrary == true }
+    func isInLibrary(_ event: Event) -> Bool { memberships[event.id]?.inLibrary == true }
 
     func isFavorite(_ event: Event) -> Bool { rows[event.id]?.isFavorite == true }
 
@@ -516,7 +555,8 @@ final class EventStore {
     /// ticket status outlives the event it was written on, so this stays true
     /// while either is still held.
     var hasRecordsToDelete: Bool {
-        rows.values.contains { $0.inLibrary || $0.isFavorite || !($0.tracking?.value.isEmpty ?? true) }
+        memberships.values.contains(where: \.inLibrary)
+            || rows.values.contains { $0.isFavorite || !($0.tracking?.value.isEmpty ?? true) }
             || eventernoteHandle != nil
             || performerRows.values.contains(where: \.isFollowing)
     }
@@ -555,16 +595,14 @@ final class EventStore {
     /// answers only for this device and the reader's other ones — an event the
     /// linked account still lists is imported again on the next refresh.
     func toggleLibraryMembership(_ event: Event) {
-        let row = makeRow(for: event.id)
-        let wasIn = row.inLibrary
-        if wasIn {
-            tombstone(row, at: .now)
+        if isInLibrary(event) {
+            tombstone(event.id, at: .now)
         } else {
-            row.membership = Stamped(true)
             // Nothing to write down: being in the library is what says the
             // reader means to go, which is what a tracking record used to be
             // opened to say for it.
-            keep(event, in: row)
+            keep(event, in: makeRow(for: event.id))
+            setMembership(Stamped(true), for: event.id)
             placeAdded(event)
         }
         save()
@@ -582,9 +620,8 @@ final class EventStore {
     /// me", which is a separate answer from whether it is in the library.
     func remove(_ events: some Sequence<Event>) {
         let now = Date.now
-        for event in events {
-            guard let row = rows[event.id] else { continue }
-            tombstone(row, at: now)
+        for event in events where rows[event.id] != nil || memberships[event.id] != nil {
+            tombstone(event.id, at: now)
         }
         save()
     }
@@ -608,19 +645,23 @@ final class EventStore {
     /// the note come straight back.
     func removeAllEvents() {
         let now = Date.now
+        for membership in Array(memberships.values) where membership.inLibrary {
+            tombstone(membership.eventID, at: now)
+        }
         for row in Array(rows.values) {
-            if row.inLibrary { tombstone(row, at: now) }
             if row.isFavorite { row.favorite = Stamped(false, at: now) }
             if let record = row.tracking, !record.value.isEmpty {
                 row.tracking = Stamped(Tracking(), at: now)
             }
-            // Every Following date back to unread, on every device: written as
-            // a record with no fingerprint rather than dropped, or the other
-            // device's copy of each read would come straight back.
-            if let read = row.followingRead, read.value.fingerprint != nil {
-                row.followingRead = Stamped(FollowingRead(fingerprint: nil, day: read.value.day), at: now)
-            }
             settle(row)
+        }
+        // Every Following date back to unread, on every device: written as a
+        // record with no fingerprint rather than dropped, or the other
+        // device's copy of each read would come straight back.
+        for mark in readMarks.values {
+            if let read = mark.read, read.value.fingerprint != nil {
+                mark.read = Stamped(FollowingRead(fingerprint: nil, day: read.value.day), at: now)
+            }
         }
         // Everyone followed goes too, as tombstones so the other device's
         // follows do not come back, and with them who they were.
@@ -644,19 +685,22 @@ final class EventStore {
     /// or nil where it is read.
     func unread(_ event: Event) -> FollowingUnread? {
         var read = LibraryArchive()
-        read.followingReads = rows[event.id]?.followingRead.map { [event.id: $0] }
+        read.followingReads = readMarks[event.id]?.read.map { [event.id: $0] }
         return read.unread(event)
     }
 
     /// Marks these rows read as the listing prints them now, or unread again.
     /// One write for the lot, however many there are — Select All then Mark
     /// is hundreds of them.
+    ///
+    /// Written to each date's ``FollowingReadMark`` and never to the event's
+    /// own row, so opening an event on a device that has not yet heard it was
+    /// removed does not send it back into the library.
     func markRead(_ events: some Sequence<Event>, read: Bool) {
         let now = Date.now
         var changed = false
         for event in events where isUnread(event) == read {
-            let row = makeRow(for: event.id)
-            row.followingRead = Stamped(
+            makeMark(for: event.id).read = Stamped(
                 FollowingRead(fingerprint: read ? event.listingFingerprint : nil, day: event.date),
                 at: now)
             changed = true
@@ -667,11 +711,12 @@ final class EventStore {
 
     /// Marks one event as removed. A note the reader typed outlives its event,
     /// so that re-adding it later brings the note back; an empty record does not.
-    private func tombstone(_ row: LibraryEvent, at now: Date) {
+    private func tombstone(_ id: Event.ID, at now: Date) {
+        setMembership(Stamped(false, at: now), for: id)
+        guard let row = rows[id] else { return }
         // Held on to, so a sheet still open on it keeps resolving once its
         // facts are pruned from the row.
-        if let facts = row.facts { seen[row.eventID] = facts }
-        row.membership = Stamped(false, at: now)
+        if let facts = row.facts { seen[id] = facts }
         if row.tracking?.value.isEmpty ?? true {
             row.tracking = nil
         }
@@ -733,9 +778,13 @@ final class EventStore {
     /// the read is written down — see ``isStale(_:)`` for what that decides.
     /// `asked` is when the page was asked for, so a read the cache was
     /// cleared under is not stamped fresh on its way in.
+    ///
+    /// A read that found nothing new leaves the row alone — see
+    /// ``Event/isSameRead(as:)`` — and is still written down as a read.
     private func apply(_ imported: Event, asked: Date) {
         pageReads?.record(imported.id, asked: asked)
-        if let row = rows[imported.id], row.hasFacts {
+        if let row = rows[imported.id], let held = row.facts {
+            guard !imported.isSameRead(as: held) else { return }
             row.facts = imported
         } else {
             seen[imported.id] = imported
@@ -1255,11 +1304,11 @@ final class EventStore {
             // out comes back if Eventernote still lists it — the same rule the
             // favourites follow. Taking one out for good means taking it off the
             // account, and an event that was never on it stays gone.
-            if !row.inLibrary {
-                row.membership = Stamped(true, at: now)
+            keep(event, in: row)
+            if memberships[event.id]?.inLibrary != true {
+                setMembership(Stamped(true, at: now), for: event.id)
                 added += 1
             }
-            keep(event, in: row)
         }
         return added
     }

@@ -48,7 +48,7 @@ struct FollowingView: View {
     @State private var selection: Set<Event.ID> = []
 
     @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
-    @Query(LibraryEvent.library) private var kept: [LibraryEvent]
+    @Query(LibraryMembership.library) private var kept: [LibraryMembership]
 
     private var performers: [PerformerProfile] { followedRows.profiles }
 

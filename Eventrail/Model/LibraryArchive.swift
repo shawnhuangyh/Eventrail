@@ -184,6 +184,21 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
         return merged.pruned()
     }
 
+    /// Folds in other copies of the same records — two rows for one thing, or
+    /// what an import landed over what this device held — without pruning.
+    ///
+    /// A record cannot be pruned on its own: an event's facts are kept by
+    /// whether the event is in the library or favourited, and whether it is in
+    /// the library is a record of its own (``LibraryMembership``), so pruning
+    /// an event's record alone would take the facts of every event it did not
+    /// say was kept. ``LibraryDatabase/prune(in:)`` prunes with the whole
+    /// library in view.
+    func merging(records others: [LibraryArchive]) -> LibraryArchive {
+        var merged = self
+        for other in others { merged.combine(other) }
+        return merged
+    }
+
     private mutating func combine(_ other: LibraryArchive) {
         // Settled against both sides as they stood, before either link moves.
         let account = Self.newer(eventernoteAccount, other.eventernoteAccount)
@@ -340,21 +355,33 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
 }
 
 /// The archive cut into records, one per thing the reader keeps a record
-/// *about*: an event (whether it is in the library, its tracking, the
-/// favourite, the Following read, and the facts that go with it), a performer
-/// (the follow and who they are), and one for the settings that belong to the
+/// *about*: an event (its facts, its tracking and the favourite), whether it
+/// is in the library, whether its Following date was read, a performer (the
+/// follow and who they are), and one for the settings that belong to the
 /// whole library.
 ///
+/// Whether an event is in the library, and whether its date was read, are
+/// records apart from the event because CloudKit settles a record whole: a
+/// device that wrote anything to the event — read its page, marked it read,
+/// typed a note — while it still held the event as kept sent the event back
+/// into the library with it.
+///
 /// Each record is a slice — an ordinary archive holding only that one thing —
-/// so records are folded back together by the same ``merging(_:)`` a whole
-/// archive always was, and every rule written there holds record by record
-/// without being written twice. It is how the library is stored: one row per
-/// record — see ``LibraryEvent``, ``FollowedPerformer`` and
-/// ``LibrarySettings``.
+/// so records are folded back together by the same rules a whole archive
+/// always was (``merging(records:)``, which leaves pruning to the whole
+/// library), and every rule holds record by record without being written
+/// twice. It is how the library is stored: one row per record — see
+/// ``LibraryEvent``, ``LibraryMembership``, ``FollowingReadMark``,
+/// ``FollowedPerformer`` and ``LibrarySettings``.
 nonisolated extension LibraryArchive {
     /// What one record is about.
     enum RecordKey: Hashable, Sendable {
         case event(Event.ID)
+        /// Whether the event is in the library — see ``LibraryMembership``.
+        case membership(Event.ID)
+        /// Whether the Following date of this event was read — see
+        /// ``FollowingReadMark``.
+        case read(Event.ID)
         case performer(String)
         case settings
     }
@@ -363,10 +390,10 @@ nonisolated extension LibraryArchive {
     var recordKeys: Set<RecordKey> {
         var keys = Set<RecordKey>()
         for id in events.keys { keys.insert(.event(id)) }
-        for id in membership.keys { keys.insert(.event(id)) }
+        for id in membership.keys { keys.insert(.membership(id)) }
         for id in tracking.keys { keys.insert(.event(id)) }
         for id in favorites.keys { keys.insert(.event(id)) }
-        for id in (followingReads ?? [:]).keys { keys.insert(.event(id)) }
+        for id in (followingReads ?? [:]).keys { keys.insert(.read(id)) }
         for id in (follows ?? [:]).keys { keys.insert(.performer(id)) }
         if slice(for: .settings) != nil { keys.insert(.settings) }
         return keys
@@ -380,14 +407,19 @@ nonisolated extension LibraryArchive {
         switch key {
         case .event(let id):
             slice.events[id] = events[id]
-            slice.membership[id] = membership[id]
             slice.tracking[id] = tracking[id]
             slice.favorites[id] = favorites[id]
-            if let read = followingReads?[id] { slice.followingReads = [id: read] }
-            let holdsSomething = slice.events[id] != nil || slice.membership[id] != nil
-                || slice.tracking[id] != nil || slice.favorites[id] != nil
-                || slice.followingReads != nil
+            let holdsSomething = slice.events[id] != nil || slice.tracking[id] != nil
+                || slice.favorites[id] != nil
             return holdsSomething ? slice : nil
+        case .membership(let id):
+            guard let record = membership[id] else { return nil }
+            slice.membership[id] = record
+            return slice
+        case .read(let id):
+            guard let read = followingReads?[id] else { return nil }
+            slice.followingReads = [id: read]
+            return slice
         case .performer(let id):
             guard let follow = follows?[id] else { return nil }
             slice.follows = [id: follow]
