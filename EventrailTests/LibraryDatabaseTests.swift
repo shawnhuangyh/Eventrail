@@ -433,6 +433,42 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// A row this build wrote — hearted, nothing mirrored on it — folded with
+    /// a twin a device still on an older build wrote with the event in its
+    /// library and a date read: the survivor goes on telling that device both,
+    /// whichever row survives.
+    @Test(arguments: [true, false])
+    func aFoldKeepsWhatAnOlderBuildReadsFromTheRow(newRowSurvives: Bool) throws {
+        let (database, context) = try database()
+        let hearted = LibraryEvent(eventID: "1")
+        context.insert(hearted)
+        hearted.favorite = Stamped(true, at: later)
+        let older = LibraryEvent(eventID: "1")
+        context.insert(older)
+        older.facts = Fixtures.event(id: "1")
+        older.inLibrary = true
+        older.inLibraryChanged = earlier
+        older.readFingerprint = "x"
+        older.readDay = ahead
+        older.readChanged = earlier
+        let low = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let high = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        hearted.uid = newRowSurvives ? low : high
+        older.uid = newRowSurvives ? high : low
+        try context.save()
+
+        #expect(try LibraryDatabase.deduplicate(in: context))
+        let left = try context.fetch(FetchDescriptor<LibraryEvent>())
+        #expect(left.count == 1)
+        let survivor = try #require(left.first)
+        #expect(survivor.uid == low)
+        #expect(survivor.inLibrary)
+        #expect(survivor.inLibraryChanged == earlier)
+        #expect(survivor.readChanged == earlier && survivor.readFingerprint == "x" && survivor.readDay == ahead)
+        #expect(survivor.isFavorite)
+        withExtendedLifetime(database) {}
+    }
+
     // MARK: - The Following read an older build keeps on the event's row
 
     /// A row as a build before the marks leaves it: the read in three columns

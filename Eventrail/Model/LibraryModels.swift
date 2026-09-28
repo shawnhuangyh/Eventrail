@@ -320,6 +320,33 @@ extension LibraryEvent {
         return archive.slice(for: .membership(eventID))
     }
 
+    /// Takes the newest of what this row and its twins keep for an older
+    /// build — whether the event is in the library, and whether its date was
+    /// read — before the twins are folded away (``LibraryDatabase/deduplicate(in:)``).
+    ///
+    /// The fold merges the rows' records, and neither is in a record any more,
+    /// so a surviving row this build wrote — hearted, with nothing mirrored on
+    /// it — would otherwise tell a device still on an older build that the
+    /// event its own twin kept is out of the library.
+    func keepLegacyRecords(of twins: [LibraryEvent]) {
+        var membership = self
+        var read = self
+        for twin in twins {
+            if let changed = twin.inLibraryChanged, changed > (membership.inLibraryChanged ?? .distantPast) {
+                membership = twin
+            }
+            if let changed = twin.readChanged, changed > (read.readChanged ?? .distantPast) {
+                read = twin
+            }
+        }
+        if let changed = membership.inLibraryChanged {
+            mirror(Stamped(membership.inLibrary, at: changed))
+        }
+        update(\.readFingerprint, to: read.readFingerprint)
+        update(\.readDay, to: read.readDay)
+        update(\.readChanged, to: read.readChanged)
+    }
+
     /// Whether this row still carries something an older build reads from it:
     /// whether the event is in the library, or a read whose night pruning has
     /// not reached. Such a row is not deleted for having nothing else to say,

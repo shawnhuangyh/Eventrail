@@ -627,8 +627,9 @@ final class LibraryDatabase {
         for group in Dictionary(grouping: rows, by: key).values where group.count > 1 {
             let ordered = group.sorted { $0.uid.uuidString < $1.uid.uuidString }
             let merged = LibraryArchive().merging(records: ordered.compactMap(\.slice))
-            for extra in ordered.dropFirst() { context.delete(extra) }
             let survivor = ordered[0]
+            survivor.keepLegacyRecords(of: Array(ordered.dropFirst()))
+            for extra in ordered.dropFirst() { context.delete(extra) }
             if merged.slice(for: survivor.key) == nil, !survivor.holdsLegacyRecord {
                 context.delete(survivor)
             } else {
@@ -869,10 +870,14 @@ protocol ArchiveRow: PersistentModel {
     /// Whether the row stays though its record says nothing — see
     /// ``LibraryEvent/holdsLegacyRecord``.
     var holdsLegacyRecord: Bool { get }
+    /// Takes what its twins keep for an older build before they are folded
+    /// away — see ``LibraryEvent/keepLegacyRecords(of:)``.
+    func keepLegacyRecords(of twins: [Self])
 }
 
 extension ArchiveRow {
     var holdsLegacyRecord: Bool { false }
+    func keepLegacyRecords(of twins: [Self]) {}
 }
 
 extension LibraryEvent: ArchiveRow {}
