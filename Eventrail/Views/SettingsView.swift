@@ -221,8 +221,8 @@ struct SettingsView: View {
         }
         switch store.syncStatus {
         case .synced, .none:
-            guard let lastSynced = store.lastSynced else { return nil }
-            return Text("Synced \(lastSynced, format: .relative(presentation: .named))")
+            guard let lastFetched = store.lastFetched else { return nil }
+            return Text("Fetched from iCloud \(lastFetched, format: .relative(presentation: .named))")
         case let status:
             return CloudSyncStatus.text(for: status)
         }

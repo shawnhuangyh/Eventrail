@@ -3017,6 +3017,28 @@
         }
       }
     },
+    "Fetched from iCloud %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@にiCloudから取得"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@从 iCloud 拉取"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@從 iCloud 拉取"
+          }
+        }
+      }
+    },
     "Fewer lottery entries" : {
       "localizations" : {
         "ja" : {
@@ -7193,28 +7215,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消關注他們？"
-          }
-        }
-      }
-    },
-    "Synced %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@に同期"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已同步于 %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已同步於 %@"
           }
         }
       }

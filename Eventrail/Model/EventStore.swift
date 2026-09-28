@@ -148,7 +148,7 @@ final class EventStore {
 
     /// How syncing stands — see ``LibraryDatabase/SyncStatus``.
     var syncStatus: LibraryDatabase.SyncStatus? { database.syncStatus }
-    var lastSynced: Date? { database.lastSynced }
+    var lastFetched: Date? { database.lastFetched }
 
     /// What a refresh is doing at this moment. Reading a nine-page history and
     /// re-reading nine hundred event pages take very different amounts of time,

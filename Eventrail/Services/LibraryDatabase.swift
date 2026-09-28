@@ -84,7 +84,17 @@ final class LibraryDatabase {
     /// one is built again.
     private(set) var generation = 0
     private(set) var syncStatus: SyncStatus?
-    private(set) var lastSynced: Date?
+    /// When this device last fetched from iCloud: the end of the last import
+    /// that succeeded, kept across launches.
+    ///
+    /// Not an export. Every launch and every return to the app sends
+    /// whatever is waiting, usually nothing, and a time that moved with those
+    /// said "just now" on a device that had not heard from the other one in
+    /// minutes. What the reader wants to know from it is whether this device
+    /// has the other one's changes, and only an import answers that.
+    private(set) var lastFetched: Date? = UserDefaults.standard.object(forKey: LibraryDatabase.lastFetchedKey) as? Date {
+        didSet { UserDefaults.standard.set(lastFetched, forKey: Self.lastFetchedKey) }
+    }
     /// Whether the store is open with CloudKit. Not the switch: with the
     /// switch on, the store is opened without CloudKit until the iCloud user
     /// has been checked (``checkAccount()``).
@@ -126,6 +136,9 @@ final class LibraryDatabase {
     /// Whether this device has taken what builds before ``LibraryEntry`` kept
     /// into entries — see ``adoptLegacyRecords(in:)``.
     private static let adoptedKey = "libraryEntriesAdopted"
+    /// ``lastFetched``, per device. Cleared with the account, since it says
+    /// when this device last heard from that account's iCloud.
+    private static let lastFetchedKey = "iCloudLastFetched"
 
     init(at location: Location = LibraryDatabase.defaultLocation, syncing: Bool) {
         self.location = location
@@ -167,6 +180,7 @@ final class LibraryDatabase {
         // said yes to, so the record is written afresh.
         UserDefaults.standard.removeObject(forKey: Self.accountKey)
         UserDefaults.standard.removeObject(forKey: Self.legacyTokenKey)
+        lastFetched = nil
         if syncing {
             checkAccount()
         } else if isSyncing {
@@ -461,7 +475,7 @@ final class LibraryDatabase {
         guard isSyncing else { return }
         if succeeded {
             syncStatus = .synced
-            lastSynced = date
+            if isImport { lastFetched = date }
         } else {
             let status = Self.status(for: error)
             // Left syncing, SwiftData would make the zone again and send the
