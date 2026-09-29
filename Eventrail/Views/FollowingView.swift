@@ -106,9 +106,15 @@ struct FollowingView: View {
                 if performers.isEmpty {
                     nobodyFollowed.bareRow()
                 } else {
-                    filters
-                        .disabled(isSelecting)
-                        .bareRow(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
+                    // A section of its own with no gap after it: the gap a
+                    // month opens with is for the month before it, not for
+                    // the chips.
+                    Section {
+                        filters
+                            .disabled(isSelecting)
+                            .bareRow(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
+                    }
+                    .listSectionSpacing(0)
                     // The whole screen goes to the failure only when there is
                     // nothing cached to fall back on. Otherwise the last copy
                     // stays up and the failure goes under it.
@@ -138,12 +144,7 @@ struct FollowingView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            // A `List` pads every row, header and section out to its own
-            // minimums; the rows here are laid out to the spacing the
-            // scroll view of panels had before, so those are taken away.
-            .listSectionSpacing(0)
-            .environment(\.defaultMinListRowHeight, 0)
-            .environment(\.defaultMinListHeaderHeight, 0)
+            .monthSections()
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
             .washBackground()
             .navigationTitle("Following")
@@ -412,7 +413,7 @@ struct FollowingView: View {
                         // In edit mode the row belongs to the selection, not to
                         // the sheet or to the controls drawn on it.
                         .allowsHitTesting(!isSelecting)
-                        .listRowInsets(EdgeInsets(top: 4.5, leading: 16, bottom: 4.5, trailing: 16))
+                        .listRowInsets(GroupHeader.rowInsets)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         // Toward the dot, as in Mail: a swipe from the leading
@@ -429,7 +430,7 @@ struct FollowingView: View {
                 }
             } header: {
                 GroupHeader(label: Text(group.label), count: group.events.count)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8.5, trailing: 20))
+                    .listRowInsets(GroupHeader.insets)
             }
         }
     }

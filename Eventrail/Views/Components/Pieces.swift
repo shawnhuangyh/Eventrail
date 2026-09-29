@@ -234,6 +234,15 @@ struct GroupHeader: View {
     let label: Text
     let count: Int
 
+    /// Where the header sits in its `List` row, and where each event row under
+    /// it sits: the two tabs' months are spaced alike only if both read these.
+    static let insets = EdgeInsets(top: 4, leading: 20, bottom: 5, trailing: 20)
+    static let rowInsets = EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16)
+    /// The gap a month opens with, over the rows' own insets — wider than the
+    /// one between the header and its first row, so a header reads as the top
+    /// of the month below it rather than the foot of the one above.
+    static let sectionSpacing: CGFloat = 20
+
     var body: some View {
         HStack(spacing: 7) {
             pill {
@@ -266,6 +275,17 @@ struct GroupHeader: View {
         content()
             .glassCapsule()
             .background(Color.washBase, in: .capsule)
+    }
+}
+
+extension View {
+    /// A `List` of months headed by ``GroupHeader``, spaced by its numbers
+    /// alone: the system's own section gap and header and row minimums are
+    /// taken away, since left in they differ with what else the list holds.
+    func monthSections() -> some View {
+        listSectionSpacing(GroupHeader.sectionSpacing)
+            .environment(\.defaultMinListRowHeight, 0)
+            .environment(\.defaultMinListHeaderHeight, 0)
     }
 }
 

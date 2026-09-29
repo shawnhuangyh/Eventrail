@@ -1741,6 +1741,28 @@
         }
       }
     },
+    "Clear the cache?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャッシュを消去しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除缓存？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除快取？"
+          }
+        }
+      }
+    },
     "Close" : {
       "localizations" : {
         "ja" : {
@@ -7347,6 +7369,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "該檔案不是 Eventrail 備份。"
+          }
+        }
+      }
+    },
+    "The backup could not be written (%@). Tap to try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バックアップを書き出せませんでした（%@）。タップしてもう一度お試しください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份未能生成（%@）。轻点以重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備份未能產生（%@）。點一下以重試。"
           }
         }
       }
