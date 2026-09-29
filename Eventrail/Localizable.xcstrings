@@ -7373,6 +7373,28 @@
         }
       }
     },
+    "The backup could not be written (%@). Tap to try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バックアップを書き出せませんでした（%@）。タップしてもう一度お試しください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备份未能生成（%@）。轻点以重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備份未能產生（%@）。點一下以重試。"
+          }
+        }
+      }
+    },
     "The Eventrail calendar could not be removed: %@" : {
       "localizations" : {
         "ja" : {

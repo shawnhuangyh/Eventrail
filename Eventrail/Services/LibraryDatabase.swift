@@ -770,9 +770,9 @@ final class LibraryDatabase {
     }
 
     /// Writes what `archive` holds into the rows, touching only those whose
-    /// answer moves. Additive: a row the archive says nothing about is left
-    /// alone, since every caller hands in the library merged with what it is
-    /// taking in — a restore adds, it never erases.
+    /// answer, or the date of it, moves. Additive: a row the archive says
+    /// nothing about is left alone, since every caller hands in the library
+    /// merged with what it is taking in — a restore adds, it never erases.
     ///
     /// Each part of an entry written here takes its own record's date, and
     /// the entry the newest of them, so what a restore raises as of now
@@ -813,19 +813,25 @@ final class LibraryDatabase {
                 answers.tracking = tracking.value
                 answers.tracking.edits = [:]
             }
-            guard held?.answers != answers else { continue }
-            // An event nobody said anything about needs no entry to say so.
-            guard held != nil || !answers.isEmpty else { continue }
-            let entry = held ?? LibraryEntry(eventID: id)
-            if held == nil { context.insert(entry) }
             let records: [LibraryEntry.Part: Date?] = [.inLibrary: archive.membership[id]?.modified,
                                                        .favorite: archive.favorites[id]?.modified,
                                                        .tracking: archive.tracking[id]?.modified]
             // A new entry is dated by every record the archive holds for it —
-            // a removal is an answer too — and one already here only by the
-            // parts that move.
+            // a removal is an answer too — and one already here by the parts
+            // that move, and by those that stay but were given again later
+            // than this entry says. The date is what a second entry for the
+            // event is settled against (``LibraryEntry/absorb(_:)``): left at
+            // the older one, a copy given in between would outrank the answer
+            // the archive just carried in.
             let moved = Set(answers.parts(differingFrom: held?.answers ?? LibraryEntry.Answers()))
-            let dates = records.compactMapValues { $0 }.filter { held == nil || moved.contains($0.key) }
+            let dates = records.compactMapValues { $0 }.filter { part, when in
+                guard let held else { return true }
+                return moved.contains(part) || when.toTheMillisecond > held.changed(part).toTheMillisecond
+            }
+            // An event nobody said anything about needs no entry to say so.
+            guard held == nil ? !answers.isEmpty : !dates.isEmpty else { continue }
+            let entry = held ?? LibraryEntry(eventID: id)
+            if held == nil { context.insert(entry) }
             entry.give(answers, dated: dates)
             let written = dates.values.max() ?? .now
             // Never older than it was, or another device's older copy would

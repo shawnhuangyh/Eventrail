@@ -1536,18 +1536,15 @@ final class EventStore {
 
     /// Everything the reader owns, as one file they can keep outside the app.
     ///
-    /// Read out of the store each time it is asked for; writing it out is the
-    /// expensive part, and that is the caller's to do.
-    var backup: LibraryBackup { LibraryBackup(archive: archive) }
-
-    /// The whole store as one archive, including edits not yet saved.
-    private var archive: LibraryArchive {
-        do {
-            return try LibraryDatabase.archive(in: database.context)
-        } catch {
-            Self.log.error("Library could not be read: \(error.localizedDescription, privacy: .public)")
-            return LibraryArchive()
-        }
+    /// Read out of the store each time it is asked for, including edits not
+    /// yet saved; writing it out is the expensive part, and that is the
+    /// caller's to do.
+    ///
+    /// Throws where the store cannot be read. It once stood in an empty
+    /// library there, and a backup of nothing looks like any other file —
+    /// found out only on the day it is restored.
+    func backup() throws -> LibraryBackup {
+        LibraryBackup(archive: try LibraryDatabase.archive(in: database.context))
     }
 
     /// Counts every write made to the library this launch, from here or from
@@ -1590,7 +1587,10 @@ final class EventStore {
         let backup = try LibraryBackup.read(at: url)
         if database.isBlocked { moveInLibraryFile() }
         let context = database.context
-        let before = archive
+        // Thrown rather than taken as empty: the merge would then have nothing
+        // of this device's to weigh the file against, and an older note in the
+        // file would be written over the one typed since.
+        let before = try LibraryDatabase.archive(in: context)
         let after = before.restoring(backup.archive)
         try LibraryDatabase.apply(after, to: context)
         try context.save()

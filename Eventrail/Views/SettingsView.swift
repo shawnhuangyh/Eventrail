@@ -31,6 +31,10 @@ struct SettingsView: View {
     @State private var isChoosingBackup = false
     /// The backup file waiting for the share sheet, rewritten on every change.
     @State private var exported: URL?
+    /// Why the last attempt to write it failed, until one succeeds. Kept apart
+    /// from `exported` being nil, which is also the moment before a file is on
+    /// disk: a failure is said and can be tried again, not left dimmed.
+    @State private var exportFailure: String?
     /// The welcome, asked for again. Its own state rather than the flag
     /// ``RootView`` watches: replaying it is not un-launching the app, and a
     /// device that has seen it has still seen it.
@@ -284,11 +288,18 @@ struct SettingsView: View {
 
     @ViewBuilder private var exportRow: some View {
         let row = SettingRowLabel("square.and.arrow.up", "Export Backup",
-                                  status: unsavedStatus, needsAttention: true)
+                                  status: exportStatus, needsAttention: true)
             .settingRowPadding()
         if let exported {
             ShareLink(item: exported) { row }
                 .buttonStyle(.plain)
+        } else if exportFailure != nil {
+            Button {
+                Task { await prepareExport() }
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
         } else {
             // The moment before the file is on disk. Dimmed rather than
             // removed, so the card does not change height under a thumb.
@@ -296,9 +307,14 @@ struct SettingsView: View {
         }
     }
 
-    /// Said under Export because exporting is what keeps them: a backup is
-    /// written from the library as it is held, saved or not.
-    private var unsavedStatus: Text? {
+    /// A backup that could not be written comes first: while it stands, the
+    /// advice to export one is advice the row cannot take.
+    private var exportStatus: Text? {
+        if let reason = exportFailure {
+            return Text("The backup could not be written (\(reason)). Tap to try again.")
+        }
+        // Said under Export because exporting is what keeps them: a backup is
+        // written from the library as it is held, saved or not.
         guard let reason = store.saveFailure else { return nil }
         return Text("Your latest changes could not be saved on this device (\(reason)). Export a backup to keep them.")
     }
@@ -331,9 +347,26 @@ struct SettingsView: View {
     /// work, and Settings should not stutter open because of it. Run again
     /// whenever the reader changes anything, so what leaves is never the
     /// library as it stood when this screen opened.
+    ///
+    /// A failure takes the last file away as well: it was written from the
+    /// library as it stood before the change that set this going, and sharing
+    /// it would pass off an older library as the current one.
     private func prepareExport() async {
-        let backup = store.backup
-        exported = await Task.detached { try? backup.write() }.value
+        let written: Result<URL, any Error>
+        do {
+            let backup = try store.backup()
+            written = await Task.detached { Result { try backup.write() } }.value
+        } catch {
+            written = .failure(error)
+        }
+        switch written {
+        case .success(let url):
+            exported = url
+            exportFailure = nil
+        case .failure(let error):
+            exported = nil
+            exportFailure = error.localizedDescription
+        }
     }
 
     // MARK: - Advanced

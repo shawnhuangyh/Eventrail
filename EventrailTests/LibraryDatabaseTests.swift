@@ -151,6 +151,35 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// An archive giving an answer the entry already holds, but later — an
+    /// older build's file, its zone, a restore — dates the entry then. Left at
+    /// the entry's older date, a second entry written in between by a device
+    /// that had not heard outranked it in the fold.
+    @Test func anAnswerGivenAgainLaterIsDatedThen() throws {
+        let (database, context) = try database()
+        let between = earlier.addingTimeInterval(30 * 60)
+        entry("1", LibraryEntry.Answers(inLibrary: true), dated: [.inLibrary: earlier], in: context)
+        try context.save()
+
+        var older = LibraryArchive()
+        older.membership["1"] = Stamped(true, at: earlier.addingTimeInterval(-60))
+        #expect(try LibraryDatabase.apply(older, to: context) == false)
+
+        var again = LibraryArchive()
+        again.membership["1"] = Stamped(true, at: later)
+        #expect(try LibraryDatabase.apply(again, to: context))
+        try context.save()
+        let held = try #require(try entries("1", in: context).first)
+        #expect(held.changed(.inLibrary) == later.toTheMillisecond)
+        #expect(held.modified == later.toTheMillisecond)
+
+        entry("1", LibraryEntry.Answers(inLibrary: false), dated: [.inLibrary: between], in: context)
+        try context.save()
+        try LibraryDatabase.deduplicate(in: context)
+        #expect(try entries("1", in: context).map(\.inLibrary) == [true])
+        withExtendedLifetime(database) {}
+    }
+
     // MARK: - Two rows for one thing
 
     /// Two devices each wrote an entry for the same event before hearing of
