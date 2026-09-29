@@ -27,6 +27,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var isConfirmingDeleteAll = false
+    @State private var isConfirmingClearCache = false
     @State private var isChoosingBackup = false
     /// The backup file waiting for the share sheet, rewritten on every change.
     @State private var exported: URL?
@@ -359,18 +360,14 @@ struct SettingsView: View {
     /// followed performers' dates, which event pages have been read, every
     /// performer's and hall's page, every flyer, and which area each hall is in.
     ///
-    /// None of it is the reader's, so there is nothing to confirm and nothing
-    /// to count — the screens go back for whatever they still need. Where a
-    /// hall *is* is deliberately not in here: rebuilding it is a run of
-    /// hundreds of searches, and it has its own screen under Advanced.
+    /// None of it is the reader's, so there is nothing to count — the screens
+    /// go back for whatever they still need. It is still asked once, since a
+    /// tap cannot be taken back and every page is read again. Where a hall
+    /// *is* is deliberately not in here: rebuilding it is a run of hundreds of
+    /// searches, and it has its own screen under Advanced.
     private var cacheRow: some View {
         Button {
-            followed.clear()
-            venues.clear()
-            store.forgetReadPages()
-            ListingCache.shared.clear()
-            Task { await ImageCache.shared.clear() }
-            withAnimation(.snappy) { cacheCleared = true }
+            isConfirmingClearCache = true
         } label: {
             SettingRowLabel("clock.arrow.circlepath", "Clear Cache") {
                 if cacheCleared {
@@ -385,6 +382,20 @@ struct SettingsView: View {
         .buttonStyle(.plain)
         .disabled(cacheCleared)
         .sensoryFeedback(.success, trigger: cacheCleared) { _, cleared in cleared }
+        .confirmationDialog("Clear the cache?", isPresented: $isConfirmingClearCache,
+                            titleVisibility: .visible) {
+            Button("Clear Cache", role: .destructive) { clearCache() }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private func clearCache() {
+        followed.clear()
+        venues.clear()
+        store.forgetReadPages()
+        ListingCache.shared.clear()
+        Task { await ImageCache.shared.clear() }
+        withAnimation(.snappy) { cacheCleared = true }
     }
 
     // MARK: - About

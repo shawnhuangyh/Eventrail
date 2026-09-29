@@ -1741,6 +1741,28 @@
         }
       }
     },
+    "Clear the cache?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャッシュを消去しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除缓存？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除快取？"
+          }
+        }
+      }
+    },
     "Close" : {
       "localizations" : {
         "ja" : {
