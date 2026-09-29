@@ -115,7 +115,7 @@ struct EventsView: View {
                             // take the tap, and only the strip the List draws
                             // its mark in would pick the row.
                             .allowsHitTesting(!isSelecting)
-                            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                            .listRowInsets(GroupHeader.rowInsets)
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             // Toward the tag, as on Following: a swipe from the
@@ -148,12 +148,13 @@ struct EventsView: View {
                     }
                 } header: {
                     GroupHeader(label: Text(group.label), count: group.events.count)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                        .listRowInsets(GroupHeader.insets)
                 }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .monthSections()
         .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
     }
 
