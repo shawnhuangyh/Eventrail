@@ -102,8 +102,8 @@ final class LibraryEvent {
 }
 
 /// Everything the reader owns about one event: whether it is in the library,
-/// whether it is hearted, and the ticket, seat, cost, lottery count and note
-/// they wrote on it.
+/// whether it is hearted, and the ticket, seat, seat class, cost, lottery count
+/// and note they wrote on it.
 ///
 /// One record, written only when one of those changes — by the reader, or by
 /// an import of their account adding the event — and never by a read of the
@@ -138,6 +138,7 @@ final class LibraryEntry {
     /// none rather than failing.
     var ticket: String = TicketStatus.none.rawValue
     var seat: String = ""
+    var seatClass: String = ""
     var cost: Int?
     var lotteryEntries: Int?
     var note: String = ""
@@ -443,12 +444,13 @@ extension LibraryEntry {
 
     var tracking: Tracking {
         get {
-            Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
+            Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat, seatClass: seatClass,
                      cost: cost, lotteryEntries: lotteryEntries, note: note)
         }
         set {
             update(\.ticket, to: newValue.ticket.rawValue)
             update(\.seat, to: newValue.seat)
+            update(\.seatClass, to: newValue.seatClass)
             update(\.cost, to: newValue.cost)
             update(\.lotteryEntries, to: newValue.lotteryEntries)
             update(\.note, to: newValue.note)

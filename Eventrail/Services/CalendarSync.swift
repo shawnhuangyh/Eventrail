@@ -54,11 +54,6 @@ final class CalendarSync {
         set { UserDefaults.standard.set(newValue, forKey: Self.calendarKey) }
     }
 
-    /// How long a performance runs when Eventernote has published a start but
-    /// no end. Used only to give the calendar entry a length; the detail sheet
-    /// still shows nothing where the site published nothing.
-    private static let assumedLength: TimeInterval = 3 * 60 * 60
-
     /// EventKit refuses a search window longer than four years, so a wider
     /// range is read in chunks of this size.
     private static let window: TimeInterval = 4 * 365 * 24 * 60 * 60
@@ -320,7 +315,7 @@ final class CalendarSync {
         let isAllDay = event.startsAt == nil
         let start = event.startsAt ?? Self.floatingDay(of: event)
         let end = event.endsAt
-            ?? event.startsAt?.addingTimeInterval(Self.assumedLength)
+            ?? event.startsAt?.addingTimeInterval(Event.assumedLength)
             ?? start
         // An all-day entry has no zone: Calendar draws it on its day wherever
         // the diary is read, and reads its dates back as this device's
