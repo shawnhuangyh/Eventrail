@@ -351,10 +351,8 @@ struct EventDetailView: View {
     /// How far off the event is, its doors, start and end on one line, and how
     /// long it runs — and on the day itself, how far along it has got.
     ///
-    /// Redrawn every second on the day, so the fill runs between the times as
-    /// the event does: from the doors to the start over the first half of the
-    /// line, from the start to the end over the second. Any other day it only
-    /// has to notice midnight.
+    /// Redrawn every second on the day, so the bars fill between the times as
+    /// the event does. Any other day it only has to notice midnight.
     ///
     /// An em dash stands in for a time the public page does not carry — the
     /// app never fills one in itself.
@@ -392,17 +390,7 @@ struct EventDetailView: View {
             }
             .animation(.snappy, value: progress.phase)
 
-            VStack(spacing: 14) {
-                HStack(alignment: .lastTextBaseline, spacing: 0) {
-                    timeNode("Doors", at: shown.doorsOpen, stop: 0, progress, tint: tint,
-                             alignment: .leading)
-                    timeNode("Start", at: shown.startsAt, stop: 1, progress, tint: tint,
-                             alignment: .center)
-                    timeNode("End", at: shown.endsAt, stop: 2, progress, tint: tint,
-                             alignment: .trailing)
-                }
-                timelineTrack(progress, tint: tint)
-            }
+            stopsRow(progress, tint: tint)
 
             HStack(spacing: 10) {
                 Label { runLine } icon: { Image(systemName: "timer") }
@@ -590,49 +578,69 @@ struct EventDetailView: View {
         return nil
     }
 
-    /// One of the event's three times, under what it is the time of.
+    /// The doors, the start and the end on one line with a bar between each
+    /// two, and what each is small over it — drawn as the Live Activity draws
+    /// its times, so the sheet and the activity read the same. The first bar
+    /// fills from the doors to the start, the second from the start to the
+    /// end. An em dash stands in for a time the page does not carry.
     ///
-    /// On the day, the time being counted down to is named in the card's
-    /// colour, and while the event is under way the times already gone by
-    /// step back — so the eye finds where it has got to before it reads.
-    private func timeNode(_ label: LocalizedStringKey, at instant: Date?, stop: Int,
-                          _ progress: EventProgress, tint: Color,
-                          alignment: HorizontalAlignment) -> some View {
-        let isNext = Self.nextStop(of: progress) == stop
-        let isPast = progress.isUnderway && progress.fraction >= Double(stop) / 2
-        return VStack(alignment: alignment, spacing: 6) {
-            Text(label)
-                .font(.system(size: 10.5, weight: .semibold))
-                .kerning(0.84)
-                .textCase(.uppercase)
-                .foregroundStyle(isNext ? AnyShapeStyle(tint) : AnyShapeStyle(.tertiary))
-            clock(instant)
-                .font(.system(size: 28, weight: .bold))
-                .kerning(-0.98)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .foregroundStyle(isPast ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+    /// The names go over the times, as in the Dynamic Island, rather than
+    /// beside them as on the Lock Screen: three times with a name beside each
+    /// left the bars a couple of dashes. A twelve-hour clock's "10:30 PM"
+    /// three times over can still outgrow the card, so the times come a size
+    /// smaller wherever they would.
+    private func stopsRow(_ progress: EventProgress, tint: Color) -> some View {
+        ViewThatFits(in: .horizontal) {
+            stopsRow(progress, tint: tint, size: 18)
+            stopsRow(progress, tint: tint, size: 15)
         }
-        .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
         .accessibilityElement(children: .combine)
     }
 
-    /// Which of the three times the day is counting down to: 0 the doors, 1
-    /// the start, 2 the end.
-    private static func nextStop(of progress: EventProgress) -> Int? {
-        switch progress.phase {
-        case .beforeDoors: 0
-        case .beforeShow, .doorsOpen: 1
-        case .onNow: 2
-        default: nil
+    private func stopsRow(_ progress: EventProgress, tint: Color, size: CGFloat) -> some View {
+        // ``EventProgress/fraction`` runs from the doors at 0 to the start at
+        // ½ and the end at 1; each half is one bar.
+        HStack(alignment: .timeMiddle, spacing: 10) {
+            stop("Doors", at: shown.doorsOpen, size: size, alignment: .leading)
+            stopBar(progress.fraction * 2, tint: tint)
+            stop("Start", at: shown.startsAt, size: size, alignment: .center)
+            stopBar((progress.fraction - 0.5) * 2, tint: tint)
+            stop("End", at: shown.endsAt, size: size, alignment: .trailing)
         }
     }
 
+    /// One time with what it is the time of small over it.
+    private func stop(_ label: LocalizedStringKey, at instant: Date?, size: CGFloat,
+                      alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .kerning(0.4)
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+            clock(instant, size: size)
+                .font(.system(size: size, weight: .bold))
+                .kerning(-0.4)
+                .monospacedDigit()
+                // The bars line up with the times, not with the names over them.
+                .alignmentGuide(.timeMiddle) { $0[VerticalAlignment.center] }
+        }
+        .lineLimit(1)
+        .fixedSize()
+    }
+
+    private func stopBar(_ filled: Double, tint: Color) -> some View {
+        ProgressView(value: min(max(filled, 0), 1))
+            .progressViewStyle(.linear)
+            .tint(tint)
+            .frame(minWidth: 20, idealWidth: 20, maxWidth: .infinity)
+            .alignmentGuide(.timeMiddle) { $0[VerticalAlignment.center] }
+            .accessibilityHidden(true)
+    }
+
     /// A time as the reader's locale writes it, with the AM or PM a
-    /// twelve-hour clock carries set small beside the digits — three of these
-    /// have to fit across the card at the size of a headline.
-    private func clock(_ instant: Date?) -> Text {
+    /// twelve-hour clock carries set small beside the digits.
+    private func clock(_ instant: Date?, size: CGFloat) -> Text {
         guard let instant else { return Text(verbatim: "—") }
         var style = Date.FormatStyle(date: .omitted, time: .shortened)
         style.timeZone = shown.timeZone
@@ -641,98 +649,9 @@ struct EventDetailView: View {
             field == .amPM ? range : nil
         }
         for range in periods {
-            time[range].font = .system(size: 14, weight: .bold)
+            time[range].font = .system(size: size * 0.6, weight: .bold)
         }
         return Text(time)
-    }
-
-    /// The line the three times stand on, filled as far as the event has got
-    /// — see ``EventProgress/fraction`` — with a marker riding the end of the
-    /// fill while it is moving.
-    ///
-    /// The line and its stops are painted into one canvas, in order. Laid out
-    /// as shapes over one another, the fill showed through a reached stop as a
-    /// darker streak however they were stacked; a canvas is one picture, and
-    /// what is painted last is simply on top. Only the marker, which moves and
-    /// breathes, is a view of its own over it.
-    private func timelineTrack(_ progress: EventProgress, tint: Color) -> some View {
-        let inset = Self.stopRadius
-        return Canvas { context, size in
-            let middle = size.height / 2
-            let length = size.width - inset * 2
-            let reached = inset + length * progress.fraction
-            func bar(from start: CGFloat, to end: CGFloat, _ color: Color) {
-                guard end > start else { return }
-                let rect = CGRect(x: start, y: middle - 2, width: end - start, height: 4)
-                context.fill(Capsule().path(in: rect), with: .color(color))
-            }
-            func disc(at x: CGFloat, radius: CGFloat, _ color: Color) {
-                let rect = CGRect(x: x - radius, y: middle - radius, width: radius * 2, height: radius * 2)
-                context.fill(Circle().path(in: rect), with: .color(color))
-            }
-            // Only what is still to come is grey, so nothing lies under the fill.
-            bar(from: reached, to: size.width - inset, Color(.quaternaryLabel))
-            bar(from: inset, to: reached, tint)
-            for stop in 0..<3 {
-                let at = inset + length * Double(stop) / 2
-                if progress.fraction > 0, progress.fraction >= Double(stop) / 2 {
-                    // Reached: a bead strung on the fill, the card's colour in
-                    // a rim of the background, so the line runs into it rather
-                    // than through it.
-                    disc(at: at, radius: Self.stopRadius, Color(.systemBackground))
-                    disc(at: at, radius: Self.stopRadius - 2, tint)
-                } else if !(progress.isUnderway && abs(at - reached) < Self.markerReach) {
-                    // Still ahead: a hollow ring — unless the marker is closing
-                    // on it, when it steps aside rather than peek out beside it.
-                    disc(at: at, radius: 6, Color(.tertiaryLabel))
-                    disc(at: at, radius: 3.5, Color(.systemBackground))
-                }
-            }
-        }
-        .frame(height: 20)
-        .overlay {
-            if progress.isUnderway {
-                GeometryReader { proxy in
-                    trackMarker(tint)
-                        .position(x: inset + (proxy.size.width - inset * 2) * progress.fraction,
-                                  y: proxy.size.height / 2)
-                }
-            }
-        }
-        // Not animated. The marker moves a fraction of a point a second, so
-        // an animation showed only as it sliding in from the left each time
-        // the sheet opened.
-        .accessibilityHidden(true)
-    }
-
-    /// The size of a reached stop, and so how far in from each end of the
-    /// card the line starts: the end stops are centred on its ends.
-    private static let stopRadius: CGFloat = 7
-    /// How near the marker comes to a stop still ahead before it covers it.
-    private static let markerReach: CGFloat = 14
-
-    /// Where the event has got to: a knob on the line, with a ring spreading
-    /// out from it over and over.
-    private func trackMarker(_ tint: Color) -> some View {
-        ZStack {
-            if !reduceMotion {
-                Circle()
-                    .fill(tint.opacity(0.35))
-                    .frame(width: 18, height: 18)
-                    .phaseAnimator([false, true]) { ring, spreading in
-                        ring
-                            .scaleEffect(spreading ? 2 : 1)
-                            .opacity(spreading ? 0 : 1)
-                    } animation: { spreading in
-                        spreading ? .easeOut(duration: 1.4) : nil
-                    }
-            }
-            Circle()
-                .fill(.white)
-                .overlay { Circle().strokeBorder(tint, lineWidth: 4) }
-                .frame(width: 18, height: 18)
-                .shadow(color: .black.opacity(0.18), radius: 3, y: 1.5)
-        }
     }
 
     /// How long the show runs, from its start to its published end.
@@ -1529,4 +1448,15 @@ private struct FooterLabelStyle: LabelStyle {
 #Preview {
     EventDetailView(event: PreviewData.events[0])
         .library(EventStore.preview)
+}
+
+private extension VerticalAlignment {
+    /// The middle of the timeline card's times, which its bars sit level with.
+    enum TimeMiddle: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat {
+            context[VerticalAlignment.center]
+        }
+    }
+
+    static let timeMiddle = VerticalAlignment(TimeMiddle.self)
 }
