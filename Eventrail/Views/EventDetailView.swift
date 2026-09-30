@@ -62,6 +62,9 @@ struct EventDetailView: View {
     /// hall Maps has never heard of.
     @State private var place: VenuePlaces.Placing?
 
+    /// Why the Live Activity could not be started, while that is being said.
+    @State private var liveActivityFailure: String?
+
     @Environment(\.openURL) private var openURL
 
     init(event: Event) {
@@ -172,6 +175,21 @@ struct EventDetailView: View {
             if phase == .active { Task { await importPage() } }
         }
         .environment(\.imagesCheckedSince, imagesCheckedSince)
+        // A seat written, or a door time the page published, reaches the
+        // event's Live Activity a moment later — not on every keystroke.
+        .task(id: liveActivityKey) {
+            guard liveActivity != nil else { return }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await EventActivities.shared.refresh(from: store)
+        }
+        .alert("Couldn't Start the Live Activity",
+               isPresented: Binding { liveActivityFailure != nil } set: { if !$0 { liveActivityFailure = nil } },
+               presenting: liveActivityFailure) { _ in
+            Button("OK") {}
+        } message: {
+            Text(verbatim: $0)
+        }
         // The first time an event at a hall nothing has looked up yet is
         // opened, this is what goes and finds it — whether or not the reader
         // mirrors anything to their calendar.
@@ -866,6 +884,15 @@ struct EventDetailView: View {
             }
             .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
 
+            if offersLiveActivity {
+                Button(action: toggleLiveActivity) {
+                    Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                          systemImage: liveActivitySymbol)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .tint(liveActivity == .running ? .trackAttended : .brandTint)
+            }
+
             ShareLink(item: event.sourceURL)
                 .tint(.brandTint)
 
@@ -880,6 +907,12 @@ struct EventDetailView: View {
     private var moreMenu: some View {
         Menu {
             Section {
+                if offersLiveActivity {
+                    Button(action: toggleLiveActivity) {
+                        Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                              systemImage: "clock")
+                    }
+                }
                 Button {
                     withAnimation(.snappy) { store.toggleFavorite(event) }
                 } label: {
@@ -928,6 +961,58 @@ struct EventDetailView: View {
             Label("More", systemImage: "ellipsis")
         }
         .menuOrder(.fixed)
+    }
+
+    /// What the event's Live Activity is doing, if it has one.
+    private var liveActivity: EventActivities.Status? {
+        EventActivities.shared.statuses[event.id]
+    }
+
+    /// Whether the bar and the menu offer the Live Activity: for a night the
+    /// reader holds a ticket for — see ``EventActivities/canOffer(_:tracking:inLibrary:at:)``
+    /// — and, whatever has changed since, for one already asked for, so it
+    /// can always be turned off from here.
+    private var offersLiveActivity: Bool {
+        liveActivity != nil
+            || EventActivities.shared.canOffer(event, tracking: tracking, inLibrary: store.isInLibrary(event))
+    }
+
+    /// A clock, with a tick on it once one is scheduled and filled in the
+    /// colour of a night under way once it is on — the design's plain, pale
+    /// and filled button.
+    private var liveActivitySymbol: String {
+        switch liveActivity {
+        case nil: "clock"
+        case .scheduled: "clock.badge.checkmark"
+        case .running: "clock.fill"
+        }
+    }
+
+    /// What the Live Activity is made from here: the seat, and the times.
+    private var liveActivityKey: String {
+        [tracking.seat, "\(store.isInLibrary(event))",
+         event.doorsOpen?.description, event.startsAt?.description, event.endsAt?.description]
+            .map { $0 ?? "" }
+            .joined(separator: "|")
+    }
+
+    /// Turns the event's Live Activity on — at once inside its window, or
+    /// scheduled for the start of it — or off.
+    private func toggleLiveActivity() {
+        let activities = EventActivities.shared
+        let event = event
+        let tracking = tracking
+        Task {
+            if activities.statuses[event.id] != nil {
+                await activities.stop(for: event)
+            } else {
+                do {
+                    try await activities.start(for: event, tracking: tracking)
+                } catch {
+                    liveActivityFailure = error.localizedDescription
+                }
+            }
+        }
     }
 
     /// The trash in the red its words are drawn in. A menu draws every icon

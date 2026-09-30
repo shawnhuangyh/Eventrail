@@ -2049,6 +2049,28 @@
         }
       }
     },
+    "Couldn't Start the Live Activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティを開始できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法开始实时活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法開始即時動態"
+          }
+        }
+      }
+    },
     "Couldn't translate" : {
       "localizations" : {
         "ja" : {
@@ -2335,6 +2357,28 @@
         }
       }
     },
+    "Disable Live Activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティをオフにする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭实时活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉即時動態"
+          }
+        }
+      }
+    },
     "Done" : {
       "localizations" : {
         "ja" : {
@@ -2445,6 +2489,28 @@
         }
       }
     },
+    "Doors open at %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@開場"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 入场"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 入場"
+          }
+        }
+      }
+    },
     "Each event lands on the right day at its venue, with an alert when the doors open." : {
       "localizations" : {
         "ja" : {
@@ -2485,6 +2551,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修改和取消會跟隨你的資料庫，已參加過的活動也會一併補上。"
+          }
+        }
+      }
+    },
+    "Enable Live Activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティをオンにする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启实时活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟即時動態"
           }
         }
       }
@@ -7656,6 +7744,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "即將開演 · 還有 %@"
+          }
+        }
+      }
+    },
+    "Starts at %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@開演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 開演"
           }
         }
       }

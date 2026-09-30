@@ -10,5 +10,10 @@ import SwiftUI
             RootView()
                 .onAppear { appearance.apply() }
         }
+        // Asked for at a Live Activity's next change of stage, and run when
+        // the system allows — see ``EventActivities``.
+        .backgroundTask(.appRefresh(EventActivities.refreshTask)) {
+            await EventActivities.shared.refresh()
+        }
     }
 }
