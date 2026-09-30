@@ -4,6 +4,11 @@ import Translation
 /// One event: what Eventernote publishes about it, and what the reader records
 /// about it. The two are kept visually distinct throughout.
 ///
+/// Laid out as `Eventrail v3.dc.html` draws it: the flyer small beside the
+/// title, the night's own clock in a card of its own, the reader's record as
+/// two tiles that open ``TicketDetailsView``, then the page's description,
+/// billing, hall and links — and the actions in a bar along the bottom.
+///
 /// A sheet opened from a search row starts with only what the row printed, and
 /// imports the event's own page for the rest.
 struct EventDetailView: View {
@@ -11,6 +16,7 @@ struct EventDetailView: View {
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
@@ -25,6 +31,12 @@ struct EventDetailView: View {
     /// Whether the description is shown whole. Collapsed to begin with, for the
     /// reason ``summaryCard`` gives.
     @State private var isSummaryExpanded = false
+    /// Whether ``TicketDetailsView`` is up over this sheet.
+    @State private var isEditingTicket = false
+    /// What has been pushed onto this sheet's stack — a performer, a hall. The
+    /// refresh notices are drawn above the action bar while nothing is, and
+    /// over the whole stack once something is; see ``body``.
+    @State private var path = NavigationPath()
 
     /// The description in the app's own language, the text it was made from
     /// and the target it was made for — so a page read again with a different
@@ -50,6 +62,9 @@ struct EventDetailView: View {
     /// hall Maps has never heard of.
     @State private var place: VenuePlaces.Placing?
 
+    /// Why the Live Activity could not be started, while that is being said.
+    @State private var liveActivityFailure: String?
+
     @Environment(\.openURL) private var openURL
 
     init(event: Event) {
@@ -62,11 +77,8 @@ struct EventDetailView: View {
         store.event(id: source.id) ?? source
     }
 
-    private var tracking: Binding<Tracking> {
-        Binding(
-            get: { store.tracking(for: event) },
-            set: { store.setTracking($0, for: event) }
-        )
+    private var tracking: Tracking {
+        store.tracking(for: event)
     }
 
     /// Whether there is anywhere to go. Eventernote announces plenty of events
@@ -91,14 +103,23 @@ struct EventDetailView: View {
     var body: some View {
         // A stack of its own, so a performer billed here — or the hall it is
         // held at — opens inside this sheet rather than dismissing it. The
-        // sheet's own chrome is the Done button, so the bar stays hidden at the
-        // root and comes back — with its back button — on whatever is pushed
-        // onto it.
-        NavigationStack {
+        // sheet's own chrome is the close button and the action bar, so the
+        // navigation bar stays hidden at the root and comes back — with its
+        // back button — on whatever is pushed onto it.
+        NavigationStack(path: $path) {
             detail
                 .toolbar(.hidden, for: .navigationBar)
+                .toolbar { actionBar }
+                // Inside the stack at the root, so the notice stands above the
+                // action bar rather than over it — the bar is part of the
+                // root's safe area, and nothing here has to know its height.
+                .refreshNotices(showing: path.isEmpty)
                 .venueDestination()
         }
+        // A performer's or a hall's page pushed here refreshes too, and has no
+        // bar to keep clear of — but the root's notice went off screen with
+        // the root, so the stack draws them meanwhile.
+        .refreshNotices(showing: !path.isEmpty)
         .presentationDragIndicator(.visible)
     }
 
@@ -107,27 +128,27 @@ struct EventDetailView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     header
-                    actions
-                    statistics
+                    timelineCard
                     // Only for an event the reader keeps. Tracking answers
                     // questions about a night they mean to be at — the ticket,
                     // the seat, what it cost — so on an event that is not in
                     // the library there is nothing for it to be about, and a
                     // date opened from Following or Search shows the facts
                     // alone until it is added. A removal keeps whatever was
-                    // written, so re-adding brings the card back as it was.
-                    if store.isInLibrary(event) { trackingCard }
+                    // written, so re-adding brings the tiles back as they were.
+                    if store.isInLibrary(event) { ticketTiles }
                     summaryCard
                     if !event.performers.isEmpty { performersCard }
                     venueCard
                     linksCard
-                    openInEventernote
                     if let importFailure {
                         RefreshFailureNote(message: importFailure)
                             .padding(.horizontal, 16)
                     }
                     footnote
                 }
+                // Clear of the close button, which floats over the top of it.
+                .padding(.top, 64)
                 .padding(.bottom, 32)
             }
             .ignoresSafeArea(edges: .top)
@@ -144,6 +165,9 @@ struct EventDetailView: View {
                 .padding(.top, 8)
         }
         .washBackground()
+        .sheet(isPresented: $isEditingTicket) {
+            TicketDetailsView(event: event)
+        }
         .task { await importPage() }
         // A sheet left open while the reader was away is owed the same check
         // it made as it opened: past the window, it reads its page again.
@@ -151,6 +175,21 @@ struct EventDetailView: View {
             if phase == .active { Task { await importPage() } }
         }
         .environment(\.imagesCheckedSince, imagesCheckedSince)
+        // A seat written, or a door time the page published, reaches the
+        // event's Live Activity a moment later — not on every keystroke.
+        .task(id: liveActivityKey) {
+            guard liveActivity != nil else { return }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await EventActivities.shared.refresh(from: store)
+        }
+        .alert("Couldn't Start the Live Activity",
+               isPresented: Binding { liveActivityFailure != nil } set: { if !$0 { liveActivityFailure = nil } },
+               presenting: liveActivityFailure) { _ in
+            Button("OK") {}
+        } message: {
+            Text(verbatim: $0)
+        }
         // The first time an event at a hall nothing has looked up yet is
         // opened, this is what goes and finds it — whether or not the reader
         // mirrors anything to their calendar.
@@ -207,153 +246,84 @@ struct EventDetailView: View {
 
     // MARK: - Header
 
+    /// The flyer, and beside it what the night is called, when and where.
+    ///
+    /// The flyer at the size of a poster on a wall rather than across the
+    /// width of the sheet: it is artwork for the event, and the sheet is read
+    /// for the facts under it.
     private var header: some View {
-        ZStack(alignment: .bottom) {
-            Rectangle()
-                .fill(.quaternary)
-                .overlay {
-                    CachedImage(url: event.imageURL) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        Image(systemName: "music.microphone")
-                            .font(.system(size: 72, weight: .ultraLight))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .clipped()
-                .overlay {
-                    // Fades the flyer into the wash so the title stays readable.
-                    LinearGradient(
-                        stops: [
-                            .init(color: .washBase.opacity(0), location: 0),
-                            .init(color: .washBase.opacity(0.75), location: 0.62),
-                            .init(color: .washBase, location: 1),
-                        ],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                }
-                .frame(height: 392)
-                .accessibilityLabel("Event flyer")
+        HStack(alignment: .top, spacing: 15) {
+            poster
 
-            VStack(spacing: 9) {
+            VStack(alignment: .leading, spacing: 7) {
                 Text(event.title)
-                    .font(.system(size: 22, weight: .bold))
-                    .multilineTextAlignment(.center)
+                    .font(.system(size: 20, weight: .bold))
+                    .kerning(-0.2)
                     .fixedSize(horizontal: false, vertical: true)
-                dateLine
-                    .font(.system(size: 12.5, weight: .medium))
+                // An already-formatted date, so it is shown as given rather
+                // than as a localizable key. The day alone: the times are the
+                // timeline's, a card below.
+                Text(verbatim: shown.longDateLine)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                zoneBadge
+                venueLine
             }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 14)
+            .padding(.top, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 4)
     }
 
-    /// The day, and only the day.
-    ///
-    /// Doors, start and end used to trail it here as well, which put the same
-    /// three times twice on one screen — once in a run-on line under the title
-    /// and again, labelled, in the tiles a scroll below. The tiles are where a
-    /// time is read from, and they already say "—" for one the page has yet to
-    /// publish, so the header is left with the one fact a title needs beside it.
-    private var dateLine: Text {
-        // An already-formatted date, so it is shown as given rather than as a
-        // localizable key.
-        Text(verbatim: shown.longDateLine)
-    }
-
-    /// The event as it is printed on the chosen clock — see
-    /// ``Event/shown(on:)``. Only ever formatted.
-    private var shown: Event { event.shown(on: timeDisplay) }
-
-    /// Which clock this sheet's times are on, where the app has established it
-    /// rather than assumed it.
-    ///
-    /// Three answers, in order of how well they are known. The hall is placed
-    /// and the placing carries the clock. Or it was placed on an earlier
-    /// visit, and the store wrote that clock into the event itself — see
-    /// ``Event/published(in:)``. Or Eventernote's own address opens with a
-    /// Japanese prefecture, and Japan keeps one clock end to end, so no map
-    /// service needs asking at all.
-    ///
-    /// Nil is the fourth answer and an honest one: a hall abroad that nothing
-    /// has placed yet is on whatever clock its members wrote, and this app
-    /// does not know which. It reads those times on Tokyo time because that is
-    /// where every import starts, and printing GMT+9 under a Seoul date would
-    /// be claiming an answer rather than having one — Seoul is not on Japan's
-    /// clock because Eventernote is Japanese. The badge then says which clock
-    /// the times are on without saying what that clock is set to, which is
-    /// exactly what is known. The sheet asks for its own hall the moment it
-    /// opens, so this is usually a second rather than a state.
-    private var venueZone: TimeZone? {
-        if let placed = place?.timeZone { return placed }
-        if event.timeZone != Event.publishedZone { return event.timeZone }
-        if let address = event.publishedAddress, Region.containing(address: address) != nil {
-            return Event.publishedZone
-        }
-        return nil
-    }
-
-    /// Which clock every time on this sheet is on.
-    ///
-    /// On every sheet rather than only on the nights abroad. The times here
-    /// are the hall's, as Eventernote's members wrote them — 18:00 is 18:00 at
-    /// the door rather than 18:00 wherever the reader is standing — and that
-    /// is as true of a Tokyo date as of a Taipei one. A reader in Shanghai
-    /// reading Tokyo is owed the same sentence as a reader in Tokyo reading
-    /// Taipei, and a badge that appeared only on the rare night abroad would
-    /// leave every other sheet quietly implying whichever clock the reader
-    /// happens to be on.
-    ///
-    /// Under the date, because it qualifies the date as much as the times: a
-    /// night falls on the day its hall says it does.
-    ///
-    /// The venue's clock rather than a place name, for the reason
-    /// ``Event/offsetLine(in:)`` gives: the name would be the map provider's
-    /// and the provider is the reader's, so a Taipei hall comes back named for
-    /// the mainland. The hall is named on this same sheet; what the badge adds
-    /// is which clock it keeps.
-    private var zoneBadge: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "globe")
-                .font(.system(size: 10, weight: .semibold))
-            // On the reader's own clock the offset is always known: it is
-            // this device's, on the night itself.
-            if timeDisplay == .local {
-                Text("My time · \(event.offsetLine(in: .current))")
-                    .font(.system(size: 10.5, weight: .semibold))
-            // The offset only where there is one to give — see ``venueZone``.
-            } else if let zone = venueZone {
-                Text("Venue time · \(event.offsetLine(in: zone))")
-                    .font(.system(size: 10.5, weight: .semibold))
-            } else {
-                Text("Venue time")
-                    .font(.system(size: 10.5, weight: .semibold))
+    private var poster: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.quaternary)
+            .overlay {
+                CachedImage(url: event.imageURL) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "music.microphone")
+                        .font(.system(size: 22, weight: .light))
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .frame(width: 76, height: 106)
+            .clipShape(.rect(cornerRadius: 12, style: .continuous))
+            .shadow(color: .black.opacity(0.12), radius: 10, y: 8)
+            .accessibilityLabel("Event flyer")
+    }
+
+    /// The hall, as the way to everything else held there. An event announced
+    /// before a hall was booked has no name to push, and says so.
+    @ViewBuilder
+    private var venueLine: some View {
+        if event.venue.isEmpty {
+            Text("Venue to be announced")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+        } else {
+            NavigationLink(value: venueLink) {
+                HStack(spacing: 4) {
+                    Text(event.venue)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.brandTint)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the venue")
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .glassCapsule()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            timeDisplay == .local
-                ? Text("Times shown in your own time, \(event.offsetLine(in: .current))")
-                : venueZone.map { Text("Times shown in the venue's own time, \(event.offsetLine(in: $0))") }
-                ?? Text("Times shown in the venue's own time")
-        )
     }
 
     /// The way out of the sheet.
     ///
     /// A glyph rather than the word Done, because nothing here is being
-    /// confirmed: every switch, note and star on this sheet has already taken
-    /// effect, and a button that says Done invites the reader to think
-    /// something is being saved by pressing it — and that leaving another way
-    /// would lose it. It is the mark the system closes things with, in the
-    /// same glass circle the actions under the title wear.
+    /// confirmed: every answer on this sheet has already taken effect, and a
+    /// button that says Done invites the reader to think something is being
+    /// saved by pressing it — and that leaving another way would lose it.
     ///
     /// The label survives as the accessibility one. A close button with no
     /// name is a button VoiceOver can only call "x mark".
@@ -372,422 +342,604 @@ struct EventDetailView: View {
         .accessibilityLabel("Close")
     }
 
-    // MARK: - Actions
+    // MARK: - The event's clock
 
-    private var actions: some View {
-        HStack(spacing: 13) {
-            if hasVenue {
-                circularAction {
-                    Button {
-                        openVenueInMaps(directions: true)
-                    } label: {
-                        actionIcon("location.fill", tint: .brandTint)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Directions to the venue")
-                }
-            }
+    /// The event as it is printed on the chosen clock — see
+    /// ``Event/shown(on:)``. Only ever formatted.
+    private var shown: Event { event.shown(on: timeDisplay) }
 
-            circularAction {
-                Button {
-                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-                } label: {
-                    actionIcon(
-                        store.isInLibrary(event) ? "checkmark" : "plus",
-                        tint: store.isInLibrary(event) ? .trackAttended : .brandTint
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(store.isInLibrary(event) ? "Remove from my events" : "Add to my events")
-            }
-
-            circularAction {
-                Button {
-                    withAnimation(.snappy) { store.toggleFavorite(event) }
-                } label: {
-                    actionIcon(
-                        store.isFavorite(event) ? "heart.fill" : "heart",
-                        tint: store.isFavorite(event) ? .favorite : .secondary
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(store.isFavorite(event) ? "Remove from favorites" : "Add to favorites")
-            }
-
-            // Both of these were a tap deeper under an ellipsis menu, which
-            // held nothing else worth the indirection.
-            circularAction {
-                Link(destination: event.sourceURL) {
-                    actionIcon("safari", tint: .brandTint)
-                }
-                .accessibilityLabel("Open in Eventernote")
-            }
-
-            circularAction {
-                ShareLink(item: event.sourceURL) {
-                    actionIcon("square.and.arrow.up", tint: .primary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Share link")
-            }
-        }
-        .padding(.top, 4)
-        .padding(.bottom, 4)
-    }
-
-    private func circularAction<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .frame(width: 56, height: 56)
-            .glassCircle(interactive: true)
-    }
-
-    private func actionIcon(_ name: String, tint: Color) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 19, weight: .medium))
-            .foregroundStyle(tint)
-            .frame(width: 56, height: 56)
-            .contentShape(.rect)
-            .contentTransition(.symbolEffect(.replace))
-    }
-
-    // MARK: - Imported facts
-
-    /// An em dash stands in for a field the public page does not carry — the
+    /// How far off the event is, its doors, start and end on one line, and how
+    /// long it runs — and on the day itself, how far along it has got.
+    ///
+    /// Redrawn every second on the day, so the bars fill between the times as
+    /// the event does. Any other day it only has to notice midnight.
+    ///
+    /// An em dash stands in for a time the public page does not carry — the
     /// app never fills one in itself.
-    private var statistics: some View {
-        HStack(alignment: .top, spacing: 11) {
-            // The head count reads as a number needing a noun, so the tile is
-            // named for where it comes from and says what was counted under it.
-            StatTile(tint: .trackInterest, value: event.listedAttendees?.formatted() ?? "—",
-                     sub: event.listedAttendees.map { _ in Text("people listed") },
-                     label: "Eventernote", layout: .field)
-            StatTile(tint: .trackTicket, value: shown.doorsLine ?? "—",
-                     label: "Doors open", layout: .field)
-            // The end time qualifies the start rather than standing on its own,
-            // so it sits under it — and stays away entirely when the page has
-            // published no end.
-            StatTile(tint: .trackAttended, value: shown.timeLine ?? "—",
-                     sub: shown.endsLine.map { Text("Ends \($0)") },
-                     label: "Performance", layout: .field)
+    private var timelineCard: some View {
+        let isToday = EventProgress(event: event, at: .now).isToday
+        return TimelineView(.periodic(from: .now, by: isToday ? 1 : 60)) { context in
+            timelineCard(EventProgress(event: event, at: context.date), at: context.date)
         }
+    }
+
+    private func timelineCard(_ progress: EventProgress, at now: Date) -> some View {
+        let tint = tint(for: progress, at: now)
+        return VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    statusDot(tint, pulsing: progress.isUnderway)
+                    headline(for: progress, at: now)
+                        .font(.system(size: 20, weight: .bold))
+                        .kerning(-0.4)
+                        .monospacedDigit()
+                        .foregroundStyle(tint)
+                        .contentTransition(.numericText())
+                    Spacer(minLength: 8)
+                    zoneCaption
+                }
+                if let detail = detail(for: progress, at: now) {
+                    detail
+                        .font(.system(size: 13, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                        // Under the words of the headline, not under its dot.
+                        .padding(.leading, 17)
+                }
+            }
+            .animation(.snappy, value: progress.phase)
+
+            stopsRow(progress, tint: tint)
+
+            HStack(spacing: 10) {
+                Label { runLine } icon: { Image(systemName: "timer") }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(1)
+                // The head count reads as a number needing a noun, so it says
+                // where it was counted.
+                if let listed = event.listedAttendees {
+                    Label {
+                        Text("\(listed.formatted()) going on Eventernote")
+                            .monospacedDigit()
+                    } icon: {
+                        Image(systemName: "person.2.fill")
+                    }
+                    .foregroundStyle(.tertiary)
+                    // Whole on one line; the run time beside it gives way.
+                    .fixedSize()
+                }
+            }
+            .labelStyle(FooterLabelStyle())
+            .font(.system(size: 12.5, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.top, 13)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(.quaternary)
+                    .frame(height: 0.5)
+            }
+        }
+        .padding(18)
+        // Tinted, faintly, while the event is under way: the one time the
+        // card is about now rather than about a date.
+        .glassBackground(in: .rect(cornerRadius: 28, style: .continuous),
+                         tint: progress.isUnderway ? tint.opacity(0.1) : nil)
         .padding(.horizontal, 18)
+    }
+
+    /// Whether the event is still ahead, as ``Event/isUpcoming`` draws that
+    /// line — the end of its day rather than of its show, the same line every
+    /// list in the app draws. The ticket tile reads it; the timeline card
+    /// reads the event's own times through ``EventProgress``.
+    private var isAhead: Bool { event.isUpcoming }
+
+    /// Whether there is a ticket to say anything about: a past event had one,
+    /// and one still to come has one once the reader says it was bought.
+    private var hasTicket: Bool { !isAhead || tracking.ticket == .purchased }
+
+    /// The colour the card is in: amber while the event is to come, green
+    /// with the doors open, orange in the last minutes before the start, the
+    /// heart's red on stage — and once it is over, green if the reader kept
+    /// it, since they went.
+    private func tint(for progress: EventProgress, at now: Date) -> Color {
+        switch progress.phase {
+        case .ahead, .today, .beforeDoors, .beforeShow: .trackTicket
+        case .doorsOpen(let starts):
+            starts.timeIntervalSince(now) <= Self.startingSoon ? .orange : .trackAttended
+        case .onNow: .favorite
+        case .wrapped, .over: store.isInLibrary(event) ? .trackAttended : .secondary
+        }
+    }
+
+    /// How close to the start the doors-open headline turns into "Starting in".
+    private static let startingSoon: TimeInterval = 5 * 60
+
+    /// What the card opens on: how far off the event is, where it has got to
+    /// on the day, or — once the day is over — whether the reader went, which
+    /// is whether it is in the library.
+    private func headline(for progress: EventProgress, at now: Date) -> Text {
+        switch progress.phase {
+        case .ahead(1): Text("Tomorrow")
+        case .ahead(let days): Text("^[In \(days) day](inflect: true)")
+        case .today: Text("Today")
+        case .beforeDoors(let doors): Text("Doors in \(Self.countdown(to: doors, from: now))")
+        case .beforeShow(let starts): Text("Starts in \(Self.countdown(to: starts, from: now))")
+        case .doorsOpen(let starts):
+            starts.timeIntervalSince(now) <= Self.startingSoon
+                ? Text("Starting in \(Self.countdown(to: starts, from: now))")
+                : Text("Doors open")
+        case .onNow: Text("On now")
+        case .wrapped: Text("That's a wrap")
+        case .over: store.isInLibrary(event) ? Text("Attended") : Text("Ended")
+        }
+    }
+
+    /// The line under the headline on the day: what comes next, and when.
+    private func detail(for progress: EventProgress, at now: Date) -> Text? {
+        switch progress.phase {
+        case .beforeDoors:
+            return shown.timeLine.map { Text("Show starts at \($0)") }
+        case .doorsOpen(let starts):
+            return starts.timeIntervalSince(now) <= Self.startingSoon
+                ? Text("Find your seat")
+                : Text("Show in \(Self.countdown(to: starts, from: now))")
+        case .onNow(let ends?):
+            guard let endsLine = shown.endsLine else { return nil }
+            return Text("\(Self.countdown(to: ends, from: now)) left · ends \(endsLine)")
+        case .onNow(nil):
+            return shown.timeLine.map { Text("Started at \($0)") }
+        case .wrapped:
+            return shown.endsLine.map { Text("Ended at \($0)") }
+        default:
+            return nil
+        }
+    }
+
+    /// "1h 12m" to a moment later today, in whole minutes rounded up — so the
+    /// last minute before the doors reads "1m" rather than "0m".
+    private static func countdown(to moment: Date, from now: Date) -> String {
+        let minutes = max(1, Int((moment.timeIntervalSince(now) / 60).rounded(.up)))
+        return Duration.seconds(minutes * 60)
+            .formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+    }
+
+    /// The dot before the headline, pulsing while the event is under way.
+    private func statusDot(_ tint: Color, pulsing: Bool) -> some View {
+        Image(systemName: "circle.fill")
+            .font(.system(size: 9))
+            .foregroundStyle(tint)
+            .symbolEffect(.pulse, options: .repeating, isActive: pulsing && !reduceMotion)
+            // Centred on the headline's lower-case letters rather than sitting
+            // on its baseline.
+            .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 1.5 }
+            .accessibilityHidden(true)
+    }
+
+    /// Which clock every time on this sheet is on.
+    ///
+    /// On every sheet rather than only on the nights abroad. The times here
+    /// are the hall's, as Eventernote's members wrote them — 18:00 is 18:00 at
+    /// the door rather than 18:00 wherever the reader is standing — and that
+    /// is as true of a Tokyo date as of a Taipei one.
+    ///
+    /// The venue's clock rather than a place name, for the reason
+    /// ``Event/offsetLine(in:)`` gives: the name would be the map provider's
+    /// and the provider is the reader's, so a Taipei hall comes back named for
+    /// the mainland. The hall is named on this same sheet; what the caption
+    /// adds is which clock it keeps.
+    private var zoneCaption: some View {
+        Group {
+            // On the reader's own clock the offset is always known: it is
+            // this device's, on the night itself.
+            if timeDisplay == .local {
+                Text("My time · \(event.offsetLine(in: .current))")
+            // The offset only where there is one to give — see ``venueZone``.
+            } else if let zone = venueZone {
+                Text("Venue time · \(event.offsetLine(in: zone))")
+            } else {
+                Text("Venue time")
+            }
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(.tertiary)
+        .accessibilityLabel(
+            timeDisplay == .local
+                ? Text("Times shown in your own time, \(event.offsetLine(in: .current))")
+                : venueZone.map { Text("Times shown in the venue's own time, \(event.offsetLine(in: $0))") }
+                ?? Text("Times shown in the venue's own time")
+        )
+    }
+
+    /// Which clock this sheet's times are on, where the app has established it
+    /// rather than assumed it.
+    ///
+    /// Three answers, in order of how well they are known. The hall is placed
+    /// and the placing carries the clock. Or it was placed on an earlier
+    /// visit, and the store wrote that clock into the event itself — see
+    /// ``Event/published(in:)``. Or Eventernote's own address opens with a
+    /// Japanese prefecture, and Japan keeps one clock end to end, so no map
+    /// service needs asking at all.
+    ///
+    /// Nil is the fourth answer and an honest one: a hall abroad that nothing
+    /// has placed yet is on whatever clock its members wrote, and this app
+    /// does not know which. It reads those times on Tokyo time because that is
+    /// where every import starts, and printing GMT+9 under a Seoul date would
+    /// be claiming an answer rather than having one. The caption then says
+    /// which clock the times are on without saying what that clock is set to,
+    /// which is exactly what is known. The sheet asks for its own hall the
+    /// moment it opens, so this is usually a second rather than a state.
+    private var venueZone: TimeZone? {
+        if let placed = place?.timeZone { return placed }
+        if event.timeZone != Event.publishedZone { return event.timeZone }
+        if let address = event.publishedAddress, Region.containing(address: address) != nil {
+            return Event.publishedZone
+        }
+        return nil
+    }
+
+    /// The doors, the start and the end on one line with a bar between each
+    /// two, and what each is small over it — drawn as the Live Activity draws
+    /// its times, so the sheet and the activity read the same. The first bar
+    /// fills from the doors to the start, the second from the start to the
+    /// end. An em dash stands in for a time the page does not carry.
+    ///
+    /// The names go over the times, as in the Dynamic Island, rather than
+    /// beside them as on the Lock Screen: three times with a name beside each
+    /// left the bars a couple of dashes. A twelve-hour clock's "10:30 PM"
+    /// three times over can still outgrow the card, so the times come a size
+    /// smaller wherever they would.
+    private func stopsRow(_ progress: EventProgress, tint: Color) -> some View {
+        ViewThatFits(in: .horizontal) {
+            stopsRow(progress, tint: tint, size: 18)
+            stopsRow(progress, tint: tint, size: 15)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func stopsRow(_ progress: EventProgress, tint: Color, size: CGFloat) -> some View {
+        // ``EventProgress/fraction`` runs from the doors at 0 to the start at
+        // ½ and the end at 1; each half is one bar.
+        HStack(alignment: .timeMiddle, spacing: 10) {
+            stop("Doors", at: shown.doorsOpen, size: size, alignment: .leading)
+            stopBar(progress.fraction * 2, tint: tint)
+            stop("Start", at: shown.startsAt, size: size, alignment: .center)
+            stopBar((progress.fraction - 0.5) * 2, tint: tint)
+            stop("End", at: shown.endsAt, size: size, alignment: .trailing)
+        }
+    }
+
+    /// One time with what it is the time of small over it.
+    private func stop(_ label: LocalizedStringKey, at instant: Date?, size: CGFloat,
+                      alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .kerning(0.4)
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+            clock(instant, size: size)
+                .font(.system(size: size, weight: .bold))
+                .kerning(-0.4)
+                .monospacedDigit()
+                // The bars line up with the times, not with the names over them.
+                .alignmentGuide(.timeMiddle) { $0[VerticalAlignment.center] }
+        }
+        .lineLimit(1)
+        .fixedSize()
+    }
+
+    private func stopBar(_ filled: Double, tint: Color) -> some View {
+        ProgressView(value: min(max(filled, 0), 1))
+            .progressViewStyle(.linear)
+            .tint(tint)
+            .frame(minWidth: 20, idealWidth: 20, maxWidth: .infinity)
+            .alignmentGuide(.timeMiddle) { $0[VerticalAlignment.center] }
+            .accessibilityHidden(true)
+    }
+
+    /// A time as the reader's locale writes it, with the AM or PM a
+    /// twelve-hour clock carries set small beside the digits.
+    private func clock(_ instant: Date?, size: CGFloat) -> Text {
+        guard let instant else { return Text(verbatim: "—") }
+        var style = Date.FormatStyle(date: .omitted, time: .shortened)
+        style.timeZone = shown.timeZone
+        var time = instant.formatted(style.attributed)
+        let periods = time.runs[\.dateField].compactMap { field, range in
+            field == .amPM ? range : nil
+        }
+        for range in periods {
+            time[range].font = .system(size: size * 0.6, weight: .bold)
+        }
+        return Text(time)
+    }
+
+    /// How long the show runs, from its start to its published end.
+    ///
+    /// Read in the order a night runs, so an end after midnight is the next
+    /// morning — see ``Event/inOrder(_:_:_:)`` — and not past
+    /// ``PassportStats/longestNight``, where the page's times are more likely
+    /// a typo than a show.
+    private var runLine: Text {
+        let times = Event.inOrder(event.doorsOpen, event.startsAt, event.endsAt)
+        guard let starts = times.starts else { return Text("Start time not announced") }
+        guard let ends = times.ends else { return Text("End time not announced") }
+        let length = ends.timeIntervalSince(starts)
+        guard length > 0, length <= PassportStats.longestNight else {
+            return Text("End time not announced")
+        }
+        let runs = Duration.seconds(length)
+            .formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+        return Text("Runs \(runs)")
     }
 
     // MARK: - The reader's own record
 
-    private var trackingCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 0) {
-                Text("My tracking")
-                    .font(.system(size: 19, weight: .bold))
-
-                Spacer(minLength: 12)
-
-                // The promise the card makes, said once at the top of it and
-                // set apart from it: on its own line under the title it read
-                // as the card's subtitle — as if what followed were a section
-                // about privacy — where a pill at the other end of the title
-                // reads as a stamp on the card. The closed lock says it before
-                // the words are read.
-                HStack(spacing: 5) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 10.5, weight: .semibold))
-                    Text("Private to you")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .glassCapsule()
+    /// The ticket and the seat as two tiles, and the note under them where
+    /// there is one. Each opens ``TicketDetailsView``, where they are answered.
+    private var ticketTiles: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 11) {
+                ticketTile("Ticket", symbol: "ticket", tint: ticketTint,
+                           value: ticketValue, valueTint: ticketTint, detail: ticketDetail)
+                // Greyed with the ticket tile until there is a ticket: a seat
+                // is only asked about once there is one to sit in.
+                ticketTile("Seat", symbol: "sofa",
+                           tint: hasTicket && !tracking.seat.isEmpty ? .primary : .secondary,
+                           value: tracking.seat.isEmpty ? Text("Seat") : Text(verbatim: tracking.seat),
+                           valueTint: hasTicket ? .primary : .secondary, detail: seatDetail)
             }
 
-            // The one question the library does not already answer, and only
-            // while it is still open to ask. Whether the reader means to go is
-            // what keeping the event says, and whether they went is what its
-            // date says once it has passed — see ``Tracking``. A night already
-            // over was a night they held a ticket for, so the picker gives way
-            // to what that ticket turned out to be.
-            if event.isUpcoming {
-                segment("Ticket", selection: tracking.ticket, options: TicketStatus.allCases)
-            }
-
-            // A count is asked on one line — see ``lotteryRow``.
-            lotteryRow
-
-            // What the ticket turned out to be, ruled off from the question
-            // that was asked before anybody had one. The two are written
-            // answers rather than a count, so they are asked the way the note
-            // is, with the label above the field; side by side because neither
-            // is more than a line and stacking them would push the note off
-            // the bottom of the card.
-            if hasTicket {
-                Divider()
-
-                HStack(alignment: .top, spacing: 12) {
-                    writtenAnswer("Seat") { seatField }
-                    writtenAnswer("Cost") { costField }
+            if !tracking.note.isEmpty {
+                Button {
+                    isEditingTicket = true
+                } label: {
+                    HStack(alignment: .top, spacing: 9) {
+                        Image(systemName: "text.alignleft")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 2)
+                        Text(tracking.note)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .contentShape(.rect)
                 }
-            }
-
-            // The one answer that is not a line at all, so it is given the
-            // card's whole width and room to grow into.
-            writtenAnswer("Notes") {
-                writing {
-                    TextField(
-                        "Notes",
-                        text: tracking.note,
-                        prompt: Text("Something only you will see"),
-                        axis: .vertical
-                    )
-                    .lineLimit(2...6)
-                }
+                .buttonStyle(.plain)
+                .glassPanel(cornerRadius: 18, interactive: true)
+                .accessibilityLabel(Text("Notes"))
+                .accessibilityValue(Text(tracking.note))
             }
         }
-        .padding(18)
-        .glassPanel(cornerRadius: 28)
         .padding(.horizontal, 18)
+        .accessibilityHint("Opens the ticket details")
     }
 
-    /// Whether there is a ticket to say anything about.
-    ///
-    /// Not asked for a past event: the night happened, so the ticket existed.
-    /// Still to come, it is there when the reader says they have bought it.
-    private var hasTicket: Bool {
-        !event.isUpcoming || store.tracking(for: event).ticket == .purchased
-    }
-
-    /// An answer written out: what is being asked, and under it the field it
-    /// is written in.
-    ///
-    /// The label goes above rather than beside because what is written can run
-    /// to the width of the card — a seat as a Japanese hall prints it, a price,
-    /// a note — and a question sitting beside it would be taking that room
-    /// away from the answer.
-    private func writtenAnswer<Content: View>(
-        _ label: LocalizedStringKey,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            fieldLabel(label)
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    /// How many entries the reader put into the lottery for this night, asked
-    /// on one line.
-    ///
-    /// The only answer here that is a count rather than something written, and
-    /// the only one asked with the question at the left: a number needs a
-    /// fixed and narrow field, so the room a label above it would take is room
-    /// nothing would ever use.
-    private var lotteryRow: some View {
-        HStack(spacing: 0) {
-            fieldLabel("Lottery entries")
-            Spacer(minLength: 12)
-            lotteryStepper
-                .frame(width: Self.countWidth)
-        }
-    }
-
-    /// How wide the count's field is.
-    ///
-    /// Two ends to press and, between them, room for the four digits
-    /// ``EntryCount`` will take and no more. It was sized as a written answer
-    /// before, which left a single digit sitting in the middle of a field with
-    /// nothing else in it — a count is a narrow thing, and a field that says
-    /// otherwise is asking for something bigger than it wants.
-    private static let countWidth: CGFloat = 108
-
-    /// The height every one-line field on the card stands at: the count, the
-    /// seat, the price.
-    ///
-    /// A floor rather than a fixed height — a field is as tall as the text
-    /// inside it, which grows with the reader's type size — but one floor for
-    /// all three. They are stacked down one card rather than set beside one
-    /// another, which is exactly when a difference of a few points reads as a
-    /// mistake rather than as a distinction.
-    ///
-    /// The written fields carry less padding than a field of this height would
-    /// give them on its own, so that the floor is what decides all three
-    /// rather than the text inside two of them.
-    private static let fieldHeight: CGFloat = 32
-
-    /// How many entries the reader put into the lottery for this night.
-    ///
-    /// Asked whether or not there is a ticket, and before the ticket is asked
-    /// about: the applications went in long before anybody knew, and a night
-    /// applied for six times and lost is worth having written down by a reader
-    /// who keeps the event anyway.
-    ///
-    /// An empty field is "not written down", and so is 0 — see
-    /// ``Tracking/lotteryEntries``. There is one way to say "no lottery here"
-    /// rather than two that mean the same thing and count differently.
-    ///
-    /// Stepped rather than typed, because the answer is nearly always one of
-    /// the first few numbers and a keyboard for those is three taps of
-    /// overhead. The field between the buttons still takes a typed number for
-    /// the reader who applied eleven times, and either way down — stepping off
-    /// 1 or clearing what was typed — leaves it empty.
-    private var lotteryStepper: some View {
-        HStack(spacing: 0) {
-            lotteryStep(by: -1, symbol: "minus")
-
-            stepperRule
-
-            TextField("Lottery entries", value: tracking.lotteryEntries,
-                      format: .entries, prompt: Text(verbatim: "—"))
-                .textFieldStyle(.plain)
-                .font(.system(size: 15, weight: .semibold))
-                .labelsHidden()
-                .multilineTextAlignment(.center)
-                .keyboardType(.numberPad)
-                .frame(maxWidth: .infinity)
-
-            stepperRule
-
-            lotteryStep(by: 1, symbol: "plus")
-        }
-        .frame(height: Self.fieldHeight)
-        .background(.quaternary.opacity(0.5), in: Self.fieldShape)
-        .overlay { Self.fieldShape.strokeBorder(.quaternary, lineWidth: 0.5) }
-        .sensoryFeedback(.selection, trigger: tracking.wrappedValue.lotteryEntries)
-    }
-
-    /// One end of the lottery stepper.
-    ///
-    /// Counting up from nothing written down means 1 rather than 0 — the reader
-    /// who reaches for plus is recording an application they made — and
-    /// counting down off 1 empties the field again, because 0 is that same
-    /// nothing rather than a step below it. So minus is dead on an empty
-    /// field: there is no answer there to take one off. The ceiling is
-    /// ``EntryCount``'s own four digits, so the two ways in agree on what a
-    /// number is.
-    ///
-    /// Both ends fall out of one comparison: a step that would leave the field
-    /// saying exactly what it says now is a step there is no point offering.
-    private func lotteryStep(by delta: Int, symbol: String) -> some View {
-        let current = tracking.wrappedValue.lotteryEntries
-        let stepped = min(max((current ?? 0) + delta, 0), 9999)
-        let next: Int? = stepped == 0 ? nil : stepped
-        let enabled = next != current
-
-        return Button {
-            tracking.lotteryEntries.wrappedValue = next
+    private func ticketTile(_ title: LocalizedStringKey, symbol: String, tint: Color,
+                            value: Text, valueTint: Color, detail: Text) -> some View {
+        Button {
+            isEditingTicket = true
         } label: {
-            // The whole end of the field is the target, not the glyph in the
-            // middle of it: the three parts are one control, and each of them
-            // gets a third of it.
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(enabled ? Color.brandTint : Color.secondary.opacity(0.4))
-                .frame(width: 33)
-                .frame(maxHeight: .infinity)
-                .contentShape(.rect)
+            VStack(alignment: .leading, spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20))
+                    .foregroundStyle(tint)
+                VStack(alignment: .leading, spacing: 4) {
+                    value
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(valueTint)
+                    detail
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(15)
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .disabled(!enabled)
-        // The glyph alone reads as "Add" and "Remove", which on this sheet is
-        // what the library button says.
-        .accessibilityLabel(delta < 0 ? Text("Fewer lottery entries") : Text("More lottery entries"))
+        .glassPanel(cornerRadius: 22, interactive: true)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text("\(value), \(detail)"))
     }
 
-    /// What separates the count from the two ends that step it. Inset from the
-    /// field's own edges, so it divides the control rather than cutting it.
-    private var stepperRule: some View {
-        Rectangle()
-            .fill(.quaternary)
-            .frame(width: 0.5)
-            .padding(.vertical, 6)
+    /// Where the ticket stands: in hand, still being tried for, or not yet —
+    /// and once the night is over, simply that the reader was there.
+    private var ticketValue: Text {
+        if !isAhead { return Text("Attended") }
+        if tracking.ticket == .purchased { return Text("Purchased") }
+        if tracking.lotteryEntries != nil { return Text("In the lottery") }
+        return Text("No ticket yet")
     }
 
-    /// Where the reader sat, as the ticket printed it.
-    private var seatField: some View {
-        writing(minHeight: Self.fieldHeight) {
-            // A block, a row and a number in three languages worth of
-            // conventions: nothing the keyboard would correct here is a
-            // correction.
-            TextField("Seat", text: tracking.seat, prompt: Text("Row and number"))
-                .autocorrectionDisabled()
+    private var ticketTint: Color {
+        if !isAhead { return .trackAttended }
+        if tracking.ticket == .purchased { return .trackTicket }
+        if tracking.lotteryEntries != nil { return .trackInterest }
+        return .secondary
+    }
+
+    /// What it cost and what it took, where either was written down.
+    private var ticketDetail: Text {
+        var parts: [Text] = []
+        if let cost = tracking.cost { parts.append(Text(verbatim: YenAmount().format(cost))) }
+        if let entries = tracking.lotteryEntries { parts.append(Text("^[\(entries) entry](inflect: true)")) }
+        guard let first = parts.first else { return Text("Tap to Edit") }
+        return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
+    }
+
+    /// The class the seat was sold as, where it was written down — in the
+    /// reader's language where it is one of the chips, as written otherwise.
+    private var seatDetail: Text {
+        if !tracking.seatClass.isEmpty {
+            return SeatClass(rawValue: tracking.seatClass).map { Text($0.label) }
+                ?? Text(verbatim: tracking.seatClass)
         }
+        return tracking.seat.isEmpty ? Text("Tap to Edit") : Text("Your seat")
     }
 
-    /// What the night cost.
-    private var costField: some View {
-        writing(minHeight: Self.fieldHeight) {
-            // The em dash the imported tiles use for a fact nobody published,
-            // for the same thing here: nobody wrote it down.
-            TextField("Cost", value: tracking.cost, format: .yen,
-                      prompt: Text(verbatim: "¥—"))
-                .keyboardType(.numberPad)
+    // MARK: - Actions
+
+    /// What the reader can do with the event, in a bar along the bottom of the
+    /// sheet: keep it, share it, and the rest behind the ellipsis.
+    ///
+    /// One capsule at the leading edge, as the design draws it, with the space
+    /// beside it left empty for the page to show through.
+    @ToolbarContentBuilder
+    private var actionBar: some ToolbarContent {
+        ToolbarItemGroup(placement: .bottomBar) {
+            Button {
+                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+            } label: {
+                Label(store.isInLibrary(event) ? "Remove from my events" : "Add to my events",
+                      systemImage: store.isInLibrary(event) ? "checkmark" : "plus")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
+
+            if offersLiveActivity {
+                Button(action: toggleLiveActivity) {
+                    Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                          systemImage: liveActivitySymbol)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .tint(liveActivity == .running ? .trackAttended : .brandTint)
+            }
+
+            ShareLink(item: event.sourceURL)
+                .tint(.brandTint)
+
+            moreMenu
+                .tint(.brandTint)
         }
+        ToolbarSpacer(.flexible, placement: .bottomBar)
     }
 
-    /// The field the reader writes in. One helper so the four of them are the
-    /// same field asked four questions.
-    ///
-    /// Flat rather than glass. Liquid Glass is the system's treatment for
-    /// something floating *over* content — a toolbar, a sheet's own chrome, the
-    /// round buttons under the flyer — and these are not floating over
-    /// anything: they are inside a card that is already glass. Glass on glass
-    /// has nothing to refract, which is why they read as empty pills rather
-    /// than as somewhere to type.
-    ///
-    /// The radius is concentric with that card rather than chosen: 28 at the
-    /// card's edge, less the 18 of inset the field sits behind, is 10 here, so
-    /// the two sets of corners run parallel instead of bulging inside one
-    /// another. The 20 they had was nearly half the field's own height, which
-    /// is what made them look like capsules that had been squashed.
-    private func writing<Content: View>(
-        minHeight: CGFloat? = nil,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .textFieldStyle(.plain)
-            .font(.system(size: 15))
-            .labelsHidden()
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .frame(minHeight: minHeight)
-            .background(.quaternary.opacity(0.5), in: Self.fieldShape)
-            .overlay { Self.fieldShape.strokeBorder(.quaternary, lineWidth: 0.5) }
-    }
-
-    /// 28 − 18: see ``writing(content:)``.
-    private static let fieldShape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-
-    /// Written for the one enum left rather than for any of them. It was
-    /// generic over three, with a type switch to find each one's label,
-    /// because three different questions were asked the same way.
-    private func segment(
-        _ label: LocalizedStringKey,
-        selection: Binding<TicketStatus>,
-        options: [TicketStatus]
-    ) -> some View {
-        writtenAnswer(label) {
-            Picker(label, selection: selection) {
-                ForEach(options) { option in
-                    Text(option.label).tag(option)
+    /// Everything the bar has no room for. In the order the design lists it
+    /// top to bottom, whichever way the menu opens.
+    private var moreMenu: some View {
+        Menu {
+            Section {
+                if offersLiveActivity {
+                    Button(action: toggleLiveActivity) {
+                        Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                              systemImage: "clock")
+                    }
+                }
+                Button {
+                    withAnimation(.snappy) { store.toggleFavorite(event) }
+                } label: {
+                    Label(store.isFavorite(event) ? "Remove from Favorites" : "Add to Favorites",
+                          systemImage: store.isFavorite(event) ? "heart.fill" : "heart")
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+
+            Section {
+                if hasVenue {
+                    Button {
+                        openVenueInMaps(directions: true)
+                    } label: {
+                        Label("Directions", systemImage: "location.fill")
+                    }
+                }
+                // Anything that changes the reader's Eventernote account
+                // happens on the official site, where they authenticate
+                // directly.
+                Link(destination: event.sourceURL) {
+                    Label("Open in Eventernote", systemImage: "safari")
+                }
+                ShareLink(item: event.sourceURL) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+            }
+
+            // The same place either way, so the menu keeps its shape as the
+            // event goes in and out of the library.
+            Section {
+                if store.isInLibrary(event) {
+                    Button(role: .destructive) {
+                        withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+                    } label: {
+                        Label { Text("Remove Event") } icon: { removalIcon }
+                    }
+                } else {
+                    Button {
+                        withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                    } label: {
+                        Label("Add Event", systemImage: "plus")
+                    }
+                }
+            }
+        } label: {
+            Label("More", systemImage: "ellipsis")
+        }
+        .menuOrder(.fixed)
+    }
+
+    /// What the event's Live Activity is doing, if it has one.
+    private var liveActivity: EventActivities.Status? {
+        EventActivities.shared.statuses[event.id]
+    }
+
+    /// Whether the bar and the menu offer the Live Activity: for a night the
+    /// reader holds a ticket for — see ``EventActivities/canOffer(_:tracking:inLibrary:at:)``
+    /// — and, whatever has changed since, for one already asked for, so it
+    /// can always be turned off from here.
+    private var offersLiveActivity: Bool {
+        liveActivity != nil
+            || EventActivities.shared.canOffer(event, tracking: tracking, inLibrary: store.isInLibrary(event))
+    }
+
+    /// A clock, with a tick on it once one is scheduled and filled in the
+    /// colour of a night under way once it is on — the design's plain, pale
+    /// and filled button.
+    private var liveActivitySymbol: String {
+        switch liveActivity {
+        case nil: "clock"
+        case .scheduled: "clock.badge.checkmark"
+        case .running: "clock.fill"
         }
     }
 
-    /// What one answer is being asked for.
-    ///
-    /// Written the way a question is written rather than set as a heading:
-    /// small caps and letter-spacing are how a *section* is labelled, and these
-    /// label neither a section nor anything the reader is meant to read past.
-    /// Beside its own answer at the reader's own text size, a label is part of
-    /// the sentence the row makes — "Lottery entries: 8".
-    private func fieldLabel(_ label: LocalizedStringKey) -> some View {
-        Text(label)
-            .font(.system(size: 15))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
+    /// What the Live Activity is made from here: the seat, and the times.
+    private var liveActivityKey: String {
+        [tracking.seat, "\(store.isInLibrary(event))",
+         event.doorsOpen?.description, event.startsAt?.description, event.endsAt?.description]
+            .map { $0 ?? "" }
+            .joined(separator: "|")
+    }
+
+    /// Turns the event's Live Activity on — at once inside its window, or
+    /// scheduled for the start of it — or off.
+    private func toggleLiveActivity() {
+        let activities = EventActivities.shared
+        let event = event
+        let tracking = tracking
+        Task {
+            if activities.statuses[event.id] != nil {
+                await activities.stop(for: event)
+            } else {
+                do {
+                    try await activities.start(for: event, tracking: tracking)
+                } catch {
+                    liveActivityFailure = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    /// The trash in the red its words are drawn in. A menu draws every icon
+    /// in its own tint whatever it is handed, so only an image carrying its
+    /// colour with it keeps one.
+    private var removalIcon: Image {
+        guard let trash = UIImage(systemName: "trash") else { return Image(systemName: "trash") }
+        return Image(uiImage: trash.withTintColor(.systemRed, renderingMode: .alwaysOriginal))
     }
 
     // MARK: - What the page says the event is
@@ -827,15 +979,10 @@ struct EventDetailView: View {
                     Button {
                         withAnimation(.snappy) { isSummaryExpanded.toggle() }
                     } label: {
-                        HStack(spacing: 4) {
-                            Text(isSummaryExpanded ? "Show less" : "Show more")
-                                .font(.system(size: 12.5, weight: .semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .semibold))
-                                .rotationEffect(.degrees(isSummaryExpanded ? 180 : 0))
-                        }
-                        .foregroundStyle(Color.brandTint)
-                        .contentShape(.rect)
+                        Text(isSummaryExpanded ? "Show less" : "Show more")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Color.brandTint)
+                            .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                 }
@@ -1259,13 +1406,6 @@ struct EventDetailView: View {
 
     // MARK: - Provenance
 
-    /// Anything that changes the reader's Eventernote account happens on the
-    /// official site, where they authenticate directly.
-    private var openInEventernote: some View {
-        ExternalLinkPanel(title: "Open in Eventernote", destination: event.sourceURL)
-            .padding(.horizontal, 18)
-    }
-
     private var footnote: some View {
         Footnote(isImporting
                  ? Text("Importing this event from its public Eventernote page…")
@@ -1292,7 +1432,31 @@ struct EventDetailView: View {
     }
 }
 
+/// A small symbol before a line of the timeline card's footer, drawn a step
+/// lighter than the words.
+private struct FooterLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 5) {
+            configuration.icon
+                .font(.system(size: 11, weight: .semibold))
+                .opacity(0.8)
+            configuration.title
+        }
+    }
+}
+
 #Preview {
     EventDetailView(event: PreviewData.events[0])
         .library(EventStore.preview)
+}
+
+private extension VerticalAlignment {
+    /// The middle of the timeline card's times, which its bars sit level with.
+    enum TimeMiddle: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat {
+            context[VerticalAlignment.center]
+        }
+    }
+
+    static let timeMiddle = VerticalAlignment(TimeMiddle.self)
 }

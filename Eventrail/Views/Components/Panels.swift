@@ -2,9 +2,10 @@ import SwiftUI
 
 /// The full-width glass panel that hands the reader off to a page on the web.
 ///
-/// An event's sheet and a performer's page each had one, identical but for the
-/// words in it. The arrow is the system's own sign for leaving the app, and it
-/// is the whole of the difference between this and a row that pushes.
+/// A performer's page carries one; an event's sheet did too, until the way out
+/// to Eventernote moved into the menu on its action bar. The arrow is the
+/// system's own sign for leaving the app, and it is the whole of the
+/// difference between this and a row that pushes.
 ///
 /// The horizontal inset is the caller's: this sits in a run of cards on one
 /// screen and in a narrower column on another.
@@ -34,8 +35,8 @@ struct ExternalLinkPanel: View {
 /// It is the one gesture that turns something published into something the
 /// reader has decided about, and it is offered in two places that are not the
 /// library — a search result and a followed performer's date — so it has to
-/// read the same in both. The event's own sheet wears a larger version of it
-/// among the actions under the flyer.
+/// read the same in both. The event's own sheet carries the same plus and
+/// checkmark at the head of its action bar.
 ///
 /// Always an explicit choice: nothing found on Eventernote joins the library by
 /// being looked at.
@@ -74,9 +75,10 @@ extension View {
     /// one of which would not.
     ///
     /// The sheet draws refresh notices of its own, because it covers the root
-    /// that draws everybody else's — see ``refreshNotices(underSheets:)``.
+    /// that draws everybody else's — see ``refreshNotices(underSheets:showing:)``.
+    /// It places them itself, so they stand clear of its action bar.
     func eventSheet(_ event: Binding<Event?>) -> some View {
-        sheet(item: event) { EventDetailView(event: $0).refreshNotices() }
+        sheet(item: event) { EventDetailView(event: $0) }
     }
 
     /// Registers a performer's page on this stack.

@@ -32,7 +32,7 @@ struct LibraryDatabaseTests {
         archive.events["4"] = abroad
         archive.membership["4"] = Stamped(true, at: later)
         archive.membership["gone"] = Stamped(false, at: later)
-        archive.tracking["1"] = Stamped(Tracking(ticket: .purchased, seat: "A12", cost: 9000,
+        archive.tracking["1"] = Stamped(Tracking(ticket: .purchased, seat: "A12", seatClass: "S席", cost: 9000,
                                                  lotteryEntries: 3, note: "front row"), at: earlier)
         archive.favorites["2"] = Stamped(true, at: earlier)
         let listed = Fixtures.event(id: "3", date: ahead)

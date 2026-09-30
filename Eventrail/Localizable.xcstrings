@@ -1,6 +1,50 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ going on Eventernote" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteで%@人が参加予定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上 %@ 人参加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上 %@ 人參加"
+          }
+        }
+      }
+    },
+    "%@ left · ends %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り%@・%@終演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %@ · %@ 结束"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩餘 %@ · %@ 結束"
+          }
+        }
+      }
+    },
     "%@ · %@" : {
       "localizations" : {
         "ja" : {
@@ -245,6 +289,28 @@
         }
       }
     },
+    "%@, %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@、%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%@"
+          }
+        }
+      }
+    },
     "%@, %@ and %@" : {
       "localizations" : {
         "ja" : {
@@ -439,6 +505,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在此有 %lld 個日期"
+          }
+        }
+      }
+    },
+    "^[%lld entry](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応募%lld回"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选 %lld 次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選 %lld 次"
           }
         }
       }
@@ -971,6 +1059,28 @@
         }
       }
     },
+    "A Seat" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A席"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A席"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A席"
+          }
+        }
+      }
+    },
     "About" : {
       "localizations" : {
         "ja" : {
@@ -1015,6 +1125,28 @@
         }
       }
     },
+    "Add Event" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントを追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增活動"
+          }
+        }
+      }
+    },
     "Add the events you have been to from My Events or from Search. Once their date has passed they are counted here." : {
       "localizations" : {
         "ja" : {
@@ -1037,7 +1169,7 @@
         }
       }
     },
-    "Add to favorites" : {
+    "Add to Favorites" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1917,6 +2049,28 @@
         }
       }
     },
+    "Couldn't Start the Live Activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティを開始できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法开始实时活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法開始即時動態"
+          }
+        }
+      }
+    },
     "Couldn't translate" : {
       "localizations" : {
         "ja" : {
@@ -2203,24 +2357,24 @@
         }
       }
     },
-    "Directions to the venue" : {
+    "Disable Live Activity" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "会場までの経路"
+            "value" : "ライブアクティビティをオフにする"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "前往场馆的路线"
+            "value" : "关闭实时活动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "前往場館的路線"
+            "value" : "關閉即時動態"
           }
         }
       }
@@ -2247,6 +2401,28 @@
         }
       }
     },
+    "Doors" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開場"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入场"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入場"
+          }
+        }
+      }
+    },
     "Doors and start time" : {
       "localizations" : {
         "ja" : {
@@ -2269,24 +2445,68 @@
         }
       }
     },
-    "Doors open" : {
+    "Doors in %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開場"
+            "value" : "開場まで%@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "入场"
+            "value" : "%@后入场"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "入場"
+            "value" : "%@後入場"
+          }
+        }
+      }
+    },
+    "Doors open" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開場中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已入场"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已入場"
+          }
+        }
+      }
+    },
+    "Doors open at %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@開場"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 入场"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 入場"
           }
         }
       }
@@ -2335,24 +2555,112 @@
         }
       }
     },
-    "Ends %@" : {
+    "Enable Live Activity" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "終了 %@"
+            "value" : "ライブアクティビティをオンにする"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "结束于 %@"
+            "value" : "开启实时活动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "結束於 %@"
+            "value" : "開啟即時動態"
+          }
+        }
+      }
+    },
+    "End" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束"
+          }
+        }
+      }
+    },
+    "End time not announced" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終演時刻は未発表"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束时间未公布"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束時間未公布"
+          }
+        }
+      }
+    },
+    "Ended" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終了"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已结束"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已結束"
+          }
+        }
+      }
+    },
+    "Ended at %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@終演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 结束"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 結束"
           }
         }
       }
@@ -3149,6 +3457,28 @@
         }
       }
     },
+    "Find your seat" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "席についてください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请入座"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請入座"
+          }
+        }
+      }
+    },
     "Follow" : {
       "localizations" : {
         "ja" : {
@@ -3325,6 +3655,29 @@
         }
       }
     },
+    "G" : {
+      "comment" : "The badge on the chip for the general seat class, 一般席.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        }
+      }
+    },
     "General" : {
       "localizations" : {
         "ja" : {
@@ -3343,6 +3696,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一般"
+          }
+        }
+      }
+    },
+    "General Seat" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般席"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般席"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般席"
           }
         }
       }
@@ -3651,6 +4026,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中國大陸"
+          }
+        }
+      }
+    },
+    "In the lottery" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選中"
           }
         }
       }
@@ -4293,6 +4690,28 @@
         }
       }
     },
+    "More" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多"
+          }
+        }
+      }
+    },
     "More lottery entries" : {
       "localizations" : {
         "ja" : {
@@ -4399,28 +4818,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本地時間 · %@"
-          }
-        }
-      }
-    },
-    "My tracking" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自分の記録"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "我的跟踪"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "我的跟蹤"
           }
         }
       }
@@ -4685,6 +5082,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已發布的日期中沒有符合所選日期和地區的活動。沒有內容被移除——擴大篩選範圍即可檢視其餘內容。"
+          }
+        }
+      }
+    },
+    "No ticket yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケット未入手"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未购票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未購票"
           }
         }
       }
@@ -5173,6 +5592,28 @@
         }
       }
     },
+    "On now" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公演中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出中"
+          }
+        }
+      }
+    },
     "Only the heart comes off — they stay in your library, and you can heart them again any time." : {
       "localizations" : {
         "ja" : {
@@ -5367,6 +5808,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打開藝人"
+          }
+        }
+      }
+    },
+    "Opens the ticket details" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケット詳細を開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开门票详情"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開門票詳情"
+          }
+        }
+      }
+    },
+    "Opens the venue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場を開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開場館"
           }
         }
       }
@@ -5569,50 +6054,6 @@
         }
       }
     },
-    "people listed" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "人が参加予定"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "人已登记"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "人已登記"
-          }
-        }
-      }
-    },
-    "Performance" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公演"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演出"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "演出"
-          }
-        }
-      }
-    },
     "Performers" : {
       "localizations" : {
         "ja" : {
@@ -5741,28 +6182,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "計劃中"
-          }
-        }
-      }
-    },
-    "Private to you" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自分だけに表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅你可见"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "僅你可見"
           }
         }
       }
@@ -6185,7 +6604,51 @@
         }
       }
     },
+    "Remove Event" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントを削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除活動"
+          }
+        }
+      }
+    },
     "Remove from favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りから削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从收藏中移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從收藏中移除"
+          }
+        }
+      }
+    },
+    "Remove from Favorites" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6405,24 +6868,46 @@
         }
       }
     },
-    "Row and number" : {
+    "Runs %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "列と番号"
+            "value" : "上演時間 %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排和座位号"
+            "value" : "时长 %@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排和座位號"
+            "value" : "時長 %@"
+          }
+        }
+      }
+    },
+    "S Seat" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S席"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S席"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S席"
           }
         }
       }
@@ -6823,28 +7308,6 @@
         }
       }
     },
-    "Share link" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リンクを共有"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "分享链接"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "分享連結"
-          }
-        }
-      }
-    },
     "Shortest Event" : {
       "localizations" : {
         "ja" : {
@@ -6885,6 +7348,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示所有活動"
+          }
+        }
+      }
+    },
+    "Show in %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演まで%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@后开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@後開演"
           }
         }
       }
@@ -6951,6 +7436,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示原文"
+          }
+        }
+      }
+    },
+    "Show starts at %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@開演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 開演"
           }
         }
       }
@@ -7153,6 +7660,138 @@
         }
       }
     },
+    "Start" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演"
+          }
+        }
+      }
+    },
+    "Start time not announced" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時刻は未発表"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开演时间未公布"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間未公布"
+          }
+        }
+      }
+    },
+    "Started at %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@開演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 開演"
+          }
+        }
+      }
+    },
+    "Starting in %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まもなく開演・あと%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将开演 · 还有 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即將開演 · 還有 %@"
+          }
+        }
+      }
+    },
+    "Starts at %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@開演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 開演"
+          }
+        }
+      }
+    },
+    "Starts in %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演まで%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@后开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@後開演"
+          }
+        }
+      }
+    },
     "Step %lld of %lld" : {
       "localizations" : {
         "ja" : {
@@ -7285,6 +7924,28 @@
         }
       }
     },
+    "Tap to Edit" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップして編集"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点以编辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點一下以編輯"
+          }
+        }
+      }
+    },
     "That backup is damaged and could not be opened." : {
       "localizations" : {
         "ja" : {
@@ -7369,6 +8030,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "該檔案不是 Eventrail 備份。"
+          }
+        }
+      }
+    },
+    "That's a wrap" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終演しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出已结束"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演出已結束"
           }
         }
       }
@@ -7523,6 +8206,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "門票"
+          }
+        }
+      }
+    },
+    "Ticket Details" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケット詳細"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "门票详情"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "門票詳情"
           }
         }
       }
@@ -7699,6 +8404,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天"
+          }
+        }
+      }
+    },
+    "Tomorrow" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明天"
           }
         }
       }
@@ -8887,6 +9614,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的備註、座位和票價儲存在此裝置上；開啟 iCloud 同步後，也會存入你自己的 iCloud——Eventrail 沒有伺服器。活動詳情讀取自 Eventernote 的公開頁面，絕不會寫回；Eventrail 與 Eventernote 無關聯。場館位置由 Apple 地圖、日本國土地理院（國土地理院）的地址搜尋和 OpenStreetMap 確定——© OpenStreetMap 貢獻者，ODbL。"
+          }
+        }
+      }
+    },
+    "Your seat" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの座席"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的座位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的座位"
           }
         }
       }

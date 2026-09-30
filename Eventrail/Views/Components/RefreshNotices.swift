@@ -125,8 +125,12 @@ extension View {
     ///
     /// `underSheets` marks the tabs: they keep quiet while a sheet is up — see
     /// ``RefreshNotices/sheetsShowing``.
-    func refreshNotices(underSheets: Bool = false) -> some View {
-        modifier(RefreshNoticeOverlay(underSheets: underSheets))
+    ///
+    /// `showing` is for a sheet that draws its notices in two places — an
+    /// event's, above its action bar at the root and over the whole stack
+    /// once a page is pushed — so that only one of them draws at a time.
+    func refreshNotices(underSheets: Bool = false, showing: Bool = true) -> some View {
+        modifier(RefreshNoticeOverlay(underSheets: underSheets, showing: showing))
     }
 }
 
@@ -134,9 +138,10 @@ private struct RefreshNoticeOverlay: ViewModifier {
     /// Optional, so a preview with no notices in its environment still draws.
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
     let underSheets: Bool
+    let showing: Bool
 
     private var shown: RefreshNotice? {
-        guard let notices, !underSheets || notices.sheetsShowing == 0 else { return nil }
+        guard showing, let notices, !underSheets || notices.sheetsShowing == 0 else { return nil }
         return notices.current
     }
 

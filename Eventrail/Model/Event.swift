@@ -208,6 +208,11 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
         return end <= .now
     }
 
+    /// How long a performance runs when Eventernote has published a start but
+    /// no end. Gives the calendar entry a length and the sheet's timeline
+    /// somewhere to run to; no screen prints an end time made from it.
+    static let assumedLength: TimeInterval = 3 * 60 * 60
+
     /// Doors, start and end, each moved to the next day wherever it is earlier
     /// than the one before it — how a night that runs past midnight has to be
     /// read, since the page prints a clock and no date. What

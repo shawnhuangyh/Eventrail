@@ -13,6 +13,42 @@ nonisolated enum TicketStatus: String, CaseIterable, Identifiable, Hashable, Cod
     }
 }
 
+/// The seat classes common enough to be a chip on the ticket sheet.
+///
+/// A menu rather than the whole of the answer: ``Tracking/seatClass`` is text,
+/// and these are what a Japanese promoter prints on nearly every ticket.
+///
+/// Written down as the ticket prints it — the raw value — and shown in the
+/// reader's language, so a class chosen on a phone set to English reads back
+/// as 一般席 on an iPad set to Japanese, and one typed before the chips were
+/// translated is still recognised.
+nonisolated enum SeatClass: String, CaseIterable, Identifiable {
+    case s = "S席"
+    case a = "A席"
+    case general = "一般席"
+
+    var id: String { rawValue }
+
+    /// What the chip and the seat tile call it.
+    var label: LocalizedStringKey {
+        switch self {
+        case .s: "S Seat"
+        case .a: "A Seat"
+        case .general: "General Seat"
+        }
+    }
+
+    /// What the chip's badge says: the letter where the class has one, and a
+    /// letter for the one that has none in English.
+    var badge: Text {
+        switch self {
+        case .s: Text(verbatim: "S")
+        case .a: Text(verbatim: "A")
+        case .general: Text("G", comment: "The badge on the chip for the general seat class, 一般席.")
+        }
+    }
+}
+
 /// The reader's private record for one event.
 ///
 /// Every field here belongs to the reader and to this app. A refresh of the
@@ -24,16 +60,16 @@ nonisolated enum TicketStatus: String, CaseIterable, Identifiable, Hashable, Cod
 /// word for being there at all; and an event in the library that has already
 /// happened is one they went to, so attendance was a second word for the date.
 /// What is left is the ticket: whether it is in hand, which the library cannot
-/// say by itself, and once it is, the two things about it worth keeping after
-/// the night is over — and whatever the reader wants to write down.
+/// say by itself, and once it is, the things about it worth keeping after the
+/// night is over — and whatever the reader wants to write down.
 ///
 /// Dropping the two needed no migration: a record written before this still
 /// carries `interest` and `attendance`, and a decoder ignores keys it has no
 /// property for. Adding one needs none either, but only because the decoder
 /// below reads every key as optional — a synthesized one treats a key an older
 /// record does not carry as a corrupt file, and takes the whole library with
-/// it. So an older record simply has no seat, no cost and no lottery count:
-/// nothing written down.
+/// it. So an older record simply has no seat, no seat class, no cost and no
+/// lottery count: nothing written down.
 nonisolated struct Tracking: Hashable, Codable {
     var ticket: TicketStatus = .none
     /// Where the reader sat, as the ticket prints it.
@@ -43,6 +79,15 @@ nonisolated struct Tracking: Hashable, Codable {
     /// house prints an entry number and no seat at all. Anything that insisted
     /// on a shape would be wrong for two of the three.
     var seat: String = ""
+    /// Which class of seat the ticket was sold as — S席, A席, 一般席 — as the
+    /// promoter printed it.
+    ///
+    /// Beside ``seat`` rather than inside it: the seat is where the reader
+    /// sat, and this is what they paid for, which the ticket prints on a line
+    /// of its own and the sheet asks with a row of chips. Kept as text rather
+    /// than as a case, so a class the chips do not offer reads back as itself.
+    /// Empty is "not written down".
+    var seatClass: String = ""
     /// What the ticket cost, in whole yen.
     ///
     /// Nil is "not written down", which is not the same as free — a lottery
@@ -77,20 +122,20 @@ nonisolated struct Tracking: Hashable, Codable {
     ///
     /// Not one of the reader's answers but the app's note about them, and it
     /// is what lets a merge settle this record an answer at a time — see
-    /// ``Stamped/merging(_:)``. A record carries one stamp for five answers,
+    /// ``Stamped/merging(_:)``. A record carries one stamp for six answers,
     /// so a cost typed on the iPad after a note was typed on the phone would
     /// otherwise carry the iPad's whole record — its older copy of the note
     /// included — over the newer note. That is the erasure ``Stamped`` exists
     /// to stop, one level down.
     ///
     /// A field missing from here is exactly as old as its record. That is what
-    /// an archive written before this existed says about all five, and what an
+    /// an archive written before this existed says about all six, and what an
     /// answer written in the same breath as its record says about itself, so
     /// only an answer *older* than the record around it is written down and a
     /// record edited once carries nothing here at all.
     var edits: [Field: Date] = [:]
 
-    /// The five answers a record holds, named so that a merge can take them
+    /// The six answers a record holds, named so that a merge can take them
     /// one at a time.
     ///
     /// A field added to this struct belongs here too, and the switches in
@@ -98,7 +143,7 @@ nonisolated struct Tracking: Hashable, Codable {
     /// is — which is the point of naming them rather than reaching for a
     /// key path.
     nonisolated enum Field: String, CaseIterable, Codable, CodingKeyRepresentable, Hashable, Sendable {
-        case ticket, seat, cost, lotteryEntries, note
+        case ticket, seat, seatClass, cost, lotteryEntries, note
     }
 
     /// Whether the reader has written anything down here.
@@ -107,7 +152,7 @@ nonisolated struct Tracking: Hashable, Codable {
     /// a record whose every answer has since been cleared is empty however
     /// recently that happened.
     var isEmpty: Bool {
-        ticket == .none && seat.isEmpty && cost == nil
+        ticket == .none && seat.isEmpty && seatClass.isEmpty && cost == nil
             && lotteryEntries == nil && note.isEmpty
     }
 }
@@ -118,17 +163,19 @@ nonisolated extension Tracking {
         switch field {
         case .ticket: ticket == other.ticket
         case .seat: seat == other.seat
+        case .seatClass: seatClass == other.seatClass
         case .cost: cost == other.cost
         case .lotteryEntries: lotteryEntries == other.lotteryEntries
         case .note: note == other.note
         }
     }
 
-    /// Takes one answer from another record and leaves the other four alone.
+    /// Takes one answer from another record and leaves the other five alone.
     fileprivate mutating func take(_ field: Field, from other: Tracking) {
         switch field {
         case .ticket: ticket = other.ticket
         case .seat: seat = other.seat
+        case .seatClass: seatClass = other.seatClass
         case .cost: cost = other.cost
         case .lotteryEntries: lotteryEntries = other.lotteryEntries
         case .note: note = other.note
@@ -140,9 +187,9 @@ nonisolated extension Tracking {
 ///
 /// ``Stamped`` settles everything else record by record, which is right where
 /// a record holds one answer: a membership, a favourite, a follow. This one
-/// holds five, and the device that wrote last had almost certainly written
+/// holds six, and the device that wrote last had almost certainly written
 /// about one of them — so taking its whole record hands back its stale copy of
-/// the other four. Two devices editing different answers between syncs now
+/// the other five. Two devices editing different answers between syncs now
 /// keep both.
 ///
 /// Two devices editing the *same* answer between syncs is still the later
@@ -222,6 +269,7 @@ nonisolated extension Tracking {
         self.init(
             ticket: try record.decodeIfPresent(TicketStatus.self, forKey: .ticket) ?? .none,
             seat: try record.decodeIfPresent(String.self, forKey: .seat) ?? "",
+            seatClass: try record.decodeIfPresent(String.self, forKey: .seatClass) ?? "",
             cost: try record.decodeIfPresent(Int.self, forKey: .cost),
             // Zeroes written before that became "not written down" are read
             // as nothing, because a property observer does not run here. A

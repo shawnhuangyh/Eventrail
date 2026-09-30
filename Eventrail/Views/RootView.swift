@@ -29,6 +29,8 @@ struct RootView: View {
     /// rather than in Settings: the app can be opened from a file while any tab
     /// is showing, and from a cold launch with no Settings sheet at all.
     @State private var openedBackup: URL?
+    /// An event opened from outside the app — its Live Activity, tapped.
+    @State private var openedEvent: Event?
     /// Whether this launch still owes the reader the welcome.
     ///
     /// Seeded once from the per-device flag ``WelcomeView`` writes for itself
@@ -63,7 +65,14 @@ struct RootView: View {
         #if !os(visionOS)
         .tabViewSearchActivation(.searchTabSelection)
         #endif
-        .onOpenURL { openedBackup = $0 }
+        .onOpenURL { url in
+            if let id = Self.eventID(in: url) {
+                openedEvent = store.event(id: id)
+            } else {
+                openedBackup = url
+            }
+        }
+        .eventSheet($openedEvent)
         // Asked about first: tapping a file is not by itself a request to fold
         // its contents into the library.
         //
@@ -86,16 +95,29 @@ struct RootView: View {
         // ever catch up after an edit or a trip to the background, so a library
         // imported on another device could sit unmirrored indefinitely.
         .task { await store.mirrorCalendar() }
+        // Live Activities can have fallen behind their nights while the app
+        // was not running — see ``EventActivities``.
+        .task { await EventActivities.shared.refresh(from: store) }
         // Edits are written after a short pause; leaving the app cuts that
         // short, so the last one is flushed here rather than lost. Coming back
         // is the moment to pick up whatever another device wrote meanwhile.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await store.syncNow() }
+                Task { await EventActivities.shared.refresh(from: store) }
             } else {
                 store.saveNow()
             }
         }
+    }
+
+    /// The event a link to its Eventernote page names — what a Live Activity
+    /// opens the app with.
+    private static func eventID(in url: URL) -> Event.ID? {
+        guard url.host() == "www.eventernote.com" else { return nil }
+        let path = url.pathComponents
+        guard path.count == 3, path[1] == "events", !path[2].isEmpty else { return nil }
+        return path[2]
     }
 }
 

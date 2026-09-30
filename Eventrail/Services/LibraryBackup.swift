@@ -61,7 +61,11 @@ nonisolated struct LibraryBackup: Sendable {
     /// 7: an event carries when its own page was last read, which is what
     /// settles two copies of it in a merge. A build that dropped it would
     /// hand the next merge an undated copy that loses to every dated one.
-    static let currentFormat: UInt8 = 7
+    ///
+    /// 8: a tracking record carries the class of seat the ticket was sold as.
+    /// The reader's own, like the seat beside it, so a build that has never
+    /// heard of it is told to refuse the file rather than drop it.
+    static let currentFormat: UInt8 = 8
 
     var app: String
     var created: Date

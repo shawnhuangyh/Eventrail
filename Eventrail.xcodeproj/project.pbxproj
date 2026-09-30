@@ -6,6 +6,10 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		000000000000000150000001 /* EventrailWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000000320 /* EventrailWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		000000000000000230000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -14,11 +18,31 @@
 			remoteGlobalIDString = 000000000000000100000000;
 			remoteInfo = Eventrail;
 		};
+		000000000000000160000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000300000000;
+			remoteInfo = EventrailWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		000000000000000150000000 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				000000000000000150000001 /* EventrailWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Eventrail.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eventrail.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000220 /* EventrailTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EventrailTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000320 /* EventrailWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = EventrailWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -30,6 +54,16 @@
 		000000000000000000000210 /* EventrailTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = EventrailTests;
+			sourceTree = "<group>";
+		};
+		000000000000000000000310 /* EventrailWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EventrailWidgets;
+			sourceTree = "<group>";
+		};
+		000000000000000000000410 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -45,6 +79,11 @@
 			files = (
 			);
 		};
+		000000000000000321000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -52,6 +91,8 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000010 /* Eventrail */,
+				000000000000000000000310 /* EventrailWidgets */,
+				000000000000000000000410 /* Shared */,
 				000000000000000000000210 /* EventrailTests */,
 				000000000000000000000020 /* Products */,
 			);
@@ -62,6 +103,7 @@
 			children = (
 				000000000000000000000120 /* Eventrail.app */,
 				000000000000000000000220 /* EventrailTests.xctest */,
+				000000000000000000000320 /* EventrailWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,11 +118,16 @@
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
+				000000000000000150000000 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
+			dependencies = (
+				000000000000000160000000 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* Eventrail */,
+				000000000000000000000410 /* Shared */,
 			);
 			name = Eventrail;
 			productName = MyApp;
@@ -108,6 +155,25 @@
 			productReference = 000000000000000000000220 /* EventrailTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		000000000000000300000000 /* EventrailWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000310000000 /* Build configuration list for PBXNativeTarget "EventrailWidgets" */;
+			buildPhases = (
+				000000000000000320000000 /* Sources */,
+				000000000000000321000000 /* Frameworks */,
+				000000000000000322000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000310 /* EventrailWidgets */,
+				000000000000000000000410 /* Shared */,
+			);
+			name = EventrailWidgets;
+			productName = EventrailWidgets;
+			productReference = 000000000000000000000320 /* EventrailWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -124,6 +190,9 @@
 					000000000000000200000000 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 000000000000000100000000;
+					};
+					000000000000000300000000 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -146,6 +215,7 @@
 			targets = (
 				000000000000000100000000 /* Eventrail */,
 				000000000000000200000000 /* EventrailTests */,
+				000000000000000300000000 /* EventrailWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -157,6 +227,11 @@
 			);
 		};
 		000000000000000214000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		000000000000000322000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -174,6 +249,11 @@
 			files = (
 			);
 		};
+		000000000000000320000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -181,6 +261,11 @@
 			isa = PBXTargetDependency;
 			target = 000000000000000100000000 /* Eventrail */;
 			targetProxy = 000000000000000230000001 /* PBXContainerItemProxy */;
+		};
+		000000000000000160000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000300000000 /* EventrailWidgets */;
+			targetProxy = 000000000000000160000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -334,6 +419,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Eventrail keeps a calendar of its own for the events in your library. It reads back only that calendar, to correct and remove its own entries.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -384,6 +470,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Eventrail keeps a calendar of its own for the events in your library. It reads back only that calendar, to correct and remove its own entries.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -469,6 +556,76 @@
 			};
 			name = Release;
 		};
+		000000000000000311000000 /* Debug configuration for PBXNativeTarget "EventrailWidgets" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = EventrailWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JE9SRTHZY7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "EventrailWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = moe.shawn.Eventrail.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		000000000000000312000000 /* Release configuration for PBXNativeTarget "EventrailWidgets" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = EventrailWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JE9SRTHZY7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "EventrailWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = moe.shawn.Eventrail.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -493,6 +650,14 @@
 			buildConfigurations = (
 				000000000000000211000000 /* Debug configuration for PBXNativeTarget "EventrailTests" */,
 				000000000000000212100000 /* Release configuration for PBXNativeTarget "EventrailTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000310000000 /* Build configuration list for PBXNativeTarget "EventrailWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000311000000 /* Debug configuration for PBXNativeTarget "EventrailWidgets" */,
+				000000000000000312000000 /* Release configuration for PBXNativeTarget "EventrailWidgets" */,
 			);
 			defaultConfigurationName = Release;
 		};

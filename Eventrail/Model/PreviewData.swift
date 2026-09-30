@@ -47,7 +47,7 @@ enum PreviewData {
     ]
 
     static let tracking: [Event.ID: Tracking] = [
-        "492514": Tracking(ticket: .purchased, seat: "3階 H列 21番", cost: 8800,
+        "492514": Tracking(ticket: .purchased, seat: "3階 H列 21番", seatClass: "S席", cost: 8800,
                            lotteryEntries: 1,
                            note: "Doors are tight — get there by 10:45."),
         "396310": Tracking(ticket: .purchased, seat: "A5ブロック 12番", cost: 9900,

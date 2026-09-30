@@ -11,6 +11,7 @@ struct TrackingTests {
         #expect(tracking.ticket == .purchased)
         #expect(tracking.note == "最前列")
         #expect(tracking.seat == "")
+        #expect(tracking.seatClass == "")
         #expect(tracking.cost == nil)
         #expect(tracking.lotteryEntries == nil)
         #expect(tracking.edits.isEmpty)
@@ -30,7 +31,7 @@ struct TrackingTests {
     }
 
     @Test func roundTripsThroughJSON() throws {
-        var tracking = Tracking(ticket: .purchased, seat: "1階 L列 23番", cost: 9900, note: "x")
+        var tracking = Tracking(ticket: .purchased, seat: "1階 L列 23番", seatClass: "A席", cost: 9900, note: "x")
         tracking.lotteryEntries = 3
         tracking.edits = [.note: Date(timeIntervalSince1970: 1_000)]
         let decoded = try JSONDecoder().decode(Tracking.self, from: JSONEncoder().encode(tracking))
@@ -49,6 +50,10 @@ struct TrackingTests {
 
     @Test func aFreeTicketIsAnAnswer() {
         #expect(!Tracking(cost: 0).isEmpty)
+    }
+
+    @Test func aSeatClassAloneIsAnAnswer() {
+        #expect(!Tracking(seatClass: "一般席").isEmpty)
     }
 
     // MARK: - Settling a record one answer at a time

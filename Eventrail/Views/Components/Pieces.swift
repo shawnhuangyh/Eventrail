@@ -128,91 +128,44 @@ struct UnreadTag: View {
     }
 }
 
-/// One cell of a three-up statistics row.
+/// One cell of a three-up statistics row: a number with its caption under it.
+/// Three of these read as one row of counts, which is what the performer and
+/// venue screens show.
 struct StatTile: View {
-    /// The two arrangements the design draws this tile in.
-    enum Layout {
-        /// A number with its caption under it. Three of these read as one row
-        /// of counts, which is what the Me and performer screens show.
-        case caption
-        /// The name on top beside the dot, the value under it, and a line
-        /// under that qualifying the value. An event's facts are three
-        /// different things rather than three counts, so each one is named
-        /// before it is read.
-        case field
-    }
-
     let tint: Color
-    /// A formatted number or time, so not a localizable key.
+    /// A formatted number, so not a localizable key.
     let value: String
-    /// A second line under the value, for a fact that only qualifies it — the
-    /// hour a performance ends under the hour it starts. Nil where the public
-    /// page published nothing to put there.
+    /// A second line under the value, for a fact that only qualifies it. Nil
+    /// where the public page published nothing to put there.
     var sub: Text?
     let label: LocalizedStringKey
-    var layout: Layout = .caption
 
     var body: some View {
-        content
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 15)
-            .glassPanel(cornerRadius: 24)
-            .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch layout {
-        case .caption:
-            VStack(alignment: .leading, spacing: 5) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(tint)
-                    .frame(width: 9, height: 9)
-                    .padding(.bottom, 3)
-                Text(value)
-                    .font(.system(size: 21, weight: .bold))
-                    .monospacedDigit()
-                if let sub {
-                    sub
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, -2)
-                }
-                Text(label)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        case .field:
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 7) {
-                    Circle()
-                        .fill(tint)
-                        .frame(width: 9, height: 9)
-                    Text(label)
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                Text(value)
-                    .font(.system(size: 25, weight: .bold))
-                    .kerning(-0.75)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                // The three tiles stand as one row, so a tile with nothing to
-                // qualify its value keeps the line rather than standing shorter
-                // than the two beside it.
-                (sub ?? Text(verbatim: " "))
-                    .font(.system(size: 12, weight: .medium))
+        VStack(alignment: .leading, spacing: 5) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(tint)
+                .frame(width: 9, height: 9)
+                .padding(.bottom, 3)
+            Text(value)
+                .font(.system(size: 21, weight: .bold))
+                .monospacedDigit()
+            if let sub {
+                sub
+                    .font(.system(size: 11.5, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .padding(.top, -2)
             }
+            Text(label)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 15)
+        .glassPanel(cornerRadius: 24)
+        .accessibilityElement(children: .combine)
     }
 }
 
