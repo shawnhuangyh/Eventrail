@@ -14,15 +14,16 @@ import UIKit
 /// holds a ticket for, as the design has it, and only once the page has
 /// published a start: without one there is nothing to count down to.
 ///
-/// **Nothing here can make an activity move on by itself.** It is drawn again
-/// when the app sends it something, and once when its stale date passes —
-/// which the extension spends on the next stage (see
-/// ``EventActivityAttributes/ContentState/staleDate``). Everything else is the
-/// app catching up whenever it runs: on launch, on coming back to the
-/// foreground, while the event's sheet is open, at each change of stage while
-/// the app is up, and in a background refresh asked for at the next one —
-/// which the system grants when it sees fit, not on the minute. There is no
-/// server to push updates from, and none is wanted.
+/// **The activity moves on through the night by itself.** It is drawn again
+/// only when the app sends it something or its stale date passes, so the
+/// extension draws every stage still to come at once and the system shows
+/// each in its own stretch (see ``EventActivityAttributes/ContentState/phases(at:)``).
+/// The app still catches it up whenever it runs — on launch, on coming back
+/// to the foreground, while the event's sheet is open, at each change of stage
+/// while the app is up, and in a background refresh asked for at the next one
+/// — for a door time or a seat written since, and for the island's outline,
+/// which only takes one colour. There is no server to push updates from, and
+/// none is wanted.
 @MainActor @Observable
 final class EventActivities {
     static let shared = EventActivities()
@@ -111,12 +112,12 @@ final class EventActivities {
                 sound: .default)
             _ = try Activity.request(
                 attributes: attributes,
-                content: ActivityContent(state: state, staleDate: state.staleDate),
+                content: ActivityContent(state: state, staleDate: state.nextChange),
                 pushType: nil, style: .standard, alertConfiguration: alert, start: opens)
         } else {
             _ = try Activity.request(
                 attributes: attributes,
-                content: ActivityContent(state: state, staleDate: state.staleDate),
+                content: ActivityContent(state: state, staleDate: state.nextChange),
                 pushType: nil)
         }
         read()
@@ -188,7 +189,7 @@ final class EventActivities {
                 await activity.end(ActivityContent(state: state, staleDate: nil),
                                    dismissalPolicy: .after(state.runsTo.addingTimeInterval(Self.lingering)))
             } else if state != activity.content.state {
-                await activity.update(ActivityContent(state: state, staleDate: state.staleDate))
+                await activity.update(ActivityContent(state: state, staleDate: state.nextChange))
             }
         }
         dropPosters()

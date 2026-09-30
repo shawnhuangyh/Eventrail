@@ -64,22 +64,48 @@ struct EventActivityTests {
         for (stage, expected) in stages { #expect(stage == expected) }
     }
 
-    /// The one change an activity makes by itself goes to the next stage;
-    /// "Starting in" is left to the app, so the start is not spent on it.
-    @Test func goingStaleMovesOnToTheNextStage() throws {
-        let before = try state(of: event(), at: Fixtures.date(2027, 5, 9, 16))
-        #expect(before.staleDate == Fixtures.date(2027, 5, 9, 17, 30))
-        #expect(before.shownStage(isStale: false) == .beforeDoors)
-        #expect(before.shownStage(isStale: true) == .doorsOpen)
+    /// Every stage still to come, each with its stretch — what the activity
+    /// moves on through with nobody sending it anything.
+    @Test func laysOutTheRestOfTheNight() throws {
+        let state = try state(of: event(), at: Fixtures.date(2027, 5, 9, 16))
+        #expect(state.phases() == [
+            EventActivityPhase(stage: .beforeDoors, until: Fixtures.date(2027, 5, 9, 17, 30)),
+            EventActivityPhase(stage: .doorsOpen, from: Fixtures.date(2027, 5, 9, 17, 30),
+                               until: Fixtures.date(2027, 5, 9, 18, 55)),
+            EventActivityPhase(stage: .startingSoon, from: Fixtures.date(2027, 5, 9, 18, 55),
+                               until: Fixtures.date(2027, 5, 9, 19)),
+            EventActivityPhase(stage: .onNow, from: Fixtures.date(2027, 5, 9, 19),
+                               until: Fixtures.date(2027, 5, 9, 20, 30)),
+            EventActivityPhase(stage: .wrapped, from: Fixtures.date(2027, 5, 9, 20, 30)),
+        ])
+        #expect(state.nextChange == Fixtures.date(2027, 5, 9, 17, 30))
+    }
 
-        let doors = try state(of: event(), at: Fixtures.date(2027, 5, 9, 18))
-        #expect(doors.staleDate == Fixtures.date(2027, 5, 9, 19))
-        #expect(doors.nextChange == Fixtures.date(2027, 5, 9, 18, 55))
-        #expect(doors.shownStage(isStale: true) == .onNow)
+    /// Drawn again later than it was sent — gone stale, say — it starts from
+    /// where the night stands rather than where it stood.
+    @Test func drawnLateStartsFromWhereTheNightStands() throws {
+        let state = try state(of: event(), at: Fixtures.date(2027, 5, 9, 16))
+        let phases = state.phases(at: Fixtures.date(2027, 5, 9, 19, 10))
+        #expect(phases.map(\.stage) == [.onNow, .wrapped])
+        #expect(phases[0].from == nil)
+        // Never back: a stage sent is not undone by a clock that reads earlier.
+        #expect(state.phases(at: Fixtures.date(2027, 5, 9, 12)).first?.stage == .beforeDoors)
+    }
 
-        let show = try state(of: event(), at: Fixtures.date(2027, 5, 9, 19, 30))
-        #expect(show.staleDate == Fixtures.date(2027, 5, 9, 20, 30))
-        #expect(show.shownStage(isStale: true) == .wrapped)
+    @Test func withNoDoorsTheShowComesNext() throws {
+        let state = try state(of: event(doors: false), at: Fixtures.date(2027, 5, 9, 16))
+        #expect(state.phases().map(\.stage) == [.beforeShow, .onNow, .wrapped])
+        #expect(state.nextChange == Fixtures.date(2027, 5, 9, 19))
+    }
+
+    /// Doors inside the last few minutes open straight into "Starting in".
+    @Test func doorsJustBeforeTheStartOpenIntoStartingSoon() throws {
+        let event = Fixtures.event(date: Fixtures.date(2027, 5, 9),
+                                   doorsOpen: Fixtures.date(2027, 5, 9, 18, 57),
+                                   startsAt: Fixtures.date(2027, 5, 9, 19))
+        let phases = try state(of: event, at: Fixtures.date(2027, 5, 9, 18)).phases()
+        #expect(phases.map(\.stage) == [.beforeDoors, .startingSoon, .onNow, .wrapped])
+        #expect(phases[1].from == Fixtures.date(2027, 5, 9, 18, 57))
     }
 
     /// A door time the page gives as the start itself is dropped: there is no

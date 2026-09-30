@@ -24,7 +24,7 @@ nonisolated struct EventActivityAttributes: ActivityAttributes {
 
     struct ContentState: Codable, Hashable, Sendable {
         /// Where the night stood when the app last looked — see
-        /// ``shownStage(isStale:)`` for what is drawn once that has passed.
+        /// ``phases(at:)`` for what is drawn after it.
         var stage: EventActivityStage
         var doors: Date?
         var starts: Date
@@ -70,18 +70,27 @@ nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
         return starts.timeIntervalSince(now) <= soonBeforeStart ? .startingSoon : .doorsOpen
     }
 
-    /// The stage this one gives way to.
-    ///
-    /// Doors open goes straight on to the show: the last few minutes before
-    /// the start are only ever shown by the app looking, since the one change
-    /// an activity can make by itself is better spent on the start.
-    var following: Self {
+    /// How far into the night the stage is, so a stage never gives way to
+    /// one before it.
+    var order: Int {
         switch self {
-        case .beforeDoors: .doorsOpen
-        case .beforeShow, .doorsOpen, .startingSoon: .onNow
-        case .onNow, .wrapped: .wrapped
+        case .beforeDoors, .beforeShow: 0
+        case .doorsOpen: 1
+        case .startingSoon: 2
+        case .onNow: 3
+        case .wrapped: 4
         }
     }
+}
+
+/// One stretch of the night as the activity draws it: a stage, from the
+/// moment it comes on until the moment the next one does.
+nonisolated struct EventActivityPhase: Hashable, Sendable {
+    let stage: EventActivityStage
+    /// When it comes on — nil for the first, already under way.
+    var from: Date?
+    /// When it gives way — nil for the last.
+    var until: Date?
 }
 
 nonisolated extension EventActivityAttributes.ContentState {
@@ -90,34 +99,38 @@ nonisolated extension EventActivityAttributes.ContentState {
         .at(now, doors: doors, starts: starts, runsTo: runsTo)
     }
 
-    /// When ``stage`` gives way to ``EventActivityStage/following`` — the
-    /// activity's stale date.
+    /// The rest of the night from ``stage`` on — or from where it stands at
+    /// `now`, where that is further on — each stage with its stretch.
     ///
     /// A Live Activity is drawn again only when the app sends it something,
-    /// and the app is rarely running during a concert. What the system does
-    /// by itself is mark an activity stale at the date it was given, and draw
-    /// it again saying so; that is spent on the next change of stage, so the
-    /// activity moves on at least once with nobody looking.
-    var staleDate: Date? {
-        switch stage {
-        case .beforeDoors: doors
-        case .beforeShow, .doorsOpen, .startingSoon: starts
-        case .onNow: runsTo
-        case .wrapped: nil
+    /// and the app is rarely running during a concert. So the extension draws
+    /// every stage still to come at once and shows each only inside its own
+    /// stretch, switched by the system as the night runs on — see
+    /// `EventLiveActivity`.
+    func phases(at now: Date? = nil) -> [EventActivityPhase] {
+        var first = stage
+        if let now, stage(at: now).order > first.order { first = stage(at: now) }
+        let moments = [doors, starts.addingTimeInterval(-EventActivityStage.soonBeforeStart), starts, runsTo]
+            .compactMap(\.self)
+            .sorted()
+        var phases = [EventActivityPhase(stage: first)]
+        for moment in moments {
+            let next = stage(at: moment)
+            guard next.order > phases[phases.count - 1].stage.order else { continue }
+            phases[phases.count - 1].until = moment
+            phases.append(EventActivityPhase(stage: next, from: moment))
         }
+        return phases
     }
 
-    /// The next moment worth the app waking for: the stale date, and the
-    /// start of "Starting in" before it.
+    /// When ``stage`` gives way to the next — the activity's stale date, and
+    /// when the app next brings it up to date.
+    ///
+    /// The system draws an activity again as it goes stale, which catches up
+    /// anything the stretches did not: whatever is drawn then starts from
+    /// where the night stands.
     var nextChange: Date? {
-        if stage == .doorsOpen { return starts.addingTimeInterval(-EventActivityStage.soonBeforeStart) }
-        return staleDate
-    }
-
-    /// What the activity draws: the stage it was last sent, or the one after
-    /// it once its stale date has passed.
-    func shownStage(isStale: Bool) -> EventActivityStage {
-        isStale ? stage.following : stage
+        phases().first?.until
     }
 }
 
