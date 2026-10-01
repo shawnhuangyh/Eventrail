@@ -11,13 +11,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		000000000000000230000001 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000000000 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 000000000000000100000000;
-			remoteInfo = Eventrail;
-		};
 		000000000000000160000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000000000 /* Project object */;
@@ -25,13 +18,20 @@
 			remoteGlobalIDString = 000000000000000300000000;
 			remoteInfo = EventrailWidgets;
 		};
+		000000000000000230000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = Eventrail;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		000000000000000150000000 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			dstPath = "";
-			dstSubfolderSpec = 13;
+			dstSubfolder = PlugIns;
 			files = (
 				000000000000000150000001 /* EventrailWidgets.appex in Embed Foundation Extensions */,
 			);
@@ -257,15 +257,15 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		000000000000000230000000 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 000000000000000100000000 /* Eventrail */;
-			targetProxy = 000000000000000230000001 /* PBXContainerItemProxy */;
-		};
 		000000000000000160000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 000000000000000300000000 /* EventrailWidgets */;
 			targetProxy = 000000000000000160000001 /* PBXContainerItemProxy */;
+		};
+		000000000000000230000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* Eventrail */;
+			targetProxy = 000000000000000230000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
