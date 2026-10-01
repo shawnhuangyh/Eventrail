@@ -132,9 +132,9 @@ extension View {
     /// written down here to go stale. And once more inside each sheet that can
     /// start a refresh, since a sheet covers the tab that would otherwise draw
     /// it; and on each page with a bar or a capsule along its foot — an
-    /// event's sheet, a performer's or a hall's page, the Following tab under
-    /// its filter — inside that page, since only its own safe area knows the
-    /// bar is there.
+    /// event's sheet, a performer's or a hall's page, the Following tab, My
+    /// Events and the full Favorite Events list under their capsules — inside
+    /// that page, since only its own safe area knows the bar is there.
     ///
     /// `aboveBar` marks those pages: one stands in front of whatever holds it,
     /// so a tab or a sheet keeps quiet while it is up — see
