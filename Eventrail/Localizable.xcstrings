@@ -7858,24 +7858,24 @@
         }
       }
     },
-    "Sort and filter events" : {
+    "Sort events" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "イベントを並べ替え・絞り込み"
+            "value" : "イベントを並べ替え"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排序和筛选活动"
+            "value" : "排序活动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排序和篩選活動"
+            "value" : "排序活動"
           }
         }
       }

@@ -49,53 +49,41 @@ func menuChoice<Value: Equatable>(_ selection: Binding<Value>,
     )
 }
 
-/// Sort and filter for a list of events, and the pencil that turns a tap on a
-/// row into a choice instead of an opening.
+/// Which half of a list of events is on screen: the nights still ahead, or the
+/// ones gone.
+///
+/// At the head of the list rather than in the capsule at its foot, because it
+/// is not a narrowing of one list but a choice between two — each read in its
+/// own order, and only the first counting down and carrying a read state — and
+/// it is always one or the other, so it has no All to set apart. The head of a
+/// list is where every screen keeps the choice of which list it is: Search its
+/// scopes, Following its performers.
 ///
 /// Shared by My Events and by the full Favorite Events list behind the Me card,
-/// so that the two cannot drift apart: the same capsule, the same menu, the
-/// same way in and out of picking rows.
-struct EventListToolbar: ToolbarContent {
+/// so that the two cannot drift apart.
+struct LibraryHalfPicker: View {
     @Binding var filter: LibraryFilter
-    @Binding var grouping: Grouping
-    /// Whether the screen is picking rows rather than opening them.
-    @Binding var isSelecting: Bool
-    /// How many events sit behind each filter, shown beside it in the menu.
-    var counts: (LibraryFilter) -> Int
-    /// Nothing to pick from leaves the pencil in place but dimmed, rather than
-    /// letting the bar rearrange itself as the list fills.
-    var canSelect = true
 
-    var body: some ToolbarContent {
-        if isSelecting {
-            // Changing the filter mid-selection would move the ground under the
-            // choice, so the menu is put away while selecting and the one way
-            // out takes its place.
-            ToolbarItem(placement: .primaryAction) {
-                Button("Done", systemImage: "checkmark") { isSelecting = false }
-            }
-        } else {
-            ToolbarItem(placement: .primaryAction) { menu }
-            // Its own capsule rather than a shared one: the menu says what the
-            // list shows, and this says what a tap on it does.
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-            ToolbarItem(placement: .primaryAction) {
-                Button("Select Events", systemImage: "pencil") { isSelecting = true }
-                    .disabled(!canSelect)
+    var body: some View {
+        Picker("Events", selection: $filter.animation(.snappy)) {
+            ForEach(LibraryFilter.allCases) { option in
+                Text(option.label).tag(option)
             }
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
+}
 
-    /// The capsule in the navigation bar: what the list is showing, and the
-    /// way into changing it. Only one word stands in it — the filter, which
-    /// names the list best — with the sort arrows beside it. Naming both
-    /// choices put two words in a capsule that has to sit next to a button.
-    ///
-    /// Sort stands above Filter because it is the choice the reader revisits:
-    /// which half of the list is on screen changes rarely, how it is broken up
-    /// changes with the task.
-    private var menu: some View {
-        Menu {
+/// The capsule at the foot of a list of events: how the list is broken up.
+///
+/// Sort only, for now: which half is on screen is chosen at the head of the
+/// list — see ``LibraryHalfPicker``.
+struct EventListMenu: View {
+    @Binding var grouping: Grouping
+
+    var body: some View {
+        ListMenu(describes: "Sort events", value: Text(grouping.label)) {
             Section("Sort") {
                 ForEach(Grouping.allCases) { option in
                     Toggle(isOn: menuChoice($grouping, option)) {
@@ -103,37 +91,16 @@ struct EventListToolbar: ToolbarContent {
                     }
                 }
             }
-
-            Section("Filter") {
-                ForEach(LibraryFilter.allCases) { option in
-                    Toggle(isOn: menuChoice($filter, option)) {
-                        Label {
-                            Text(option.label)
-                            Text(counts(option).formatted())
-                        } icon: {
-                            Image(systemName: option.symbol)
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 13, weight: .medium))
-                Text(filter.label)
-                    .font(.system(size: 13.5, weight: .semibold))
-                Circle()
-                    .fill(.tertiary)
-                    .frame(width: 3.5, height: 3.5)
+        } face: {
+            HStack(spacing: 8) {
                 Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
+                Text(grouping.label)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
             }
         }
-        .accessibilityLabel("Sort and filter events")
     }
 }
 
@@ -242,14 +209,19 @@ struct SelectionMark: View {
     }
 }
 
-/// The one control a list of performers carries: the pencil that turns a tap on
-/// a row into a choice, and the mark that ends it.
+/// The one control a list carries in its navigation bar: the pencil that turns
+/// a tap on a row into a choice, and the mark that ends it.
 ///
-/// No capsule beside it. A performer has no past and no future of their own,
-/// and the list is already in the one order that means anything for a settled
-/// list — so there is nothing for a sort or a filter to say.
-struct PerformerListToolbar: ToolbarContent {
+/// Alone up there: what a list is narrowed to and how it is ordered is in the
+/// capsule at its foot (``ListMenu``), and which half of it is on screen at its
+/// head (``LibraryHalfPicker``). Changing either mid-selection would move the
+/// ground under the choice, so both are put away or held still while picking.
+struct PencilToolbar: ToolbarContent {
     @Binding var isSelecting: Bool
+    /// What the pencil is for, as VoiceOver says it.
+    let title: LocalizedStringKey
+    /// Nothing to pick from leaves the pencil in place but dimmed, rather than
+    /// letting the bar rearrange itself as the list fills.
     var canSelect = true
 
     var body: some ToolbarContent {
@@ -259,7 +231,7 @@ struct PerformerListToolbar: ToolbarContent {
             }
         } else {
             ToolbarItem(placement: .primaryAction) {
-                Button("Select Performers", systemImage: "pencil") { isSelecting = true }
+                Button(title, systemImage: "pencil") { isSelecting = true }
                     .disabled(!canSelect)
             }
         }
