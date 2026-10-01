@@ -89,6 +89,45 @@ struct PassportStatsTests {
         #expect(stats.topLotteries.map(\.event.id) == ["a", "b"])
     }
 
+    /// Prices on three of four nights — one of them free — across two
+    /// classes and one night that names none.
+    @Test func addsUpTheTicketsThatHaveAPrice() {
+        let costs: [Event.ID: (Int?, String)] = [
+            "a": (9_900, "S席"), "b": (0, " S席 "), "c": (7_000, ""), "d": (nil, "A席"),
+        ]
+        let stats = PassportStats(events: Self.nights) {
+            var tracking = Tracking()
+            tracking.cost = costs[$0.id]?.0
+            tracking.seatClass = costs[$0.id]?.1 ?? ""
+            return tracking
+        }
+        // A free seat is a price; a class with no price is not a ticket here.
+        #expect(stats.tickets.map(\.id) == ["a", "c", "b"])
+        #expect(stats.ticketSpending == 16_900)
+        #expect(stats.highestTicketPrice == 9_900)
+        #expect(stats.lowestTicketPrice == 0)
+        #expect(stats.averageTicketPrice == 16_900.0 / 3)
+        // Trimmed into one class, and the night that names none goes last.
+        #expect(stats.ticketTypes.map(\.seatClass) == ["S席", ""])
+        #expect(stats.ticketTypes.first?.count == 2)
+        #expect(stats.ticketTypes.first?.spent == 9_900)
+        #expect(stats.ticketTypes.first?.lowest == 0)
+        #expect(stats.ticketTypes.first?.highest == 9_900)
+    }
+
+    @Test func ordersTicketTypesByHowManyThenByPrice() {
+        let classes: [Event.ID: (Int, String)] = [
+            "a": (5_000, "A席"), "b": (12_000, "S席"), "c": (3_000, ""), "d": (4_000, ""),
+        ]
+        let stats = PassportStats(events: Self.nights) {
+            var tracking = Tracking()
+            tracking.cost = classes[$0.id]?.0
+            tracking.seatClass = classes[$0.id]?.1 ?? ""
+            return tracking
+        }
+        #expect(stats.ticketTypes.map(\.seatClass) == ["S席", "A席", ""])
+    }
+
     @Test func tallyByYearFillsTheGaps() {
         let years = stats.tally(by: .year)
         #expect(years.map(\.value) == [2023, 2024, 2025])
@@ -112,6 +151,9 @@ struct PassportStatsTests {
         let empty = PassportStats(events: []) { _ in Tracking() }
         #expect(empty.totalEvents == 0)
         #expect(empty.averageLotteryEntries == 0)
+        #expect(empty.tickets.isEmpty)
+        #expect(empty.averageTicketPrice == 0)
+        #expect(empty.highestTicketPrice == nil)
         #expect(empty.tally(by: .year).isEmpty)
         #expect(empty.firstEvent == nil)
     }
