@@ -1,4 +1,6 @@
 import SwiftUI
+import Photos
+import QuickLook
 import Translation
 
 /// One event: what Eventernote publishes about it, and what the reader records
@@ -64,6 +66,31 @@ struct EventDetailView: View {
 
     /// Why the Live Activity could not be started, while that is being said.
     @State private var liveActivityFailure: String?
+
+    /// The flyer as a file Quick Look and the share sheet can be handed —
+    /// see ``ImageCache/file(for:named:checkedSince:)``. Nil until it is
+    /// written, and for an event with no flyer.
+    @State private var flyerFile: URL?
+    /// The file Quick Look is showing, while it is.
+    @State private var previewedFlyer: URL?
+    /// Counted up as each save lands, for the tap that says so.
+    @State private var flyerSaves = 0
+    @State private var flyerSaveFailure: FlyerSaveFailure?
+
+    /// Why the flyer did not reach the reader's photos.
+    private enum FlyerSaveFailure {
+        /// The reader has said no, here or in Settings.
+        case notAllowed
+        case failed(String)
+    }
+
+    /// What ``flyerFile`` is written from: the flyer, the title it is named
+    /// for, and the last refresh by hand it has to be as fresh as.
+    private struct FlyerLoad: Equatable {
+        let url: URL?
+        let name: String
+        let checkedSince: Date?
+    }
 
     @Environment(\.openURL) private var openURL
 
@@ -190,6 +217,34 @@ struct EventDetailView: View {
         } message: {
             Text(verbatim: $0)
         }
+        // Over this sheet, rather than in its stack: the flyer is looked at
+        // whole, the way the system shows any picture.
+        .quickLookPreview($previewedFlyer)
+        // Written again with the flyer, so the file opened is the picture on
+        // the sheet — a pull asks the host about both at once.
+        .task(id: FlyerLoad(url: event.imageURL, name: event.title, checkedSince: imagesCheckedSince)) {
+            guard let url = event.imageURL else {
+                flyerFile = nil
+                return
+            }
+            flyerFile = await ImageCache.shared.file(for: url, named: event.title, checkedSince: imagesCheckedSince)
+        }
+        .sensoryFeedback(.success, trigger: flyerSaves)
+        .alert("Couldn't Save the Flyer",
+               isPresented: Binding { flyerSaveFailure != nil } set: { if !$0 { flyerSaveFailure = nil } },
+               presenting: flyerSaveFailure) { failure in
+            if case .notAllowed = failure {
+                Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK") {}
+            }
+        } message: { failure in
+            switch failure {
+            case .notAllowed: Text("Eventrail isn't allowed to add to your photos. You can allow it in Settings.")
+            case .failed(let reason): Text(verbatim: reason)
+            }
+        }
         // The first time an event at a hall nothing has looked up yet is
         // opened, this is what goes and finds it — whether or not the reader
         // mirrors anything to their calendar.
@@ -275,22 +330,64 @@ struct EventDetailView: View {
         .padding(.bottom, 4)
     }
 
+    /// Opens whole in Quick Look — the system's own viewer, zoomed with a
+    /// pinch and closed with a swipe, whose share button saves and sends it —
+    /// and on a long press offers the same as a menu over a larger copy.
+    /// Neither until ``flyerFile`` is written: both are handed the file.
     private var poster: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(.quaternary)
-            .overlay {
-                CachedImage(url: event.imageURL) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Image(systemName: "music.microphone")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(.tertiary)
+        Button {
+            previewedFlyer = flyerFile
+        } label: {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.quaternary)
+                .overlay {
+                    CachedImage(url: event.imageURL) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Image(systemName: "music.microphone")
+                            .font(.system(size: 22, weight: .light))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(width: 76, height: 106)
+                .clipShape(.rect(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if let flyerFile {
+                ShareLink(item: flyerFile)
+                Button("Save to Photos", systemImage: "square.and.arrow.down") {
+                    Task { await saveFlyer(flyerFile) }
                 }
             }
-            .frame(width: 76, height: 106)
-            .clipShape(.rect(cornerRadius: 12, style: .continuous))
-            .shadow(color: .black.opacity(0.12), radius: 10, y: 8)
-            .accessibilityLabel("Event flyer")
+        } preview: {
+            CachedImage(url: event.imageURL) { image in
+                image.resizable().scaledToFit().frame(width: 300)
+            } placeholder: {
+                EmptyView()
+            }
+        }
+        .shadow(color: .black.opacity(0.12), radius: 10, y: 8)
+        .accessibilityLabel("Event flyer")
+        .accessibilityHint(flyerFile == nil ? Text(verbatim: "") : Text("Opens the flyer"))
+    }
+
+    /// Adds the flyer to the reader's photos as the host sent it, asking for
+    /// leave to add — and only to add — the first time.
+    private func saveFlyer(_ file: URL) async {
+        switch await PHPhotoLibrary.requestAuthorization(for: .addOnly) {
+        case .authorized, .limited:
+            do {
+                try await PHPhotoLibrary.shared().performChanges { @Sendable in
+                    PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: file, options: nil)
+                }
+                flyerSaves += 1
+            } catch {
+                flyerSaveFailure = .failed(error.localizedDescription)
+            }
+        default:
+            flyerSaveFailure = .notAllowed
+        }
     }
 
     /// The hall, as the way to everything else held there. An event announced

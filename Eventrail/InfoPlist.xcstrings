@@ -117,6 +117,35 @@
           }
         }
       }
+    },
+    "NSPhotoLibraryAddUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail adds an event's flyer to your photos when you ask it to save one. It never reads your photos."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存を選んだときに、Eventrailはイベントのフライヤーを写真に追加します。写真を読み取ることはありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当你选择存储时，Eventrail 会将活动海报添加到“照片”。它不会读取你的照片。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當你選擇儲存時，Eventrail 會將活動海報加入「照片」。它不會讀取你的照片。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

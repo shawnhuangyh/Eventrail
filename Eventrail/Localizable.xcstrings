@@ -2049,6 +2049,28 @@
         }
       }
     },
+    "Couldn't Save the Flyer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フライヤーを保存できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法存储海报"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存海報"
+          }
+        }
+      }
+    },
     "Couldn't Start the Live Activity" : {
       "localizations" : {
         "ja" : {
@@ -3057,6 +3079,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eventrail 會匯入你的 Eventernote 個人資料中已有的內容——你參加過的活動以及收藏的藝人。"
+          }
+        }
+      }
+    },
+    "Eventrail isn't allowed to add to your photos. You can allow it in Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrailには写真への追加が許可されていません。設定で許可できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 未获准向“照片”添加内容。你可以在“设置”中允许。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 未獲准將內容加入「照片」。你可以在「設定」中允許。"
           }
         }
       }
@@ -5790,6 +5834,28 @@
         }
       }
     },
+    "Opens the flyer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フライヤーを開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开海报"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開海報"
+          }
+        }
+      }
+    },
     "Opens the performer" : {
       "localizations" : {
         "ja" : {
@@ -6930,6 +6996,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "與 App 語言相同"
+          }
+        }
+      }
+    },
+    "Save to Photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真に保存"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储到“照片”"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存到「照片」"
           }
         }
       }
