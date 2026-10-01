@@ -146,11 +146,4 @@ struct EventTests {
         #expect(!event.isUpcomingAnywhere(asOf: Fixtures.date(2027, 5, 10, 12, in: gmt)))
     }
 
-    @Test func fallsComparesDaysNotInstants() {
-        let event = Fixtures.event(date: Fixtures.day(fromToday: 3))
-        let today = Calendar.current.startOfDay(for: .now)
-        let later = Calendar.current.date(byAdding: .day, value: 3, to: today)!
-        #expect(event.falls(in: today ... later))
-        #expect(!event.falls(in: today ... Calendar.current.date(byAdding: .day, value: 2, to: today)!))
-    }
 }

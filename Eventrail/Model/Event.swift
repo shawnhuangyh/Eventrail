@@ -335,23 +335,15 @@ nonisolated extension Event {
     /// The written date this is published on, as an instant the reader's own
     /// calendar puts on that day.
     ///
-    /// A date picker deals in the reader's calendar and Eventernote publishes
-    /// in the venue's, so the two are compared as *written dates* rather than
-    /// as instants: midnight in Kobe is the evening before in London, and
-    /// handing either one the other's midnight puts a show on the wrong day.
+    /// The reader's calendar counts days and Eventernote publishes in the
+    /// venue's, so the two are compared as *written dates* rather than as
+    /// instants: midnight in Kobe is the evening before in London, and handing
+    /// either one the other's midnight puts a show on the wrong day.
     var localDay: Date {
         let fields = calendar.dateComponents([.year, .month, .day], from: date)
         return Calendar.current.date(from: fields) ?? date
     }
 
-    /// Whether this falls on or between the two days the reader picked, both
-    /// ends included. Compared day against day — see ``localDay`` — so the hour
-    /// either end happens to carry never decides it.
-    func falls(in days: ClosedRange<Date>) -> Bool {
-        let calendar = Calendar.current
-        return localDay >= calendar.startOfDay(for: days.lowerBound)
-            && localDay <= calendar.startOfDay(for: days.upperBound)
-    }
 }
 
 nonisolated extension Event {
