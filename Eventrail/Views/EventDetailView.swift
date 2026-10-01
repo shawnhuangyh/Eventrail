@@ -140,13 +140,15 @@ struct EventDetailView: View {
                 // Inside the stack at the root, so the notice stands above the
                 // action bar rather than over it — the bar is part of the
                 // root's safe area, and nothing here has to know its height.
-                .refreshNotices(showing: path.isEmpty)
+                .refreshNotices(aboveBar: true, showing: path.isEmpty)
                 .venueDestination()
         }
-        // A performer's or a hall's page pushed here refreshes too, and has no
-        // bar to keep clear of — but the root's notice went off screen with
-        // the root, so the stack draws them meanwhile.
+        // A performer's or a hall's page pushed here draws its own above its
+        // bar; but the See All behind either has no bar and draws nothing, and
+        // the root's notice went off screen with the root, so the stack draws
+        // them there.
         .refreshNotices(showing: !path.isEmpty)
+        .refreshNoticesInSheet()
         .presentationDragIndicator(.visible)
     }
 

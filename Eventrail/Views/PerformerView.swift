@@ -108,9 +108,16 @@ struct PerformerView: View {
             .padding(.bottom, 32)
         }
         .washBackground()
+        // Inside the page, so the notice stands above its bar rather than
+        // over it — see ``refreshNotices(aboveBar:showing:)``.
+        .refreshNotices(aboveBar: true)
         // An imported name, shown in the language Eventernote published it in.
         .navigationTitle(Text(verbatim: link.name))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { actionBar }
+        // The bar takes the foot of the screen over, as an event's sheet
+        // has it: the tab bar stands down while the page is up.
+        .toolbar(.hidden, for: .tabBar)
         .eventSheet($openEvent)
         .task { await open() }
         // The page's own, so a performer reached from the Following tab does
@@ -243,10 +250,6 @@ struct PerformerView: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if let profile {
-                actions(for: profile)
-                followNote(for: profile)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
@@ -282,56 +285,39 @@ struct PerformerView: View {
         }
     }
 
-    private func actions(for profile: PerformerProfile) -> some View {
-        let isFollowing = store.isFollowing(profile)
-        return HStack(spacing: 9) {
-            Button {
-                withAnimation(.snappy) { store.toggleFollow(profile) }
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: isFollowing ? "checkmark" : "plus")
-                        .font(.system(size: 14, weight: .semibold))
+    // MARK: - Actions
+
+    /// What the reader can do with the performer, in a bar along the bottom
+    /// of the page as an event's sheet has one: follow them, share the page,
+    /// and open it on Eventernote. One capsule at the leading edge, with the
+    /// space beside it left empty for the page to show through.
+    ///
+    /// Only once the page behind the name is found: a name the site files
+    /// nobody under has nothing to follow, share or open.
+    @ToolbarContentBuilder
+    private var actionBar: some ToolbarContent {
+        if let profile {
+            let isFollowing = store.isFollowing(profile)
+            ToolbarItemGroup(placement: .bottomBar) {
+                Button {
+                    withAnimation(.snappy) { store.toggleFollow(profile) }
+                } label: {
+                    Label(isFollowing ? "Unfollow" : "Follow",
+                          systemImage: isFollowing ? "checkmark" : "plus")
                         .contentTransition(.symbolEffect(.replace))
-                    if isFollowing { Text("Following") } else { Text("Follow") }
                 }
-                .font(.system(size: 14.5, weight: .semibold))
-                .foregroundStyle(isFollowing ? Color.trackAttended : Color.brandTint)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .glassCapsule(interactive: true)
+                .tint(isFollowing ? .trackAttended : .brandTint)
 
-            ShareLink(item: profile.pageURL) {
-                Text("Share")
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundStyle(Color.brandTint)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .glassCapsule(interactive: true)
-        }
-        .padding(.top, 3)
-    }
+                ShareLink(item: profile.pageURL)
+                    .tint(.brandTint)
 
-    /// Says what following does here, which is less than the word usually
-    /// promises: it marks the performer in this reader's own library and
-    /// nothing is sent to Eventernote.
-    private func followNote(for profile: PerformerProfile) -> some View {
-        Group {
-            if store.isFollowing(profile) {
-                Text("Kept with your library and private to you. Your Eventernote favourites are untouched.")
-            } else {
-                Text("Following keeps a performer with your library. It is private to you and never written back to Eventernote.")
+                Link(destination: profile.pageURL) {
+                    Label("Open in Eventernote", systemImage: "safari")
+                }
+                .tint(.brandTint)
             }
+            ToolbarSpacer(.flexible, placement: .bottomBar)
         }
-        .font(.system(size: 11.5))
-        .foregroundStyle(.tertiary)
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: 290)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.top, 2)
     }
 
     // MARK: - What they are billed on
@@ -397,7 +383,6 @@ struct PerformerView: View {
                 RefreshFailureNote(message: refreshFailure)
                     .padding(.horizontal, 18)
             }
-            openInEventernote
             footnote
         }
     }
@@ -527,15 +512,6 @@ struct PerformerView: View {
     }
 
     // MARK: - Provenance
-
-    @ViewBuilder
-    private var openInEventernote: some View {
-        if let profile {
-            ExternalLinkPanel(title: "Open performer on Eventernote",
-                              destination: profile.pageURL)
-                .padding(.horizontal, 18)
-        }
-    }
 
     private var footnote: some View {
         Footnote(Text("Appearances come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back."))

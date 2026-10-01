@@ -1,34 +1,5 @@
 import SwiftUI
 
-/// The full-width glass panel that hands the reader off to a page on the web.
-///
-/// A performer's page carries one; an event's sheet did too, until the way out
-/// to Eventernote moved into the menu on its action bar. The arrow is the
-/// system's own sign for leaving the app, and it is the whole of the
-/// difference between this and a row that pushes.
-///
-/// The horizontal inset is the caller's: this sits in a run of cards on one
-/// screen and in a narrower column on another.
-struct ExternalLinkPanel: View {
-    let title: LocalizedStringKey
-    let destination: URL
-
-    var body: some View {
-        Link(destination: destination) {
-            HStack(spacing: 9) {
-                Text(title)
-                    .font(.system(size: 14.5, weight: .semibold))
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundStyle(Color.brandTint)
-            .frame(maxWidth: .infinity)
-            .padding(16)
-        }
-        .glassPanel(interactive: true)
-    }
-}
-
 /// The circular control that puts an event in the reader's library, or takes it
 /// back out.
 ///
@@ -75,7 +46,7 @@ extension View {
     /// one of which would not.
     ///
     /// The sheet draws refresh notices of its own, because it covers the root
-    /// that draws everybody else's — see ``refreshNotices(underSheets:showing:)``.
+    /// that draws everybody else's — see ``refreshNotices(aboveBar:showing:)``.
     /// It places them itself, so they stand clear of its action bar.
     func eventSheet(_ event: Binding<Event?>) -> some View {
         sheet(item: event) { EventDetailView(event: $0) }

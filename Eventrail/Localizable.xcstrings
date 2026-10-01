@@ -3611,28 +3611,6 @@
         }
       }
     },
-    "Following keeps a performer with your library. It is private to you and never written back to Eventernote." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "フォローした出演者はライブラリに保存されます。自分だけに表示され、Eventernoteには書き込まれません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关注会将艺人保存在你的资料库中。这些信息仅你可见，绝不会写回 Eventernote。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "關注會將藝人儲存在你的資料庫中。這些資訊僅你可見，絕不會寫回 Eventernote。"
-          }
-        }
-      }
-    },
     "Following Performers" : {
       "localizations" : {
         "ja" : {
@@ -4246,28 +4224,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保留"
-          }
-        }
-      }
-    },
-    "Kept with your library and private to you. Your Eventernote favourites are untouched." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライブラリに保存され、自分だけに表示されます。Eventernoteのお気に入りは変更されません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "随资料库保存，仅你可见。不会更改你的 Eventernote 收藏。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "隨資料庫儲存，僅你可見。不會更改你的 Eventernote 收藏。"
           }
         }
       }
@@ -5724,28 +5680,6 @@
         }
       }
     },
-    "Open performer on Eventernote" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "出演者をEventernoteで開く"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打开艺人"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打開藝人"
-          }
-        }
-      }
-    },
     "Open Settings" : {
       "localizations" : {
         "ja" : {
@@ -5786,28 +5720,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在地圖中打開場館"
-          }
-        }
-      }
-    },
-    "Open venue on Eventernote" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "会場をEventernoteで開く"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打开场馆"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打開場館"
           }
         }
       }

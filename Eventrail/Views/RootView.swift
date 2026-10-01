@@ -45,19 +45,19 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $selection) {
             Tab("My Events", systemImage: "calendar", value: AppTab.events) {
-                EventsView().refreshNotices(underSheets: true)
+                EventsView().refreshNotices()
             }
 
             Tab("Following", systemImage: "person.2", value: AppTab.following) {
-                FollowingView().refreshNotices(underSheets: true)
+                FollowingView().refreshNotices()
             }
 
             Tab("Me", systemImage: "person.crop.circle", value: AppTab.me) {
-                MeView().refreshNotices(underSheets: true)
+                MeView().refreshNotices()
             }
 
             Tab(value: AppTab.search, role: .search) {
-                SearchView().refreshNotices(underSheets: true)
+                SearchView().refreshNotices()
             }
         }
         // Selecting the search tab opens the field straight away, rather than

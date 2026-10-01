@@ -131,6 +131,10 @@ struct ListingHalfView: View {
         // An imported name, shown in the language Eventernote published it in.
         .navigationSubtitle(Text(verbatim: subject.name))
         .navigationBarTitleDisplayMode(.inline)
+        // Pushed from a performer's or a hall's page, which put the tab bar
+        // away for its own bar; it stays away until the reader is back past
+        // that page, rather than coming back for one screen.
+        .toolbar(.hidden, for: .tabBar)
         .eventSheet($openEvent)
     }
 

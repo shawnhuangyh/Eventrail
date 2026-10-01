@@ -38,10 +38,14 @@ struct RefreshNotice: Identifiable, Equatable {
 final class RefreshNotices {
     private(set) var current: RefreshNotice?
 
-    /// How many sheets are open with a notice of their own drawn in them. The
-    /// tabs keep quiet while any is, or the same notice would show twice —
-    /// once in the sheet and once again behind it.
-    fileprivate(set) var sheetsShowing = 0
+    /// Every place on screen able to draw a notice now, with how far in front
+    /// it stands — see ``RefreshNoticeOverlay/rank``. Only the frontmost
+    /// draws, or the same notice would show twice: once in a sheet and once
+    /// again behind it, which an iPad's form sheet leaves in view, or once
+    /// above a page's bar and once again over it.
+    fileprivate var standing: [UUID: Int] = [:]
+
+    fileprivate var front: Int? { standing.values.max() }
 
     @ObservationIgnored private var dismissal: Task<Void, Never>?
 
@@ -112,6 +116,12 @@ extension RefreshNotice {
 
 // MARK: - Drawing it
 
+extension EnvironmentValues {
+    /// How many sheets drawing notices of their own stand between this view
+    /// and the tabs — see ``View/refreshNoticesInSheet()``.
+    @Entry var refreshNoticeDepth = 0
+}
+
 extension View {
     /// Draws whatever notice is up along the bottom of this screen.
     ///
@@ -121,27 +131,55 @@ extension View {
     /// iPad, where the bar sits at the top — with no height of the bar's
     /// written down here to go stale. And once more inside each sheet that can
     /// start a refresh, since a sheet covers the tab that would otherwise draw
-    /// it.
+    /// it; and on each page with a bar along its foot — an event's sheet, a
+    /// performer's or a hall's page — inside that page, since only its own
+    /// safe area knows the bar is there.
     ///
-    /// `underSheets` marks the tabs: they keep quiet while a sheet is up — see
-    /// ``RefreshNotices/sheetsShowing``.
+    /// `aboveBar` marks those pages: one stands in front of whatever holds it,
+    /// so a tab or a sheet keeps quiet while it is up — see
+    /// ``RefreshNotices/standing``.
     ///
     /// `showing` is for a sheet that draws its notices in two places — an
     /// event's, above its action bar at the root and over the whole stack
     /// once a page is pushed — so that only one of them draws at a time.
-    func refreshNotices(underSheets: Bool = false, showing: Bool = true) -> some View {
-        modifier(RefreshNoticeOverlay(underSheets: underSheets, showing: showing))
+    func refreshNotices(aboveBar: Bool = false, showing: Bool = true) -> some View {
+        modifier(RefreshNoticeOverlay(aboveBar: aboveBar, showing: showing))
+    }
+
+    /// Marks this view as a sheet that draws notices of its own, so they stand
+    /// in front of those of the screen it covers. On the sheet's whole content,
+    /// outside its own ``refreshNotices(aboveBar:showing:)``.
+    func refreshNoticesInSheet() -> some View {
+        modifier(RefreshNoticeSheet())
+    }
+}
+
+private struct RefreshNoticeSheet: ViewModifier {
+    @Environment(\.refreshNoticeDepth) private var depth
+
+    func body(content: Content) -> some View {
+        content.environment(\.refreshNoticeDepth, depth + 1)
     }
 }
 
 private struct RefreshNoticeOverlay: ViewModifier {
     /// Optional, so a preview with no notices in its environment still draws.
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
-    let underSheets: Bool
+    @Environment(\.refreshNoticeDepth) private var depth
+    let aboveBar: Bool
     let showing: Bool
 
+    @State private var id = UUID()
+    @State private var isOnScreen = false
+
+    /// How far in front this stands: a sheet in front of what it covers, and
+    /// a page with a bar of its own in front of the stack or tab it is pushed
+    /// onto. Two at the same rank are never on screen together — a page
+    /// pushed over another sends the one beneath off screen.
+    private var rank: Int { depth * 2 + (aboveBar ? 1 : 0) }
+
     private var shown: RefreshNotice? {
-        guard showing, let notices, !underSheets || notices.sheetsShowing == 0 else { return nil }
+        guard showing, isOnScreen, let notices, notices.front == rank else { return nil }
         return notices.current
     }
 
@@ -156,8 +194,19 @@ private struct RefreshNoticeOverlay: ViewModifier {
                 }
             }
             .animation(.bouncy, value: shown)
-            .onAppear { if !underSheets { notices?.sheetsShowing += 1 } }
-            .onDisappear { if !underSheets { notices?.sheetsShowing -= 1 } }
+            .onAppear {
+                isOnScreen = true
+                stand()
+            }
+            .onDisappear {
+                isOnScreen = false
+                stand()
+            }
+            .onChange(of: showing) { stand() }
+    }
+
+    private func stand() {
+        notices?.standing[id] = isOnScreen && showing ? rank : nil
     }
 }
 
