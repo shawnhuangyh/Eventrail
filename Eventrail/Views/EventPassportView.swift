@@ -486,8 +486,12 @@ struct EventPassportView: View {
         return cell(DurationLabel(seconds: seconds), label: "Avg. Time", isFirst: false)
     }
 
+    /// An equal share of the row: the time card's four readings are one
+    /// figure said four ways at much the same width, and columns line them up.
     private func cell(_ value: some View, label: LocalizedStringKey, isFirst: Bool) -> some View {
-        passportReading(value, label: label, leading: isFirst ? 0 : 14)
+        passportReading(value, label: label)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, isFirst ? 0 : 14)
     }
 
     // MARK: - The briefest night and the longest
@@ -699,15 +703,13 @@ struct EventPassportView: View {
 
 }
 
-/// One of the readings under a card's total. Ruled off from nothing: four
-/// figures under one number are four ways of saying it, and a rule between
-/// them reads as a boundary that isn't there.
+/// One of the readings under a card's total, at its own width. Ruled off from
+/// nothing: four figures under one number are four ways of saying it, and a
+/// rule between them reads as a boundary that isn't there.
 ///
-/// `leading` is the gap before it — none for the first, and a little less on
-/// the spending card, whose four prices are wider than four counts.
-private func passportReading(
-    _ value: some View, label: LocalizedStringKey, leading: CGFloat
-) -> some View {
+/// How the readings share a row is the card's to say — see
+/// ``EventPassportView`` `cell` and ``PassportSpendingCard``.
+private func passportReading(_ value: some View, label: LocalizedStringKey) -> some View {
     VStack(alignment: .leading, spacing: 5) {
         value
             .font(.system(size: 16, weight: .bold))
@@ -722,8 +724,6 @@ private func passportReading(
             .foregroundStyle(.secondary)
             .lineLimit(1)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.leading, leading)
     .accessibilityElement(children: .combine)
 }
 
@@ -1299,15 +1299,18 @@ private struct PassportSpendingCard: View {
             CardHeader(title: "Ticket Spending")
             headline
 
-            HStack(spacing: 0) {
-                passportReading(Text(stats.tickets.count.formatted()),
-                                label: "Tickets", leading: 0)
-                passportReading(Text(yen(stats.averageTicketPrice)),
-                                label: "Avg. Price", leading: 10)
-                passportReading(Text(yen(stats.highestTicketPrice)),
-                                label: "Highest", leading: 10)
-                passportReading(Text(yen(stats.lowestTicketPrice)),
-                                label: "Lowest", leading: 10)
+            // Each at its own width with equal gaps between, rather than in
+            // quarters: a count of tickets is a digit or two and a price is
+            // seven characters, so equal columns left a hole after the count
+            // and the three prices all but touching.
+            HStack(alignment: .top, spacing: 0) {
+                passportReading(Text(stats.tickets.count.formatted()), label: "Tickets")
+                Spacer(minLength: 12)
+                passportReading(Text(yen(stats.averageTicketPrice)), label: "Avg. Price")
+                Spacer(minLength: 12)
+                passportReading(Text(yen(stats.highestTicketPrice)), label: "Highest")
+                Spacer(minLength: 12)
+                passportReading(Text(yen(stats.lowestTicketPrice)), label: "Lowest")
             }
 
             types(styles)
