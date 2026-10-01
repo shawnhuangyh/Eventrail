@@ -23,10 +23,10 @@ struct FollowingView: View {
     /// their filter is on falls back to all of them rather than to an empty
     /// list of one person who is no longer there.
     @State private var performer: PerformerProfile.ID?
-    /// The dates and the areas the list is held to, which is a different
-    /// question from whose dates they are — hence the second control.
+    /// How far ahead and which areas the list is held to, which is a
+    /// different question from whose dates they are — hence the second
+    /// control.
     @State private var filter = FollowingFilter()
-    @State private var isFiltering = false
     @State private var openEvent: Event?
     /// When the list was last pulled down, so the flyers on it are asked about
     /// again with the rows — see ``EnvironmentValues/imagesCheckedSince``.
@@ -60,14 +60,14 @@ struct FollowingView: View {
         return [chosen]
     }
 
-    /// Everything published for whoever is on screen, before the day and the
-    /// areas have their say. Kept apart from ``events`` because the counts have
+    /// Everything published for whoever is on screen, before the filter has
+    /// its say. Kept apart from ``events`` because the counts have
     /// to be able to name what they are counting out of.
     private var published: [Event] { followed.events(for: shown) }
 
     private var events: [Event] { narrowed(published) }
 
-    /// Holds a list to the chosen dates and areas, then to the unread ones if
+    /// Holds a list to the chosen window and areas, then to the unread ones if
     /// that is asked for. An untouched filter narrows nothing, so this is the
     /// identity until the reader asks for something.
     private func narrowed(_ events: [Event]) -> [Event] {
@@ -76,8 +76,8 @@ struct FollowingView: View {
         return placed.filter { store.isUnread($0) || readWhileFiltering.contains($0.id) }
     }
 
-    /// The dates and areas alone — what tells "nothing in that range" from
-    /// "nothing unread" when the list comes up empty.
+    /// The filter alone — what tells "nothing matches" from "nothing unread"
+    /// when the list comes up empty.
     private func filtered(_ events: [Event]) -> [Event] {
         guard filter.isNarrowing else { return events }
         return events.filter { filter.matches($0, in: venues.region(of: $0)) }
@@ -144,6 +144,16 @@ struct FollowingView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            // Drawn here rather than by the tab, inside the room the capsule
+            // leaves, so a notice stands above the capsule rather than over it
+            // — see ``refreshNotices(aboveBar:showing:)``.
+            .refreshNotices(aboveBar: true)
+            // Over the tab bar, in the middle, as the Search tab's stands over
+            // its field: the tab's own content stops short of the bar, so the
+            // capsule rests just above it, and the dates scroll clear of it.
+            .safeAreaInset(edge: .bottom) {
+                if !performers.isEmpty, !isSelecting { filterCapsule }
+            }
             .monthSections()
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
             .washBackground()
@@ -155,8 +165,19 @@ struct FollowingView: View {
             .toolbar { toolbar }
             .performerDestination()
             .eventSheet($openEvent)
-            .sheet(isPresented: $isFiltering) {
-                FollowingFilterSheet(filter: $filter, events: published)
+            // The tab's own load places a ration of halls, which a list held
+            // to areas can outrun: what nothing has placed is under Not Placed
+            // until it is. So while the list is held to any, halls go on
+            // being placed for as long as each run gets somewhere. A run that
+            // placed nothing means the site stopped answering, and pressing it
+            // further would only make that worse.
+            .task(id: filter.holdsAreas) {
+                while filter.holdsAreas, !Task.isCancelled {
+                    let waiting = venues.pendingCount(published)
+                    guard waiting > 0 else { return }
+                    await venues.settle(published)
+                    guard venues.pendingCount(published) < waiting else { return }
+                }
             }
             .refreshable { await reload() }
             // Following someone on their page should show their dates here on
@@ -223,10 +244,9 @@ struct FollowingView: View {
                     Spacer()
                 }
             } else {
-                // The two ways of narrowing the list share a capsule; picking
-                // rows is a different act, and stands apart from them.
+                // Picking rows is a different act from narrowing them, and
+                // stands apart. The areas are in the capsule over the tab bar.
                 ToolbarItem(placement: .primaryAction) { unreadButton }
-                ToolbarItem(placement: .primaryAction) { filterButton }
                 ToolbarSpacer(.fixed, placement: .primaryAction)
                 ToolbarItem(placement: .primaryAction) {
                     Button("Select Events", systemImage: "pencil") { isSelecting = true }
@@ -245,7 +265,7 @@ struct FollowingView: View {
     }
 
     /// Only the dates not looked at yet. Filled in and tinted while it is on,
-    /// like the filter beside it.
+    /// so a short list is never a mystery.
     private var unreadButton: some View {
         Button {
             withAnimation(.snappy) { unreadOnly.toggle() }
@@ -256,18 +276,105 @@ struct FollowingView: View {
         .tint(unreadOnly ? Color.brandTint : nil)
     }
 
-    /// The way into the dates and the areas. Filled in and tinted while it is
-    /// holding something back, so a short list is never a mystery.
-    private var filterButton: some View {
-        Button {
-            isFiltering = true
-        } label: {
-            Label("Filter Dates",
-                  systemImage: filter.isNarrowing
-                      ? "line.3.horizontal.decrease.circle.fill"
-                      : "line.3.horizontal.decrease.circle")
+    // MARK: - The capsule
+
+    /// The capsule over the tab bar — see ``ListMenu`` — holding the filter,
+    /// without the order the Search tab's holds: the dates here run one way,
+    /// soonest first. Its face says what the list is held to.
+    private var filterCapsule: some View {
+        ListMenu(describes: "Filter", value: filterSummary) {
+            // In each submenu the choice that holds nothing back stands above
+            // a divider and the ones that do below it, as on the Search tab.
+            Section("Filter") {
+                Menu {
+                    Toggle(isOn: menuChoice($filter.window, .any)) { Text(FollowingFilter.Window.any.label) }
+                    Section {
+                        ForEach(FollowingFilter.Window.allCases.filter { $0 != .any }, id: \.self) { window in
+                            Toggle(isOn: menuChoice($filter.window, window)) { Text(window.label) }
+                        }
+                    }
+                } label: {
+                    Label("Date", systemImage: "calendar")
+                    Text(filter.window.label)
+                }
+                Menu {
+                    // Several can be picked, so the menu stays open while
+                    // they are.
+                    Toggle(isOn: Binding(get: { !filter.holdsAreas },
+                                         set: { if $0 { filter.areas = []; filter.unplaced = false } })) {
+                        Text("Anywhere")
+                    }
+                    Section {
+                        ForEach(Region.allCases) { region in
+                            Toggle(isOn: picking(region)) {
+                                Text(region.label)
+                                Text("^[\(tally[region] ?? 0) event](inflect: true)")
+                            }
+                            .menuActionDismissBehavior(.disabled)
+                        }
+                        // Only while it has anything, or is picked: it empties
+                        // as the halls are read.
+                        if (tally[Region?.none] ?? 0) > 0 || filter.unplaced {
+                            Toggle(isOn: $filter.unplaced) {
+                                Text("Not Placed")
+                                Text("^[\(tally[Region?.none] ?? 0) event](inflect: true)")
+                            }
+                            .menuActionDismissBehavior(.disabled)
+                        }
+                    }
+                } label: {
+                    Label("Area", systemImage: "map")
+                    areaSummary
+                }
+            }
+        } face: {
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .secondary)
+                filterSummary
+                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .primary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
         }
-        .tint(filter.isNarrowing ? Color.brandTint : nil)
+    }
+
+    /// What the list is held to, in as few words as will say it: how far
+    /// ahead, and where.
+    private var filterSummary: Text {
+        var parts: [Text] = []
+        if filter.window != .any { parts.append(Text(filter.window.label)) }
+        if filter.holdsAreas { parts.append(areaSummary) }
+        guard let first = parts.first else { return Text("All") }
+        return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
+    }
+
+    /// How the dates inside the window break down by area, with the halls
+    /// nothing has placed counted under nil — what each area in the menu
+    /// would leave.
+    private var tally: [Region?: Int] {
+        venues.tally(published.filter { filter.window.contains($0) })
+    }
+
+    /// One area, picked or let go of beside the others.
+    private func picking(_ region: Region) -> Binding<Bool> {
+        Binding(get: { filter.areas.contains(region) },
+                set: { isOn in
+                    if isOn { filter.areas.insert(region) } else { filter.areas.remove(region) }
+                })
+    }
+
+    /// The areas picked, in as few words as will say them.
+    private var areaSummary: Text {
+        var names = Region.allCases.filter(filter.areas.contains).map { Text($0.label) }
+        if filter.unplaced { names.append(Text("Not Placed")) }
+        switch names.count {
+        case 0: return Text("Anywhere")
+        case 1: return names[0]
+        default: return Text("^[\(names.count) area](inflect: true)")
+        }
     }
 
     // MARK: - Read and unread
@@ -462,9 +569,9 @@ struct FollowingView: View {
 
     private var nothingMatches: some View {
         ContentUnavailableView {
-            Label("Nothing in That Range", systemImage: "line.3.horizontal.decrease.circle")
+            Label("No Matching Events", systemImage: "line.3.horizontal.decrease.circle")
         } description: {
-            Text("No published date falls in the dates and areas you picked. Nothing has been removed — widen the filter to see the rest.")
+            Text("No published date matches the filter. Nothing has been removed — widen it to see the rest.")
         } actions: {
             Button("Clear Filter") {
                 withAnimation(.snappy) { filter = FollowingFilter() }
@@ -509,15 +616,49 @@ private extension View {
 
 // MARK: - What the list is held to
 
-/// What the Following tab is narrowed to beyond the performer chips: a span of
-/// days, and whichever parts of the country the reader picked.
+/// What the Following tab is narrowed to beyond the performer chips: how far
+/// ahead, and whichever parts of the country the reader picked.
 ///
-/// Both start empty, and empty narrows nothing: the tab opens on everything
+/// It starts empty, and empty narrows nothing: the tab opens on everything
 /// that is coming, which is what it is for.
 struct FollowingFilter: Equatable {
-    /// The span of days the list is held to, both ends included, or nil for
-    /// every published date.
-    var days: ClosedRange<Date>?
+    /// How far ahead the list reaches, from today. A few fixed spans rather
+    /// than a range picked on a calendar, which a menu has no room for; and
+    /// rolling ones rather than "this week" or "this month", which near their
+    /// end hold almost nothing.
+    enum Window: CaseIterable, Hashable {
+        case any, week, month, threeMonths, sixMonths
+
+        var label: LocalizedStringKey {
+            switch self {
+            case .any: "All"
+            case .week: "Next 7 Days"
+            case .month: "Next 30 Days"
+            case .threeMonths: "Next 3 Months"
+            case .sixMonths: "Next 6 Months"
+            }
+        }
+
+        /// Whether `event` falls inside the window. Counted in written dates,
+        /// as ``Event/daysAway`` counts them — today and the next six days are
+        /// the next seven, whatever the hour — and the months as the calendar
+        /// has them, so three months from 30 November is the end of February.
+        func contains(_ event: Event, asOf now: Date = .now) -> Bool {
+            let reader = Calendar.current
+            let today = reader.startOfDay(for: now)
+            let end: Date? = switch self {
+            case .any: nil
+            case .week: reader.date(byAdding: .day, value: 7, to: today)
+            case .month: reader.date(byAdding: .day, value: 30, to: today)
+            case .threeMonths: reader.date(byAdding: .month, value: 3, to: today)
+            case .sixMonths: reader.date(byAdding: .month, value: 6, to: today)
+            }
+            guard let end else { return true }
+            return event.localDay < end
+        }
+    }
+
+    var window = Window.any
     /// The areas the list is held to. Empty means anywhere — which is not the
     /// same as every case of ``Region``, because a hall nothing has placed is
     /// in none of them.
@@ -528,380 +669,19 @@ struct FollowingFilter: Equatable {
     /// filed under an area it might not be in.
     var unplaced = false
 
-    var isNarrowing: Bool { days != nil || !areas.isEmpty || unplaced }
+    /// Whether the list is held to any area — the half that needs the halls
+    /// placed.
+    var holdsAreas: Bool { !areas.isEmpty || unplaced }
+
+    var isNarrowing: Bool { window != .any || holdsAreas }
 
     /// Whether an event survives the filter, given whatever is known about
     /// where its hall is.
     func matches(_ event: Event, in region: Region?) -> Bool {
-        if let days, !event.falls(in: days) { return false }
-        guard !areas.isEmpty || unplaced else { return true }
+        guard window.contains(event) else { return false }
+        guard holdsAreas else { return true }
         guard let region else { return unplaced }
         return areas.contains(region)
-    }
-}
-
-/// The dates and the areas, picked out of a sheet rather than a menu: a
-/// calendar is the control for choosing a date, and a menu is not big enough to
-/// hold one — let alone the two ends of a range.
-private struct FollowingFilterSheet: View {
-    @Environment(VenueRegions.self) private var venues
-    @Environment(\.dismiss) private var dismiss
-
-    @Binding var filter: FollowingFilter
-    /// Everything the tab would show if this narrowed nothing — what every
-    /// count in here is counted out of.
-    let events: [Event]
-
-    /// How the dates break down by area, with the halls nothing has placed
-    /// counted under nil.
-    private var tally: [Region?: Int] { venues.tally(events) }
-
-    /// The span the calendars offer: the first published date to the last, as
-    /// the reader's own calendar writes them — see ``Event/localDay``. There is
-    /// no sense in offering a month nobody is playing in.
-    /// What the range opens on: tomorrow, through to the furthest published
-    /// date.
-    ///
-    /// Tomorrow rather than the soonest published date, so that the range opens
-    /// on the same day whoever is on screen — the soonest date moves with the
-    /// performer chips, and a start that shifts about as the list is narrowed
-    /// is not a default the reader can hold in their head. It is clamped to the
-    /// far end, because a span that has already run out would otherwise be
-    /// handed a start later than its end.
-    private var opening: ClosedRange<Date> {
-        let calendar = Calendar.current
-        let tomorrow = calendar.date(byAdding: .day, value: 1,
-                                     to: calendar.startOfDay(for: .now)) ?? span.lowerBound
-        return min(tomorrow, span.upperBound) ... span.upperBound
-    }
-
-    private var span: ClosedRange<Date> {
-        let days = events.map(\.localDay)
-        guard let first = days.min(), let last = days.max(), first <= last else {
-            return Date.distantPast ... Date.distantFuture
-        }
-        return first ... last
-    }
-
-    /// The range the calendar reads and writes. Nil stands for the whole
-    /// published span, so the calendar never has to draw an absent range.
-    private var chosenDays: Binding<ClosedRange<Date>> {
-        Binding(get: { filter.days ?? opening }, set: { filter.days = $0 })
-    }
-
-    /// What the calendar will let the reader page to: the published span,
-    /// widened to hold a range they set earlier. Narrowing to one performer
-    /// shortens the span, and a picker whose own selection sits outside its
-    /// bounds has nothing sensible to show.
-    private var reachable: Range<Date> {
-        let days = filter.days ?? opening
-        let first = min(span.lowerBound, days.lowerBound)
-        let last = max(span.upperBound, days.upperBound)
-        let calendar = Calendar.current
-        // Half-open, so the last published day has to be a day short of the
-        // end or it could not be picked.
-        return calendar.startOfDay(for: first)
-            ..< (calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: last)) ?? last)
-    }
-
-    /// The switch itself. Turning it on starts on tomorrow through to the
-    /// furthest published date, so nothing ahead disappears at the moment it is
-    /// switched on: the reader pulls the ends in from there.
-    private var isFilteringByDate: Binding<Bool> {
-        Binding(get: { filter.days != nil },
-                set: { isOn in filter.days = isOn ? opening : nil })
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    SectionLabel(label: "When")
-                    datesCard
-
-                    SectionLabel(label: "Where")
-                        .padding(.top, 6)
-                    areaCard
-                    areaFootnote
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 40)
-            }
-            .washBackground()
-            .navigationTitle("Filter")
-            .navigationSubtitle(subtitle)
-            .presentationDragIndicator(.visible)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear") {
-                        withAnimation(.snappy) { filter = FollowingFilter() }
-                    }
-                    .disabled(!filter.isNarrowing)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            // The tab's own load reads a ration of halls too — a night abroad
-            // needs its hall's address before it can be shown on its hall's
-            // clock — but a run is rationed, so this keeps starting them for as
-            // long as the sheet is open and each one gets somewhere: the counts
-            // fill in while the reader watches rather than waiting on them
-            // closing the sheet and opening it again, which nothing tells them
-            // to do. A run that placed nothing means the site stopped
-            // answering, and pressing it further would only make that worse.
-            .task {
-                while !Task.isCancelled {
-                    let waiting = venues.pendingCount(events)
-                    guard waiting > 0 else { return }
-                    await venues.settle(events)
-                    guard venues.pendingCount(events) < waiting else { return }
-                }
-            }
-        }
-    }
-
-    private var subtitle: Text {
-        let matching = events.filter { filter.matches($0, in: venues.region(of: $0)) }.count
-        return Text("\(matching) of \(Text("^[\(events.count) event](inflect: true)"))")
-    }
-
-    // MARK: - One day
-
-    private var datesCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Toggle(isOn: isFilteringByDate.animation(.snappy)) {
-                Text("Date Range")
-                    .font(.system(size: 14, weight: .semibold))
-            }
-            .tint(Color.trackAttended)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 13)
-
-            if filter.days != nil {
-                Divider()
-                VStack(spacing: 12) {
-                    ends
-                    RangeCalendar(days: chosenDays, in: reachable)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 13)
-                .padding(.bottom, 15)
-            }
-        }
-        .glassPanel()
-    }
-
-    /// The two ends, written out over the calendar. The calendar says which
-    /// days they are; this says which dates, because a numbered cell in a grid
-    /// does not carry its month or its year.
-    private var ends: some View {
-        let days = chosenDays.wrappedValue
-        return HStack(spacing: 9) {
-            endPill(days.lowerBound)
-            Text(verbatim: "–")
-                .font(.system(size: 13))
-                .foregroundStyle(.tertiary)
-            endPill(days.upperBound)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// The month is abbreviated and the line is held to one: "September 19,
-    /// 2026" does not fit beside its other half at this size, and a date broken
-    /// over two lines reads as two dates. Where even the short form will not go
-    /// — a long locale, or large type — it scales down rather than wrapping.
-    ///
-    /// A flat fill rather than a second pane of glass: this sits on the card,
-    /// and glass on glass is the one thing the material is not for.
-    private func endPill(_ day: Date) -> some View {
-        Text(day.formatted(.dateTime.month(.abbreviated).day().year()))
-            .font(.system(size: 13.5, weight: .semibold))
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(.fill.tertiary, in: .rect(cornerRadius: 12, style: .continuous))
-    }
-
-    // MARK: - Where in the country
-
-    /// Every area the site has, whether or not anything has landed in one yet.
-    ///
-    /// The list is ``Region/allCases`` rather than the areas the tally has
-    /// found, because the halls are read while the sheet is open: a list of
-    /// what is placed so far would grow a row at a time under the reader's
-    /// thumb, moving whatever they were reaching for. Fixed rows and a count
-    /// that climbs says the same thing without the list ever changing shape.
-    private var areaCard: some View {
-        VStack(spacing: 0) {
-            let unplaced = tally[Region?.none] ?? 0
-
-            ForEach(Region.allCases) { region in
-                row(isOn: filter.areas.contains(region),
-                    showsDivider: region != Region.allCases.first,
-                    title: Text(region.label),
-                    detail: Text(region.detail),
-                    count: tally[region] ?? 0) {
-                    if filter.areas.contains(region) {
-                        filter.areas.remove(region)
-                    } else {
-                        filter.areas.insert(region)
-                    }
-                }
-            }
-
-            // The one row that is not a fixed part of the country. It starts
-            // holding everything and empties as the halls are read, so it is
-            // dropped only once it has nothing left to offer — and kept while
-            // it is picked, so a filter in force never loses its own control.
-            if unplaced > 0 || filter.unplaced {
-                row(isOn: filter.unplaced,
-                    showsDivider: true,
-                    title: Text("Not Placed"),
-                    detail: unplacedDetail,
-                    count: unplaced) {
-                    filter.unplaced.toggle()
-                }
-            }
-        }
-        .glassPanel()
-    }
-
-    /// Why a hall might have no area, said plainly — it is either still being
-    /// read or genuinely outside the site's areas, and the reader can see which
-    /// from whether the count keeps falling.
-    private var unplacedDetail: Text {
-        venues.isPlacing
-            ? Text("Reading these venues from Eventernote…")
-            : Text("Venues Eventernote files under no area, or none it published")
-    }
-
-    private func row(
-        isOn: Bool, showsDivider: Bool, title: Text, detail: Text, count: Int,
-        choose: @escaping () -> Void
-    ) -> some View {
-        Button {
-            withAnimation(.snappy) { choose() }
-        } label: {
-            HStack(spacing: 12) {
-                SelectionMark(isSelected: isOn)
-                VStack(alignment: .leading, spacing: 3) {
-                    title
-                        .font(.system(size: 14, weight: .semibold))
-                    detail
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Text(count.formatted())
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .top) {
-            if showsDivider { Divider().padding(.leading, 48) }
-        }
-    }
-
-    private var areaFootnote: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("Pick none and every area is shown. Areas are Eventernote's own, read from each venue's page — a venue it files under no area counts as Not Placed.")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-            if venues.isPlacing {
-                ProgressView().controlSize(.mini)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.top, 2)
-    }
-}
-
-/// The month grid the date range is pulled about on.
-///
-/// `MultiDatePicker` is the system's own calendar — its month paging, its
-/// weekday heads, its locale and its accessibility — and it deals in a *set* of
-/// days rather than a span. So the span is handed to it as every day in it, and
-/// the set it hands back is only ever read for which day the reader touched.
-/// Two touches then make the range, the way every calendar that picks one
-/// works: see ``choose(_:)``.
-private struct RangeCalendar: View {
-    @Binding var days: ClosedRange<Date>
-    /// The days the calendar will page to — see the sheet's `reachable`.
-    let bounds: Range<Date>
-
-    private let calendar = Calendar.current
-
-    /// What `MultiDatePicker` matches its own days against. The calendar and
-    /// the era belong in it: the picker fills both in on everything it hands
-    /// back, and a set built without them matches none of it.
-    private static let fields: Set<Calendar.Component> = [.calendar, .era, .year, .month, .day]
-
-    init(days: Binding<ClosedRange<Date>>, in bounds: Range<Date>) {
-        _days = days
-        self.bounds = bounds
-    }
-
-    /// Whether the range is waiting on its second touch.
-    private var isHalfPicked: Bool {
-        calendar.isDate(days.lowerBound, inSameDayAs: days.upperBound)
-    }
-
-    var body: some View {
-        MultiDatePicker("Date range", selection: picked, in: bounds)
-            .labelsHidden()
-    }
-
-    private var picked: Binding<Set<DateComponents>> {
-        Binding(get: { everyDay(in: days) }, set: { touched in
-            let changed = touched.symmetricDifference(everyDay(in: days))
-            let day = changed.compactMap(calendar.date(from:)).min()
-            if let day { choose(day) }
-        })
-    }
-
-    /// The span written out one day at a time, which is the only shape the
-    /// system calendar takes a selection in.
-    private func everyDay(in span: ClosedRange<Date>) -> Set<DateComponents> {
-        var days: Set<DateComponents> = []
-        var day = calendar.startOfDay(for: span.lowerBound)
-        let last = calendar.startOfDay(for: span.upperBound)
-        while day <= last {
-            days.insert(calendar.dateComponents(Self.fields, from: day))
-            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = next
-        }
-        return days
-    }
-
-    /// Two touches make a range: the first closes it onto the day it runs
-    /// from, the second opens it out to the day it runs to. A touch on a range
-    /// already made starts the next one.
-    ///
-    /// The nearer end used to move to the day touched instead, which reads
-    /// well over a fortnight and falls apart over a year — the second touch of
-    /// a short range is nearly always nearer the end just set than the far one,
-    /// so it moved that same end again and the range could never be closed.
-    ///
-    /// Whichever way round the two touches come, the earlier day is the start:
-    /// the range is built from the pair rather than assigned to an end, so
-    /// there is no way to hand it a start later than its end.
-    private func choose(_ day: Date) {
-        guard isHalfPicked else {
-            days = day ... day
-            return
-        }
-        let anchor = days.lowerBound
-        days = day < anchor ? day ... anchor : anchor ... day
     }
 }
 

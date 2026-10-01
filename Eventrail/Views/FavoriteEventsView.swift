@@ -7,9 +7,10 @@ import SwiftUI
 /// without limit: a card that runs past the bottom of the screen stops being a
 /// summary of the library and becomes the library.
 ///
-/// It carries the same controls My Events does — the sort and filter capsule,
-/// and the pencil that turns a tap on a row into a choice — because by the time
-/// a list is long enough to need its own screen it is long enough to need them.
+/// It carries the same controls My Events does — the halves at its head, the
+/// capsule at its foot, and the pencil that turns a tap on a row into a choice
+/// — because by the time a list is long enough to need its own screen it is
+/// long enough to need them.
 struct FavoriteEventsView: View {
     @Environment(EventStore.self) private var store
     @Query(LibraryEntry.favorites) private var hearted: [LibraryEntry]
@@ -42,6 +43,11 @@ struct FavoriteEventsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if !favorites.isEmpty {
+                    LibraryHalfPicker(filter: $filter)
+                        .disabled(isSelecting)
+                        .padding(.horizontal, 4)
+                }
                 if favorites.isEmpty {
                     // Reachable by un-hearting the last one from this screen.
                     note(FavoriteEventRow.emptyNote)
@@ -58,15 +64,19 @@ struct FavoriteEventsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
+        // Inside the room the capsule leaves, so a notice — the Me card's
+        // refresh can still be running — stands above the capsule.
+        .refreshNotices(aboveBar: true)
+        .safeAreaInset(edge: .bottom) {
+            if !isSelecting, !groups.isEmpty { EventListMenu(grouping: $grouping) }
+        }
         .washBackground()
         .navigationTitle("Favorite Events")
         .navigationSubtitle(subtitle)
         .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
         .toolbar {
-            EventListToolbar(filter: $filter, grouping: $grouping,
-                             isSelecting: $isSelecting,
-                             counts: { $0.rows(of: favorites).count },
-                             canSelect: !favorites.isEmpty)
+            PencilToolbar(isSelecting: $isSelecting, title: "Select Events",
+                          canSelect: !favorites.isEmpty)
             if isSelecting {
                 SelectionToolbar(
                     isEverythingSelected: selection == shownIDs,

@@ -35,7 +35,11 @@ final class Feed<Item: Identifiable & Sendable> {
 
     /// Points the feed at a listing and loads its first page, replacing whatever
     /// was on screen.
-    func load(from source: @escaping Source) async {
+    ///
+    /// Or the page `first`, for a screen that has worked out the pages in
+    /// front of it hold nothing it wants: the feed reads on from there as if
+    /// it were the first.
+    func load(startingAt first: Int = 1, from source: @escaping Source) async {
         self.source = source
         page = 0
         hasMore = false
@@ -45,18 +49,18 @@ final class Feed<Item: Identifiable & Sendable> {
         defer { isLoading = false }
 
         do {
-            let result = try await source(1)
+            let result = try await source(first)
             items = result.items
             total = result.total
             hasMore = result.hasMore
-            page = 1
+            page = first
         } catch is CancellationError {
             // A retyped query supersedes this one; the newer load owns the state.
         } catch {
             guard !Task.isCancelled else { return }
             items = []
             total = 0
-            page = 1
+            page = first
             failure = error.localizedDescription
         }
     }

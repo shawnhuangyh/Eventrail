@@ -2,6 +2,10 @@ import SwiftData
 import SwiftUI
 
 /// The reader's own library: everything they have tracked, grouped and filtered.
+///
+/// Which half of it is on screen is chosen at the head of the list, and how it
+/// is broken up in the capsule at its foot — see ``LibraryHalfPicker`` and
+/// ``EventListMenu``.
 struct EventsView: View {
     @Environment(EventStore.self) private var store
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
@@ -38,13 +42,7 @@ struct EventsView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if groups.isEmpty {
-                    emptyState
-                } else {
-                    list
-                }
-            }
+            list
             .washBackground()
             .navigationTitle("My Events")
             .navigationSubtitle(subtitle)
@@ -53,10 +51,8 @@ struct EventsView: View {
             // what is selected can stand where the thumb already is.
             .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
             .toolbar {
-                EventListToolbar(filter: $filter, grouping: $grouping,
-                                 isSelecting: $isSelecting,
-                                 counts: { $0.rows(of: library).count },
-                                 canSelect: eventCount > 0)
+                PencilToolbar(isSelecting: $isSelecting, title: "Select Events",
+                              canSelect: eventCount > 0)
                 if isSelecting {
                     SelectionToolbar(
                         isEverythingSelected: selection == shownIDs,
@@ -99,6 +95,23 @@ struct EventsView: View {
 
     private var list: some View {
         List(selection: $selection) {
+            // A section of its own with no gap after it, as Following's chips
+            // have: the gap a month opens with is for the month before it.
+            // Held still while picking, for the reason the capsule is put away.
+            Section {
+                LibraryHalfPicker(filter: $filter)
+                    .disabled(isSelecting)
+                    .padding(.horizontal, 20)
+                    .headRow(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
+            }
+            .listSectionSpacing(0)
+
+            if groups.isEmpty {
+                emptyState
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                    .headRow()
+            }
             ForEach(groups) { group in
                 Section {
                     ForEach(group.events) { event in
@@ -154,6 +167,14 @@ struct EventsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        // Drawn here rather than by the tab, inside the room the capsule
+        // leaves, so a notice stands above the capsule rather than over it.
+        .refreshNotices(aboveBar: true)
+        // Over the tab bar, in the middle, as Following's stands. Put away
+        // while picking, when the bottom of the screen is the selection's.
+        .safeAreaInset(edge: .bottom) {
+            if !isSelecting, !groups.isEmpty { EventListMenu(grouping: $grouping) }
+        }
         .monthSections()
         .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
     }
@@ -216,6 +237,17 @@ struct EventsView: View {
         } description: {
             Text("Events you track appear here. Find them in Search.")
         }
+    }
+}
+
+private extension View {
+    /// A row of the list that is not an event: no background, no separator,
+    /// and nothing to pick while events are being picked.
+    func headRow(_ insets: EdgeInsets = EdgeInsets()) -> some View {
+        listRowInsets(insets)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .selectionDisabled()
     }
 }
 

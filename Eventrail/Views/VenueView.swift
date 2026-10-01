@@ -115,9 +115,16 @@ struct VenueView: View {
             .padding(.bottom, 32)
         }
         .washBackground()
+        // Inside the page, so the notice stands above its bar rather than
+        // over it — see ``refreshNotices(aboveBar:showing:)``.
+        .refreshNotices(aboveBar: true)
         // An imported name, shown in the language Eventernote published it in.
         .navigationTitle(Text(verbatim: link.name))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { actionBar }
+        // The bar takes the foot of the screen over, as an event's sheet
+        // has it: the tab bar stands down while the page is up.
+        .toolbar(.hidden, for: .tabBar)
         .eventSheet($openEvent)
         .task { await open() }
         // The page's own, so a hall reached from the Following tab does not
@@ -278,7 +285,6 @@ struct VenueView: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if let profile { actions(for: profile) }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
@@ -302,35 +308,36 @@ struct VenueView: View {
         }
     }
 
-    private func actions(for profile: VenueProfile) -> some View {
-        HStack(spacing: 9) {
-            Button {
-                VenueDirections.open(profile.name, at: place, directions: true, with: openURL)
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Directions")
-                }
-                .font(.system(size: 14.5, weight: .semibold))
-                .foregroundStyle(Color.brandTint)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .glassCapsule(interactive: true)
+    // MARK: - Actions
 
-            ShareLink(item: profile.pageURL) {
-                Text("Share")
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundStyle(Color.brandTint)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
+    /// What the reader can do with the hall, in a bar along the bottom of the
+    /// page as an event's sheet has one: the way there, the page shared, and
+    /// the page on Eventernote. One capsule at the leading edge, with the
+    /// space beside it left empty for the page to show through.
+    ///
+    /// Only once the hall's page is found: a name the site files no hall
+    /// under has no page to share or open.
+    @ToolbarContentBuilder
+    private var actionBar: some ToolbarContent {
+        if let profile {
+            ToolbarItemGroup(placement: .bottomBar) {
+                Button {
+                    VenueDirections.open(profile.name, at: place, directions: true, with: openURL)
+                } label: {
+                    Label("Directions", systemImage: "location.fill")
+                }
+                .tint(.brandTint)
+
+                ShareLink(item: profile.pageURL)
+                    .tint(.brandTint)
+
+                Link(destination: profile.pageURL) {
+                    Label("Open in Eventernote", systemImage: "safari")
+                }
+                .tint(.brandTint)
             }
-            .buttonStyle(.plain)
-            .glassCapsule(interactive: true)
+            ToolbarSpacer(.flexible, placement: .bottomBar)
         }
-        .padding(.top, 3)
     }
 
     // MARK: - What the hall publishes about itself
@@ -496,7 +503,6 @@ struct VenueView: View {
                 RefreshFailureNote(message: refreshFailure)
                     .padding(.horizontal, 18)
             }
-            openInEventernote
             footnote
         }
     }
@@ -624,14 +630,6 @@ struct VenueView: View {
     }
 
     // MARK: - Provenance
-
-    @ViewBuilder
-    private var openInEventernote: some View {
-        if let profile {
-            ExternalLinkPanel(title: "Open venue on Eventernote", destination: profile.pageURL)
-                .padding(.horizontal, 18)
-        }
-    }
 
     private var footnote: some View {
         Footnote(Text("Venue details and events come from publicly accessible Eventernote pages. The map is drawn from the published address — nothing is written back."))

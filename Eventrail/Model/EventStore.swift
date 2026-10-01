@@ -16,15 +16,6 @@ enum LibraryFilter: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// The glyph beside the option in the Filter menu: a plain clock for what
-    /// is ahead, the rewound one for what has already happened.
-    var symbol: String {
-        switch self {
-        case .upcoming: "clock"
-        case .past: "clock.arrow.trianglehead.counterclockwise.rotate.90"
-        }
-    }
-
     /// This half of a list, in the order this half is read in: what is coming
     /// runs towards the reader, what has happened runs away from them.
     ///
@@ -58,7 +49,8 @@ enum Grouping: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// The glyph beside the option in the Sort menu.
+    /// The glyph beside the option in the Sort menu at the foot of an event
+    /// list.
     var symbol: String {
         switch self {
         case .date: "calendar"

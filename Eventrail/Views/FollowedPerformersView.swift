@@ -60,8 +60,8 @@ struct FollowedPerformersView: View {
         .navigationSubtitle(subtitle)
         .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
         .toolbar {
-            PerformerListToolbar(isSelecting: $isSelecting,
-                                 canSelect: !performers.isEmpty)
+            PencilToolbar(isSelecting: $isSelecting, title: "Select Performers",
+                          canSelect: !performers.isEmpty)
             if isSelecting {
                 SelectionToolbar(
                     isEverythingSelected: selection == allIDs,

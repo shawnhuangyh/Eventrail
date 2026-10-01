@@ -1,5 +1,7 @@
 import CryptoKit
+import ImageIO
 import UIKit
+import UniformTypeIdentifiers
 
 /// Event flyers and the linked account's picture, kept on this device once
 /// downloaded.
@@ -118,6 +120,46 @@ actor ImageCache {
             return image
         }
         return await join(url) { await self.load(url, checkedSince: checkedSince) }
+    }
+
+    /// The image at `url` as a file of its own, the host's bytes as sent,
+    /// named `name` with the extension those bytes call for — what Quick Look
+    /// and the share sheet are handed, since both go by a file's name and kind
+    /// and the copy kept here has neither. Fetched first as
+    /// ``image(for:checkedSince:)`` would, and nil where no copy can be had.
+    ///
+    /// Written into the temporary directory, one folder per image, and
+    /// written again each time: the flyer and the name may both have changed.
+    func file(for url: URL, named name: String, checkedSince: Date? = nil) async -> URL? {
+        _ = await image(for: url, checkedSince: checkedSince)
+        let (stored, _) = paths(for: url)
+        guard let data = try? Data(contentsOf: stored) else { return nil }
+        let kind = CGImageSourceCreateWithData(data as CFData, nil)
+            .flatMap(CGImageSourceGetType)
+            .flatMap { UTType($0 as String) }
+        let fileExtension = kind?.preferredFilenameExtension
+            ?? (url.pathExtension.isEmpty ? "jpg" : url.pathExtension)
+        let folder = URL.temporaryDirectory.appending(path: "Flyers/\(stored.lastPathComponent)", directoryHint: .isDirectory)
+        let file = folder.appending(path: Self.fileName(name)).appendingPathExtension(fileExtension)
+        do {
+            try? FileManager.default.removeItem(at: folder)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: file, options: .atomic)
+            return file
+        } catch {
+            return nil
+        }
+    }
+
+    /// `name` as a file name: no slash or colon, and short enough in bytes
+    /// for the extension to fit after it.
+    private static func fileName(_ name: String) -> String {
+        var kept = ""
+        for character in name.replacing(/[\/:]/, with: "-").trimmingCharacters(in: .whitespacesAndNewlines) {
+            guard kept.utf8.count + character.utf8.count <= 200 else { break }
+            kept.append(character)
+        }
+        return kept.isEmpty ? "Flyer" : kept
     }
 
     /// Throws every copy away, from memory and from this device.

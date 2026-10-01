@@ -377,6 +377,28 @@
         }
       }
     },
+    "%lld of %@ so far" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %@（読み込み中）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %@（仍在读取）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %@（仍在讀取）"
+          }
+        }
+      }
+    },
     "%lld of %lld" : {
       "localizations" : {
         "ja" : {
@@ -483,6 +505,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 條跟蹤記錄"
+          }
+        }
+      }
+    },
+    "^[%lld area](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld地域"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个地区"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個地區"
           }
         }
       }
@@ -773,6 +817,28 @@
         }
       }
     },
+    "^[%lld result](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld件の結果"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個結果"
+          }
+        }
+      }
+    },
     "^[%lld result](inflect: true) on Eventernote" : {
       "localizations" : {
         "ja" : {
@@ -791,6 +857,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eventernote 上有 %lld 個結果"
+          }
+        }
+      }
+    },
+    "^[%lld result](inflect: true) read so far. The rest may hold more." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これまでに%lld件の結果を読み込みました。残りにも該当するものがあるかもしれません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已读取 %lld 个结果，其余结果中可能还有符合条件的活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已讀取 %lld 個結果，其餘結果中可能還有符合條件的活動。"
           }
         }
       }
@@ -1345,6 +1433,28 @@
         }
       }
     },
+    "Anywhere" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての地域"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有地区"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有地區"
+          }
+        }
+      }
+    },
     "App Language" : {
       "localizations" : {
         "ja" : {
@@ -1473,6 +1583,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；日本和中國大陸以外的場館則不會被定位。開啟「用 OpenStreetMap 細化位置」後，會定位到具體建築，也會定位這些海外場館。"
+          }
+        }
+      }
+    },
+    "Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地域"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地区"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地區"
           }
         }
       }
@@ -2049,6 +2181,28 @@
         }
       }
     },
+    "Couldn't Save the Flyer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フライヤーを保存できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法存储海报"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存海報"
+          }
+        }
+      }
+    },
     "Couldn't Start the Live Activity" : {
       "localizations" : {
         "ja" : {
@@ -2155,50 +2309,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "日期"
-          }
-        }
-      }
-    },
-    "Date range" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "期間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "日期范围"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "日期範圍"
-          }
-        }
-      }
-    },
-    "Date Range" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "期間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "日期范围"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "日期範圍"
           }
         }
       }
@@ -3061,6 +3171,28 @@
         }
       }
     },
+    "Eventrail isn't allowed to add to your photos. You can allow it in Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrailには写真への追加が許可されていません。設定で許可できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 未获准向“照片”添加内容。你可以在“设置”中允许。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 未獲准將內容加入「照片」。你可以在「設定」中允許。"
+          }
+        }
+      }
+    },
     "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
       "localizations" : {
         "ja" : {
@@ -3413,24 +3545,24 @@
         }
       }
     },
-    "Filter Dates" : {
+    "Filter and Sort" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日付を絞り込む"
+            "value" : "絞り込みと並べ替え"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "筛选日期"
+            "value" : "筛选与排序"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "篩選日期"
+            "value" : "篩選與排序"
           }
         }
       }
@@ -3563,28 +3695,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "關注"
-          }
-        }
-      }
-    },
-    "Following keeps a performer with your library. It is private to you and never written back to Eventernote." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "フォローした出演者はライブラリに保存されます。自分だけに表示され、Eventernoteには書き込まれません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关注会将艺人保存在你的资料库中。这些信息仅你可见，绝不会写回 Eventernote。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "關注會將藝人儲存在你的資料庫中。這些資訊僅你可見，絕不會寫回 Eventernote。"
           }
         }
       }
@@ -4184,6 +4294,28 @@
         }
       }
     },
+    "Keep Looking" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "さらに探す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续查找"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續查找"
+          }
+        }
+      }
+    },
     "Keep them" : {
       "localizations" : {
         "ja" : {
@@ -4202,28 +4334,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保留"
-          }
-        }
-      }
-    },
-    "Kept with your library and private to you. Your Eventernote favourites are untouched." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ライブラリに保存され、自分だけに表示されます。Eventernoteのお気に入りは変更されません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "随资料库保存，仅你可见。不会更改你的 Eventernote 收藏。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "隨資料庫儲存，僅你可見。不會更改你的 Eventernote 收藏。"
           }
         }
       }
@@ -4910,6 +5020,116 @@
         }
       }
     },
+    "Newest First" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい順"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新优先"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新優先"
+          }
+        }
+      }
+    },
+    "Next 3 Months" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3か月以内"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 个月内"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 個月內"
+          }
+        }
+      }
+    },
+    "Next 30 Days" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30日以内"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 天内"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 天內"
+          }
+        }
+      }
+    },
+    "Next 6 Months" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6か月以内"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 个月内"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 個月內"
+          }
+        }
+      }
+    },
+    "Next 7 Days" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7日以内"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天内"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天內"
+          }
+        }
+      }
+    },
     "No Dates Published" : {
       "localizations" : {
         "ja" : {
@@ -5042,6 +5262,28 @@
         }
       }
     },
+    "No Matching Events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該当するイベントはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有符合条件的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有符合條件的活動"
+          }
+        }
+      }
+    },
     "No Past Events" : {
       "localizations" : {
         "ja" : {
@@ -5064,24 +5306,24 @@
         }
       }
     },
-    "No published date falls in the dates and areas you picked. Nothing has been removed — widen the filter to see the rest." : {
+    "No published date matches the filter. Nothing has been removed — widen it to see the rest." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選択した期間と地域に該当する公開日程はありません。何も削除されていません。フィルターを広げると残りを表示できます。"
+            "value" : "絞り込みの条件に合う日程はありません。何も削除されていません。条件を広げると残りが表示されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已发布的日期中没有符合所选日期和地区的活动。没有内容被移除——扩大筛选范围即可查看其余内容。"
+            "value" : "没有符合筛选条件的日程。没有删除任何内容，放宽条件即可看到其余日程。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已發布的日期中沒有符合所選日期和地區的活動。沒有內容被移除——擴大篩選範圍即可檢視其餘內容。"
+            "value" : "沒有符合篩選條件的日程。沒有刪除任何內容，放寬條件即可看到其餘日程。"
           }
         }
       }
@@ -5328,24 +5570,24 @@
         }
       }
     },
-    "Nothing in That Range" : {
+    "Nothing Eventernote found for this search falls within the filter. Widen it to see the rest." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "指定範囲にありません"
+            "value" : "この検索でEventernoteから見つかったイベントは、どれも絞り込みの条件に合いません。条件を広げると残りが表示されます。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "该范围内没有内容"
+            "value" : "Eventernote 为这次搜索找到的活动都不符合筛选条件。放宽条件即可看到其余活动。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "該範圍內沒有內容"
+            "value" : "Eventernote 為這次搜尋找到的活動都不符合篩選條件。放寬條件即可看到其餘活動。"
           }
         }
       }
@@ -5592,6 +5834,28 @@
         }
       }
     },
+    "Oldest First" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "古い順"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最早优先"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最早優先"
+          }
+        }
+      }
+    },
     "On now" : {
       "localizations" : {
         "ja" : {
@@ -5680,28 +5944,6 @@
         }
       }
     },
-    "Open performer on Eventernote" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "出演者をEventernoteで開く"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打开艺人"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打開藝人"
-          }
-        }
-      }
-    },
     "Open Settings" : {
       "localizations" : {
         "ja" : {
@@ -5746,28 +5988,6 @@
         }
       }
     },
-    "Open venue on Eventernote" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "会場をEventernoteで開く"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打开场馆"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Eventernote 中打開場館"
-          }
-        }
-      }
-    },
     "Opens the event" : {
       "localizations" : {
         "ja" : {
@@ -5786,6 +6006,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打開活動"
+          }
+        }
+      }
+    },
+    "Opens the flyer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フライヤーを開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开海报"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開海報"
           }
         }
       }
@@ -5940,6 +6182,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中國大陸以外"
+          }
+        }
+      }
+    },
+    "Overseas" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海外"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海外"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海外"
           }
         }
       }
@@ -6120,28 +6384,6 @@
         }
       }
     },
-    "Pick none and every area is shown. Areas are Eventernote's own, read from each venue's page — a venue it files under no area counts as Not Placed." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "何も選ばない場合はすべての地域を表示します。地域は各会場ページから読み取ったEventernote独自の分類です。地域に分類されていない会場は「地域不明」に含まれます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不选择任何地区时会显示全部。地区采用 Eventernote 自有分类，从各场馆页面读取——未归入任何地区的场馆会计入“未归类”。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不選擇任何地區時會顯示全部。地區採用 Eventernote 自有分類，從各場館頁面讀取——未歸入任何地區的場館會計入“未歸類”。"
-          }
-        }
-      }
-    },
     "Pick up where you left off" : {
       "localizations" : {
         "ja" : {
@@ -6292,28 +6534,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在讀取其活動…"
-          }
-        }
-      }
-    },
-    "Reading these venues from Eventernote…" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventernoteから会場を読み込み中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在从 Eventernote 读取这些场馆…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在從 Eventernote 讀取這些場館…"
           }
         }
       }
@@ -6930,6 +7150,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "與 App 語言相同"
+          }
+        }
+      }
+    },
+    "Save to Photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真に保存"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储到“照片”"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存到「照片」"
           }
         }
       }
@@ -7616,24 +7858,24 @@
         }
       }
     },
-    "Sort and filter events" : {
+    "Sort events" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "イベントを並べ替え・絞り込み"
+            "value" : "イベントを並べ替え"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排序和筛选活动"
+            "value" : "排序活动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "排序和篩選活動"
+            "value" : "排序活動"
           }
         }
       }
@@ -9156,28 +9398,6 @@
         }
       }
     },
-    "Venues Eventernote files under no area, or none it published" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventernoteで地域が設定されていない、または地域が公開されていない会場"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventernote 未归入任何地区或未发布地区的场馆"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eventernote 未歸入任何地區或未發布地區的場館"
-          }
-        }
-      }
-    },
     "Venues visited" : {
       "localizations" : {
         "ja" : {
@@ -9350,28 +9570,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間"
-          }
-        }
-      }
-    },
-    "Where" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "場所"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地点"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地點"
           }
         }
       }

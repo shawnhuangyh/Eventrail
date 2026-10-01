@@ -115,6 +115,7 @@ struct SettingsView: View {
         // A sheet over the root, so it draws its own — the venue refresh on
         // the screen pushed from Advanced would otherwise report behind it.
         .refreshNotices()
+        .refreshNoticesInSheet()
     }
 
     // MARK: - The shape of the screen
