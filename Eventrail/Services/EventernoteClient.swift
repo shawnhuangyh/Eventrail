@@ -59,11 +59,18 @@ nonisolated struct EventernoteClient: Sendable {
 
     // MARK: - Searching
 
-    func searchEvents(keyword: String, page: Int = 1) async throws -> EventernotePage<Event> {
-        let html = try await html(
-            at: "/events/search",
-            query: ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)"]
-        )
+    /// Events matching `keyword` in date order, in one of the site's areas
+    /// where `areaID` names one — see ``SearchFilter``.
+    ///
+    /// The order is always asked for by name, newest first included, rather
+    /// than left to the site's default: the Search tab's own narrowing leans on
+    /// the listing being in date order.
+    func searchEvents(keyword: String, areaID: Int? = nil, order: SearchOrder = .newestFirst,
+                      page: Int = 1) async throws -> EventernotePage<Event> {
+        var query = ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)",
+                     "sort": "event_date", "order": order.order]
+        if let areaID { query["area_id"] = "\(areaID)" }
+        let html = try await html(at: "/events/search", query: query)
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 

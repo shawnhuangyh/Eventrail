@@ -1,40 +1,39 @@
 import SwiftUI
 
-/// The capsule every list screen carries in its navigation bar: what the list
-/// is showing, and the way into changing it.
+/// The capsule over the foot of a list, holding one menu — the ways the list
+/// can be narrowed or put in order, as the system's own lists keep theirs. Over
+/// the tab bar on a tab, over the search field on Search, in the middle.
 ///
-/// Only one word stands in it — whichever choice names the list best — with the
-/// sort arrows beside it. Naming both choices put two words in a capsule that
-/// has to sit next to a button.
-struct ListMenu<Content: View>: View {
-    /// The choice the capsule spells out: the filter where a screen has one,
-    /// the sort order where it does not.
-    let label: Text
+/// The face is the caller's: it says what the list is held to now, so a short
+/// list is never a mystery. Everything else — the type, the glass, the room
+/// round it and the order the menu opens in — is the same on every list.
+struct ListMenu<Content: View, Face: View>: View {
     /// What the reader is choosing about, for VoiceOver.
     let describes: LocalizedStringKey
+    /// What the list is held to now, for VoiceOver.
+    let value: Text
     @ViewBuilder var content: Content
+    @ViewBuilder var face: Face
 
     var body: some View {
         Menu {
             content
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 13, weight: .medium))
-                label
-                    .font(.system(size: 13.5, weight: .semibold))
-                Circle()
-                    .fill(.tertiary)
-                    .frame(width: 3.5, height: 3.5)
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
+            face
+                .font(.system(size: 15, weight: .semibold))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .contentShape(.capsule)
         }
+        .buttonStyle(.plain)
+        // In the order written, whichever way the menu opens: it opens upwards
+        // from here, and would otherwise turn its sections over.
+        .menuOrder(.fixed)
+        .glassCapsule(interactive: true)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
         .accessibilityLabel(describes)
+        .accessibilityValue(value)
     }
 }
 
@@ -87,11 +86,16 @@ struct EventListToolbar: ToolbarContent {
         }
     }
 
+    /// The capsule in the navigation bar: what the list is showing, and the
+    /// way into changing it. Only one word stands in it — the filter, which
+    /// names the list best — with the sort arrows beside it. Naming both
+    /// choices put two words in a capsule that has to sit next to a button.
+    ///
     /// Sort stands above Filter because it is the choice the reader revisits:
     /// which half of the list is on screen changes rarely, how it is broken up
     /// changes with the task.
     private var menu: some View {
-        ListMenu(label: Text(filter.label), describes: "Sort and filter events") {
+        Menu {
             Section("Sort") {
                 ForEach(Grouping.allCases) { option in
                     Toggle(isOn: menuChoice($grouping, option)) {
@@ -112,7 +116,24 @@ struct EventListToolbar: ToolbarContent {
                     }
                 }
             }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 13, weight: .medium))
+                Text(filter.label)
+                    .font(.system(size: 13.5, weight: .semibold))
+                Circle()
+                    .fill(.tertiary)
+                    .frame(width: 3.5, height: 3.5)
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
+        .accessibilityLabel("Sort and filter events")
     }
 }
 

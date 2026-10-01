@@ -4,9 +4,10 @@ import SwiftUI
 /// The parts of the country Eventernote files its venues under.
 ///
 /// The site's own areas, read off the `area_id` facet its event search offers,
-/// so narrowing by area here answers the way narrowing there would. Only the
-/// grouping is borrowed: the app never asks the site to filter for it, because
-/// a followed performer's listing takes no area of its own.
+/// so narrowing by area here answers the way narrowing there would. On the
+/// Following tab only the grouping is borrowed, because a followed performer's
+/// listing takes no area of its own; the Search tab, whose listing does, asks
+/// the site for one by ``areaID`` instead — see ``SearchFilter``.
 ///
 /// The whole of that facet, as the `<select name="area_id">` on `/events`
 /// spells it, so nobody has to fetch the page again to check a case against it:
@@ -60,6 +61,18 @@ enum Region: String, CaseIterable, Identifiable, Hashable {
         case .tokai: "Nagoya, Shizuoka, Gifu and Mie"
         case .north: "Hokkaidō, Tōhoku, Kōshin and Hokuriku"
         case .west: "Chūgoku, Shikoku, Kyūshū and Okinawa"
+        }
+    }
+
+    /// The site's own number for the area, from the table above — what its
+    /// event search is handed as `area_id`.
+    nonisolated var areaID: Int {
+        switch self {
+        case .kanto: 1
+        case .kansai: 2
+        case .tokai: 3
+        case .north: 4
+        case .west: 5
         }
     }
 

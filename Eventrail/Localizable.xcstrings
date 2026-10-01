@@ -377,6 +377,28 @@
         }
       }
     },
+    "%lld of %@ so far" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %@（読み込み中）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %@（仍在读取）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %@（仍在讀取）"
+          }
+        }
+      }
+    },
     "%lld of %lld" : {
       "localizations" : {
         "ja" : {
@@ -773,6 +795,28 @@
         }
       }
     },
+    "^[%lld result](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld件の結果"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個結果"
+          }
+        }
+      }
+    },
     "^[%lld result](inflect: true) on Eventernote" : {
       "localizations" : {
         "ja" : {
@@ -791,6 +835,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eventernote 上有 %lld 個結果"
+          }
+        }
+      }
+    },
+    "^[%lld result](inflect: true) read so far. The rest may hold more." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これまでに%lld件の結果を読み込みました。残りにも該当するものがあるかもしれません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已读取 %lld 个结果，其余结果中可能还有符合条件的活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已讀取 %lld 個結果，其餘結果中可能還有符合條件的活動。"
           }
         }
       }
@@ -1345,6 +1411,28 @@
         }
       }
     },
+    "Anywhere" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての地域"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有地区"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有地區"
+          }
+        }
+      }
+    },
     "App Language" : {
       "localizations" : {
         "ja" : {
@@ -1473,6 +1561,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple 地圖由當地服務商提供，幾乎不收錄境外場館，因此搜尋日本的場館常常一無所獲。這類場館會轉由地址檢索定位，但只能精確到街區；日本和中國大陸以外的場館則不會被定位。開啟「用 OpenStreetMap 細化位置」後，會定位到具體建築，也會定位這些海外場館。"
+          }
+        }
+      }
+    },
+    "Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地域"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地区"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地區"
           }
         }
       }
@@ -3479,6 +3589,28 @@
         }
       }
     },
+    "Filter and Sort" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絞り込みと並べ替え"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "筛选与排序"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "篩選與排序"
+          }
+        }
+      }
+    },
     "Find your account" : {
       "localizations" : {
         "ja" : {
@@ -4206,6 +4338,28 @@
         }
       }
     },
+    "Keep Looking" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "さらに探す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续查找"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續查找"
+          }
+        }
+      }
+    },
     "Keep them" : {
       "localizations" : {
         "ja" : {
@@ -4910,6 +5064,28 @@
         }
       }
     },
+    "Newest First" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい順"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新优先"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新優先"
+          }
+        }
+      }
+    },
     "No Dates Published" : {
       "localizations" : {
         "ja" : {
@@ -5038,6 +5214,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不匹配"
+          }
+        }
+      }
+    },
+    "No Matching Events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該当するイベントはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有符合条件的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有符合條件的活動"
           }
         }
       }
@@ -5350,6 +5548,28 @@
         }
       }
     },
+    "Nothing Eventernote found for this search falls within the filter. Widen it to see the rest." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この検索でEventernoteから見つかったイベントは、どれも絞り込みの条件に合いません。条件を広げると残りが表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 为这次搜索找到的活动都不符合筛选条件。放宽条件即可看到其余活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 為這次搜尋找到的活動都不符合篩選條件。放寬條件即可看到其餘活動。"
+          }
+        }
+      }
+    },
     "Nothing is overwritten" : {
       "localizations" : {
         "ja" : {
@@ -5588,6 +5808,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "好"
+          }
+        }
+      }
+    },
+    "Oldest First" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "古い順"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最早优先"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最早優先"
           }
         }
       }
@@ -5918,6 +6160,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中國大陸以外"
+          }
+        }
+      }
+    },
+    "Overseas" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海外"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海外"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海外"
           }
         }
       }
