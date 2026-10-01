@@ -123,6 +123,9 @@ struct EventPassportView: View {
                     PassportEventsCard(stats: stats)
                     timeCard(stats)
                     if !stats.topLotteries.isEmpty { lotteryCard(stats) }
+                    if !stats.tickets.isEmpty {
+                        PassportSpendingCard(stats: stats) { openEvent = $0 }
+                    }
                     if !stats.topPerformers.isEmpty { performersCard(stats) }
                     if !stats.topVenues.isEmpty { venuesCard(stats) }
                 }
@@ -483,27 +486,8 @@ struct EventPassportView: View {
         return cell(DurationLabel(seconds: seconds), label: "Avg. Time", isFirst: false)
     }
 
-    /// One of the four readings under the total. Ruled off from nothing: four
-    /// figures under one number are four ways of saying it, and a rule between
-    /// them reads as a boundary that isn't there.
     private func cell(_ value: some View, label: LocalizedStringKey, isFirst: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            value
-                .font(.system(size: 16, weight: .bold))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            // No shrink-to-fit: all four labels are a word or two, and a
-            // label drawn a point smaller than the three beside it reads as a
-            // mistake rather than as a fit.
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, isFirst ? 0 : 14)
-        .accessibilityElement(children: .combine)
+        passportReading(value, label: label, leading: isFirst ? 0 : 14)
     }
 
     // MARK: - The briefest night and the longest
@@ -713,6 +697,34 @@ struct EventPassportView: View {
         placings = VenuePlaces.shared.mapItems(for: attended)
     }
 
+}
+
+/// One of the readings under a card's total. Ruled off from nothing: four
+/// figures under one number are four ways of saying it, and a rule between
+/// them reads as a boundary that isn't there.
+///
+/// `leading` is the gap before it — none for the first, and a little less on
+/// the spending card, whose four prices are wider than four counts.
+private func passportReading(
+    _ value: some View, label: LocalizedStringKey, leading: CGFloat
+) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+        value
+            .font(.system(size: 16, weight: .bold))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+        // No shrink-to-fit: all four labels are a word or two, and a
+        // label drawn a point smaller than the three beside it reads as a
+        // mistake rather than as a fit.
+        Text(label)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.leading, leading)
+    .accessibilityElement(children: .combine)
 }
 
 /// A length of time, drawn the way the headline over it is: the figures in the
@@ -1246,6 +1258,520 @@ private struct PassportLotterySheet: View {
         .washBackground()
         .presentationDetents([.medium, .large])
         .eventSheet($openEvent)
+    }
+}
+
+// MARK: - What the reader paid
+
+/// What the reader paid for the nights they went to, and for which seats.
+///
+/// Counted, like the lottery card, from something they typed: every figure is
+/// over the nights a price was written on — ``PassportStats/tickets`` — and a
+/// night left blank is left out rather than read as free.
+///
+/// Its own type, as the events card is, because the seat-type filter over its
+/// two ends is state of its own — and, like the cadence there, deliberately
+/// not remembered between visits.
+private struct PassportSpendingCard: View {
+    let stats: PassportStats
+    /// Opens a night on the screen's own event sheet.
+    let open: (Event) -> Void
+
+    /// The class the dearest and cheapest are read over; nil for every ticket.
+    @State private var seatFilter: String?
+    @State private var isShowingTickets = false
+
+    /// The chosen class, unless the year filter has just taken it away
+    /// underneath the reader.
+    private var filter: String? {
+        stats.ticketTypes.contains { $0.seatClass == seatFilter } ? seatFilter : nil
+    }
+
+    /// The tickets the two ends are read off, dearest first.
+    private var filtered: [PassportStats.Ticket] {
+        guard let filter else { return stats.tickets }
+        return stats.tickets.filter { $0.seatClass == filter }
+    }
+
+    var body: some View {
+        let styles = SeatStyle.styles(for: stats.ticketTypes)
+        VStack(alignment: .leading, spacing: 14) {
+            CardHeader(title: "Ticket Spending")
+            headline
+
+            HStack(spacing: 0) {
+                passportReading(Text(stats.tickets.count.formatted()),
+                                label: "Tickets", leading: 0)
+                passportReading(Text(yen(stats.averageTicketPrice)),
+                                label: "Avg. Price", leading: 10)
+                passportReading(Text(yen(stats.highestTicketPrice)),
+                                label: "Highest", leading: 10)
+                passportReading(Text(yen(stats.lowestTicketPrice)),
+                                label: "Lowest", leading: 10)
+            }
+
+            types(styles)
+            // Two tickets before there are two ends, for the reason the time
+            // card waits for two timed nights.
+            if stats.tickets.count >= 2 { extremes(styles) }
+        }
+        .padding(16)
+        .glassPanel(cornerRadius: 28)
+        .sheet(isPresented: $isShowingTickets) {
+            PassportTicketSheet(tickets: filtered, styles: styles,
+                                seatType: filter.map { styles[$0].label })
+        }
+    }
+
+    /// The total, its ¥ dimmed in front of it the way the time card dims its
+    /// units after.
+    private var headline: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(verbatim: "¥")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(.tertiary)
+            Text(stats.ticketSpending.formatted())
+                .font(.system(size: 40, weight: .bold))
+                .kerning(-1.4)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: yen(stats.ticketSpending)))
+    }
+
+    // MARK: By the class of seat
+
+    /// Where the money went: one bar split by how many tickets each class
+    /// took, then each class with what it cost on one scale, so an S seat and
+    /// a general seat can be read against each other.
+    private func types(_ styles: SeatStyles) -> some View {
+        let axis = priceAxis
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("By Ticket Type")
+                .font(.system(size: 15.5, weight: .bold))
+
+            PassportShareBar(parts: stats.ticketTypes.map {
+                PassportShareBar.Part(count: $0.count, color: styles[$0.seatClass].color)
+            })
+
+            ForEach(stats.ticketTypes) { type in
+                PassportTicketTypeRow(type: type, style: styles[type.seatClass],
+                                      total: stats.tickets.count, axis: axis)
+            }
+
+            if let axis {
+                HStack {
+                    Text(verbatim: yen(axis.lowerBound))
+                    Spacer(minLength: 8)
+                    Text(verbatim: yen(axis.upperBound))
+                }
+                .font(.system(size: 9.5, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+                .padding(.top, 8)
+                .overlay(alignment: .top) {
+                    HorizontalRule()
+                        .stroke(.quaternary, style: StrokeStyle(lineWidth: 0.5, dash: [3, 2]))
+                        .frame(height: 0.5)
+                }
+                .padding(.leading, 30)
+                .padding(.top, -4)
+            }
+        }
+        .padding(.top, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    /// The cheapest ticket to the dearest, which every class's range is drawn
+    /// on. Nil where every ticket cost the same: a scale with one point on it
+    /// puts every dot in one place and says nothing the averages do not.
+    private var priceAxis: ClosedRange<Int>? {
+        guard let lowest = stats.lowestTicketPrice, let highest = stats.highestTicketPrice,
+              highest > lowest else { return nil }
+        return lowest ... highest
+    }
+
+    // MARK: The dearest and the cheapest
+
+    private func extremes(_ styles: SeatStyles) -> some View {
+        let tickets = filtered
+        return VStack(alignment: .leading, spacing: 14) {
+            if stats.ticketTypes.count > 1 { chips(styles) }
+
+            if let dearest = tickets.first {
+                end(tickets.count > 1 ? "Highest Price" : "Price",
+                    ticket: dearest, of: tickets, styles: styles)
+            }
+            if tickets.count > 1, let cheapest = tickets.last {
+                end("Lowest Price", ticket: cheapest, of: tickets, styles: styles)
+                    .padding(.top, 14)
+                    .overlay(alignment: .top) { Divider() }
+            }
+        }
+        .padding(.top, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    /// Tinted rather than filled, as the cadence chips on the events card are,
+    /// and each with its class's dot so a chip reads as the row above it.
+    private func chips(_ styles: SeatStyles) -> some View {
+        FlowLayout(spacing: 6) {
+            Text("Seat Type")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.trailing, 2)
+            chip(nil, label: Text("All"), color: .brandTint)
+            ForEach(stats.ticketTypes) { type in
+                let style = styles[type.seatClass]
+                chip(type.seatClass, label: style.label, color: style.color)
+            }
+        }
+    }
+
+    private func chip(_ seatClass: String?, label: Text, color: Color) -> some View {
+        let isOn = filter == seatClass
+        return Button {
+            withAnimation(.snappy) { seatFilter = seatClass }
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 7, height: 7)
+                label
+                    .lineLimit(1)
+            }
+            .font(.system(size: 12.5, weight: .semibold))
+            .foregroundStyle(isOn ? color : .secondary)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background {
+                if isOn { Capsule().fill(color.opacity(0.15)) }
+            }
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+
+    /// One end of the filtered tickets, with a See All to the rest of them
+    /// once there are more than the two ends show.
+    private func end(
+        _ title: LocalizedStringKey, ticket: PassportStats.Ticket,
+        of tickets: [PassportStats.Ticket], styles: SeatStyles
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title)
+                    .font(.system(size: 15.5, weight: .bold))
+                Spacer(minLength: 8)
+                if tickets.count > 2 {
+                    Button { isShowingTickets = true } label: { SeeAllLabel() }
+                        .buttonStyle(.plain)
+                }
+            }
+            Button { open(ticket.event) } label: {
+                PassportTicketRow(ticket: ticket, style: styles[ticket.seatClass])
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// An amount of yen as every price in the app is written, or a dash where
+/// there is none to write.
+private func yen(_ amount: Int?) -> String {
+    amount.map { YenAmount().format($0) } ?? "—"
+}
+
+/// An average to the nearest yen: a ticket is never sold for a fraction of one.
+private func yen(_ amount: Double) -> String {
+    yen(Int(amount.rounded()))
+}
+
+/// How the card draws one class of seat: its name in the reader's language,
+/// the letter on its badge and its colour.
+private struct SeatStyle {
+    let label: Text
+    let badge: Text
+    let color: Color
+
+    /// The tickets that name no class: a dash rather than a letter, and grey,
+    /// since what they share is that nothing was written.
+    static let unspecified = SeatStyle(label: Text("Unspecified"),
+                                       badge: Text(verbatim: "–"),
+                                       color: Color(.systemGray2))
+
+    /// A style for every class in the slice.
+    ///
+    /// The three classes the ticket sheet offers keep one colour each whatever
+    /// the year, so an S seat is the same red on every slice. A class the
+    /// reader typed is named as typed, badged with its first letter, and given
+    /// the next of the spare colours in the order the card lists it.
+    static func styles(for types: [PassportStats.TicketType]) -> SeatStyles {
+        var styles: [String: SeatStyle] = [:]
+        var spare = 0
+        for type in types where !type.seatClass.isEmpty {
+            if let listed = SeatClass(rawValue: type.seatClass) {
+                styles[type.seatClass] = SeatStyle(label: Text(listed.label), badge: listed.badge,
+                                                   color: color(of: listed))
+            } else {
+                styles[type.seatClass] = SeatStyle(
+                    label: Text(verbatim: type.seatClass),
+                    badge: Text(verbatim: type.seatClass.prefix(1).uppercased()),
+                    color: spareColors[spare % spareColors.count])
+                spare += 1
+            }
+        }
+        return SeatStyles(styles: styles)
+    }
+
+    private static func color(of seatClass: SeatClass) -> Color {
+        switch seatClass {
+        case .s: .favorite
+        case .a: .trackTicket
+        case .general: .brandTint
+        }
+    }
+
+    private static let spareColors: [Color] = [.trackAttended, .indigo, .teal, .brown]
+}
+
+/// The styles of one slice's classes, read by the class as written.
+private struct SeatStyles {
+    let styles: [String: SeatStyle]
+
+    subscript(seatClass: String) -> SeatStyle { styles[seatClass] ?? .unspecified }
+}
+
+/// A class of seat's badge: its letter on its colour.
+private struct SeatBadge: View {
+    let style: SeatStyle
+
+    var body: some View {
+        style.badge
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: 22, height: 22)
+            .background(style.color, in: .circle)
+            .accessibilityHidden(true)
+    }
+}
+
+/// How many tickets each class took, as one bar split between them.
+private struct PassportShareBar: View {
+    struct Part {
+        let count: Int
+        let color: Color
+    }
+
+    let parts: [Part]
+
+    var body: some View {
+        GeometryReader { proxy in
+            // Every part gets a sliver first and shares the rest by count,
+            // so a class with one ticket in a hundred is still in the bar.
+            let gaps = CGFloat(max(0, parts.count - 1)) * 2
+            let free = max(0, proxy.size.width - gaps - CGFloat(parts.count) * 4)
+            let total = CGFloat(max(1, parts.reduce(0) { $0 + $1.count }))
+            HStack(spacing: 2) {
+                ForEach(parts.indices, id: \.self) { index in
+                    Rectangle()
+                        .fill(parts[index].color)
+                        .frame(width: 4 + free * CGFloat(parts[index].count) / total)
+                }
+            }
+        }
+        .frame(height: 10)
+        .clipShape(.capsule)
+        .accessibilityHidden(true)
+    }
+}
+
+/// One class of seat: how many tickets, their share, and what they cost —
+/// the spread on the card's one scale, with the average marked on it.
+private struct PassportTicketTypeRow: View {
+    let type: PassportStats.TicketType
+    let style: SeatStyle
+    /// Every ticket in the slice, which the share is taken of.
+    let total: Int
+    /// The scale the spread is drawn on; nil where there is none.
+    let axis: ClosedRange<Int>?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                SeatBadge(style: style)
+                style.label
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(type.count.formatted())
+                    .font(.system(size: 13, weight: .bold))
+                    .monospacedDigit()
+                Text((Double(type.count) / Double(max(1, total)))
+                        .formatted(.percent.precision(.fractionLength(0))))
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 34, alignment: .trailing)
+            }
+
+            if let axis {
+                PassportPriceRange(type: type, axis: axis, color: style.color)
+                    .padding(.leading, 30)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Avg. \(Text(verbatim: yen(type.average)).fontWeight(.semibold).foregroundStyle(.primary))")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                // One price is its own average, already printed beside it.
+                if type.highest > type.lowest {
+                    Text(verbatim: "\(yen(type.lowest))–\(yen(type.highest))")
+                }
+            }
+            .font(.system(size: 11.5))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.leading, 30)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A class's cheapest ticket to its dearest, as a span on the card's scale,
+/// and a dot at what an average one cost.
+private struct PassportPriceRange: View {
+    let type: PassportStats.TicketType
+    let axis: ClosedRange<Int>
+    let color: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            // Inset by the dot's radius at both ends, so the cheapest ticket
+            // and the dearest sit inside the track rather than half off it.
+            let inner = max(0, proxy.size.width - 10)
+            let low = fraction(type.lowest) * inner
+            let high = fraction(type.highest) * inner
+            let middle = proxy.size.height / 2
+            Capsule()
+                .fill(color.opacity(0.35))
+                .frame(width: high - low, height: proxy.size.height)
+                .position(x: 5 + (low + high) / 2, y: middle)
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+                .background {
+                    Circle()
+                        .fill(Color(.systemBackground).opacity(0.95))
+                        .frame(width: 14, height: 14)
+                }
+                .position(x: 5 + fraction(Int(type.average.rounded())) * inner, y: middle)
+        }
+        .frame(height: 6)
+        .background(Capsule().fill(.quaternary))
+        .accessibilityHidden(true)
+    }
+
+    private func fraction(_ price: Int) -> CGFloat {
+        CGFloat(price - axis.lowerBound) / CGFloat(axis.upperBound - axis.lowerBound)
+    }
+}
+
+/// A line along the middle of its frame, for the dashed rule over the scale.
+nonisolated private struct HorizontalRule: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        }
+    }
+}
+
+/// One ticket: its class, the night, and what it cost.
+///
+/// Its own type for the reason ``PassportSpanRow`` is: the card shows two and
+/// the sheet behind its See All shows the rest.
+private struct PassportTicketRow: View {
+    /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+    let ticket: PassportStats.Ticket
+    let style: SeatStyle
+
+    var body: some View {
+        HStack(spacing: 11) {
+            SeatBadge(style: style)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: ticket.event.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                Text(verbatim: "\(ticket.event.shown(on: timeDisplay).dayLine) · \(ticket.event.venue)")
+                    .font(.system(size: 11.5))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(verbatim: yen(ticket.price))
+                .font(.system(size: 15, weight: .bold))
+                .kerning(-0.3)
+                .monospacedDigit()
+        }
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Every ticket under the card's seat-type filter, dearest first, behind
+/// either See All.
+///
+/// A drawer with the rows ruled off, as ``PassportExtremesSheet`` draws its
+/// own: these are nights with a figure each, not a ranking with a bar.
+private struct PassportTicketSheet: View {
+    let tickets: [PassportStats.Ticket]
+    let styles: SeatStyles
+    /// The class the card was filtered to, named in the eyebrow; nil for all.
+    let seatType: Text?
+
+    @State private var openEvent: Event?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            PassportSheetHeader(eyebrow: eyebrow, title: "Ticket Prices")
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(tickets.enumerated()), id: \.element.id) { index, ticket in
+                        if index > 0 { Divider() }
+                        Button { openEvent = ticket.event } label: {
+                            PassportTicketRow(ticket: ticket, style: styles[ticket.seatClass])
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+            }
+        }
+        .washBackground()
+        .presentationDetents([.medium, .large])
+        .eventSheet($openEvent)
+    }
+
+    private var eyebrow: Text {
+        if let seatType {
+            Text("^[\(tickets.count) ticket](inflect: true) · \(seatType)")
+        } else {
+            Text("^[\(tickets.count) ticket](inflect: true)")
+        }
     }
 }
 

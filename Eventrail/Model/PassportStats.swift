@@ -115,6 +115,31 @@ nonisolated struct PassportStats {
         var id: Event.ID { event.id }
     }
 
+    /// One night the reader wrote a price on, and the class of seat it bought.
+    struct Ticket: Identifiable, Hashable {
+        let event: Event
+        let price: Int
+        /// ``Tracking/seatClass`` as written, trimmed; empty where it was not.
+        let seatClass: String
+
+        var id: Event.ID { event.id }
+    }
+
+    /// The tickets of one class of seat, and what they cost.
+    struct TicketType: Identifiable, Hashable {
+        /// The class as the reader wrote it — S席 as the chip wrote it, or
+        /// whatever they typed — and empty for the tickets that name none.
+        let seatClass: String
+        let count: Int
+        let spent: Int
+        let lowest: Int
+        let highest: Int
+
+        var id: String { seatClass }
+
+        var average: Double { Double(spent) / Double(count) }
+    }
+
     /// The scoped nights themselves, most recent first.
     let events: [Event]
     let totalEvents: Int
@@ -141,6 +166,11 @@ nonisolated struct PassportStats {
     let topPerformers: [Ranking]
     let topVenues: [Ranking]
     let topLotteries: [Lottery]
+    /// Every night with a price written on it, dearest first.
+    let tickets: [Ticket]
+    /// Those tickets by the class of seat they bought, most tickets first and
+    /// the ones that name no class last.
+    let ticketTypes: [TicketType]
     /// The briefest nights, briefest first, and the longest, longest first.
     let shortest: [Span]
     let longest: [Span]
@@ -173,6 +203,24 @@ nonisolated struct PassportStats {
     var averageLotteryEntries: Double {
         lotteryEvents > 0 ? Double(lotteryEntries) / Double(lotteryEvents) : 0
     }
+
+    // MARK: - Reading the cost back
+
+    /// What the reader paid, over the nights they wrote a price on.
+    ///
+    /// Every figure on the spending card is over ``tickets`` rather than over
+    /// the slice, for the reason the lottery figures are: a night with no
+    /// price written is not a free night — ``Tracking/cost`` keeps zero for
+    /// that — but a night nobody answered for.
+    var ticketSpending: Int { tickets.reduce(0) { $0 + $1.price } }
+
+    var averageTicketPrice: Double {
+        tickets.isEmpty ? 0 : Double(ticketSpending) / Double(tickets.count)
+    }
+
+    /// Read off the two ends of ``tickets``, which is already sorted by price.
+    var highestTicketPrice: Int? { tickets.first?.price }
+    var lowestTicketPrice: Int? { tickets.last?.price }
 
     // MARK: - Reading the library
 
@@ -244,6 +292,45 @@ nonisolated struct PassportStats {
             $0.entries == $1.entries ? $0.event.sortDate > $1.event.sortDate : $0.entries > $1.entries
         }
         lotteryEntries = lotteries.reduce(0) { $0 + $1.entries }
+
+        let tickets = events.compactMap { event -> Ticket? in
+            // Zero is a price — a seat won or given — and is counted; only a
+            // price never written leaves the night out.
+            let record = tracking(event)
+            guard let price = record.cost else { return nil }
+            return Ticket(event: event, price: price,
+                          seatClass: record.seatClass.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        // Equal prices fall back on the night, newest first, and then the id,
+        // so the dearest and the cheapest stay put across a redraw.
+        self.tickets = tickets.sorted {
+            if $0.price != $1.price { return $0.price > $1.price }
+            if $0.event.sortDate != $1.event.sortDate { return $0.event.sortDate > $1.event.sortDate }
+            return $0.event.id < $1.event.id
+        }
+        ticketTypes = Self.types(of: tickets)
+    }
+
+    /// Tickets gathered by the class they bought.
+    ///
+    /// Most tickets first, the way every other ranking on the screen runs, and
+    /// the dearer class first between two of a size. The tickets that name no
+    /// class go last whatever their number: they are the rest of the bar, not
+    /// a class of their own.
+    private static func types(of tickets: [Ticket]) -> [TicketType] {
+        Dictionary(grouping: tickets, by: \.seatClass)
+            .map { seatClass, tickets in
+                let prices = tickets.map(\.price)
+                return TicketType(seatClass: seatClass, count: tickets.count,
+                                  spent: prices.reduce(0, +),
+                                  lowest: prices.min() ?? 0, highest: prices.max() ?? 0)
+            }
+            .sorted {
+                if $0.seatClass.isEmpty != $1.seatClass.isEmpty { return $1.seatClass.isEmpty }
+                if $0.count != $1.count { return $0.count > $1.count }
+                if $0.average != $1.average { return $0.average > $1.average }
+                return $0.seatClass < $1.seatClass
+            }
     }
 
     /// The scoped nights counted by year, by month of the year, or by day of
