@@ -23,6 +23,29 @@
         }
       }
     },
+    "%lldh" : {
+      "comment" : "Whole hours left, in the Dynamic Island's smallest view: 1h. Only the largest unit is shown, so an hour and twenty minutes reads 1h.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld時間"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld小时"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld小時"
+          }
+        }
+      }
+    },
     "Done" : {
       "comment" : "What the Dynamic Island says once the show is over.",
       "localizations" : {
@@ -395,6 +418,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "演出已結束"
+          }
+        }
+      }
+    },
+    "m" : {
+      "comment" : "Minutes, after the count of them in the Dynamic Island's smallest view: 40m.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分"
+          }
+        }
+      }
+    },
+    "s" : {
+      "comment" : "Seconds, after the count of them in the Dynamic Island's smallest view: 40s.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秒"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "秒"
           }
         }
       }

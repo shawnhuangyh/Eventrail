@@ -66,6 +66,10 @@ struct EventDetailView: View {
 
     /// Why the Live Activity could not be started, while that is being said.
     @State private var liveActivityFailure: String?
+    #if DEBUG
+    /// The Live Activity bench is up — see ``LiveActivityTestView``.
+    @State private var isTestingLiveActivity = false
+    #endif
 
     /// The flyer as a file Quick Look and the share sheet can be handed —
     /// see ``ImageCache/file(for:named:checkedSince:)``. Nil until it is
@@ -176,6 +180,13 @@ struct EventDetailView: View {
                     }
                     footnote
                 }
+                // As wide as the sheet and no wider. A card's layout can come
+                // out a hair over the width it was offered — the timeline card
+                // measured 402.00000000000006 on a 402-point sheet, for one
+                // event's times and not another's — and a stack any wider than
+                // its scroll view let that sheet be dragged sideways as well as
+                // up and down.
+                .containerRelativeFrame(.horizontal)
                 // Clear of the close button, which floats over the top of it.
                 .padding(.top, 64)
                 .padding(.bottom, 32)
@@ -197,6 +208,11 @@ struct EventDetailView: View {
         .sheet(isPresented: $isEditingTicket) {
             TicketDetailsView(event: event)
         }
+        #if DEBUG
+        .sheet(isPresented: $isTestingLiveActivity) {
+            LiveActivityTestView(event: event, seat: tracking.seat)
+        }
+        #endif
         .task { await importPage() }
         // A sheet left open while the reader was away is owed the same check
         // it made as it opened: past the window, it reads its page again.
@@ -957,6 +973,16 @@ struct EventDetailView: View {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
             }
+
+            #if DEBUG
+            Section {
+                Button {
+                    isTestingLiveActivity = true
+                } label: {
+                    Label { Text(verbatim: "Test Live Activity…") } icon: { Image(systemName: "hammer") }
+                }
+            }
+            #endif
 
             // The same place either way, so the menu keeps its shape as the
             // event goes in and out of the library.
