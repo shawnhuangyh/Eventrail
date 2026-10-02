@@ -187,8 +187,9 @@ struct LiveActivityTestView: View {
 
 extension EventActivities {
     /// Starts — or, before its window, schedules — an activity for `event`
-    /// as given, its times already moved, the way ``start(for:tracking:)``
-    /// would for a night with those times, under a test id. Ends any test
+    /// as given, its times already moved, under a test id. Scheduling is the
+    /// bench's alone now (``start(for:tracking:)`` only ever starts one, at
+    /// once), kept for watching a stage come on by itself. Ends any test
     /// activity already up first, so a run of tries does not reach the
     /// system's limit. With `diagnostics`, it is filed so that the extension
     /// draws its gate swatches on the Lock Screen instead of the card.
@@ -198,7 +199,7 @@ extension EventActivities {
         guard var state = Self.state(for: event, seat: seat, at: now) else { return }
         let id = (diagnostics ? "test-diag-" : "test-") + event.id
         await Self.keepTestPoster(for: event, as: id)
-        let opens = Self.opening(of: state)
+        let opens = (state.doors ?? state.starts).addingTimeInterval(-EventActivityStage.lead)
         let attributes = EventActivityAttributes(
             eventID: id, title: event.title, venue: event.venue,
             link: event.sourceURL, opens: max(opens, now))

@@ -16,17 +16,35 @@ import SwiftUI
 /// Deliberately two words and a reason. What a refresh brought in is on the
 /// screen behind the notice already; the notice only has to say whether to
 /// trust it.
+///
+/// It also says, the same way, when a tap was turned down — a Live Activity
+/// asked for too early to last the night: a few words and an ✕ that go by
+/// themselves, as Apple Music says "Added to Library", rather than an alert
+/// the reader has to answer for being early.
 struct RefreshNotice: Identifiable, Equatable {
+    enum Outcome: Equatable {
+        case updated
+        /// Why the refresh failed, in the words of whatever refused it.
+        case failed(String)
+        /// Not a refresh at all: what the reader tapped for, and why it was
+        /// not done, in a line.
+        case refused(LocalizedStringKey)
+    }
+
     let id = UUID()
-    /// Why the refresh failed, in the words of whatever refused it. Nil for one
-    /// that went through.
-    let failure: String?
+    let outcome: Outcome
 
-    var succeeded: Bool { failure == nil }
+    var succeeded: Bool { outcome == .updated }
 
-    static var updated: RefreshNotice { RefreshNotice(failure: nil) }
+    var failure: String? {
+        if case .failed(let reason) = outcome { reason } else { nil }
+    }
 
-    static func failed(_ reason: String) -> RefreshNotice { RefreshNotice(failure: reason) }
+    static var updated: RefreshNotice { RefreshNotice(outcome: .updated) }
+
+    static func failed(_ reason: String) -> RefreshNotice { RefreshNotice(outcome: .failed(reason)) }
+
+    static func refused(_ words: LocalizedStringKey) -> RefreshNotice { RefreshNotice(outcome: .refused(words)) }
 }
 
 /// The one notice on screen, shared by every screen that refreshes.
@@ -52,13 +70,16 @@ final class RefreshNotices {
     func post(_ notice: RefreshNotice) {
         // The same news twice in a row — two screens that joined one read, each
         // reporting it — keeps the notice already up rather than sliding a copy
-        // of it in over itself. Its time on screen starts again.
-        if current == nil || current?.failure != notice.failure { current = notice }
+        // of it in over itself. Its time on screen starts again. A refusal is
+        // the reader's own tap every time, so every one is said, and felt,
+        // again.
+        if current?.outcome != notice.outcome { current = notice }
+        if case .refused = notice.outcome { current = notice }
         let notice = current ?? notice
         dismissal?.cancel()
         // A failure stays up longer: it is the one with a reason worth reading
         // to the end.
-        let shownFor: Duration = notice.succeeded ? .seconds(3) : .seconds(5)
+        let shownFor: Duration = notice.failure == nil ? .seconds(3) : .seconds(5)
         dismissal = Task { [weak self] in
             try? await Task.sleep(for: shownFor)
             guard !Task.isCancelled else { return }
@@ -212,20 +233,37 @@ private struct RefreshNoticeOverlay: ViewModifier {
 }
 
 /// Liquid Glass, the material of the tab bar it rests above: a pill saying
-/// "Updated", or a card saying "Update failed" with the reason beneath it.
+/// "Updated" or what a tap was turned down for, or a card saying "Update
+/// failed" with the reason beneath it.
 private struct RefreshNoticeBanner: View {
     let notice: RefreshNotice
     let dismiss: () -> Void
 
     private var tint: Color { notice.succeeded ? .brandTint : .favorite }
 
+    private var symbol: String {
+        switch notice.outcome {
+        case .updated: "checkmark.circle.fill"
+        case .failed: "exclamationmark.circle.fill"
+        case .refused: "xmark.circle.fill"
+        }
+    }
+
+    private var headline: Text {
+        switch notice.outcome {
+        case .updated: Text("Updated")
+        case .failed: Text("Update failed")
+        case .refused(let words): Text(words)
+        }
+    }
+
     var body: some View {
-        HStack(alignment: notice.succeeded ? .center : .top, spacing: 8) {
-            Image(systemName: notice.succeeded ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+        HStack(alignment: notice.failure == nil ? .center : .top, spacing: 8) {
+            Image(systemName: symbol)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 2) {
-                Text(notice.succeeded ? "Updated" : "Update failed")
+                headline
                     .font(.system(size: 14, weight: .semibold))
                 if let failure = notice.failure {
                     Text(verbatim: failure)
@@ -237,16 +275,16 @@ private struct RefreshNoticeBanner: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, notice.succeeded ? 10 : 12)
-        // A pill for the one word; a rounded card once a reason has to wrap,
-        // since a sentence set in a capsule loses its ends to the curve. A
-        // failure tints the glass itself, so it reads as one before a word of
-        // it is read.
-        .glassBackground(in: notice.succeeded
+        .padding(.vertical, notice.failure == nil ? 10 : 12)
+        // A pill for a line; a rounded card once a reason has to wrap, since a
+        // sentence set in a capsule loses its ends to the curve. A failure
+        // tints the glass itself, so it reads as one before a word of it is
+        // read; a refusal is said by its ✕ alone, being no fault of anything.
+        .glassBackground(in: notice.failure == nil
                              ? AnyShape(.capsule)
                              : AnyShape(.rect(cornerRadius: 22, style: .continuous)),
                          interactive: true,
-                         tint: notice.succeeded ? nil : Color.favorite.opacity(0.2))
+                         tint: notice.failure == nil ? nil : Color.favorite.opacity(0.2))
         .contentShape(.rect)
         // Out of the way the moment the reader wants it gone.
         .onTapGesture(perform: dismiss)

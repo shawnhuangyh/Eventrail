@@ -18,7 +18,10 @@ nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
     /// Over. The app ends the activity as soon as it next runs.
     case wrapped
 
-    /// How long before the doors the activity comes on.
+    /// Two hours before the doors: when the watch app reads a night written
+    /// as tomorrow as near, and when the debug bench's scheduled test comes
+    /// on. The app's own activities start when the reader turns them on —
+    /// see `EventActivities`.
     static let lead: TimeInterval = 2 * 60 * 60
 
     /// How close to the start "Doors open" turns into "Starting in", as it
