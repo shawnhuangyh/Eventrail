@@ -233,11 +233,15 @@ struct LockScreenView: View {
 /// The card is the night's colour washed over a dark grey, and it is drawn
 /// for the stage the night is at and no other — not every stage behind a
 /// ``Gate``, as the phone's are. The watch does not honour the gates: it drew
-/// every stage at once, text over text, and with them the card came with a
-/// "last refresh … ago" notice no other card in the Smart Stack carries. On
-/// one stage the countdown and the fill still run by themselves, and the card
-/// moves on to the next stage when it is next drawn — as the stage changes
-/// and the activity goes stale, or when the app brings it up to date.
+/// every stage at once, text over text. On one stage the countdown and the
+/// fill still run by themselves, and the card moves on to the next stage when
+/// it is next drawn — as the stage changes and the activity goes stale, or
+/// when the app brings it up to date.
+///
+/// The "Last Updated … ago" the watch sometimes lays over the card is not
+/// the card's: watchOS covers every iPhone Live Activity in the Smart Stack
+/// with it once the watch has lost its phone for a minute, and nothing this
+/// view draws or the app sends changes that.
 ///
 /// It is drawn at whatever size the watch gives it, the three lines spread
 /// down it. The design's card is a 46 mm watch's; on a smaller one the gaps
