@@ -180,6 +180,13 @@ struct EventDetailView: View {
                     }
                     footnote
                 }
+                // As wide as the sheet and no wider. A card's layout can come
+                // out a hair over the width it was offered — the timeline card
+                // measured 402.00000000000006 on a 402-point sheet, for one
+                // event's times and not another's — and a stack any wider than
+                // its scroll view let that sheet be dragged sideways as well as
+                // up and down.
+                .containerRelativeFrame(.horizontal)
                 // Clear of the close button, which floats over the top of it.
                 .padding(.top, 64)
                 .padding(.bottom, 32)
