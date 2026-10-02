@@ -353,18 +353,8 @@ struct Night {
     /// glass, dark on any wallpaper so the tints read the same on every one.
     static let platter = Color(red: 22 / 255, green: 20 / 255, blue: 30 / 255).opacity(0.58)
 
-    /// Amber until the doors, green with them open, orange in the last
-    /// minutes, red on stage, grey once it is over — the design's colours,
-    /// set for the dark the activity is always drawn on.
-    var tint: Color {
-        switch stage {
-        case .beforeDoors, .beforeShow: Color(red: 1, green: 0xB3 / 255, blue: 0x40 / 255)
-        case .doorsOpen: Color(red: 0x4C / 255, green: 0xD9 / 255, blue: 0x64 / 255)
-        case .startingSoon: Color(red: 1, green: 0x7A / 255, blue: 0x59 / 255)
-        case .onNow: Color(red: 1, green: 0x4F / 255, blue: 0x6A / 255)
-        case .wrapped: Color(red: 0xB9 / 255, green: 0xB6 / 255, blue: 0xC4 / 255)
-        }
-    }
+    /// The stage's colour — see ``EventActivityStage/tint``.
+    var tint: Color { stage.tint }
 
     var headline: Text {
         switch stage {

@@ -1697,6 +1697,50 @@
         }
       }
     },
+    "Available from %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@から利用できます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 后才能开启"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 後才能開啟"
+          }
+        }
+      }
+    },
+    "Available on the day of the event" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベント当日から利用できます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活动当天才能开启"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活動當天才能開啟"
+          }
+        }
+      }
+    },
     "Avg. %@" : {
       "localizations" : {
         "ja" : {
@@ -2705,28 +2749,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已入場"
-          }
-        }
-      }
-    },
-    "Doors open at %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@開場"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 入场"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 入場"
           }
         }
       }
@@ -8228,28 +8250,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "即將開演 · 還有 %@"
-          }
-        }
-      }
-    },
-    "Starts at %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@開演"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 开演"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 開演"
           }
         }
       }

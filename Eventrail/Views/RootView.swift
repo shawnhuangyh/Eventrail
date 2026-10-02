@@ -41,6 +41,9 @@ struct RootView: View {
     /// Closing it early costs them this launch's showing; it does not spend
     /// the only one they get.
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
+    /// Read only to send the watch its copy again when it changes — see
+    /// ``WatchLink``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     var body: some View {
         TabView(selection: $selection) {
@@ -98,6 +101,11 @@ struct RootView: View {
         // Live Activities can have fallen behind their nights while the app
         // was not running — see ``EventActivities``.
         .task { await EventActivities.shared.refresh(from: store) }
+        // The watch draws the nights still to come from a copy sent from here,
+        // so the copy follows every write and the clock it is printed on.
+        .task { WatchLink.shared.send(from: store) }
+        .onChange(of: store.revision) { WatchLink.shared.send(from: store) }
+        .onChange(of: timeDisplay) { WatchLink.shared.send(from: store) }
         // Edits are written after a short pause; leaving the app cuts that
         // short, so the last one is flushed here rather than lost. Coming back
         // is the moment to pick up whatever another device wrote meanwhile.
@@ -105,6 +113,9 @@ struct RootView: View {
             if phase == .active {
                 Task { await store.syncNow() }
                 Task { await EventActivities.shared.refresh(from: store) }
+                // A night whose day ended while the app was away leaves the
+                // watch's list too.
+                WatchLink.shared.send(from: store)
             } else {
                 store.saveNow()
             }

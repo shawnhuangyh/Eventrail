@@ -15,14 +15,20 @@ struct EventActivityTests {
         try #require(EventActivities.state(for: event, seat: "", at: now))
     }
 
-    @Test func comesOnTwoHoursBeforeTheDoors() throws {
+    /// Eight hours, the system's limit, before the end: started any earlier
+    /// it would be ended before the show was.
+    @Test func canStartEightHoursBeforeTheEnd() throws {
         let state = try state(of: event(), at: Fixtures.date(2027, 5, 1))
-        #expect(EventActivities.opening(of: state) == Fixtures.date(2027, 5, 9, 15, 30))
+        #expect(EventActivities.earliestStart(of: state) == Fixtures.date(2027, 5, 9, 12, 30))
     }
 
-    @Test func withNoDoorsPublishedComesOnTwoHoursBeforeTheStart() throws {
+    @Test func withNoEndPublishedCanStartEightHoursBeforeTheAssumedOne() throws {
+        let state = try state(of: event(ends: false), at: Fixtures.date(2027, 5, 1))
+        #expect(EventActivities.earliestStart(of: state) == Fixtures.date(2027, 5, 9, 14))
+    }
+
+    @Test func withNoDoorsPublishedTheStartComesFirst() throws {
         let state = try state(of: event(doors: false), at: Fixtures.date(2027, 5, 1))
-        #expect(EventActivities.opening(of: state) == Fixtures.date(2027, 5, 9, 17))
         #expect(state.stage == .beforeShow)
     }
 
@@ -117,5 +123,32 @@ struct EventActivityTests {
         let state = try state(of: event, at: Fixtures.date(2027, 5, 9, 18))
         #expect(state.doors == nil)
         #expect(state.stage == .beforeShow)
+    }
+
+    // MARK: - Started when it will last
+
+    /// The reader's calendar, set to the hall's clock so a test machine
+    /// anywhere counts the same days.
+    var reader: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = Fixtures.tokyo
+        return calendar
+    }
+
+    /// Any day before, the sheet names the day rather than a time.
+    @Test func isRefusedOnTheDaysBefore() {
+        #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 1), in: reader) == .beforeItsDay)
+        #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 8, 20), in: reader) == .beforeItsDay)
+    }
+
+    /// On the day itself, too early to last the night, it says from when.
+    @Test func isRefusedUntilItWouldLastTheNight() {
+        #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 10), in: reader)
+                == .tooEarly(earliest: Fixtures.date(2027, 5, 9, 12, 30)))
+    }
+
+    @Test func startsOnceItWouldLastTheNight() {
+        #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 12, 30), in: reader) == nil)
+        #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 19), in: reader) == nil)
     }
 }

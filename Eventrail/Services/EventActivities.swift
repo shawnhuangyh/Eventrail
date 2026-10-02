@@ -6,13 +6,17 @@ import UIKit
 /// The Live Activities the app has started or scheduled — at most one per
 /// event — and what keeps each in step with its night.
 ///
-/// **An activity is asked for from the event's sheet, and comes on two hours
-/// before the doors** (``EventActivityStage/lead``). Asked for any earlier —
-/// any day before the night, or that morning — it is scheduled with the
-/// system, which starts it at that moment whether or not the app is running;
-/// asked for inside the window it starts at once. Only for a night the reader
-/// holds a ticket for, as the design has it, and only once the page has
-/// published a start: without one there is nothing to count down to.
+/// **An activity is started from the event's sheet, at once, and never
+/// scheduled** — and only once, started then, it will last the night: the
+/// system ends an activity eight hours after it starts (``longest``), so the
+/// sheet refuses before ``earliestStart(of:)`` and says from when it can be
+/// (``refusal(for:at:in:)``). Not scheduled ahead, though iOS 26 could: **iOS
+/// ends every activity an app has, scheduled ones included, when the app is
+/// updated** (`liveactivitiesd` logs "Stopping uninstalled activity" as the
+/// new build is installed), and one scheduled weeks before was usually gone
+/// by the night. Only for a night the reader holds a ticket for, as the
+/// design has it, and only once the page has published a start: without one
+/// there is nothing to count down to.
 ///
 /// **The activity moves on through the night by itself.** It is drawn again
 /// only when the app sends it something or its stale date passes, so the
@@ -85,41 +89,56 @@ final class EventActivities {
         return now < state.runsTo
     }
 
-    /// Starts the event's activity, or schedules it for the start of its
-    /// window. Asks nothing where it already has one.
-    func start(for event: Event, tracking: Tracking) async throws {
-        guard !Self.live.contains(where: { $0.attributes.eventID == event.id }) else { return }
-        try await request(for: event, tracking: tracking)
+    /// Why an activity was not started.
+    enum Refusal: Error, Equatable {
+        /// It could be from a day still to come — the night's own, as a rule.
+        case beforeItsDay
+        /// It can be later today, from `earliest` — see ``earliestStart(of:)``.
+        case tooEarly(earliest: Date)
     }
 
-    private func request(for event: Event, tracking: Tracking) async throws {
+    /// How long an activity stays on: the system ends one eight hours after
+    /// it starts, and takes it out of the Dynamic Island.
+    static let longest: TimeInterval = 8 * 60 * 60
+
+    /// The earliest an activity can start and still be on until the night is
+    /// over: ``longest`` before what it runs to. Started at ten for a show
+    /// ending at eight, the system would end it at six, as the show began.
+    static func earliestStart(of state: EventActivityAttributes.ContentState) -> Date {
+        state.runsTo.addingTimeInterval(-longest)
+    }
+
+    /// Why an activity cannot be started for the night at `now`, or nil where
+    /// it can: before ``earliestStart(of:)``, said as a time where that is
+    /// later today on the reader's `calendar` and as the night's day where it
+    /// is not.
+    static func refusal(for event: Event, at now: Date = .now,
+                        in calendar: Calendar = .current) -> Refusal? {
+        guard let state = state(for: event, seat: "", at: now) else { return nil }
+        let earliest = earliestStart(of: state)
+        guard now < earliest else { return nil }
+        return calendar.isDate(earliest, inSameDayAs: now) ? .tooEarly(earliest: earliest) : .beforeItsDay
+    }
+
+    /// Starts the event's activity, at once. Asks nothing where it already
+    /// has one, and refuses where, started now, it would end before the night
+    /// did — see ``refusal(for:at:in:)``.
+    func start(for event: Event, tracking: Tracking) async throws {
+        guard !Self.live.contains(where: { $0.attributes.eventID == event.id }) else { return }
+        if let refusal = Self.refusal(for: event) { throw refusal }
         let now = Date.now
-        guard var state = Self.state(for: event, seat: tracking.seat, at: now),
+        guard let state = Self.state(for: event, seat: tracking.seat, at: now),
               starting.insert(event.id).inserted else { return }
         defer { starting.remove(event.id) }
-        let opens = Self.opening(of: state)
         // Before the request, so the first time it is drawn has the flyer.
         await Self.keepPoster(for: event)
         let attributes = EventActivityAttributes(
             eventID: event.id, title: event.title, venue: event.venue,
-            link: event.sourceURL, opens: max(opens, now))
-        if opens > now {
-            state.stage = state.stage(at: opens)
-            // The system says so as it starts one, and wants the words for it.
-            let alert = AlertConfiguration(
-                title: LocalizedStringResource(stringLiteral: event.title),
-                body: Self.alertBody(for: state),
-                sound: .default)
-            _ = try Activity.request(
-                attributes: attributes,
-                content: ActivityContent(state: state, staleDate: state.nextChange),
-                pushType: nil, style: .standard, alertConfiguration: alert, start: opens)
-        } else {
-            _ = try Activity.request(
-                attributes: attributes,
-                content: ActivityContent(state: state, staleDate: state.nextChange),
-                pushType: nil)
-        }
+            link: event.sourceURL, opens: now)
+        _ = try Activity.request(
+            attributes: attributes,
+            content: ActivityContent(state: state, staleDate: state.nextChange),
+            pushType: nil)
         read()
         scheduleWake()
     }
@@ -171,18 +190,10 @@ final class EventActivities {
                 }
                 let tracking = store.tracking(for: event)
                 if let latest = Self.state(for: event, seat: tracking.seat, at: now) { state = latest }
-                // A door time published since moves the window. One already on
-                // stays on; one still waiting is asked for again at the new
-                // time — which only the app in front of the reader may do.
-                if activity.activityState == .pending,
-                   Self.opening(of: state) != activity.attributes.opens,
-                   UIApplication.shared.applicationState == .active {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                    try? await request(for: event, tracking: tracking)
-                    continue
-                }
                 if !Self.hasPoster(for: event.id) { await Self.keepPoster(for: event) }
             }
+            // Pending is only ever one the debug bench scheduled, or an older
+            // build: still waiting, it stands where the night will at its start.
             state.stage = state.stage(at: activity.activityState == .pending
                                       ? max(now, activity.attributes.opens) : now)
             if state.stage == .wrapped {
@@ -260,19 +271,6 @@ final class EventActivities {
         return .init(stage: .at(now, doors: doors, starts: starts, runsTo: runsTo),
                      doors: doors, starts: starts, ends: ends, runsTo: runsTo,
                      timeZone: event.shown(on: display).timeZone, seat: seat)
-    }
-
-    /// When the activity comes on: two hours before the doors, or before the
-    /// start where the page published no doors.
-    static func opening(of state: EventActivityAttributes.ContentState) -> Date {
-        (state.doors ?? state.starts).addingTimeInterval(-EventActivityStage.lead)
-    }
-
-    private static func alertBody(for state: EventActivityAttributes.ContentState) -> LocalizedStringResource {
-        var style = Date.FormatStyle(date: .omitted, time: .shortened)
-        style.timeZone = state.timeZone
-        if let doors = state.doors { return "Doors open at \(doors.formatted(style))" }
-        return "Starts at \(state.starts.formatted(style))"
     }
 
     // MARK: - The flyer

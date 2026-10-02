@@ -1040,8 +1040,11 @@ struct EventDetailView: View {
             .joined(separator: "|")
     }
 
-    /// Turns the event's Live Activity on — at once inside its window, or
-    /// scheduled for the start of it — or off.
+    /// Turns the event's Live Activity on, at once, or off. Too early for it
+    /// to last the night it says from when it can be instead, in passing —
+    /// the notice pill and its error haptic, no alert to answer: the button
+    /// is there all along, so the reader learns the feature exists and when
+    /// to come back for it. See ``EventActivities/refusal(for:at:in:)``.
     private func toggleLiveActivity() {
         let activities = EventActivities.shared
         let event = event
@@ -1052,6 +1055,13 @@ struct EventDetailView: View {
             } else {
                 do {
                     try await activities.start(for: event, tracking: tracking)
+                } catch EventActivities.Refusal.beforeItsDay {
+                    notices?.post(.refused("Available on the day of the event"))
+                } catch EventActivities.Refusal.tooEarly(let earliest) {
+                    // On the clock the sheet prints its times on.
+                    var style = Date.FormatStyle(date: .omitted, time: .shortened)
+                    style.timeZone = shown.timeZone
+                    notices?.post(.refused("Available from \(earliest.formatted(style))"))
                 } catch {
                     liveActivityFailure = error.localizedDescription
                 }
