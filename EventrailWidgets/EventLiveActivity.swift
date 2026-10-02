@@ -34,7 +34,17 @@ import WidgetKit
 struct EventLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: EventActivityAttributes.self) { context in
-            LockScreenView(night: Night(context))
+            Group {
+                #if DEBUG
+                if context.attributes.eventID.hasPrefix(GateDiagnostics.prefix) {
+                    GateDiagnostics(since: context.attributes.opens)
+                } else {
+                    LockScreenView(night: Night(context))
+                }
+                #else
+                LockScreenView(night: Night(context))
+                #endif
+            }
                 .activityBackgroundTint(Night.platter)
                 .activitySystemActionForegroundColor(.white)
                 .widgetURL(context.attributes.link)
@@ -100,19 +110,24 @@ struct EventLiveActivity: Widget {
             } compactLeading: {
                 night.poster(width: 20, height: 26, radius: 6)
             } compactTrailing: {
-                // A timer takes all the width it is offered, so it is given
-                // only what its longest reading needs.
+                // A timer takes all the width it is offered, and the island
+                // is as wide on the poster's side as on this one, so each is
+                // laid over a copy of its longest reading, hidden — and
+                // counts down only through the last hour, since the width is
+                // fixed as the island is drawn and a "1:59:59" left it that
+                // wide long after the hours had gone.
+                let template = night.longestGlanceCountdown
                 night.eachStage(alignment: .trailing) { night in
-                    night.shortStatus
+                    night.glanceStatus(sizedFor: template)
                         .font(.system(size: 14, weight: .bold))
                         .monospacedDigit()
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(night.tint)
+                        .lineLimit(1)
                 }
-                .frame(maxWidth: 62, alignment: .trailing)
             } minimal: {
                 night.eachStage { night in
-                    night.shortStatus
+                    night.glanceStatus(sizedFor: nil)
                         .font(.system(size: 11, weight: .bold))
                         .monospacedDigit()
                         .multilineTextAlignment(.center)
@@ -280,6 +295,81 @@ struct Night {
         case .onNow: Text("LIVE")
         case .wrapped: Text("Done")
         }
+    }
+
+    /// The longest a countdown runs in the island before the time it counts
+    /// to gives way to it — just under an hour, so it reads "59:59" as it
+    /// comes on rather than "1:00:00".
+    static let glanceCountdown: TimeInterval = 3599
+
+    /// What ``shortStatus`` counts down to at `stage`, if it counts.
+    private func countdownTarget(at stage: EventActivityStage) -> Date? {
+        switch stage {
+        case .beforeDoors: state.doors ?? state.starts
+        case .beforeShow, .doorsOpen, .startingSoon: state.starts
+        case .onNow, .wrapped: nil
+        }
+    }
+
+    /// ``shortStatus`` as the compact and minimal island draw it: while what
+    /// it counts to is more than an hour off, the time of it — "18:00", the
+    /// AM or PM left off — and only then the countdown, switched by a
+    /// ``Gate`` with nothing sent. The island's width is fixed as it is
+    /// drawn, and the two are the same width, so it never has to be as wide
+    /// as a count with hours in it. Laid over `template` where one is given,
+    /// since a timer takes all the width it is offered.
+    ///
+    /// The countdown's own interval is only the last hour, not from now: a
+    /// timer is set for the longest reading its interval holds, and one
+    /// running from more than an hour off was set for "1:00:59", shrunk to
+    /// fit beside the poster, and stayed small after it had come down to
+    /// "59:58".
+    @ViewBuilder
+    func glanceStatus(sizedFor template: String?) -> some View {
+        if let target = countdownTarget(at: stage) {
+            let switchover = target.addingTimeInterval(-Self.glanceCountdown)
+            let later = switchover > .now
+            let countdown = Text(timerInterval: max(switchover, .now)...max(target, .now), countsDown: true)
+            ZStack(alignment: .trailing) {
+                if later {
+                    Text(verbatim: glanceTime(target))
+                        .mask { Gate(at: switchover, opening: false) }
+                }
+                Group {
+                    if let template {
+                        Text(verbatim: template)
+                            .hidden()
+                            .overlay(alignment: .trailing) { countdown }
+                    } else {
+                        countdown
+                    }
+                }
+                .mask { Gate(at: later ? switchover : nil, opening: true) }
+            }
+        } else {
+            shortStatus
+        }
+    }
+
+    /// The longest reading the island's countdown will show over the rest of
+    /// the night, as a template of the timer's shape — "0:00" or "00:00",
+    /// never more, since it counts only through the last hour — for sizing
+    /// it: each stage's countdown is longest as its stretch begins.
+    var longestGlanceCountdown: String {
+        let now = Date.now
+        let longest = phases.map { phase -> TimeInterval in
+            guard let target = countdownTarget(at: phase.stage) else { return 0 }
+            return min(Self.glanceCountdown, target.timeIntervalSince(max(now, phase.from ?? now)))
+        }.max() ?? 0
+        return longest >= 600 ? "00:00" : "0:00"
+    }
+
+    /// A time as the island prints it, without the AM or PM a twelve-hour
+    /// clock carries: there is no room for one beside it.
+    private func glanceTime(_ instant: Date) -> String {
+        var style = Date.FormatStyle().hour(.defaultDigits(amPM: .omitted)).minute(.twoDigits)
+        style.timeZone = state.timeZone
+        return instant.formatted(style)
     }
 
     /// The seat, where the reader wrote one down: a capsule in the night's
@@ -484,11 +574,19 @@ private struct Stretch: ViewModifier {
 /// Clear before `moment` and solid after it where it is `opening`, the other
 /// way round where it is not — solid throughout where there is no moment.
 ///
-/// The bar's empty track is not clear — used as it is, it left every hidden
-/// stage faintly showing through the one in front. So the bar is drawn white
-/// on black and taken to its extremes, and only then made a mask: the track
-/// comes out clear and the fill solid.
-private struct Gate: View {
+/// The bar's empty track is not clear, and it is not the same grey wherever
+/// the activity is drawn. On the phone it is a faint see-through grey, and
+/// the bar used as a mask as it is left every hidden stage faintly showing
+/// through the one in front. In the Mac's menu bar it is an opaque grey about
+/// two-thirds of the way to white, which a mask lets through whole. Only the
+/// fill is the same everywhere: white, as the tint asks. So the bar is drawn
+/// on black and cut at a level only the fill reaches — brightness taken down
+/// by 0.35 and contrast taken up sixteenfold, so everything under 0.82 of
+/// white goes black and everything over 0.88 white — and only then made a
+/// mask: the track comes out clear and the fill solid. Cut at the midpoint,
+/// as `contrast(4)` alone cuts, the Mac's track still came out 90 % solid,
+/// and every stage showed at once.
+struct Gate: View {
     let moment: Date?
     let opening: Bool
 
@@ -499,30 +597,42 @@ private struct Gate: View {
 
     var body: some View {
         if let moment {
-            ZStack {
-                Color.black
-                ProgressView(timerInterval: moment...moment.addingTimeInterval(1), countsDown: !opening) {
-                    EmptyView()
-                } currentValueLabel: {
-                    EmptyView()
-                }
-                .progressViewStyle(.linear)
-                .tint(.white)
-                // Run well past the view at both ends, so the rounded end of
-                // the fill — which stays put however little is filled — sits
-                // outside it even in the island's narrowest place; and the
-                // few points of its height stretched over all of it.
-                .padding(.horizontal, -60)
-                // Turned round for the stage going off, so its fill gives way
-                // from the side the next one's comes in from.
-                .scaleEffect(x: opening ? 1 : -1, y: 200)
-            }
-            .compositingGroup()
-            .contrast(4)
-            .luminanceToAlpha()
+            exact(at: moment)
         } else {
             Color.white
         }
+    }
+
+    /// The system's timer bar, filling over a second from `moment`, stretched
+    /// over the whole view.
+    func bar(at moment: Date) -> some View {
+        ProgressView(timerInterval: moment...moment.addingTimeInterval(1), countsDown: !opening) {
+            EmptyView()
+        } currentValueLabel: {
+            EmptyView()
+        }
+        .progressViewStyle(.linear)
+        .tint(.white)
+        // Run well past the view at both ends, so the rounded end of the
+        // fill — which stays put however little is filled — sits outside it
+        // even in the island's narrowest place; and the few points of its
+        // height stretched over all of it.
+        .padding(.horizontal, -60)
+        // Turned round for the stage going off, so its fill gives way from
+        // the side the next one's comes in from.
+        .scaleEffect(x: opening ? 1 : -1, y: 200)
+    }
+
+    /// The bar with its track cleared, whatever grey it is drawn in.
+    func exact(at moment: Date) -> some View {
+        ZStack {
+            Color.black
+            bar(at: moment)
+        }
+        .compositingGroup()
+        .brightness(-0.35)
+        .contrast(16)
+        .luminanceToAlpha()
     }
 }
 
