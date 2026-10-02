@@ -517,6 +517,12 @@ final class EventStore {
         entries.values.compactMap { $0.inLibrary ? event(id: $0.eventID) : nil }
     }
 
+    /// The library's nights still to come, soonest first — what the watch is
+    /// sent (``WatchLink``).
+    var upcoming: [Event] {
+        library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+    }
+
     var lastRefreshed: Date? { settingsRow?.lastRefreshed }
 
     /// The Eventernote account the reader imports from, if they have named one.

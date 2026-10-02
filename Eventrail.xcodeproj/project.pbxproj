@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		000000000000000150000001 /* EventrailWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000000320 /* EventrailWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000170000001 /* EventrailWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000000520 /* EventrailWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -17,6 +18,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 000000000000000300000000;
 			remoteInfo = EventrailWidgets;
+		};
+		000000000000000180000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000500000000;
+			remoteInfo = EventrailWatch;
 		};
 		000000000000000230000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -37,13 +45,33 @@
 			);
 			name = "Embed Foundation Extensions";
 		};
+		000000000000000170000000 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolder = Product;
+			files = (
+				000000000000000170000001 /* EventrailWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Eventrail.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eventrail.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000220 /* EventrailTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EventrailTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000320 /* EventrailWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = EventrailWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000520 /* EventrailWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EventrailWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		000000000000000000000411 /* Exceptions for "Shared" folder in "EventrailWatch" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				EventActivity.swift,
+			);
+			target = 000000000000000500000000 /* EventrailWatch */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		000000000000000000000010 /* Eventrail */ = {
@@ -63,7 +91,15 @@
 		};
 		000000000000000000000410 /* Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				000000000000000000000411 /* Exceptions for "Shared" folder in "EventrailWatch" target */,
+			);
 			path = Shared;
+			sourceTree = "<group>";
+		};
+		000000000000000000000510 /* EventrailWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = EventrailWatch;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -84,6 +120,11 @@
 			files = (
 			);
 		};
+		000000000000000521000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -92,6 +133,7 @@
 			children = (
 				000000000000000000000010 /* Eventrail */,
 				000000000000000000000310 /* EventrailWidgets */,
+				000000000000000000000510 /* EventrailWatch */,
 				000000000000000000000410 /* Shared */,
 				000000000000000000000210 /* EventrailTests */,
 				000000000000000000000020 /* Products */,
@@ -104,6 +146,7 @@
 				000000000000000000000120 /* Eventrail.app */,
 				000000000000000000000220 /* EventrailTests.xctest */,
 				000000000000000000000320 /* EventrailWidgets.appex */,
+				000000000000000000000520 /* EventrailWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -119,11 +162,13 @@
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
 				000000000000000150000000 /* Embed Foundation Extensions */,
+				000000000000000170000000 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				000000000000000160000000 /* PBXTargetDependency */,
+				000000000000000180000000 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* Eventrail */,
@@ -174,6 +219,25 @@
 			productReference = 000000000000000000000320 /* EventrailWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		000000000000000500000000 /* EventrailWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000510000000 /* Build configuration list for PBXNativeTarget "EventrailWatch" */;
+			buildPhases = (
+				000000000000000520000000 /* Sources */,
+				000000000000000521000000 /* Frameworks */,
+				000000000000000522000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000410 /* Shared */,
+				000000000000000000000510 /* EventrailWatch */,
+			);
+			name = EventrailWatch;
+			productName = EventrailWatch;
+			productReference = 000000000000000000000520 /* EventrailWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -192,6 +256,9 @@
 						TestTargetID = 000000000000000100000000;
 					};
 					000000000000000300000000 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					000000000000000500000000 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -216,6 +283,7 @@
 				000000000000000100000000 /* Eventrail */,
 				000000000000000200000000 /* EventrailTests */,
 				000000000000000300000000 /* EventrailWidgets */,
+				000000000000000500000000 /* EventrailWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -232,6 +300,11 @@
 			);
 		};
 		000000000000000322000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		000000000000000522000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -254,6 +327,11 @@
 			files = (
 			);
 		};
+		000000000000000520000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -261,6 +339,11 @@
 			isa = PBXTargetDependency;
 			target = 000000000000000300000000 /* EventrailWidgets */;
 			targetProxy = 000000000000000160000001 /* PBXContainerItemProxy */;
+		};
+		000000000000000180000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000500000000 /* EventrailWatch */;
+			targetProxy = 000000000000000180000001 /* PBXContainerItemProxy */;
 		};
 		000000000000000230000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -335,7 +418,7 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				TVOS_DEPLOYMENT_TARGET = 27.0;
-				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
@@ -397,7 +480,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				TVOS_DEPLOYMENT_TARGET = 27.0;
-				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
@@ -628,6 +711,74 @@
 			};
 			name = Release;
 		};
+		000000000000000511000000 /* Debug configuration for PBXNativeTarget "EventrailWatch" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JE9SRTHZY7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = moe.shawn.Eventrail;
+				INFOPLIST_KEY_WKSupportsLiveActivityLaunchAttributeTypes = EventActivityAttributes;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = moe.shawn.Eventrail.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		000000000000000512000000 /* Release configuration for PBXNativeTarget "EventrailWatch" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JE9SRTHZY7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = moe.shawn.Eventrail;
+				INFOPLIST_KEY_WKSupportsLiveActivityLaunchAttributeTypes = EventActivityAttributes;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = moe.shawn.Eventrail.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -660,6 +811,14 @@
 			buildConfigurations = (
 				000000000000000311000000 /* Debug configuration for PBXNativeTarget "EventrailWidgets" */,
 				000000000000000312000000 /* Release configuration for PBXNativeTarget "EventrailWidgets" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000510000000 /* Build configuration list for PBXNativeTarget "EventrailWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000511000000 /* Debug configuration for PBXNativeTarget "EventrailWatch" */,
+				000000000000000512000000 /* Release configuration for PBXNativeTarget "EventrailWatch" */,
 			);
 			defaultConfigurationName = Release;
 		};

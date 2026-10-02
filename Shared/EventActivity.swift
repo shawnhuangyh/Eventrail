@@ -40,49 +40,6 @@ nonisolated struct EventActivityAttributes: ActivityAttributes {
     }
 }
 
-/// Where a night stands, as the activity shows it. Each has its own words and
-/// colour, and the fill runs over the times on either side of it.
-nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
-    /// Before the doors, which the page published.
-    case beforeDoors
-    /// Before the start, where the page published no doors.
-    case beforeShow
-    case doorsOpen
-    /// The last few minutes before the start — see ``soonBeforeStart``.
-    case startingSoon
-    case onNow
-    /// Over. The app ends the activity as soon as it next runs.
-    case wrapped
-
-    /// How long before the doors the activity comes on.
-    static let lead: TimeInterval = 2 * 60 * 60
-
-    /// How close to the start "Doors open" turns into "Starting in", as it
-    /// does on the event's sheet.
-    static let soonBeforeStart: TimeInterval = 5 * 60
-
-    /// Where a night with these times stands at `now`.
-    static func at(_ now: Date, doors: Date?, starts: Date, runsTo: Date) -> Self {
-        if now >= runsTo { return .wrapped }
-        if now >= starts { return .onNow }
-        guard let doors, doors < starts else { return .beforeShow }
-        if now < doors { return .beforeDoors }
-        return starts.timeIntervalSince(now) <= soonBeforeStart ? .startingSoon : .doorsOpen
-    }
-
-    /// How far into the night the stage is, so a stage never gives way to
-    /// one before it.
-    var order: Int {
-        switch self {
-        case .beforeDoors, .beforeShow: 0
-        case .doorsOpen: 1
-        case .startingSoon: 2
-        case .onNow: 3
-        case .wrapped: 4
-        }
-    }
-}
-
 /// One stretch of the night as the activity draws it: a stage, from the
 /// moment it comes on until the moment the next one does.
 nonisolated struct EventActivityPhase: Hashable, Sendable {
