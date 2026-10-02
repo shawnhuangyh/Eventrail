@@ -132,13 +132,13 @@ struct EventLiveActivity: Widget {
                         .lineLimit(1)
                 }
             } minimal: {
+                // Only the largest unit left — "1h", "40m", "40s": the
+                // smallest view has room for three characters, not a clock.
                 night.eachStage { night in
-                    night.glanceStatus(sizedFor: nil)
-                        .font(.system(size: 11, weight: .bold))
+                    night.minimalStatus
+                        .font(.system(size: 13, weight: .bold))
                         .monospacedDigit()
-                        .multilineTextAlignment(.center)
                         .foregroundStyle(night.tint)
-                        .minimumScaleFactor(0.5)
                 }
             }
             // The margins are left as the system has them. Taken in to 10 at
@@ -419,13 +419,13 @@ struct Night {
         }
     }
 
-    /// ``shortStatus`` as the compact and minimal island draw it: while what
-    /// it counts to is more than an hour off, the time of it — "18:00", the
-    /// AM or PM left off — and only then the countdown, switched by a
-    /// ``Gate`` with nothing sent. The island's width is fixed as it is
-    /// drawn, and the two are the same width, so it never has to be as wide
-    /// as a count with hours in it. Laid over `template` where one is given,
-    /// since a timer takes all the width it is offered.
+    /// ``shortStatus`` as the compact island draws it: while what it counts
+    /// to is more than an hour off, the time of it — "18:00", the AM or PM
+    /// left off — and only then the countdown, switched by a ``Gate`` with
+    /// nothing sent. The island's width is fixed as it is drawn, and the two
+    /// are the same width, so it never has to be as wide as a count with
+    /// hours in it. Laid over `template`, since a timer takes all the width
+    /// it is offered.
     ///
     /// The countdown's own interval is only the last hour, not from now: a
     /// timer is set for the longest reading its interval holds, and one
@@ -433,7 +433,7 @@ struct Night {
     /// fit beside the poster, and stayed small after it had come down to
     /// "59:58".
     @ViewBuilder
-    func glanceStatus(sizedFor template: String?) -> some View {
+    func glanceStatus(sizedFor template: String) -> some View {
         if let target = countdownTarget(at: stage) {
             let switchover = target.addingTimeInterval(-Self.glanceCountdown)
             let later = switchover > .now
@@ -443,20 +443,154 @@ struct Night {
                     Text(verbatim: glanceTime(target))
                         .mask { Gate(at: switchover, opening: false) }
                 }
-                Group {
-                    if let template {
-                        Text(verbatim: template)
-                            .hidden()
-                            .overlay(alignment: .trailing) { countdown }
-                    } else {
-                        countdown
-                    }
-                }
-                .mask { Gate(at: later ? switchover : nil, opening: true) }
+                Text(verbatim: template)
+                    .hidden()
+                    .overlay(alignment: .trailing) { countdown }
+                    .mask { Gate(at: later ? switchover : nil, opening: true) }
             }
         } else {
             shortStatus
         }
+    }
+
+    /// ``shortStatus`` as the minimal island draws it: only the largest unit
+    /// left, rounded down — "1h" with an hour and twenty minutes to go, "40m"
+    /// with forty minutes and forty seconds, "40s" in the last minute. The
+    /// smallest view, the one the island falls back to beside another app's
+    /// activity, has room for three characters rather than a clock.
+    ///
+    /// Nothing the system runs by itself counts like that: the formats that
+    /// stop at the largest unit spell it out in words ("40 minutes"). So each
+    /// way of reading it is drawn once and shown only over its own stretch of
+    /// the time left, switched by a ``Gate`` — the hours as words of their
+    /// own, the minutes and the seconds as the system's timer with all but
+    /// those digits masked off (``digits(of:over:keeping:at:unit:)``), so
+    /// "40:40" reads "40m" and still counts by itself. That is four readings
+    /// a stage and a word for each hour, rather than one for every minute.
+    @ViewBuilder
+    var minimalStatus: some View {
+        if let target = countdownTarget(at: stage), target > .now {
+            ZStack {
+                ForEach(minimalReadings(to: target)) { reading in
+                    minimalReading(reading.shape, to: target)
+                        .mask { Gate(at: reading.from, opening: true) }
+                        .mask { Gate(at: reading.until, opening: false) }
+                }
+            }
+        } else {
+            shortStatus
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+        }
+    }
+
+    /// One way the minimal island reads the time left, and when it does.
+    struct MinimalReading: Identifiable {
+        enum Shape: Hashable {
+            /// The time it counts to, where that is too far off for hours.
+            case time
+            case hours(Int)
+            case minutes(digits: Int)
+            case seconds(digits: Int)
+        }
+
+        let shape: Shape
+        /// When it comes on — nil where it is on as the stage is.
+        let from: Date?
+        /// When it gives way — nil where it lasts as long as the stage.
+        let until: Date?
+
+        var id: Shape { shape }
+    }
+
+    /// Past this many hours left the minimal island shows the time of the
+    /// moment instead — which only an activity drawn long before its window
+    /// ever sees, and which keeps the hours to a handful of readings.
+    static let minimalHours = 12
+
+    /// Each reading of the time left to `target` that falls inside this
+    /// stage's stretch of the night, with the moments it comes on and gives
+    /// way — nil at either end the stage's own ``Stretch`` already covers.
+    func minimalReadings(to target: Date) -> [MinimalReading] {
+        let phase = phases.first { $0.stage == stage }
+        // How much is left as the stage comes on, and as it gives way.
+        let most = target.timeIntervalSince(max(phase?.from ?? .now, .now))
+        let least = target.timeIntervalSince(phase?.until ?? target)
+        let hour: TimeInterval = 3600
+        var readings: [(MinimalReading.Shape, Range<TimeInterval>)] = [
+            (.seconds(digits: 1), 0..<10),
+            (.seconds(digits: 2), 10..<60),
+            (.minutes(digits: 1), 60..<600),
+            (.minutes(digits: 2), 600..<hour),
+        ]
+        let hours = min(Int(most / hour), Self.minimalHours - 1)
+        if hours >= 1 {
+            for count in 1...hours {
+                readings.append((.hours(count), Double(count) * hour..<Double(count + 1) * hour))
+            }
+        }
+        readings.append((.time, Double(Self.minimalHours) * hour..<TimeInterval.infinity))
+        return readings.compactMap { shape, left in
+            guard left.lowerBound < most, left.upperBound > least else { return nil }
+            return MinimalReading(
+                shape: shape,
+                from: left.upperBound < most ? target.addingTimeInterval(-left.upperBound) : nil,
+                until: left.lowerBound > least ? target.addingTimeInterval(-left.lowerBound) : nil)
+        }
+    }
+
+    @ViewBuilder
+    private func minimalReading(_ shape: MinimalReading.Shape, to target: Date) -> some View {
+        switch shape {
+        case .time:
+            Text(verbatim: glanceTime(target))
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+        case .hours(let count):
+            Text("\(count)h", comment: "Whole hours left, in the Dynamic Island's smallest view: 1h. Only the largest unit is shown, so an hour and twenty minutes reads 1h.")
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+        case .minutes(let digits):
+            self.digits(of: target, over: digits == 2 ? 3599 : 599, keeping: digits, at: .leading,
+                        unit: Text("m", comment: "Minutes, after the count of them in the Dynamic Island's smallest view: 40m."))
+        case .seconds(let digits):
+            self.digits(of: target, over: digits == 2 ? 59 : 9, keeping: digits, at: .trailing,
+                        unit: Text("s", comment: "Seconds, after the count of them in the Dynamic Island's smallest view: 40s."))
+        }
+    }
+
+    /// The system's countdown to `target` over the last `window` before it,
+    /// masked down to the `digits` at its head (the minutes) or at its tail
+    /// (the seconds), with `unit` after them.
+    ///
+    /// The timer is laid over a hidden template of its longest reading —
+    /// "00:00", or "0:00" under ten minutes — set against its trailing edge,
+    /// as the compact island sets it; a slot as wide as the digits kept is
+    /// set against the same edge of the template, and everything outside the
+    /// slot is clipped away. Digits are one width, so the slot always falls
+    /// on the same digits. Each window starts at the longest reading the
+    /// slot can hold — "59:59", "9:59", "0:59", "0:09" — since a timer is
+    /// set for the longest reading its interval holds, and one set for more
+    /// would be shrunk.
+    private func digits(of target: Date, over window: TimeInterval, keeping digits: Int,
+                        at edge: HorizontalEdge, unit: Text) -> some View {
+        HStack(spacing: 0) {
+            Text(verbatim: String(repeating: "0", count: digits))
+                .hidden()
+                .overlay(alignment: edge == .leading ? .leading : .trailing) {
+                    Text(verbatim: window >= 600 ? "00:00" : "0:00")
+                        .hidden()
+                        .overlay(alignment: .trailing) {
+                            Text(timerInterval: target.addingTimeInterval(-window)...target, countsDown: true)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        .fixedSize()
+                }
+                .clipped()
+            unit
+        }
+        .lineLimit(1)
+        .fixedSize()
     }
 
     /// The longest reading the island's countdown will show over the rest of
@@ -788,6 +922,15 @@ extension EventActivityAttributes.ContentState {
     EventLiveActivity()
 } contentStates: {
     EventActivityAttributes.ContentState.preview(.beforeDoors)
+    EventActivityAttributes.ContentState.preview(.onNow)
+}
+
+#Preview("Minimal", as: .dynamicIsland(.minimal), using: EventActivityAttributes.preview) {
+    EventLiveActivity()
+} contentStates: {
+    EventActivityAttributes.ContentState.preview(.beforeDoors)
+    EventActivityAttributes.ContentState.preview(.doorsOpen)
+    EventActivityAttributes.ContentState.preview(.startingSoon)
     EventActivityAttributes.ContentState.preview(.onNow)
 }
 
