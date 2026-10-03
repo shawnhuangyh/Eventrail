@@ -238,11 +238,6 @@ struct LockScreenView: View {
 /// it is next drawn — as the stage changes and the activity goes stale, or
 /// when the app brings it up to date.
 ///
-/// The "Last Updated … ago" the watch sometimes lays over the card is not
-/// the card's: watchOS covers every iPhone Live Activity in the Smart Stack
-/// with it once the watch has lost its phone for a minute, and nothing this
-/// view draws or the app sends changes that.
-///
 /// It is drawn at whatever size the watch gives it, the three lines spread
 /// down it. The design's card is a 46 mm watch's; on a smaller one the gaps
 /// close up rather than the card being cut off.
