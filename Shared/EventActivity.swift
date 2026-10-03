@@ -7,7 +7,7 @@ import Foundation
 ///
 /// Compiled into the app, which starts, schedules, updates and ends it, and
 /// into the widget extension, which draws it. What never changes over the
-/// night is here; the times and the seat are in ``ContentState``, since the
+/// event is here; the times and the seat are in ``ContentState``, since the
 /// page can publish a door time — and the reader write a seat — after the
 /// activity was asked for.
 nonisolated struct EventActivityAttributes: ActivityAttributes {
@@ -23,7 +23,7 @@ nonisolated struct EventActivityAttributes: ActivityAttributes {
     let opens: Date
 
     struct ContentState: Codable, Hashable, Sendable {
-        /// Where the night stood when the app last looked — see
+        /// Where the event stood when the app last looked — see
         /// ``phases(at:)`` for what is drawn after it.
         var stage: EventActivityStage
         var doors: Date?
@@ -40,7 +40,7 @@ nonisolated struct EventActivityAttributes: ActivityAttributes {
     }
 }
 
-/// One stretch of the night as the activity draws it: a stage, from the
+/// One stretch of the event as the activity draws it: a stage, from the
 /// moment it comes on until the moment the next one does.
 nonisolated struct EventActivityPhase: Hashable, Sendable {
     let stage: EventActivityStage
@@ -56,13 +56,13 @@ nonisolated extension EventActivityAttributes.ContentState {
         .at(now, doors: doors, starts: starts, runsTo: runsTo)
     }
 
-    /// The rest of the night from ``stage`` on — or from where it stands at
+    /// The rest of the event from ``stage`` on — or from where it stands at
     /// `now`, where that is further on — each stage with its stretch.
     ///
     /// A Live Activity is drawn again only when the app sends it something,
     /// and the app is rarely running during a concert. So the extension draws
     /// every stage still to come at once and shows each only inside its own
-    /// stretch, switched by the system as the night runs on — see
+    /// stretch, switched by the system as the event runs on — see
     /// `EventLiveActivity`.
     func phases(at now: Date? = nil) -> [EventActivityPhase] {
         var first = stage
@@ -85,7 +85,7 @@ nonisolated extension EventActivityAttributes.ContentState {
     ///
     /// The system draws an activity again as it goes stale, which catches up
     /// anything the stretches did not: whatever is drawn then starts from
-    /// where the night stands.
+    /// where the event stands.
     var nextChange: Date? {
         phases().first?.until
     }

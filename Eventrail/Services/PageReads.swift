@@ -67,6 +67,12 @@ final class PageReads {
         return read.timeIntervalSinceNow > -Self.freshness
     }
 
+    /// When this device last read this event's page, if within the week a
+    /// stamp is kept.
+    func lastRead(_ id: Event.ID) -> Date? {
+        reads[id]
+    }
+
     /// Writes down that this event's page has just been read — unless the
     /// stamps were cleared after it was asked for, `asked` being when.
     func record(_ id: Event.ID, asked: Date) {

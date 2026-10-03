@@ -5,7 +5,7 @@ import WatchConnectivity
 /// Keeps the watch app's copy of the library in step with the phone's.
 ///
 /// The watch has no store of its own: it draws the ``WatchLibrary`` this
-/// sends, the nights still to come with the reader's ticket for each. Sent as
+/// sends, the events still to come with the reader's ticket for each. Sent as
 /// WatchConnectivity's application context, which keeps only the latest and
 /// hands it to the watch app whenever that next runs — so the phone sends a
 /// fresh copy whenever the library or the Time Zone setting changes, as the

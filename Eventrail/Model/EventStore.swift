@@ -332,7 +332,7 @@ final class EventStore {
         // A hall being placed is owed a mirror whether or not this device syncs.
         observeVenuePlacings()
 
-        // Written back rather than only held: what this corrects is a night
+        // Written back rather than only held: what this corrects is an event
         // abroad imported before its hall was placed, and correcting it once a
         // launch would be correcting it forever.
         if retimeEvents() { save() }
@@ -517,7 +517,7 @@ final class EventStore {
         entries.values.compactMap { $0.inLibrary ? event(id: $0.eventID) : nil }
     }
 
-    /// The library's nights still to come, soonest first — what the watch is
+    /// The library's events still to come, soonest first — what the watch is
     /// sent (``WatchLink``).
     var upcoming: [Event] {
         library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
@@ -792,6 +792,19 @@ final class EventStore {
     func isStale(_ event: Event) -> Bool {
         guard let pageReads else { return false }
         return !pageReads.isFresh(event.id)
+    }
+
+    /// When the event's page was last read from Eventernote, for the line
+    /// under Refresh in its sheet's menu.
+    ///
+    /// The later of this device's last read and the copy's own ``Event/readAt``.
+    /// Neither alone: `readAt` moves only when a read finds something new — a
+    /// read that finds the page unchanged writes nothing — so a page just
+    /// refreshed would still say days; and this device's stamps are kept a
+    /// week and gone after Clear Cache, where the copy may have been read on
+    /// another device since.
+    func lastRead(of event: Event) -> Date? {
+        [pageReads?.lastRead(event.id), event.readAt].compactMap(\.self).max()
     }
 
     /// How one read of an event's page ended, for the sheet that asked.
@@ -1330,7 +1343,7 @@ final class EventStore {
     /// and that is the whole of the rule — the mirror does not go on to second-
     /// guess it by tracking field. An earlier cut on the ticket field quietly
     /// left every past event out, because nothing back-fills a ticket for a
-    /// night already over.
+    /// event already over.
     var calendarEvents: [Event] { library }
 
     /// Brings the calendar into line with the library, or clears it out when
@@ -1408,7 +1421,7 @@ final class EventStore {
     ///
     /// The other half of ``Event/published(in:)``. An import reads every page
     /// on Tokyo time because that is all the page says — Eventernote prints a
-    /// clock and never a zone — and a night in Taipei or Shanghai is published
+    /// clock and never a zone — and an event in Taipei or Shanghai is published
     /// in the hall's clock like every other. So the correction waits on the one
     /// thing that knows where the hall stands, which is the placing, and is
     /// applied here whenever a placing lands.
@@ -1419,7 +1432,7 @@ final class EventStore {
     ///
     /// Written into the archive rather than worked out where the times are
     /// read, because it is the instant that is wrong rather than the way it is
-    /// shown — the library's order, whether a night has passed, the calendar
+    /// shown — the library's order, whether an event has passed, the calendar
     /// entry and its alert are all made of it, and none of them should have to
     /// know about zones.
     @discardableResult

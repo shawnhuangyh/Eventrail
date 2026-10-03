@@ -99,8 +99,8 @@ struct LibraryRow: View {
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     let event: Event
-    /// Why the reader has not looked at this night yet, for the tag above the
-    /// title — nil where they have, and on every night already past.
+    /// Why the reader has not looked at this event yet, for the tag above the
+    /// title — nil where they have, and on every event already past.
     var unread: FollowingUnread? = nil
     let open: () -> Void
 
@@ -118,7 +118,7 @@ struct LibraryRow: View {
                     StatusBadge(status: store.status(for: event))
                     Spacer(minLength: 7)
                     HStack(spacing: 7) {
-                        // Only on the nights still ahead, and so only in this
+                        // Only on the events still ahead, and so only in this
                         // row: the library is the one list the reader keeps
                         // because they mean to be there. Every other list on
                         // the app is somebody else's or somewhere else's, and

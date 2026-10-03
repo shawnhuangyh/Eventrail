@@ -26,7 +26,7 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
     /// The fingerprint of the copy that was read, or nil where the date was
     /// marked unread again.
     var fingerprint: String?
-    /// The night the record is about, which is what decides when it can go:
+    /// The event the record is about, which is what decides when it can go:
     /// see ``LibraryArchive/pruned()``.
     var day: Date
 
@@ -40,7 +40,7 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
         // since re-read on its hall's clock abroad is read back onto Tokyo's
         // first, or every instant in it differs from the one that was marked.
         //
-        // And that copy had every time on the night's own day, before a clock
+        // And that copy had every time on the event's own day, before a clock
         // earlier than the one before it was read as the next morning, so the
         // mark is also held against the times put back on that day.
         let tokyo = event.timeZone == Event.publishedZone ? event : event.published(in: Event.publishedZone)
@@ -58,12 +58,12 @@ nonisolated enum FollowingUnread: Sendable {
 }
 
 nonisolated extension Event {
-    /// What a listing row says about the night, boiled down to something that
+    /// What a listing row says about the event, boiled down to something that
     /// changes exactly when the row does — see ``FollowingRead``.
     ///
     /// Only what a performer's listing prints: the title, the hall, the day,
     /// whatever times it carries and the bill. Not the head count, which moves
-    /// with every member who lists the night, and not the flyer, whose URL the
+    /// with every member who lists the event, and not the flyer, whose URL the
     /// host keeps when the picture is replaced. Hashed so a mark is a short
     /// string rather than a copy of the row, and hashed with SHA-256 rather
     /// than `hashValue`, which is seeded afresh on every launch — and on every
@@ -71,7 +71,7 @@ nonisolated extension Event {
     ///
     /// The times are taken as the page prints them — the wall clock in the
     /// event's own zone — rather than as instants. The Following tab's copy
-    /// of a night abroad stays on Tokyo time while the library's is re-read in
+    /// of an event abroad stays on Tokyo time while the library's is re-read in
     /// the hall's zone (``Event/published(in:)``), and the two tabs share one
     /// mark: as instants the same unchanged row would read Updated on
     /// whichever tab had not marked it.
@@ -94,7 +94,7 @@ nonisolated extension Event {
         return Self.digest([title, venue, printedDay] + times + performers.map(\.name))
     }
 
-    /// Every time put back on the night's own day, as every copy was read
+    /// Every time put back on the event's own day, as every copy was read
     /// before an after-midnight clock was taken to be the next morning. Only
     /// for recognising a mark taken then — see ``FollowingRead/matches(_:)``.
     var onItsOwnDay: Event {

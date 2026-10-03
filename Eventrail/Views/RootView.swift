@@ -98,10 +98,10 @@ struct RootView: View {
         // ever catch up after an edit or a trip to the background, so a library
         // imported on another device could sit unmirrored indefinitely.
         .task { await store.mirrorCalendar() }
-        // Live Activities can have fallen behind their nights while the app
+        // Live Activities can have fallen behind their events while the app
         // was not running — see ``EventActivities``.
         .task { await EventActivities.shared.refresh(from: store) }
-        // The watch draws the nights still to come from a copy sent from here,
+        // The watch draws the events still to come from a copy sent from here,
         // so the copy follows every write and the clock it is printed on.
         .task { WatchLink.shared.send(from: store) }
         .onChange(of: store.revision) { WatchLink.shared.send(from: store) }
@@ -113,7 +113,7 @@ struct RootView: View {
             if phase == .active {
                 Task { await store.syncNow() }
                 Task { await EventActivities.shared.refresh(from: store) }
-                // A night whose day ended while the app was away leaves the
+                // An event whose day ended while the app was away leaves the
                 // watch's list too.
                 WatchLink.shared.send(from: store)
             } else {
@@ -156,11 +156,11 @@ final class Launch {
     /// Made together, so the dates know which clock each hall keeps before
     /// any screen reads them — see ``FollowedDates/hallZone``. Four answers,
     /// none of them asked for here: a hall ``VenueRegions`` places in one of
-    /// the site's areas is in Japan; the library's own copy of the night
+    /// the site's areas is in Japan; the library's own copy of the event
     /// carries its hall's clock once a placing retimed it; a hall abroad
     /// whose clock ``VenueRegions/settleClocks(for:)`` settled from its
     /// address keeps that; and a hall placed under any address — the reader
-    /// opening the night places it — answers by its name.
+    /// opening the event places it — answers by its name.
     private init() {
         let store = EventStore()
         let followed = FollowedDates()

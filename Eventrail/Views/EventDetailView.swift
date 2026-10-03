@@ -7,7 +7,7 @@ import Translation
 /// about it. The two are kept visually distinct throughout.
 ///
 /// Laid out as `Eventrail v3.dc.html` draws it: the flyer small beside the
-/// title, the night's own clock in a card of its own, the reader's record as
+/// title, the event's own clock in a card of its own, the reader's record as
 /// two tiles that open ``TicketDetailsView``, then the page's description,
 /// billing, hall and links — and the actions in a bar along the bottom.
 ///
@@ -20,7 +20,14 @@ struct EventDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    /// Where this sheet starts; ``clockChoice`` is where the reader took it.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+    /// The other clock, where the reader picked it on this sheet's switch —
+    /// for as long as the sheet is open, and never written back to Settings.
+    /// Nil follows Settings. See ``clock``.
+    @State private var clockChoice: TimeDisplay?
+    @Namespace private var clockSwitchSpace
+    @Environment(\.colorScheme) private var colorScheme
 
     private let source: Event
     @State private var isImporting = false
@@ -163,7 +170,7 @@ struct EventDetailView: View {
                     header
                     timelineCard
                     // Only for an event the reader keeps. Tracking answers
-                    // questions about a night they mean to be at — the ticket,
+                    // questions about an event they mean to be at — the ticket,
                     // the seat, what it cost — so on an event that is not in
                     // the library there is nothing for it to be about, and a
                     // date opened from Following or Search shows the facts
@@ -192,13 +199,9 @@ struct EventDetailView: View {
                 .padding(.bottom, 32)
             }
             .ignoresSafeArea(edges: .top)
-            // The sheet's own, and not only for the sheets that had none. A
-            // `.refreshable` is carried down the environment into whatever a
-            // screen presents, so a sheet opened from the Following tab used
-            // to answer a pull by re-reading every followed performer's
-            // listing — and one opened from My Events, whose list has no
-            // refresh, by doing nothing. Pulling on an event reads that event.
-            .refreshable { await refreshPage() }
+            // No pull: a pull down from the top of a sheet is how it is put
+            // away. The page is read again from Refresh in the menu instead —
+            // see ``RefreshMenuItem``.
 
             closeButton
                 .padding(.horizontal, 20)
@@ -239,7 +242,7 @@ struct EventDetailView: View {
         // whole, the way the system shows any picture.
         .quickLookPreview($previewedFlyer)
         // Written again with the flyer, so the file opened is the picture on
-        // the sheet — a pull asks the host about both at once.
+        // the sheet — a Refresh asks the host about both at once.
         .task(id: FlyerLoad(url: event.imageURL, name: event.title, checkedSince: imagesCheckedSince)) {
             guard let url = event.imageURL else {
                 flyerFile = nil
@@ -291,7 +294,7 @@ struct EventDetailView: View {
         await readPage(byHand: false)
     }
 
-    /// Reads the event's own page again because the reader pulled for it —
+    /// Reads the event's own page again because the reader chose Refresh —
     /// however recently it was read, since that is the reader asking. What is
     /// on screen stays if the page cannot be had, with the reason under it.
     private func refreshPage() async {
@@ -299,7 +302,7 @@ struct EventDetailView: View {
     }
 
     /// The one read both of those make, and what it says when it is done: a
-    /// notice — either way for a pull, only on failure otherwise — and on
+    /// notice — either way for a Refresh, only on failure otherwise — and on
     /// failure a line under the copy that stayed, which outlasts the notice
     /// since the reader is still looking at that copy after it has gone.
     private func readPage(byHand: Bool) async {
@@ -319,7 +322,7 @@ struct EventDetailView: View {
 
     // MARK: - Header
 
-    /// The flyer, and beside it what the night is called, when and where.
+    /// The flyer, and beside it what the event is called, when and where.
     ///
     /// The flyer at the size of a poster on a wall rather than across the
     /// width of the sheet: it is artwork for the event, and the sheet is read
@@ -459,9 +462,19 @@ struct EventDetailView: View {
 
     // MARK: - The event's clock
 
+    /// The clock this sheet prints on: Settings › Time Zone, until the reader
+    /// picks the other on the timeline card's switch.
+    private var clock: TimeDisplay { clockChoice ?? timeDisplay }
+
+    /// Picking the clock Settings already names goes back to following it, so
+    /// a sheet switched there and back is no different from one never touched.
+    private func choose(_ option: TimeDisplay) {
+        clockChoice = option == timeDisplay ? nil : option
+    }
+
     /// The event as it is printed on the chosen clock — see
     /// ``Event/shown(on:)``. Only ever formatted.
-    private var shown: Event { event.shown(on: timeDisplay) }
+    private var shown: Event { event.shown(on: clock) }
 
     /// How far off the event is, its doors, start and end on one line, and how
     /// long it runs — and on the day itself, how far along it has got.
@@ -484,14 +497,24 @@ struct EventDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     statusDot(tint, pulsing: progress.isUnderway)
+                    // Wraps rather than cutting off where the switch leaves it
+                    // too little room: a countdown is no use with its end gone.
                     headline(for: progress, at: now)
                         .font(.system(size: 20, weight: .bold))
                         .kerning(-0.4)
                         .monospacedDigit()
                         .foregroundStyle(tint)
                         .contentTransition(.numericText())
-                    Spacer(minLength: 8)
-                    zoneCaption
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // The offset and the switch on one baseline, so the two
+                    // small lines read as one, and together centred on the
+                    // headline's capitals rather than sitting on its baseline,
+                    // as the dot before it is.
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        clockOffset
+                        clockSwitch
+                    }
+                    .alignmentGuide(.firstTextBaseline) { $0[.firstTextBaseline] + 3 }
                 }
                 if let detail = detail(for: progress, at: now) {
                     detail
@@ -631,39 +654,81 @@ struct EventDetailView: View {
             .accessibilityHidden(true)
     }
 
-    /// Which clock every time on this sheet is on.
+    /// The offset of the clock this sheet's times are on, beside the switch
+    /// that says which clock that is.
     ///
-    /// On every sheet rather than only on the nights abroad. The times here
-    /// are the hall's, as Eventernote's members wrote them — 18:00 is 18:00 at
-    /// the door rather than 18:00 wherever the reader is standing — and that
-    /// is as true of a Tokyo date as of a Taipei one.
+    /// On every sheet rather than only on the events abroad. On the venue's
+    /// clock the times are the hall's, as Eventernote's members wrote them —
+    /// 18:00 is 18:00 at the door rather than 18:00 wherever the reader is
+    /// standing — and that is as true of a Tokyo date as of a Taipei one.
     ///
-    /// The venue's clock rather than a place name, for the reason
+    /// The offset rather than a place name, for the reason
     /// ``Event/offsetLine(in:)`` gives: the name would be the map provider's
     /// and the provider is the reader's, so a Taipei hall comes back named for
-    /// the mainland. The hall is named on this same sheet; what the caption
+    /// the mainland. The hall is named on this same sheet; what the offset
     /// adds is which clock it keeps.
-    private var zoneCaption: some View {
-        Group {
-            // On the reader's own clock the offset is always known: it is
-            // this device's, on the night itself.
-            if timeDisplay == .local {
-                Text("My time · \(event.offsetLine(in: .current))")
-            // The offset only where there is one to give — see ``venueZone``.
-            } else if let zone = venueZone {
-                Text("Venue time · \(event.offsetLine(in: zone))")
-            } else {
-                Text("Venue time")
+    @ViewBuilder private var clockOffset: some View {
+        // On the reader's own clock the offset is always known: it is this
+        // device's, on the day of the event. On the venue's, only where there
+        // is one to give — see ``venueZone``. Without it the switch alone says
+        // the times are the hall's, which is all that is known.
+        let zone = clock == .local ? TimeZone.current : venueZone
+        if let zone {
+            let offset = event.offsetLine(in: zone)
+            Text(verbatim: offset)
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+                .fixedSize()
+                .accessibilityLabel(clock == .local
+                    ? Text("Times shown in local time, \(offset)")
+                    : Text("Times shown in the venue's own time, \(offset)"))
+        }
+    }
+
+    /// Venue or Local: which clock this sheet prints on, for as long as it is
+    /// open. It starts on Settings › Time Zone and goes back to it when the
+    /// sheet closes — a way of reading this one event, not a preference, so
+    /// it moves no other screen and not the Live Activity either.
+    ///
+    /// A capsule of its own rather than a segmented picker, as the design
+    /// draws it: the system's control is too tall and too wide to sit beside
+    /// the headline. VoiceOver is handed the picker it stands for.
+    private var clockSwitch: some View {
+        HStack(spacing: 2) {
+            ForEach(TimeDisplay.allCases) { option in
+                let isOn = clock == option
+                Button {
+                    withAnimation(.snappy) { choose(option) }
+                } label: {
+                    Text(option.shortLabel)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(isOn ? Color.primary : .secondary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background {
+                            if isOn {
+                                Capsule()
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.2) : .white)
+                                    .shadow(color: .black.opacity(0.1), radius: 1.5, y: 1)
+                                    .matchedGeometryEffect(id: "clock", in: clockSwitchSpace)
+                            }
+                        }
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(.tertiary)
-        .accessibilityLabel(
-            timeDisplay == .local
-                ? Text("Times shown in your own time, \(event.offsetLine(in: .current))")
-                : venueZone.map { Text("Times shown in the venue's own time, \(event.offsetLine(in: $0))") }
-                ?? Text("Times shown in the venue's own time")
-        )
+        .padding(2)
+        .background(Color.primary.opacity(0.07), in: .capsule)
+        .fixedSize()
+        .accessibilityRepresentation {
+            Picker("Time Zone", selection: Binding(get: { clock }, set: choose)) {
+                ForEach(TimeDisplay.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+        }
     }
 
     /// Which clock this sheet's times are on, where the app has established it
@@ -771,16 +836,16 @@ struct EventDetailView: View {
 
     /// How long the show runs, from its start to its published end.
     ///
-    /// Read in the order a night runs, so an end after midnight is the next
+    /// Read in the order an event runs, so an end after midnight is the next
     /// morning — see ``Event/inOrder(_:_:_:)`` — and not past
-    /// ``PassportStats/longestNight``, where the page's times are more likely
+    /// ``PassportStats/longestEvent``, where the page's times are more likely
     /// a typo than a show.
     private var runLine: Text {
         let times = Event.inOrder(event.doorsOpen, event.startsAt, event.endsAt)
         guard let starts = times.starts else { return Text("Start time not announced") }
         guard let ends = times.ends else { return Text("End time not announced") }
         let length = ends.timeIntervalSince(starts)
-        guard length > 0, length <= PassportStats.longestNight else {
+        guard length > 0, length <= PassportStats.longestEvent else {
             return Text("End time not announced")
         }
         let runs = Duration.seconds(length)
@@ -865,7 +930,7 @@ struct EventDetailView: View {
     }
 
     /// Where the ticket stands: in hand, still being tried for, or not yet —
-    /// and once the night is over, simply that the reader was there.
+    /// and once the event is over, simply that the reader was there.
     private var ticketValue: Text {
         if !isAhead { return Text("Attended") }
         if tracking.ticket == .purchased { return Text("Purchased") }
@@ -936,69 +1001,76 @@ struct EventDetailView: View {
         ToolbarSpacer(.flexible, placement: .bottomBar)
     }
 
-    /// Everything the bar has no room for. In the order the design lists it
-    /// top to bottom, whichever way the menu opens.
+    /// Everything the bar has no room for, and the bar's own actions again,
+    /// in groups a divider apart, the same groups a performer's and a hall's
+    /// menus keep: what the reader keeps about the event, where it is and
+    /// passing it on, the page it was read from — and last, whether it is in
+    /// the library at all. In that order whichever way the menu opens.
     private var moreMenu: some View {
         Menu {
-            Section {
-                if offersLiveActivity {
-                    Button(action: toggleLiveActivity) {
-                        Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
-                              systemImage: "clock")
-                    }
-                }
-                Button {
-                    withAnimation(.snappy) { store.toggleFavorite(event) }
-                } label: {
-                    Label(store.isFavorite(event) ? "Remove from Favorites" : "Add to Favorites",
-                          systemImage: store.isFavorite(event) ? "heart.fill" : "heart")
+            if offersLiveActivity {
+                Button(action: toggleLiveActivity) {
+                    Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                          systemImage: "clock")
                 }
             }
+            Button {
+                withAnimation(.snappy) { store.toggleFavorite(event) }
+            } label: {
+                Label(store.isFavorite(event) ? "Remove from Favorites" : "Add to Favorites",
+                      systemImage: store.isFavorite(event) ? "heart.fill" : "heart")
+            }
 
-            Section {
-                if hasVenue {
-                    Button {
-                        openVenueInMaps(directions: true)
-                    } label: {
-                        Label("Directions", systemImage: "location.fill")
-                    }
+            Divider()
+
+            if hasVenue {
+                Button {
+                    openVenueInMaps(directions: true)
+                } label: {
+                    Label("Directions", systemImage: "location.fill")
                 }
-                // Anything that changes the reader's Eventernote account
-                // happens on the official site, where they authenticate
-                // directly.
-                Link(destination: event.sourceURL) {
-                    Label("Open in Eventernote", systemImage: "safari")
-                }
-                ShareLink(item: event.sourceURL) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
+            }
+            ShareLink(item: event.sourceURL) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+
+            Divider()
+
+            // Anything that changes the reader's Eventernote account happens
+            // on the official site, where they authenticate directly.
+            Link(destination: event.sourceURL) {
+                Label("Open in Eventernote", systemImage: "safari")
+            }
+            // In a Task of its own: the menu does not wait for the read, and
+            // the notice says how it went.
+            RefreshMenuItem(isRefreshing: isImporting) {
+                Task { await refreshPage() }
             }
 
             #if DEBUG
-            Section {
-                Button {
-                    isTestingLiveActivity = true
-                } label: {
-                    Label { Text(verbatim: "Test Live Activity…") } icon: { Image(systemName: "hammer") }
-                }
+            Divider()
+            Button {
+                isTestingLiveActivity = true
+            } label: {
+                Label { Text(verbatim: "Test Live Activity…") } icon: { Image(systemName: "hammer") }
             }
             #endif
 
+            Divider()
+
             // The same place either way, so the menu keeps its shape as the
             // event goes in and out of the library.
-            Section {
-                if store.isInLibrary(event) {
-                    Button(role: .destructive) {
-                        withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
-                    } label: {
-                        Label { Text("Remove Event") } icon: { removalIcon }
-                    }
-                } else {
-                    Button {
-                        withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-                    } label: {
-                        Label("Add Event", systemImage: "plus")
-                    }
+            if store.isInLibrary(event) {
+                Button(role: .destructive) {
+                    withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+                } label: {
+                    Label { Text("Remove Event") } icon: { removalIcon }
+                }
+            } else {
+                Button {
+                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                } label: {
+                    Label("Add Event", systemImage: "plus")
                 }
             }
         } label: {
@@ -1012,7 +1084,7 @@ struct EventDetailView: View {
         EventActivities.shared.statuses[event.id]
     }
 
-    /// Whether the bar and the menu offer the Live Activity: for a night the
+    /// Whether the bar and the menu offer the Live Activity: for an event the
     /// reader holds a ticket for — see ``EventActivities/canOffer(_:tracking:inLibrary:at:)``
     /// — and, whatever has changed since, for one already asked for, so it
     /// can always be turned off from here.
@@ -1022,7 +1094,7 @@ struct EventDetailView: View {
     }
 
     /// A clock, with a tick on it once one is scheduled and filled in the
-    /// colour of a night under way once it is on — the design's plain, pale
+    /// colour of an event under way once it is on — the design's plain, pale
     /// and filled button.
     private var liveActivitySymbol: String {
         switch liveActivity {
@@ -1040,11 +1112,11 @@ struct EventDetailView: View {
             .joined(separator: "|")
     }
 
-    /// Turns the event's Live Activity on, at once, or off. Too early for it
-    /// to last the night it says from when it can be instead, in passing —
-    /// the notice pill and its error haptic, no alert to answer: the button
-    /// is there all along, so the reader learns the feature exists and when
-    /// to come back for it. See ``EventActivities/refusal(for:at:in:)``.
+    /// Turns the event's Live Activity on, at once, or off. Too early for it to
+    /// last until the event is over, it says from when it can be instead, in
+    /// passing — the notice pill and its error haptic, no alert to answer: the
+    /// button is there all along, so the reader learns the feature exists and
+    /// when to come back for it. See ``EventActivities/refusal(for:at:in:)``.
     private func toggleLiveActivity() {
         let activities = EventActivities.shared
         let event = event
@@ -1084,7 +1156,7 @@ struct EventDetailView: View {
     ///
     /// It is where everything the site has no field for ends up — ticket
     /// prices, seat types, the on-sale date, which stage each act is on — so
-    /// for most events it is the fullest thing published about the night. It
+    /// for most events it is the fullest thing published about the event. It
     /// also runs from one line to forty, which is why it opens collapsed: the
     /// billing and the hall below it should not sit under a wall of ticket
     /// terms the reader has already read once.
@@ -1185,6 +1257,8 @@ struct EventDetailView: View {
         return nil
     }
 
+    private static let translateFont = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+
     private func translateButton(for summary: String) -> some View {
         let isShowing = showsTranslation && hasTranslation(of: summary)
         return Button {
@@ -1202,15 +1276,20 @@ struct EventDetailView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                if isTranslating {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Image(systemName: "translate")
-                        .font(.system(size: 11, weight: .semibold))
+            // On the words' baseline, so the card's header lines them up with
+            // its title — see ``SeeAllLabel``.
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Group {
+                    if isTranslating {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: "translate")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
                 }
+                .centredOnLine(of: Self.translateFont)
                 Text(isShowing ? "Show Original" : "Translate")
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(Font(Self.translateFont))
             }
             .foregroundStyle(Color.brandTint)
             .contentShape(.rect)
@@ -1319,7 +1398,7 @@ struct EventDetailView: View {
     // MARK: - Where the announcement was made
 
     /// 関連リンク and Twitterハッシュタグ: the pages the event was announced on,
-    /// and what to follow the night under.
+    /// and what to follow the event under.
     ///
     /// One card rather than two, because both answer the same question — where
     /// the rest of this is — and because most events publish one or the other
@@ -1544,7 +1623,8 @@ struct EventDetailView: View {
     private var footnote: some View {
         Footnote(isImporting
                  ? Text("Importing this event from its public Eventernote page…")
-                 : provenance)
+                 : provenance,
+                 updated: isImporting ? nil : store.lastRead(of: event))
             .padding(.horizontal, 26)
             .padding(.top, 2)
     }
@@ -1554,7 +1634,7 @@ struct EventDetailView: View {
     ///
     /// Eventernote's event pages are written by its members rather than by the
     /// promoter, so how recently one was touched is part of reading it: an
-    /// upcoming night last edited two years ago has doors nobody has checked
+    /// upcoming event last edited two years ago has doors nobody has checked
     /// since. The handle is shown as the site prints it.
     private var provenance: Text {
         let source = Text("Event data imported from the public Eventernote page.")

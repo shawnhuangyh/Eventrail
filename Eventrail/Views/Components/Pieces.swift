@@ -55,7 +55,7 @@ struct StatusBadge: View {
     }
 }
 
-/// How long until a night, as a count of days over the word for them.
+/// How long until an event, as a count of days over the word for them.
 ///
 /// The one thing a row about the future can say that a row about the past
 /// cannot, and the thing a reader with a ticket actually wants off a list: not

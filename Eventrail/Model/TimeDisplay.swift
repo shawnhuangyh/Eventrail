@@ -11,7 +11,7 @@ import SwiftUI
 /// the calendar entry, its door alert and the library's order are made of those
 /// already — and so is everything that works in written dates: the month a row
 /// is grouped under, the days-away count, the Following tab's date filter. A
-/// night belongs to the day its hall says it falls on.
+/// event belongs to the day its hall says it falls on.
 enum TimeDisplay: String, CaseIterable, Identifiable {
     case venue, local
 
@@ -24,7 +24,15 @@ enum TimeDisplay: String, CaseIterable, Identifiable {
     var label: LocalizedStringKey {
         switch self {
         case .venue: "Venue Time"
-        case .local: "My Time"
+        case .local: "Local Time"
+        }
+    }
+
+    /// The same, short enough for the switch on an event's timeline card.
+    var shortLabel: LocalizedStringKey {
+        switch self {
+        case .venue: "Venue"
+        case .local: "Local"
         }
     }
 }
@@ -35,7 +43,7 @@ nonisolated extension Event {
     ///
     /// On the reader's clock the day is the day of the first time the page
     /// published, in the reader's zone: 18:00 in Tokyo is 02:00 the same day in
-    /// Los Angeles, and 09:00 the next morning nowhere. A night with no time
+    /// Los Angeles, and 09:00 the next morning nowhere. An event with no time
     /// published yet keeps its hall's day, because a day alone cannot be
     /// converted — its midnight in Tokyo is the afternoon before in London, and
     /// saying so would put the show on a day nobody announced.

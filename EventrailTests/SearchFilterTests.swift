@@ -23,9 +23,9 @@ struct SearchFilterTests {
         #expect(gone.matches(past))
     }
 
-    /// Read newest first, the upcoming nights come first: a past row ends the
+    /// Read newest first, the upcoming events come first: a past row ends the
     /// upcoming ones, and an upcoming row is in front of the past ones.
-    @Test func newestFirstSkipsTheNightsAheadAndStopsAtThePastOnes() {
+    @Test func newestFirstSkipsTheEventsAheadAndStopsAtThePastOnes() {
         let upcoming = SearchFilter(when: .upcoming)
         #expect(upcoming.comesAfterMatches(past, reading: .newestFirst))
         #expect(!upcoming.comesAfterMatches(ahead, reading: .newestFirst))
@@ -37,7 +37,7 @@ struct SearchFilterTests {
         #expect(!gone.comesAfterMatches(past, reading: .newestFirst))
     }
 
-    /// Oldest first, the same edges swap ends: every past night is in front
+    /// Oldest first, the same edges swap ends: every past event is in front
     /// of the first upcoming one.
     @Test func oldestFirstSwapsTheEnds() {
         let upcoming = SearchFilter(when: .upcoming)

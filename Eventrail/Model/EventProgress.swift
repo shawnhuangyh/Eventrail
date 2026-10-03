@@ -1,7 +1,7 @@
 import Foundation
 
 /// Where an event stands at one moment — what the event sheet's timeline says
-/// and how far along its doors, start and end the night has got.
+/// and how far along its doors, start and end the event has got.
 ///
 /// Worked out from the event's instants rather than from the clock it is
 /// printed on, so it is right on either setting of ``TimeDisplay``. Computed
@@ -28,7 +28,7 @@ nonisolated struct EventProgress: Equatable {
     }
 
     let phase: Phase
-    /// How far along the night it has got: 0 at the doors, ½ at the start, 1
+    /// How far along the event it has got: 0 at the doors, ½ at the start, 1
     /// at the end — so each half is the share of that stretch gone by, which
     /// is what the sheet fills the line between its two times with.
     let fraction: Double

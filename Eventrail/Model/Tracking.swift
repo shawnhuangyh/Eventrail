@@ -61,7 +61,7 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
 /// happened is one they went to, so attendance was a second word for the date.
 /// What is left is the ticket: whether it is in hand, which the library cannot
 /// say by itself, and once it is, the things about it worth keeping after the
-/// night is over — and whatever the reader wants to write down.
+/// event is over — and whatever the reader wants to write down.
 ///
 /// Dropping the two needed no migration: a record written before this still
 /// carries `interest` and `attendance`, and a decoder ignores keys it has no
@@ -94,24 +94,24 @@ nonisolated struct Tracking: Hashable, Codable {
     /// seat or an invite really does cost nothing, and it is worth being able
     /// to record that.
     var cost: Int?
-    /// How many entries the reader put into the lottery for this night.
+    /// How many entries the reader put into the lottery for this event.
     ///
-    /// Nil is "not written down", and so is zero: a night the reader applied
-    /// for nothing is a night with no lottery on it rather than a lottery they
+    /// Nil is "not written down", and so is zero: an event the reader applied
+    /// for nothing is an event with no lottery on it rather than a lottery they
     /// entered no times. Unlike ``cost``, where zero is a real answer — a seat
     /// that was won or given really did cost nothing — there is nothing a 0
     /// here says that an empty field does not.
     ///
     /// So a count taken back down to nothing empties the field. It used to
-    /// settle on 0 and go on counting as a night the reader had answered for,
+    /// settle on 0 and go on counting as an event the reader had answered for,
     /// which is what the Passport's `Recorded` and its averages are counted
-    /// over: one taken down to zero read there as a night applied for and
+    /// over: one taken down to zero read there as an event applied for and
     /// nothing gained.
     var lotteryEntries: Int? {
         // The one place the rule holds, so that nothing which reads this
         // record has to know it: a sheet writing through a binding, a merge
         // taking the answer from another device, the Passport counting up the
-        // nights it was written on. Assigning inside `didSet` does not run it
+        // events it was written on. Assigning inside `didSet` does not run it
         // again, and an observer does not run during init at all — which is
         // what the decoder below handles for records already written.
         didSet { if lotteryEntries == 0 { lotteryEntries = nil } }
@@ -331,7 +331,7 @@ nonisolated struct EntryCount: ParseableFormatStyle {
     }
 
     nonisolated struct Strategy: ParseStrategy {
-        /// Four digits is 9,999 applications for one night. Past that the
+        /// Four digits is 9,999 applications for one event. Past that the
         /// reader is leaning on a key rather than recording a lottery.
         ///
         /// A field left empty and a field holding 0 read back the same, for

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Eventrail on Apple Watch, as `Eventrail Watch.dc.html` (1a) draws it: My
-/// Events, then each night in three pages turned with the Crown — the
+/// Events, then each event in three pages turned with the Crown — the
 /// countdown, the seat, the times.
 ///
 /// Read-only, and fed by the phone: the library comes over as a

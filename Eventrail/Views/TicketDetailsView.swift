@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The reader's own record for one night — the ticket, the lottery, the seat,
+/// The reader's own record for one event — the ticket, the lottery, the seat,
 /// what it cost and a note — asked on a sheet of its own over the event's.
 ///
 /// The event's sheet shows these answers as two tiles and a line of note, so
@@ -26,7 +26,7 @@ struct TicketDetailsView: View {
 
     /// Whether there is a ticket to say anything about.
     ///
-    /// Not asked for a past event: the night happened, so the ticket existed.
+    /// Not asked for a past event: the event happened, so the ticket existed.
     /// Still to come, it is there when the reader says they have bought it.
     private var hasTicket: Bool {
         !event.isUpcoming || tracking.wrappedValue.ticket == .purchased
@@ -36,14 +36,13 @@ struct TicketDetailsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // The one question the library does not already answer,
-                    // and only while it is still open to ask — see
-                    // ``Tracking``. A night already over was a night they held
-                    // a ticket for.
+                    // The one question the library does not already answer, and
+                    // only while it is still open to ask — see ``Tracking``. An
+                    // event already over was an event they held a ticket for.
                     if event.isUpcoming { ticketSection }
                     // Asked whether or not there is a ticket: the applications
-                    // went in long before anybody knew, and a night applied for
-                    // six times and lost is worth having written down.
+                    // went in long before anybody knew, and an event applied
+                    // for six times and lost is worth having written down.
                     lotterySection
                     if hasTicket {
                         seatSection
@@ -83,7 +82,7 @@ struct TicketDetailsView: View {
         }
     }
 
-    /// How many entries the reader put into the lottery for this night.
+    /// How many entries the reader put into the lottery for this event.
     ///
     /// Stepped rather than typed, because the answer is nearly always one of
     /// the first few numbers — but the count itself is still a field, for the

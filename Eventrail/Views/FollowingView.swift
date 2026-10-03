@@ -144,6 +144,13 @@ struct FollowingView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            // On the list itself, inside the destinations and the sheet below.
+            // A `.refreshable` is carried down the environment into whatever is
+            // pushed or presented from beneath it, and a performer's page or an
+            // event's sheet opened from here answered a pull by re-reading
+            // every followed listing; those read themselves again from Refresh
+            // in their own menus — see ``RefreshMenuItem``.
+            .refreshable { await reload() }
             // Drawn here rather than by the tab, inside the room the capsule
             // leaves, so a notice stands above the capsule rather than over it
             // — see ``refreshNotices(aboveBar:showing:)``.
@@ -179,7 +186,6 @@ struct FollowingView: View {
                     guard venues.pendingCount(published) < waiting else { return }
                 }
             }
-            .refreshable { await reload() }
             // Following someone on their page should show their dates here on
             // the way back, so this follows the list rather than only the first
             // appearance of the screen — and the cache's generation with it,
@@ -482,7 +488,9 @@ struct FollowingView: View {
         Button {
             withAnimation(.snappy) { choose() }
         } label: {
-            HStack(spacing: 7) {
+            // The count on the name's baseline, as a count beside a title is
+            // everywhere else; centred on it, the smaller figure rode high.
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 label
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(isOn ? Color.brandTint : .secondary)

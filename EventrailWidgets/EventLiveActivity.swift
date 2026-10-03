@@ -9,7 +9,7 @@ import WidgetKit
 /// something or its stale date passes, and the app is rarely running during a
 /// concert. So nothing here waits to be told the stage has changed: every
 /// stage still to come is drawn at once, and each is shown only inside its own
-/// stretch of the night (``Stretch``), switched by the system as the night runs
+/// stretch of the event (``Stretch``), switched by the system as the event runs
 /// on. Everything that moves within a stage is a view the system runs by
 /// itself too: the countdowns are timers, held at zero once they run out, and
 /// the fill is a timer progress bar.
@@ -44,61 +44,61 @@ struct EventLiveActivity: Widget {
                 #if DEBUG
                 if context.attributes.eventID.hasPrefix(GateDiagnostics.prefix) {
                     GateDiagnostics(since: context.attributes.opens)
-                        .activityBackgroundTint(Night.platter)
+                        .activityBackgroundTint(EventMoment.platter)
                 } else {
-                    ActivityCard(night: Night(context))
+                    ActivityCard(moment: EventMoment(context))
                 }
                 #else
-                ActivityCard(night: Night(context))
+                ActivityCard(moment: EventMoment(context))
                 #endif
             }
                 .activitySystemActionForegroundColor(.white)
                 .widgetURL(context.attributes.link)
         } dynamicIsland: { context in
-            let night = Night(context)
+            let moment = EventMoment(context)
             return DynamicIsland {
                 // The top row splits around the camera: the time counted from
                 // on one side, the time counted to on the other.
                 DynamicIslandExpandedRegion(.leading) {
-                    night.eachStage(alignment: .leading) { night in
-                        night.stopColumn(night.stops.from, alignment: .leading)
+                    moment.eachStage(alignment: .leading) { moment in
+                        moment.stopColumn(moment.stops.from, alignment: .leading)
                     }
                     .padding(.leading, 6)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    night.eachStage(alignment: .trailing) { night in
-                        night.stopColumn(night.stops.to, alignment: .trailing)
+                    moment.eachStage(alignment: .trailing) { moment in
+                        moment.stopColumn(moment.stops.to, alignment: .trailing)
                     }
                     .padding(.trailing, 6)
                 }
-                // Everything else below it: the event, and where the night
+                // Everything else below it: the event, and where the event
                 // stands beside the seat. The design sets a rule between the
                 // two; the island has no height to spare for one.
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 6) {
                         HStack(spacing: 10) {
-                            night.poster(width: 22, height: 31, radius: 5)
+                            moment.poster(width: 22, height: 31, radius: 5)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(verbatim: night.attributes.title)
+                                Text(verbatim: moment.attributes.title)
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(.white.opacity(0.92))
-                                Text(verbatim: night.attributes.venue)
+                                Text(verbatim: moment.attributes.venue)
                                     .font(.system(size: 11.5, weight: .medium))
                                     .foregroundStyle(.white.opacity(0.5))
                             }
                             .lineLimit(1)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        night.eachStage { night in
+                        moment.eachStage { moment in
                             HStack(spacing: 12) {
-                                night.headline
+                                moment.headline
                                     .font(.system(size: 17, weight: .bold))
                                     .kerning(-0.17)
                                     .monospacedDigit()
-                                    .foregroundStyle(night.tint)
+                                    .foregroundStyle(moment.tint)
                                     .lineLimit(1)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                night.seatCapsule(height: 24)
+                                moment.seatCapsule(height: 24)
                             }
                         }
                     }
@@ -114,7 +114,7 @@ struct EventLiveActivity: Widget {
                     .padding(.bottom, 6)
                 }
             } compactLeading: {
-                night.poster(width: 20, height: 26, radius: 6)
+                moment.poster(width: 20, height: 26, radius: 6)
             } compactTrailing: {
                 // A timer takes all the width it is offered, and the island
                 // is as wide on the poster's side as on this one, so each is
@@ -122,23 +122,23 @@ struct EventLiveActivity: Widget {
                 // counts down only through the last hour, since the width is
                 // fixed as the island is drawn and a "1:59:59" left it that
                 // wide long after the hours had gone.
-                let template = night.longestGlanceCountdown
-                night.eachStage(alignment: .trailing) { night in
-                    night.glanceStatus(sizedFor: template)
+                let template = moment.longestGlanceCountdown
+                moment.eachStage(alignment: .trailing) { moment in
+                    moment.glanceStatus(sizedFor: template)
                         .font(.system(size: 14, weight: .bold))
                         .monospacedDigit()
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(night.tint)
+                        .foregroundStyle(moment.tint)
                         .lineLimit(1)
                 }
             } minimal: {
                 // Only the largest unit left — "1h", "40m", "40s": the
                 // smallest view has room for three characters, not a clock.
-                night.eachStage { night in
-                    night.minimalStatus
+                moment.eachStage { moment in
+                    moment.minimalStatus
                         .font(.system(size: 13, weight: .bold))
                         .monospacedDigit()
-                        .foregroundStyle(night.tint)
+                        .foregroundStyle(moment.tint)
                 }
             }
             // The margins are left as the system has them. Taken in to 10 at
@@ -149,8 +149,8 @@ struct EventLiveActivity: Widget {
             //
             // The outline takes one colour, not one per stretch: the stage's
             // as the app last saw it.
-            .keylineTint(night.tint)
-            .widgetURL(night.attributes.link)
+            .keylineTint(moment.tint)
+            .widgetURL(moment.attributes.link)
         }
         .supplementalActivityFamilies([.small])
     }
@@ -159,36 +159,36 @@ struct EventLiveActivity: Widget {
 /// The card outside the island, each on its own background: the Lock
 /// Screen's, or the Smart Stack's where the system asks for the small family.
 struct ActivityCard: View {
-    let night: Night
+    let moment: EventMoment
     @Environment(\.activityFamily) private var family
 
     var body: some View {
         switch family {
         case .small:
-            SmartStackView(night: night)
+            SmartStackView(moment: moment)
                 .activityBackgroundTint(SmartStackView.base)
         default:
-            LockScreenView(night: night)
-                .activityBackgroundTint(Night.platter)
+            LockScreenView(moment: moment)
+                .activityBackgroundTint(EventMoment.platter)
         }
     }
 }
 
-/// The Lock Screen card: where the night stands and what comes next, the seat,
+/// The Lock Screen card: where the event stands and what comes next, the seat,
 /// the event itself, and the two times the fill runs between.
 struct LockScreenView: View {
-    let night: Night
+    let moment: EventMoment
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            night.eachStage(alignment: .topLeading) { night in
+            moment.eachStage(alignment: .topLeading) { moment in
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        night.headline
+                        moment.headline
                             .font(.system(size: 20, weight: .bold))
                             .kerning(-0.4)
-                            .foregroundStyle(night.tint)
-                        if let detail = night.detail {
+                            .foregroundStyle(moment.tint)
+                        if let detail = moment.detail {
                             detail
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.6))
@@ -197,25 +197,25 @@ struct LockScreenView: View {
                     .lineLimit(1)
                     .monospacedDigit()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    night.seatCapsule()
+                    moment.seatCapsule()
                 }
             }
 
             HStack(spacing: 9) {
-                night.poster(width: 26, height: 36, radius: 5)
+                moment.poster(width: 26, height: 36, radius: 5)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: night.attributes.title)
+                    Text(verbatim: moment.attributes.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.95))
-                    Text(verbatim: night.attributes.venue)
+                    Text(verbatim: moment.attributes.venue)
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundStyle(.white.opacity(0.55))
                 }
                 .lineLimit(1)
             }
 
-            night.eachStage { night in
-                night.trackRow(timeSize: 18, labelSize: 11)
+            moment.eachStage { moment in
+                moment.trackRow(timeSize: 18, labelSize: 11)
             }
         }
         .padding(.horizontal, 18)
@@ -225,29 +225,24 @@ struct LockScreenView: View {
 }
 
 /// The card in a paired Apple Watch's Smart Stack, as `Eventrail Watch.dc.html`
-/// draws it: three lines — where the night stands, the seat, and the two times
+/// draws it: three lines — where the event stands, the seat, and the two times
 /// the fill runs between. The title is left to the phone, and the flyer beside
 /// the first line says which event it is. Where no seat was written down, the
 /// hall stands in its place.
 ///
-/// The card is the night's colour washed over a dark grey, and it is drawn
-/// for the stage the night is at and no other — not every stage behind a
+/// The card is the event's colour washed over a dark grey, and it is drawn
+/// for the stage the event is at and no other — not every stage behind a
 /// ``Gate``, as the phone's are. The watch does not honour the gates: it drew
 /// every stage at once, text over text. On one stage the countdown and the
 /// fill still run by themselves, and the card moves on to the next stage when
 /// it is next drawn — as the stage changes and the activity goes stale, or
 /// when the app brings it up to date.
 ///
-/// The "Last Updated … ago" the watch sometimes lays over the card is not
-/// the card's: watchOS covers every iPhone Live Activity in the Smart Stack
-/// with it once the watch has lost its phone for a minute, and nothing this
-/// view draws or the app sends changes that.
-///
 /// It is drawn at whatever size the watch gives it, the three lines spread
 /// down it. The design's card is a 46 mm watch's; on a smaller one the gaps
 /// close up rather than the card being cut off.
 struct SmartStackView: View {
-    let night: Night
+    let moment: EventMoment
 
     /// The card under the wash.
     static let base = Color(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1F / 255)
@@ -258,7 +253,7 @@ struct SmartStackView: View {
     var body: some View {
         card
             .overlay(alignment: .topTrailing) {
-                night.poster(width: Self.poster.width, height: Self.poster.height, radius: 3)
+                moment.poster(width: Self.poster.width, height: Self.poster.height, radius: 3)
                     .padding(.top, Self.margins.top)
                     .padding(.trailing, Self.margins.trailing)
             }
@@ -267,11 +262,11 @@ struct SmartStackView: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
-            night.headline
+            moment.headline
                 .font(.system(size: 16.5, weight: .bold))
                 .kerning(-0.165)
                 .monospacedDigit()
-                .foregroundStyle(night.tint)
+                .foregroundStyle(moment.tint)
                 .lineLimit(1)
                 // "まもなく開演・あと3:30" is half as long again as the
                 // English, and the card has no second line to give it.
@@ -280,13 +275,13 @@ struct SmartStackView: View {
                 .padding(.trailing, Self.poster.width + 6)
                 .frame(maxWidth: .infinity, minHeight: Self.poster.height, alignment: .topLeading)
             Spacer(minLength: 4)
-            if night.state.seat.isEmpty {
-                Text(verbatim: night.attributes.venue)
+            if moment.state.seat.isEmpty {
+                Text(verbatim: moment.attributes.venue)
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
             } else {
-                night.seatCapsule(height: 21, value: 12.5, label: 7.5, padding: 8, spacing: 4.5)
+                moment.seatCapsule(height: 21, value: 12.5, label: 7.5, padding: 8, spacing: 4.5)
             }
             Spacer(minLength: 4)
             // "16:18 Doors" and "Start 16:33" leave the fill a couple of
@@ -294,14 +289,14 @@ struct SmartStackView: View {
             // clock leaves it nothing: a size down first, then the labels go
             // before the fill does.
             ViewThatFits(in: .horizontal) {
-                night.trackRow(timeSize: 13, labelSize: 9, spacing: 5)
-                night.trackRow(timeSize: 12, labelSize: 8.5, spacing: 4)
-                night.trackRow(timeSize: 13, labelSize: 9, spacing: 5, labelled: false)
+                moment.trackRow(timeSize: 13, labelSize: 9, spacing: 5)
+                moment.trackRow(timeSize: 12, labelSize: 8.5, spacing: 4)
+                moment.trackRow(timeSize: 13, labelSize: 9, spacing: 5, labelled: false)
             }
         }
         .padding(Self.margins)
         .background {
-            LinearGradient(colors: [night.tint.opacity(0.3), night.tint.opacity(0.08)],
+            LinearGradient(colors: [moment.tint.opacity(0.3), moment.tint.opacity(0.08)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
@@ -309,10 +304,10 @@ struct SmartStackView: View {
 
 /// One activity's worth of what to draw, worked out once from its context —
 /// and, through ``eachStage(alignment:_:)``, once for each stage still to come.
-struct Night {
+struct EventMoment {
     let attributes: EventActivityAttributes
     let state: EventActivityAttributes.ContentState
-    /// The rest of the night as it stands as this is drawn — see
+    /// The rest of the event as it stands as this is drawn — see
     /// ``EventActivityAttributes/ContentState/phases(at:)``.
     let phases: [EventActivityPhase]
     /// The stage this copy draws: the first of ``phases``, or the one it was
@@ -330,20 +325,20 @@ struct Night {
         stage = phases[0].stage
     }
 
-    private init(_ night: Night, stage: EventActivityStage) {
-        attributes = night.attributes
-        state = night.state
-        phases = night.phases
+    private init(_ moment: EventMoment, stage: EventActivityStage) {
+        attributes = moment.attributes
+        state = moment.state
+        phases = moment.phases
         self.stage = stage
     }
 
     /// `content` drawn once for each stage still to come, each shown only in
-    /// its own stretch of the night.
+    /// its own stretch of the event.
     func eachStage<Content: View>(alignment: Alignment = .center,
-                                  @ViewBuilder _ content: @escaping (Night) -> Content) -> some View {
+                                  @ViewBuilder _ content: @escaping (EventMoment) -> Content) -> some View {
         ZStack(alignment: alignment) {
             ForEach(phases, id: \.stage) { phase in
-                content(Night(self, stage: phase.stage))
+                content(EventMoment(self, stage: phase.stage))
                     .modifier(Stretch(phase: phase))
             }
         }
@@ -499,7 +494,7 @@ struct Night {
     static let minimalHours = 12
 
     /// Each reading of the time left to `target` that falls inside this
-    /// stage's stretch of the night, with the moments it comes on and gives
+    /// stage's stretch of the event, with the moments it comes on and gives
     /// way — nil at either end the stage's own ``Stretch`` already covers.
     func minimalReadings(to target: Date) -> [MinimalReading] {
         let phase = phases.first { $0.stage == stage }
@@ -584,7 +579,7 @@ struct Night {
     }
 
     /// The longest reading the island's countdown will show over the rest of
-    /// the night, as a template of the timer's shape — "0:00" or "00:00",
+    /// the event, as a template of the timer's shape — "0:00" or "00:00",
     /// never more, since it counts only through the last hour — for sizing
     /// it: each stage's countdown is longest as its stretch begins.
     var longestGlanceCountdown: String {
@@ -604,7 +599,7 @@ struct Night {
         return instant.formatted(style)
     }
 
-    /// The seat, where the reader wrote one down: a capsule in the night's
+    /// The seat, where the reader wrote one down: a capsule in the event's
     /// colour, as the designs set it on the Lock Screen, in the island and on
     /// the watch — 28 points tall on the Lock Screen, a little less in the
     /// island, which has none to spare, and smaller all through on the watch.
@@ -632,13 +627,13 @@ struct Night {
         }
     }
 
-    /// A time the night runs between, and which one it is.
+    /// A time the event runs between, and which one it is.
     struct Stop {
         let instant: Date?
         let label: LocalizedStringKey
     }
 
-    /// Whether the night is still counting from the doors to the start, rather
+    /// Whether the event is still counting from the doors to the start, rather
     /// than from the start to the end.
     private var countsToStart: Bool {
         [.beforeDoors, .doorsOpen, .startingSoon].contains(stage) && state.doors != nil
@@ -703,7 +698,7 @@ struct Night {
             .lineLimit(1)
     }
 
-    /// The line between the two times, filled by the system as the night
+    /// The line between the two times, filled by the system as the event
     /// runs on — nothing here has to be sent anything for it to move.
     ///
     /// No knob on the end of the fill, as the design has: the fill is the
@@ -735,7 +730,7 @@ struct Night {
     }
 
     /// The flyer, where the app left one in the shared container, or a card
-    /// of the night's colour where it did not.
+    /// of the event's colour where it did not.
     func poster(width: CGFloat, height: CGFloat, radius: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         return Group {
@@ -932,7 +927,7 @@ extension EventActivityAttributes.ContentState {
     ]
     VStack(spacing: 8) {
         ForEach(states, id: \.stage) { state in
-            SmartStackView(night: Night(attributes: .preview, state: state, at: .now))
+            SmartStackView(moment: EventMoment(attributes: .preview, state: state, at: .now))
                 .frame(width: 194, height: 89)
                 .background(SmartStackView.base)
                 .clipShape(.rect(cornerRadius: 20))

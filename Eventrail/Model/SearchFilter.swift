@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// What the Search tab's event results are narrowed to: whether a night is
+/// What the Search tab's event results are narrowed to: whether an event is
 /// still ahead, and the part of the world.
 ///
 /// Answered in two places, because the site answers only half of it. An area
@@ -17,7 +17,7 @@ import SwiftUI
 /// ``comesBeforeMatches(_:reading:)`` — and the reading stops at the first row
 /// past it — see ``comesAfterMatches(_:reading:)``.
 struct SearchFilter: Hashable {
-    /// Whether a night is still ahead.
+    /// Whether an event is still ahead.
     enum When: CaseIterable, Hashable {
         case any, upcoming, past
 
@@ -77,7 +77,7 @@ struct SearchFilter: Hashable {
 
     /// Whether, in a listing read in `order`, the rows the filter wants have
     /// not begun yet at `event` — so a page ending on it can be skipped: a
-    /// night still ahead while only past ones are wanted, newest first, or a
+    /// event still ahead while only past ones are wanted, newest first, or a
     /// past one while only upcoming ones are, oldest first.
     func comesBeforeMatches(_ event: Event, reading order: SearchOrder) -> Bool {
         switch (when, order) {
@@ -95,6 +95,17 @@ struct SearchFilter: Hashable {
         case (.past, .oldestFirst): event.isUpcoming
         default: false
         }
+    }
+
+    /// What the filter holds a list to, in as few words as will say it: when,
+    /// and where — "All" while it holds nothing back. The face of the capsule
+    /// over every list it narrows.
+    var summary: Text {
+        var parts: [Text] = []
+        if when != .any { parts.append(Text(when.label)) }
+        if let area { parts.append(Text(area.label)) }
+        guard let first = parts.first else { return Text("All") }
+        return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
     }
 }
 

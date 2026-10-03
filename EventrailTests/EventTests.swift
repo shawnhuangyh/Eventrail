@@ -115,7 +115,7 @@ struct EventTests {
         #expect(!edited.isSameRead(as: held))
     }
 
-    // MARK: - Where the night stands
+    // MARK: - Where the event stands
 
     @Test func sortDatePrefersTheStartTime() {
         let start = Fixtures.date(2027, 5, 9, 18, 0)

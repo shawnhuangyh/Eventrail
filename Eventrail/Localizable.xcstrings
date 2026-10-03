@@ -3149,6 +3149,28 @@
         }
       }
     },
+    "Eventernote lists nothing here yet." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteにはまだ何も掲載されていません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上暂时没有列出任何内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上暫時沒有列出任何內容。"
+          }
+        }
+      }
+    },
     "Eventernote publishes no performer page under this name, so there is nothing to list." : {
       "localizations" : {
         "ja" : {
@@ -3519,6 +3541,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無論你指定哪個帳號，已匯入的內容都會保留在資料庫中。改變的只是 Eventrail 下次讀取的來源。"
+          }
+        }
+      }
+    },
+    "Everything Eventernote lists for this date in Japan, earliest start first, from its public pages — nothing is written back." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、日本でのこの日のイベントすべてを開演の早い順に表示します。Eventernoteには何も書き込みません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上列出的、日本当天的全部活动，按开演时间从早到晚排列——不会写回任何内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上列出的、日本當天的全部活動，按開演時間從早到晚排列——不會寫回任何內容。"
           }
         }
       }
@@ -4360,6 +4404,28 @@
         }
       }
     },
+    "Just Added" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新添加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新新增"
+          }
+        }
+      }
+    },
     "Kansai" : {
       "localizations" : {
         "ja" : {
@@ -4686,6 +4752,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "列出的活動"
+          }
+        }
+      }
+    },
+    "Local" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地"
+          }
+        }
+      }
+    },
+    "Local Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末の時間"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地時間"
           }
         }
       }
@@ -5108,50 +5218,6 @@
         }
       }
     },
-    "My Time" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末の時間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地时间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地時間"
-          }
-        }
-      }
-    },
-    "My time · %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末の時間・%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地时间 · %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地時間 · %@"
-          }
-        }
-      }
-    },
     "Nagoya, Shizuoka, Gifu and Mie" : {
       "localizations" : {
         "ja" : {
@@ -5412,6 +5478,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "沒有使用該名稱的 Eventernote 使用者。請檢查拼寫，或先跳過——你隨時可以在“我的”中指定帳號。"
+          }
+        }
+      }
+    },
+    "No Events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントなし"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有活動"
           }
         }
       }
@@ -5830,6 +5918,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不會覆蓋任何內容"
+          }
+        }
+      }
+    },
+    "Nothing on this list falls within the filter. Widen it to see the rest." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリストのイベントは、どれも絞り込みの条件に合いません。条件を広げると残りが表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此列表中的活动都不符合筛选条件。放宽条件即可看到其余活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此列表中的活動都不符合篩選條件。放寬條件即可看到其餘活動。"
           }
         }
       }
@@ -8606,6 +8716,50 @@
         }
       }
     },
+    "The events most recently added to Eventernote, newest first, from its public pages — some already past, added late. Nothing is written back." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページから、最近登録されたイベントを新しい順に表示します。あとから登録された、すでに終わったイベントも含まれます。Eventernoteには何も書き込みません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自公开可访问的 Eventernote 页面、最近添加的活动，最新的在前——其中也有事后补登的已结束活动。不会写回任何内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自公開可存取的 Eventernote 頁面、最近新增的活動，最新的在前——其中也有事後補登的已結束活動。不會寫回任何內容。"
+          }
+        }
+      }
+    },
+    "The latest %lld on Eventernote" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteの新着%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 最新添加的 %lld 个活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 最新新增的 %lld 個活動"
+          }
+        }
+      }
+    },
     "Their dates stop appearing in Following, on this device and on your other devices. Anyone your Eventernote account still favorites comes back on the next refresh." : {
       "localizations" : {
         "ja" : {
@@ -8870,24 +9024,24 @@
         }
       }
     },
-    "Times shown in the venue's own time" : {
+    "Times shown in local time, %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "時刻は現地時間で表示"
+            "value" : "時刻は端末の時間（%@）で表示"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "时间以现地时间显示"
+            "value" : "时间以本地时间显示，%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "時間以現地時間顯示"
+            "value" : "時間以本地時間顯示，%@"
           }
         }
       }
@@ -8910,28 +9064,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間以現地時間顯示，%@"
-          }
-        }
-      }
-    },
-    "Times shown in your own time, %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時刻は端末の時間（%@）で表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "时间以本地时间显示，%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時間以本地時間顯示，%@"
           }
         }
       }
@@ -9508,6 +9640,50 @@
         }
       }
     },
+    "Updated %@." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に更新しました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@更新。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@更新。"
+          }
+        }
+      }
+    },
+    "Updated just now." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "たった今更新しました。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刚刚更新。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剛剛更新。"
+          }
+        }
+      }
+    },
     "Used Eventrail before? Bring what you kept here — now, or later in Settings." : {
       "localizations" : {
         "ja" : {
@@ -9548,6 +9724,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "地圖找不到時使用，定位到街區。"
+          }
+        }
+      }
+    },
+    "Venue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現地"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现地"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現地"
           }
         }
       }
@@ -9618,28 +9816,6 @@
         }
       }
     },
-    "Venue time" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "现地时间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間"
-          }
-        }
-      }
-    },
     "Venue Time" : {
       "localizations" : {
         "ja" : {
@@ -9658,28 +9834,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現地時間"
-          }
-        }
-      }
-    },
-    "Venue time · %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間・%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "现地时间 · %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間 · %@"
           }
         }
       }

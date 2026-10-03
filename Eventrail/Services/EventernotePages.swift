@@ -456,7 +456,7 @@ nonisolated enum EventernotePages {
     /// An event's tags are one field and one link, even when several are
     /// written in it — "#チェンステ #チェンソーマン" is a single search for
     /// both at once. **Don't split them.** The site publishes one link because
-    /// the search it points at is the one worth running: the night is tagged
+    /// the search it points at is the one worth running: the event is tagged
     /// both ways, and either tag on its own is a wider net than the event.
     private static func hashtags(in html: String) -> [Hashtag] {
         guard let markup = section("Twitterハッシュタグ", in: html) else { return [] }
@@ -622,7 +622,7 @@ nonisolated enum EventernotePages {
         // the same day — which put the show over before its doors opened, in
         // the calendar entry and in ``Event/hasEnded`` alike. So each time is
         // taken as the first of its clock after the one before it, in the order
-        // a night runs. (25:00 already rolls over by itself.)
+        // an event runs. (25:00 already rolls over by itself.)
         let (doorsOpen, startsAt, endsAt) = Event.inOrder(
             time(labelled: "開場", in: times, on: day, calendar: calendar),
             time(labelled: "開演", in: times, on: day, calendar: calendar),

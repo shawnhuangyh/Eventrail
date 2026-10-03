@@ -107,16 +107,41 @@ extension CardHeader where Trailing == EmptyView {
 /// a performer's listing hands its already-read feed to the screen behind the
 /// arrow. What the reader sees is the same either way, which is the part that
 /// belongs here.
+///
+/// It sits on the words' baseline, so a header lines "See All" up with its
+/// title. Centred on the words as it used to be, the label took its baseline
+/// from the smaller chevron instead, and the words sat a point below the
+/// title beside them.
 struct SeeAllLabel: View {
+    private static let font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text("See All")
-                .font(.system(size: 13, weight: .semibold))
+                .font(Font(Self.font))
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
+                .centredOnLine(of: Self.font)
         }
         .foregroundStyle(Color.brandTint)
         .contentShape(.rect)
+    }
+}
+
+extension View {
+    /// Beside words set in `font`, in a row lined up by their baseline: an
+    /// icon, a spinner or a badge, centred on the words' line as it would be
+    /// if the two were centred on each other.
+    ///
+    /// Centred on each other outright, a row takes the topmost baseline of
+    /// what is in it, and a smaller icon's sits higher than the words' — so
+    /// the words of a label made that way sit a point low beside a title.
+    /// This puts the icon's middle where the words' line has its middle,
+    /// measured from their baseline, and leaves the baseline to the words.
+    func centredOnLine(of font: UIFont) -> some View {
+        alignmentGuide(.firstTextBaseline) {
+            $0[VerticalAlignment.center] + (font.ascender + font.descender) / 2
+        }
     }
 }
 
@@ -130,19 +155,49 @@ struct SeeAllLabel: View {
 ///
 /// It takes a `Text` rather than a key because one of them says two different
 /// things depending on whether an import is still running.
+///
+/// Under a page read from Eventernote — an event's sheet, a performer's page,
+/// a hall's — it opens with when that page was read: "Updated 2 hours ago."
+/// Here rather than under Refresh in the page's menu, where it could be read
+/// only by opening the menu; first, so it is read as the age of the copy on
+/// screen rather than of anything the sentences after it name.
 struct Footnote: View {
     let text: Text
+    /// When the page under this was read from Eventernote; nil where it is
+    /// not such a page, or has not been read yet.
+    let updated: Date?
 
-    init(_ text: Text) {
+    init(_ text: Text, updated: Date? = nil) {
         self.text = text
+        self.updated = updated
     }
 
     var body: some View {
+        if let updated {
+            // Redrawn by the minute, so a page left open does not go on
+            // saying "just now".
+            TimelineView(.everyMinute) { _ in
+                styled(Text("\(Self.updated(updated)) \(text)"))
+            }
+        } else {
+            styled(text)
+        }
+    }
+
+    private func styled(_ text: Text) -> some View {
         text
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "Updated 2 hours ago.", or "Updated just now." inside the first minute,
+    /// where the relative style would count the seconds.
+    private static func updated(_ readAt: Date) -> Text {
+        let readAt = min(readAt, .now)
+        guard Date.now.timeIntervalSince(readAt) >= 60 else { return Text("Updated just now.") }
+        return Text("Updated \(readAt.formatted(.relative(presentation: .named))).")
     }
 }
 

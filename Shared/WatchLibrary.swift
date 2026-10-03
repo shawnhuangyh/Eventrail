@@ -1,6 +1,6 @@
 import Foundation
 
-/// What the phone tells the watch: the library's nights still to come,
+/// What the phone tells the watch: the library's events still to come,
 /// soonest first, each with the reader's ticket — everything the watch app
 /// draws, and nothing it does not.
 ///
@@ -21,12 +21,12 @@ nonisolated struct WatchLibrary: Codable, Equatable, Sendable {
     /// The application context's one key.
     static let contextKey = "library"
 
-    /// How many nights are sent: the context has a ceiling, and the watch is
+    /// How many events are sent: the context has a ceiling, and the watch is
     /// for the next few rather than the season.
     static let limit = 60
 }
 
-/// One night in the library, as the watch draws it.
+/// One event in the library, as the watch draws it.
 nonisolated struct WatchEvent: Codable, Hashable, Identifiable, Sendable {
     /// The Eventernote event id.
     let id: String
@@ -36,9 +36,9 @@ nonisolated struct WatchEvent: Codable, Hashable, Identifiable, Sendable {
     /// with, and so what the watch app is opened with from the Smart Stack.
     let link: URL
     let flyer: URL?
-    /// Midnight, on the hall's clock, of the day the night is published on.
+    /// Midnight, on the hall's clock, of the day the event is published on.
     let day: Date
-    /// Doors, start and end in the order the night runs (`Event.inOrder`).
+    /// Doors, start and end in the order the event runs (`Event.inOrder`).
     /// Nil wherever the page has published none.
     let doors: Date?
     let starts: Date?

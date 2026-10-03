@@ -201,7 +201,7 @@ final class VenueRegions {
 
     /// Settles which clock each hall abroad in these events keeps, from the
     /// address ``place(_:)`` kept for it — what lets the Following tab show
-    /// and end a night abroad on its hall's own time.
+    /// and end an event abroad on its hall's own time.
     ///
     /// ``VenuePlaces`` is asked first, on the terms an import's arrivals are
     /// (``VenuePlaces/placeUnplaced(_:onProgress:)``: only halls it has no

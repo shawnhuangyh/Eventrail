@@ -18,9 +18,9 @@ import SwiftUI
 /// trust it.
 ///
 /// It also says, the same way, when a tap was turned down — a Live Activity
-/// asked for too early to last the night: a few words and an ✕ that go by
-/// themselves, as Apple Music says "Added to Library", rather than an alert
-/// the reader has to answer for being early.
+/// asked for too early to last until the event is over: a few words and an ✕
+/// that go by themselves, as Apple Music says "Added to Library", rather than
+/// an alert the reader has to answer for being early.
 struct RefreshNotice: Identifiable, Equatable {
     enum Outcome: Equatable {
         case updated
@@ -291,5 +291,34 @@ private struct RefreshNoticeBanner: View {
         // Felt on a device as it arrives, for a reader who has looked away.
         .sensoryFeedback(notice.succeeded ? .success : .error, trigger: notice.id)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Refresh, in the ⋯ menu of a page read from Eventernote — an event's sheet,
+/// a performer's page, a hall's.
+///
+/// In the menu rather than on a pull. An event's sheet is a sheet, and a pull
+/// down from its top is how a sheet is put away; a pull there that read the
+/// page instead was the gesture taken for something else. And the pages read
+/// themselves once their copy has gone stale, so reading one again by hand is
+/// an occasional want — a menu's. The performer's and the hall's pages work
+/// the same way, so a page read from the site is refreshed the same way
+/// wherever it is. The Following tab keeps its pull: it is a list, where a
+/// pull is expected and is nothing else.
+///
+/// When the page was last read is said in the small print at its foot — see
+/// ``Footnote`` — where it can be read without opening anything. The read it starts ends in a notice like every refresh the
+/// reader asks for — see ``RefreshNotices``.
+struct RefreshMenuItem: View {
+    /// Whether a read is going on now, by hand or by itself: the item cannot
+    /// be chosen again until it has ended.
+    let isRefreshing: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Refresh", systemImage: "arrow.clockwise")
+        }
+        .disabled(isRefreshing)
     }
 }
