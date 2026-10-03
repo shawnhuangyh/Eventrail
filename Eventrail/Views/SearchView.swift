@@ -28,6 +28,11 @@ struct SearchView: View {
     /// Whether the search is still finding the first page worth reading — see
     /// ``firstPage(of:pages:reading:filter:)``.
     @State private var isSkipping = false
+    /// What each of the site's own lists is narrowed to, kept here rather than
+    /// by the screen so it lasts from one visit to the next, as the search's
+    /// own filter lasts from one search to the next — see ``SiteListingView``.
+    @State private var todayFilter = SearchFilter()
+    @State private var justAddedFilter = SearchFilter()
 
     /// Everything a search is made of: any of it changing starts a new one.
     /// The filter as a whole, not only what the site is asked: what is held
@@ -73,6 +78,12 @@ struct SearchView: View {
                 }
             }
             .onSubmit(of: .search) { store.remember(search: term) }
+            .navigationDestination(for: SiteListing.self) { listing in
+                switch listing {
+                case .today: SiteListingView(listing: listing, filter: $todayFilter)
+                case .justAdded: SiteListingView(listing: listing, filter: $justAddedFilter)
+                }
+            }
             .performerDestination()
             .eventSheet($openEvent)
             .task(id: Request(term: term, scope: scope, filter: filter, order: order)) { await search() }
@@ -269,34 +280,14 @@ struct SearchView: View {
     /// and the order. Its face says what the results are held to while they are
     /// held to anything, so a short list is never a mystery.
     private var controls: some View {
-        ListMenu(describes: "Filter and Sort", value: Text("\(filterSummary), \(Text(order.label))")) {
+        ListMenu(describes: "Filter and Sort", value: Text("\(filter.summary), \(Text(order.label))")) {
             // Both halves of the filter a level down, each a row with its
             // icon and what it is set to, beside the order's own rows. In
             // each, the choice that holds nothing back stands above a divider
             // and the ones that do below it.
             Section("Filter") {
-                Menu {
-                    Toggle(isOn: menuChoice($filter.when, .any)) { Text(SearchFilter.When.any.label) }
-                    Section {
-                        ForEach(SearchFilter.When.allCases.filter { $0 != .any }, id: \.self) { when in
-                            Toggle(isOn: menuChoice($filter.when, when)) { Text(when.label) }
-                        }
-                    }
-                } label: {
-                    Label("Date", systemImage: "calendar")
-                    Text(filter.when.label)
-                }
-                Menu {
-                    Toggle(isOn: menuChoice($filter.area, nil)) { Text("Anywhere") }
-                    Section {
-                        ForEach(SearchFilter.Area.all, id: \.self) { area in
-                            Toggle(isOn: menuChoice($filter.area, area)) { Text(area.label) }
-                        }
-                    }
-                } label: {
-                    Label("Area", systemImage: "map")
-                    Text(filter.area?.label ?? "Anywhere")
-                }
+                SearchDateMenu(when: $filter.when)
+                SearchAreaMenu(area: $filter.area)
             }
             Section("Sort") {
                 ForEach(SearchOrder.allCases, id: \.self) { choice in
@@ -310,7 +301,7 @@ struct SearchView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "line.3.horizontal.decrease")
                         .foregroundStyle(filter.isNarrowing ? Color.brandTint : .secondary)
-                    filterSummary
+                    filter.summary
                         .foregroundStyle(filter.isNarrowing ? Color.brandTint : .primary)
                         .lineLimit(1)
                 }
@@ -325,16 +316,6 @@ struct SearchView: View {
                 .foregroundStyle(.secondary)
             }
         }
-    }
-
-    /// What the filter holds the results to, in as few words as will say it:
-    /// when, and where.
-    private var filterSummary: Text {
-        var parts: [Text] = []
-        if filter.when != .any { parts.append(Text(filter.when.label)) }
-        if let area = filter.area { parts.append(Text(area.label)) }
-        guard let first = parts.first else { return Text("All") }
-        return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
     }
 
     /// Nothing the site sent survives the filter.
@@ -405,6 +386,8 @@ struct SearchView: View {
 
     private var startingPoints: some View {
         VStack(alignment: .leading, spacing: 12) {
+            siteListings
+
             if !recentSearches.isEmpty {
                 HStack(alignment: .firstTextBaseline) {
                     // Not a ``SectionLabel``: that carries its own inset, and
@@ -450,6 +433,52 @@ struct SearchView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
     }
+
+    /// The lists the site keeps of its own — what is on today, and what was
+    /// added last — which are the tabs over its own event search. Above the
+    /// recent searches, so they stay where they are however many of those
+    /// there are. Nothing is read until one is opened.
+    private var siteListings: some View {
+        VStack(spacing: 9) {
+            ForEach(SiteListing.allCases, id: \.self) { listing in
+                NavigationLink(value: listing) {
+                    SiteListingRow(listing: listing)
+                }
+                .buttonStyle(.plain)
+                .glassPanel(interactive: true)
+            }
+        }
+    }
+}
+
+/// The way into one of the site's own lists, from the Search tab before
+/// anything is typed: what it is, and — for today's — which day that is on
+/// the site's calendar, which is not the reader's own everywhere.
+private struct SiteListingRow: View {
+    let listing: SiteListing
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: listing.symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.brandTint)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(listing.title)
+                    .font(.system(size: 14.5, weight: .semibold))
+                listing.detail(on: Event.siteDay(of: .now))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .contentShape(.rect)
+    }
 }
 
 /// A search result. The circular control adds the event to the library, or
@@ -475,6 +504,53 @@ struct SearchResultRow: View {
         .contentShape(.rect)
         .onTapGesture(perform: open)
         .glassPanel()
+    }
+}
+
+/// The Date submenu of the capsule over a list of the site's events — whether
+/// an event is still ahead, held here over the rows read. The choice that
+/// holds nothing back stands above a divider, and the ones that do below it.
+///
+/// Shared by the search results and the newest events behind the Search tab,
+/// so the two cannot drift apart.
+struct SearchDateMenu: View {
+    @Binding var when: SearchFilter.When
+
+    var body: some View {
+        Menu {
+            Toggle(isOn: menuChoice($when, .any)) { Text(SearchFilter.When.any.label) }
+            Section {
+                ForEach(SearchFilter.When.allCases.filter { $0 != .any }, id: \.self) { option in
+                    Toggle(isOn: menuChoice($when, option)) { Text(option.label) }
+                }
+            }
+        } label: {
+            Label("Date", systemImage: "calendar")
+            Text(when.label)
+        }
+    }
+}
+
+/// The Area submenu of the capsule over a list of the site's events — one of
+/// its areas, asked of the site as its `area_id`. Laid out as
+/// ``SearchDateMenu`` is.
+///
+/// Shared by the search results and today's events behind the Search tab.
+struct SearchAreaMenu: View {
+    @Binding var area: SearchFilter.Area?
+
+    var body: some View {
+        Menu {
+            Toggle(isOn: menuChoice($area, nil)) { Text("Anywhere") }
+            Section {
+                ForEach(SearchFilter.Area.all, id: \.self) { option in
+                    Toggle(isOn: menuChoice($area, option)) { Text(option.label) }
+                }
+            }
+        } label: {
+            Label("Area", systemImage: "map")
+            Text(area?.label ?? "Anywhere")
+        }
     }
 }
 

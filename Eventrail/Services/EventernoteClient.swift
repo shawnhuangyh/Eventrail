@@ -104,6 +104,63 @@ nonisolated struct EventernoteClient: Sendable {
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
+    // MARK: - The site's own lists
+
+    /// How many rows the site's 新着 tab holds. It has no pages: the hundred
+    /// events most recently added, and nothing behind them.
+    static let newestCount = 100
+
+    /// Everything held on one day of the site's calendar, the earliest start
+    /// first — the site's own 今日開催 tab, asked of its search instead.
+    ///
+    /// The tab prints the whole day on one page and ignores `area_id`. The
+    /// search, given the day as its 開催日, lists the same events a page at a
+    /// time, counts them, and narrows them to one of the site's areas the way
+    /// the Search tab's results are narrowed. `start_time` is one of the
+    /// orders its menu offers, and puts the events with no start published
+    /// first.
+    func events(on day: Date, areaID: Int? = nil, page: Int = 1) async throws -> EventernotePage<Event> {
+        var query = Self.dayQuery(day, areaID: areaID)
+        query["limit"] = "\(Self.pageSize)"
+        query["page"] = "\(page)"
+        let html = try await html(at: "/events/search", query: query)
+        return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
+    }
+
+    /// The hundred events most recently added to the site, the newest first —
+    /// its 新着 tab. In the order they were added rather than by date, so a
+    /// date already past is among them wherever somebody filed one late. The
+    /// tab takes no `area_id` either.
+    func newestEvents() async throws -> EventernotePage<Event> {
+        let html = try await html(at: Self.newestPath, query: Self.newestQuery)
+        return try EventernotePages.events(in: html, page: 1, pageSize: Self.newestCount)
+    }
+
+    /// The page on the site listing what ``events(on:areaID:page:)`` reads,
+    /// in the same order.
+    static func pageURL(forEventsOn day: Date, areaID: Int?) -> URL? {
+        url(at: "/events/search", query: dayQuery(day, areaID: areaID))
+    }
+
+    /// The site's own 新着 tab.
+    static var newestEventsURL: URL? {
+        url(at: newestPath, query: newestQuery)
+    }
+
+    private static let newestPath = "/events/"
+    private static let newestQuery = ["type": "2"]
+
+    /// The day as the search form's 開催日 asks for it — on the site's
+    /// calendar, so a moment late in the evening west of Japan asks for the
+    /// day Japan is already on.
+    private static func dayQuery(_ day: Date, areaID: Int?) -> [String: String] {
+        let parts = Event.siteCalendar.dateComponents([.year, .month, .day], from: day)
+        var query = ["year": "\(parts.year ?? 0)", "month": "\(parts.month ?? 0)", "day": "\(parts.day ?? 0)",
+                     "sort": "start_time", "order": "ASC"]
+        if let areaID { query["area_id"] = "\(areaID)" }
+        return query
+    }
+
     // MARK: - A member's own history
 
     enum Account {
@@ -222,17 +279,27 @@ nonisolated struct EventernoteClient: Sendable {
 
     // MARK: - Fetching
 
-    private func html(at path: String, query: [String: String], isPreEncoded: Bool = false) async throws -> String {
-        var components = URLComponents(url: Self.site, resolvingAgainstBaseURL: false) ?? URLComponents()
+    /// The address of one of the site's pages — what is asked for, and what a
+    /// screen hands the browser to open the same page there. The query in the
+    /// order of its names, so one page has one address.
+    static func url(at path: String, query: [String: String], isPreEncoded: Bool = false) -> URL? {
+        var components = URLComponents(url: site, resolvingAgainstBaseURL: false) ?? URLComponents()
         if isPreEncoded {
             components.percentEncodedPath = path
         } else {
             components.path = path
         }
         if !query.isEmpty {
-            components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+            components.queryItems = query.sorted { $0.key < $1.key }
+                .map { URLQueryItem(name: $0.key, value: $0.value) }
         }
-        guard let url = components.url else { throw Failure.unreadable }
+        return components.url
+    }
+
+    private func html(at path: String, query: [String: String], isPreEncoded: Bool = false) async throws -> String {
+        guard let url = Self.url(at: path, query: query, isPreEncoded: isPreEncoded) else {
+            throw Failure.unreadable
+        }
 
         var request = URLRequest(url: url)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")

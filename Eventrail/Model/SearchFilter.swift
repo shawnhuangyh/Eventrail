@@ -96,6 +96,17 @@ struct SearchFilter: Hashable {
         default: false
         }
     }
+
+    /// What the filter holds a list to, in as few words as will say it: when,
+    /// and where — "All" while it holds nothing back. The face of the capsule
+    /// over every list it narrows.
+    var summary: Text {
+        var parts: [Text] = []
+        if when != .any { parts.append(Text(when.label)) }
+        if let area { parts.append(Text(area.label)) }
+        guard let first = parts.first else { return Text("All") }
+        return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
+    }
 }
 
 /// Which way round the Search tab's event results run: by date, the newest or
