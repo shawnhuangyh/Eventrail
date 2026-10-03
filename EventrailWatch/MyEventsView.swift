@@ -1,13 +1,13 @@
 import SwiftUI
 import WidgetKit
 
-/// The watch app's front: the library's nights still to come, soonest first,
-/// and — through the list button every page carries — the night picked from
+/// The watch app's front: the library's events still to come, soonest first,
+/// and — through the list button every page carries — the event picked from
 /// it, in three pages (``EventPagesView``).
 ///
 /// A split view rather than a stack, as the design has it: the pages are the
-/// app, and the list is where a night is loaded into them. Opened from the
-/// Live Activity in the Smart Stack, it goes straight to that night's
+/// app, and the list is where an event is loaded into them. Opened from the
+/// Live Activity in the Smart Stack, it goes straight to that event's
 /// Countdown.
 struct MyEventsView: View {
     @Environment(WatchLibraryStore.self) private var store
@@ -26,7 +26,8 @@ struct MyEventsView: View {
         // A card tapped opens on the first page, wherever the last one was
         // left.
         .onChange(of: selection) { page = .countdown }
-        // A night taken out of the library on the phone leaves nothing to show.
+        // An event taken out of the library on the phone leaves nothing to
+        // show.
         .onChange(of: store.library) {
             if let selection, store.event(id: selection) == nil { self.selection = nil }
         }
@@ -34,17 +35,17 @@ struct MyEventsView: View {
         // What the system hands over where an activity carried no link —
         // every one of this app's does, so this is only a fallback.
         .onContinueUserActivity(NSUserActivityTypeLiveActivity) { _ in
-            let nights = store.events(at: .now).map { Night($0, showsLocalTime: store.showsLocalTime, at: .now) }
-            let tonight = nights.first { $0.event.hasTicket && $0.stage != nil && $0.stage != .wrapped }
-                ?? nights.first { $0.daysAway == 0 }
-            show(tonight?.event.id)
+            let moments = store.events(at: .now).map { EventMoment($0, showsLocalTime: store.showsLocalTime, at: .now) }
+            let current = moments.first { $0.event.hasTicket && $0.stage != nil && $0.stage != .wrapped }
+                ?? moments.first { $0.daysAway == 0 }
+            show(current?.event.id)
         }
     }
 
     private var list: some View {
         let changes = store.events(at: .now)
-            .flatMap { Night($0, showsLocalTime: store.showsLocalTime, at: .now).changes }
-        return TimelineView(NightSchedule(changes: changes, step: 60)) { context in
+            .flatMap { EventMoment($0, showsLocalTime: store.showsLocalTime, at: .now).changes }
+        return TimelineView(StageSchedule(changes: changes, step: 60)) { context in
             let events = store.events(at: context.date)
             if store.library == nil {
                 ContentUnavailableView("Open Eventrail on Your iPhone", systemImage: "iphone",
@@ -56,7 +57,7 @@ struct MyEventsView: View {
                 List(selection: $selection) {
                     ForEach(events) { event in
                         NavigationLink(value: event.id) {
-                            EventCard(night: Night(event, showsLocalTime: store.showsLocalTime, at: context.date))
+                            EventCard(moment: EventMoment(event, showsLocalTime: store.showsLocalTime, at: context.date))
                         }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(
@@ -86,37 +87,37 @@ struct MyEventsView: View {
     }
 }
 
-/// One night in My Events: the title beside the flyer, the hall, on the day
-/// what the night is doing, and the date.
+/// One event in My Events: the title beside the flyer, the hall, on the day
+/// what the event is doing, and the date.
 struct EventCard: View {
-    let night: Night
+    let moment: EventMoment
 
     static let background = Color(red: 0x23 / 255, green: 0x23 / 255, blue: 0x26 / 255)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4.5) {
             HStack(alignment: .top, spacing: 6) {
-                Text(verbatim: night.event.title)
+                Text(verbatim: moment.event.title)
                     .font(.system(size: 15.5, weight: .medium))
                     .kerning(-0.155)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Flyer(event: night.event)
+                Flyer(event: moment.event)
                     .frame(width: 28, height: 28)
                     .clipShape(.circle)
             }
-            Text(verbatim: night.event.venue)
+            Text(verbatim: moment.event.venue)
                 .font(.system(size: 13.5, weight: .medium))
                 .foregroundStyle(.white.opacity(0.6))
                 .lineLimit(1)
-            if let headline = night.headline {
+            if let headline = moment.headline {
                 headline
                     .font(.system(size: 14.5, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(night.tint)
+                    .foregroundStyle(moment.tint)
                     .lineLimit(1)
             }
-            Text(verbatim: night.dateLine)
+            Text(verbatim: moment.dateLine)
                 .font(.system(size: 13.5, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(0.5))

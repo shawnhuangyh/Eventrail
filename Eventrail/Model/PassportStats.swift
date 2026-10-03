@@ -34,10 +34,10 @@ nonisolated enum PassportScope: Hashable, Identifiable {
     }
 }
 
-/// How the Events card cuts the reader's nights up.
+/// How the Events card cuts the reader's events up.
 ///
 /// Three cuts because three are worth reading off a library of a few hundred
-/// nights: which years they went out in, which months of the year they go out
+/// events: which years they went out in, which months of the year they go out
 /// in, and which days of the week. Anything finer — a week, a day — is a
 /// calendar, and the app already has one.
 nonisolated enum PassportCadence: CaseIterable, Identifiable, Hashable {
@@ -73,7 +73,7 @@ nonisolated enum PassportCadence: CaseIterable, Identifiable, Hashable {
 /// device. A `let` on the screen that shows it cannot go stale.
 nonisolated struct PassportStats {
     /// One row of a ranked list: who or where, and how many of the reader's
-    /// nights it accounts for.
+    /// events it accounts for.
     struct Ranking: Identifiable, Hashable {
         /// A performer as Eventernote bills them, or a hall as it names it —
         /// verbatim either way, never translated.
@@ -87,7 +87,7 @@ nonisolated struct PassportStats {
     }
 
     /// One column of the Events chart: where it sits on the axis, what the
-    /// axis prints under it, and how many nights it holds.
+    /// axis prints under it, and how many events it holds.
     struct Tally: Identifiable, Hashable {
         /// A year, a month of the year, or a day of the week — the number
         /// the axis is ordered by rather than the name it prints, so a chart
@@ -99,7 +99,7 @@ nonisolated struct PassportStats {
         var id: Int { value }
     }
 
-    /// One night with both ends published, and how long it ran.
+    /// One event with both ends published, and how long it ran.
     struct Span: Identifiable, Hashable {
         let event: Event
         let duration: TimeInterval
@@ -107,7 +107,7 @@ nonisolated struct PassportStats {
         var id: Event.ID { event.id }
     }
 
-    /// One night the reader applied for, and how many times they did.
+    /// One event the reader applied for, and how many times they did.
     struct Lottery: Identifiable, Hashable {
         let event: Event
         let entries: Int
@@ -115,7 +115,7 @@ nonisolated struct PassportStats {
         var id: Event.ID { event.id }
     }
 
-    /// One night the reader wrote a price on, and the class of seat it bought.
+    /// One event the reader wrote a price on, and the class of seat it bought.
     struct Ticket: Identifiable, Hashable {
         let event: Event
         let price: Int
@@ -140,24 +140,24 @@ nonisolated struct PassportStats {
         var average: Double { Double(spent) / Double(count) }
     }
 
-    /// The scoped nights themselves, most recent first.
+    /// The scoped events themselves, most recent first.
     let events: [Event]
     let totalEvents: Int
 
-    /// How long the reader has spent at events, over the nights that can say.
+    /// How long the reader has spent at events, over the events that can say.
     let totalDuration: TimeInterval
-    /// How many nights that total was measured over.
+    /// How many events that total was measured over.
     ///
     /// Eventernote routinely announces a date months before it publishes a
-    /// time, and publishes a finish time for fewer nights still. So the total
+    /// time, and publishes a finish time for fewer events still. So the total
     /// above is always a total over *part* of the library, and the screen says
-    /// which part rather than implying it read every night.
+    /// which part rather than implying it read every event.
     let timedEvents: Int
 
     let venues: Int
     let performers: Int
     /// The reader's own number — the one thing on this screen they fill in by
-    /// hand — summed over the nights they wrote it on.
+    /// hand — summed over the events they wrote it on.
     let lotteryEntries: Int
     /// How many of the 47 prefectures the reader has been to, counted from the
     /// prefecture at the head of each hall's published address.
@@ -166,52 +166,52 @@ nonisolated struct PassportStats {
     let topPerformers: [Ranking]
     let topVenues: [Ranking]
     let topLotteries: [Lottery]
-    /// Every night with a price written on it, dearest first.
+    /// Every event with a price written on it, dearest first.
     let tickets: [Ticket]
     /// Those tickets by the class of seat they bought, most tickets first and
     /// the ones that name no class last.
     let ticketTypes: [TicketType]
-    /// The briefest nights, briefest first, and the longest, longest first.
+    /// The briefest events, briefest first, and the longest, longest first.
     let shortest: [Span]
     let longest: [Span]
 
-    /// The first and last night in this slice, for the line under the title.
+    /// The first and last event in this slice, for the line under the title.
     let firstEvent: Date?
     let lastEvent: Date?
 
     // MARK: - Reading the lottery count back
 
-    /// How many nights the reader wrote a lottery count on.
+    /// How many events the reader wrote a lottery count on.
     ///
     /// What every other lottery figure is counted over: ``lotteryEntries`` is
-    /// a total over the nights they answered for, not over the slice, and the
+    /// a total over the events they answered for, not over the slice, and the
     /// screen says so rather than letting a part-filled column read as a whole.
     var lotteryEvents: Int { topLotteries.count }
 
-    /// The most entries the reader put into any one night.
+    /// The most entries the reader put into any one event.
     ///
     /// Read off the front of ``topLotteries``, which is already sorted by
     /// entries: the hardest they ever tried for a seat is the first row of the
     /// list, and counting it a second way is how the two drift apart.
     var mostLotteryEntries: Int { topLotteries.first?.entries ?? 0 }
 
-    /// How many entries an average recorded night took.
+    /// How many entries an average recorded event took.
     ///
     /// Over ``lotteryEvents`` rather than over the slice, for the reason
-    /// `Avg. Time` is over the timed nights: a night they never wrote a count
-    /// on is not a night they entered nothing for.
+    /// `Avg. Time` is over the timed events: an event they never wrote a count
+    /// on is not an event they entered nothing for.
     var averageLotteryEntries: Double {
         lotteryEvents > 0 ? Double(lotteryEntries) / Double(lotteryEvents) : 0
     }
 
     // MARK: - Reading the cost back
 
-    /// What the reader paid, over the nights they wrote a price on.
+    /// What the reader paid, over the events they wrote a price on.
     ///
     /// Every figure on the spending card is over ``tickets`` rather than over
-    /// the slice, for the reason the lottery figures are: a night with no
-    /// price written is not a free night — ``Tracking/cost`` keeps zero for
-    /// that — but a night nobody answered for.
+    /// the slice, for the reason the lottery figures are: an event with no
+    /// price written is not a free event — ``Tracking/cost`` keeps zero for
+    /// that — but an event nobody answered for.
     var ticketSpending: Int { tickets.reduce(0) { $0 + $1.price } }
 
     var averageTicketPrice: Double {
@@ -237,9 +237,9 @@ nonisolated struct PassportStats {
         firstEvent = events.last?.date
         lastEvent = events.first?.date
 
-        // Sorted once, read from both ends: the briefest nights are the front
+        // Sorted once, read from both ends: the briefest events are the front
         // of this and the longest are the back.
-        // Equal lengths fall back on the night and then the id, so a redraw
+        // Equal lengths fall back on the date and then the id, so a redraw
         // never swaps two of them.
         let spans = events.compactMap(Self.span(of:)).sorted {
             if $0.duration != $1.duration { return $0.duration < $1.duration }
@@ -250,7 +250,7 @@ nonisolated struct PassportStats {
         totalDuration = spans.reduce(0) { $0 + $1.duration }
         // Five at most, which is what the sheet behind each See All shows, and
         // half the run at most on top of that, so the two lists cannot name the
-        // same night twice when the library is short — an event that is both
+        // same event twice when the library is short — an event that is both
         // the briefest and the longest is true and reads as a mistake.
         let half = max(1, min(5, spans.count / 2))
         shortest = Array(spans.prefix(half))
@@ -260,12 +260,12 @@ nonisolated struct PassportStats {
         var venueCounts: [String: Int] = [:]
         var venuePrefectures: [String: String] = [:]
         for event in events {
-            // Counted once per night however the page bills them: a performer
+            // Counted once per event however the page bills them: a performer
             // named twice on one event is one event they were at.
             for name in Set(event.performers.map(\.name)) {
                 performerCounts[name, default: 0] += 1
             }
-            // A night still counts when it was a stream or the room was never
+            // An event still counts when it was a stream or the room was never
             // disclosed; it just adds no hall — see ``Event/isAtHall``.
             guard event.isAtHall else { continue }
             venueCounts[event.venue, default: 0] += 1
@@ -281,9 +281,9 @@ nonisolated struct PassportStats {
         topVenues = Self.ranked(venueCounts) { venuePrefectures[$0] }
 
         let lotteries = events.compactMap { event -> Lottery? in
-            // A count written down at all is a night the reader applied for:
+            // A count written down at all is an event the reader applied for:
             // zero is "not written down" too, and never reaches this — see
-            // ``Tracking/lotteryEntries``. So these are the nights every
+            // ``Tracking/lotteryEntries``. So these are the events every
             // figure below is counted over.
             guard let entries = tracking(event).lotteryEntries else { return nil }
             return Lottery(event: event, entries: entries)
@@ -295,13 +295,13 @@ nonisolated struct PassportStats {
 
         let tickets = events.compactMap { event -> Ticket? in
             // Zero is a price — a seat won or given — and is counted; only a
-            // price never written leaves the night out.
+            // price never written leaves the event out.
             let record = tracking(event)
             guard let price = record.cost else { return nil }
             return Ticket(event: event, price: price,
                           seatClass: record.seatClass.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        // Equal prices fall back on the night, newest first, and then the id,
+        // Equal prices fall back on the date, newest first, and then the id,
         // so the dearest and the cheapest stay put across a redraw.
         self.tickets = tickets.sorted {
             if $0.price != $1.price { return $0.price > $1.price }
@@ -333,7 +333,7 @@ nonisolated struct PassportStats {
             }
     }
 
-    /// The scoped nights counted by year, by month of the year, or by day of
+    /// The scoped events counted by year, by month of the year, or by day of
     /// the week.
     ///
     /// Empty stretches inside the run are counted rather than left out: a year
@@ -343,7 +343,7 @@ nonisolated struct PassportStats {
     ///
     /// Months and days are named and ordered by the reader's own calendar —
     /// a week that starts on Monday starts on Monday here — but which month
-    /// and which day a night *falls* on is read in the hall's zone, for the
+    /// and which day an event *falls* on is read in the hall's zone, for the
     /// reason ``component(_:of:)`` gives.
     func tally(by cadence: PassportCadence) -> [Tally] {
         let calendar = Calendar.current
@@ -351,7 +351,7 @@ nonisolated struct PassportStats {
         case .year:
             var counts: [Int: Int] = [:]
             for event in events { counts[Self.year(of: event), default: 0] += 1 }
-            // From the reader's first night to their last, and no further
+            // From the reader's first event to their last, and no further
             // back: a column standing in a year before the library begins is
             // a year they are being told they went to nothing in, when the
             // truth is the record does not reach it.
@@ -381,7 +381,7 @@ nonisolated struct PassportStats {
         }
     }
 
-    /// Which month or day of the week a night fell on, read where it was held.
+    /// Which month or day of the week an event fell on, read where it was held.
     ///
     /// ``Event/date`` is midnight in the *venue's* zone, and every line in the
     /// app that prints a day prints it in that zone. Read in the reader's zone
@@ -394,29 +394,29 @@ nonisolated struct PassportStats {
         return calendar.component(component, from: event.date)
     }
 
-    /// How long a night ran, for the nights that can say.
+    /// How long an event ran, for the events that can say.
     ///
     /// Both ends or nothing: an event with a start and no finish is not a
     /// short event, it is an event nobody has published the end of, and
     /// guessing a length for it would put a made-up number into every total on
     /// the screen.
     ///
-    /// Nor anything past ``longestNight``. The page prints a clock and no
+    /// Nor anything past ``longestEvent``. The page prints a clock and no
     /// date, so an end earlier than the start is read as the next morning
     /// (``Event/inOrder(_:_:_:)``) — right for 22:00 to 05:00, and a finish
-    /// typed as 17:30 under an 18:00 start becomes a night of twenty-three
+    /// typed as 17:30 under an 18:00 start becomes an event of twenty-three
     /// and a half hours, at the top of Longest and in every total.
     private static func span(of event: Event) -> Span? {
         guard let start = event.startsAt, let end = event.endsAt, end > start else { return nil }
         let duration = end.timeIntervalSince(start)
-        guard duration <= longestNight else { return nil }
+        guard duration <= longestEvent else { return nil }
         return Span(event: event, duration: duration)
     }
 
     /// The longest a published start and end are believed to be apart. Past
     /// any all-nighter or day-long festival, well short of the day a mistyped
     /// finish wraps round to.
-    static let longestNight: TimeInterval = 16 * 60 * 60
+    static let longestEvent: TimeInterval = 16 * 60 * 60
 
     /// Counts into rows, most first and then by name, so a screen redrawn
     /// after an edit does not reshuffle everything that happens to be tied.
@@ -428,7 +428,7 @@ nonisolated struct PassportStats {
             .sorted { $0.count == $1.count ? $0.name < $1.name : $0.count > $1.count }
     }
 
-    // MARK: - Where a night was, and when
+    // MARK: - Where an event was, and when
 
     /// Every prefecture the site spells, which is also how each one is spelled
     /// at the head of the addresses it publishes. ``Region`` already writes the
@@ -450,7 +450,7 @@ nonisolated struct PassportStats {
         return allPrefectures.first { address.hasPrefix($0) }
     }
 
-    /// The year a night falls in, read where it was held.
+    /// The year an event falls in, read where it was held.
     ///
     /// The venue's calendar rather than the reader's, for the reason
     /// ``component(_:of:)`` gives: a New Year's Day show in Tokyo is still

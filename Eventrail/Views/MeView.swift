@@ -209,7 +209,7 @@ struct MeView: View {
         if let outcome = await followed.load(for: performers) {
             notices?.report(.following(outcome), byHand: false)
         }
-        // The card counts what is still ahead, and a night abroad is ahead
+        // The card counts what is still ahead, and an event abroad is ahead
         // until its own hall's clock says otherwise.
         venues.learn(from: library)
         await venues.settle(followed.events(for: performers))
@@ -322,7 +322,7 @@ struct MeView: View {
     /// push as readily as the See All does.
     ///
     /// The three are the Passport's own numbers rather than the library's:
-    /// every one is counted over the nights already stood at, so a date still
+    /// every one is counted over the events already been to, so a date still
     /// ahead moves nothing here until it has passed, and the card says what
     /// the screen behind it says.
     private var passportCard: some View {

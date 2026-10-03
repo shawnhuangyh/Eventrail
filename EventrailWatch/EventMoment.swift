@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// One night at one moment: where it stands, in what colour, and the words and
+/// One event at one moment: where it stands, in what colour, and the words and
 /// times each screen prints for it.
 ///
-/// On the day it reads the night by the Live Activity's own rules
+/// On the day it reads the event by the Live Activity's own rules
 /// (``EventActivityStage``) and in its colours, so the watch app and the card
 /// in the Smart Stack never disagree about what is next. Any other day it is
 /// "coming up", in the design's blue.
-struct Night {
+struct EventMoment {
     let event: WatchEvent
     let now: Date
     /// The clock the day and the times are printed on: the hall's, or the
@@ -16,7 +16,7 @@ struct Night {
     /// The day printed — the hall's, or on the reader's clock the day of the
     /// first time the page published, as `Event.shown(on:)` has it.
     let day: Date
-    /// Whole days from today to the night, counted in written dates as
+    /// Whole days from today to the event, counted in written dates as
     /// `Event.daysAway` counts them.
     let daysAway: Int
     /// The doors where they come before the start, and the end where it comes
@@ -26,11 +26,12 @@ struct Night {
     let ends: Date?
     /// The published end, or the app's assumed length after the start.
     let runsTo: Date?
-    /// Where the night stands, once it is near enough to stand anywhere — nil
+    /// Where the event stands, once it is near enough to stand anywhere — nil
     /// on any day before, and on the day where no start was published.
     let stage: EventActivityStage?
 
-    /// How long a night with no end published is given — `Event.assumedLength`.
+    /// How long an event with no end published is given —
+    /// `Event.assumedLength`.
     static let assumedLength: TimeInterval = 3 * 60 * 60
 
     init(_ event: WatchEvent, showsLocalTime: Bool, at now: Date) {
@@ -80,7 +81,7 @@ struct Night {
         return max(dayEnds, runsTo ?? dayEnds) > now
     }
 
-    /// The design's blue for a night still to come.
+    /// The design's blue for an event still to come.
     static let ahead = Color(red: 0x64 / 255, green: 0xA8 / 255, blue: 1)
 
     var tint: Color { stage?.tint ?? Self.ahead }
@@ -129,7 +130,7 @@ struct Night {
         Text(timerInterval: now...max(now, date), countsDown: true)
     }
 
-    /// What the night is doing, in the words the Live Activity uses — nil
+    /// What the event is doing, in the words the Live Activity uses — nil
     /// before its day.
     var headline: Text? {
         guard let stage, let starts else { return nil }
@@ -189,7 +190,7 @@ struct Night {
         return daysAway == 1 ? Text("Tomorrow") : Text("^[In \(daysAway) day](inflect: true)")
     }
 
-    /// Whether the heading is told in the night's colour, or greyed: nothing
+    /// Whether the heading is told in the event's colour, or greyed: nothing
     /// published, or nothing left to happen.
     var timesHeadingIsLive: Bool { starts != nil && stage != .wrapped }
 
@@ -255,7 +256,7 @@ struct Night {
 
     // MARK: - Dates and times
 
-    /// "11:05", on the night's clock — or "--:--" where nothing was published.
+    /// "11:05", on the event's clock — or "--:--" where nothing was published.
     func time(_ date: Date?) -> String {
         guard let date else { return "--:--" }
         var style = Date.FormatStyle(date: .omitted, time: .shortened)

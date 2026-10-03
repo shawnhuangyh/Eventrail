@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Where a night stands, as the activity shows it. Each has its own words and
+/// Where an event stands, as the activity shows it. Each has its own words and
 /// colour, and the fill runs over the times on either side of it.
 ///
-/// Apart from ``EventActivityAttributes`` because the watch app reads a night
+/// Apart from ``EventActivityAttributes`` because the watch app reads an event
 /// by the same rules and in the same colours, and watchOS has no ActivityKit:
 /// the watch target compiles everything in `Shared` but that file.
 nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
@@ -18,7 +18,7 @@ nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
     /// Over. The app ends the activity as soon as it next runs.
     case wrapped
 
-    /// Two hours before the doors: when the watch app reads a night written
+    /// Two hours before the doors: when the watch app reads an event written
     /// as tomorrow as near, and when the debug bench's scheduled test comes
     /// on. The app's own activities start when the reader turns them on —
     /// see `EventActivities`.
@@ -28,7 +28,7 @@ nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
     /// does on the event's sheet.
     static let soonBeforeStart: TimeInterval = 5 * 60
 
-    /// Where a night with these times stands at `now`.
+    /// Where an event with these times stands at `now`.
     static func at(_ now: Date, doors: Date?, starts: Date, runsTo: Date) -> Self {
         if now >= runsTo { return .wrapped }
         if now >= starts { return .onNow }
@@ -37,7 +37,7 @@ nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
         return starts.timeIntervalSince(now) <= soonBeforeStart ? .startingSoon : .doorsOpen
     }
 
-    /// How far into the night the stage is, so a stage never gives way to
+    /// How far into the event the stage is, so a stage never gives way to
     /// one before it.
     var order: Int {
         switch self {

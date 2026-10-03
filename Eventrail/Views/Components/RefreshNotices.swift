@@ -18,9 +18,9 @@ import SwiftUI
 /// trust it.
 ///
 /// It also says, the same way, when a tap was turned down — a Live Activity
-/// asked for too early to last the night: a few words and an ✕ that go by
-/// themselves, as Apple Music says "Added to Library", rather than an alert
-/// the reader has to answer for being early.
+/// asked for too early to last until the event is over: a few words and an ✕
+/// that go by themselves, as Apple Music says "Added to Library", rather than
+/// an alert the reader has to answer for being early.
 struct RefreshNotice: Identifiable, Equatable {
     enum Outcome: Equatable {
         case updated

@@ -115,9 +115,9 @@ struct EventsView: View {
             ForEach(groups) { group in
                 Section {
                     ForEach(group.events) { event in
-                        // Only a night still ahead is read or unread, as on
+                        // Only an event still ahead is read or unread, as on
                         // Following: a past one is history rather than news, and
-                        // its record has been pruned with the night anyway.
+                        // its record has been pruned with the event anyway.
                         let unread = event.isUpcoming ? store.unread(event) : nil
                         LibraryRow(event: event, unread: unread) {
                             if event.isUpcoming { mark(event, read: true) }
@@ -202,7 +202,7 @@ struct EventsView: View {
             : Text("Remove \(selection.count) events from your library?")
     }
 
-    /// Following's logic, over the picked nights still ahead: a past one has no
+    /// Following's logic, over the picked events still ahead: a past one has no
     /// read state, and would only write a record the next prune takes away.
     private var markButton: MarkReadButton {
         let picked = chosen.filter(\.isUpcoming)

@@ -85,7 +85,7 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
     ///
     /// Keyed by events the archive otherwise knows nothing about: a followed
     /// performer's date is not in ``events`` until the reader adds it. So each
-    /// record carries its own night, and is pruned by that rather than by
+    /// record carries its own event, and is pruned by that rather than by
     /// whether anything else points at it.
     ///
     /// Optional on the outside only so that an archive written before this
@@ -339,8 +339,8 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
         // Who someone is only matters while they are followed — the same reason
         // an event nothing points at any more is dropped below.
         pruned.followedPerformers = followedPerformers?.filter { pruned.follows?[$0.key]?.value == true }
-        // A night that has been is off the Following tab, and so is whether it
-        // was read. By the night rather than by the stamp, so both devices
+        // An event that has been is off the Following tab, and so is whether it
+        // was read. By the event rather than by the stamp, so both devices
         // drop the same records and neither hands one back. A few days' grace
         // covers a device whose clock or zone disagrees with the hall's.
         let over = Date.now.addingTimeInterval(-3 * 24 * 60 * 60)

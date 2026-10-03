@@ -15,7 +15,7 @@ import SwiftUI
 /// type mirrors whatever it is handed.
 ///
 /// Every entry also carries one alert, set for the moment the doors open,
-/// wherever Eventernote has published a door time — past nights included, so
+/// wherever Eventernote has published a door time — past events included, so
 /// the diary records the hour the reader had to be there. No switch governs it:
 /// the door time is the event's own fact rather than a preference, and a
 /// reader who has asked for their events in their calendar has asked to be
@@ -63,8 +63,8 @@ final class CalendarSync {
     ///
     /// Deliberately not measured from the library. An entry whose event has
     /// left the library is not in the library to be measured, so a range that
-    /// began at the earliest night still held could never reach it: a reader
-    /// who removes the oldest night of a ten-year history — or empties the
+    /// began at the earliest event still held could never reach it: a reader
+    /// who removes the oldest event of a ten-year history — or empties the
     /// whole library — would leave everything before the cut-off sitting in
     /// their diary with nothing left that would ever remove it. A fixed sweep
     /// costs ten predicates against one calendar this app owns, and finds
@@ -240,7 +240,7 @@ final class CalendarSync {
     /// syncs: an iPad with nothing in `UserDefaults` would make a second
     /// "Eventrail" beside the one the phone had already sent it, each device
     /// mirroring the whole library into its own, and the reader would see
-    /// every night twice under one name. The same gap opens on a single
+    /// every event twice under one name. The same gap opens on a single
     /// device whenever the identifier stops resolving — a restore, or iCloud
     /// handing the calendar back under a new one — and there the entries
     /// already written are not even reachable to be corrected, since every
@@ -366,7 +366,7 @@ final class CalendarSync {
         return changed
     }
 
-    /// The night's day as its hall names it, at this device's midnight.
+    /// The event's day as its hall names it, at this device's midnight.
     ///
     /// ``Event/date`` is midnight on the hall's clock — Tokyo's, for most —
     /// and handed to an all-day entry as it stands it lands wherever that
@@ -392,7 +392,7 @@ final class CalendarSync {
     /// rather than a second one beside it.
     ///
     /// Written for past events as much as upcoming ones, so an entry carries
-    /// the door time whether the night is ahead or behind — a diary that
+    /// the door time whether the event is ahead or behind — a diary that
     /// records when the reader had to be at the hall reads the same either
     /// way, and an alert that appears on this year's entries but not last
     /// year's is a difference the reader would have to explain to themselves.

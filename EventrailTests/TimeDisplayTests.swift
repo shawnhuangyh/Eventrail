@@ -17,7 +17,7 @@ struct TimeDisplayTests {
         #expect(shown.date == event.startsAt)
     }
 
-    @Test func aNightWithNoTimeKeepsItsHallsDay() {
+    @Test func anEventWithNoTimeKeepsItsHallsDay() {
         let event = Fixtures.event()
         #expect(event.shown(on: .local) == event)
     }

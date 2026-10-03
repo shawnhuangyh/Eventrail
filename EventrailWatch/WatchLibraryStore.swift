@@ -6,7 +6,7 @@ import WatchConnectivity
 ///
 /// Kept in a file as it arrives, so the app opens on the last copy at once —
 /// with the phone out of reach, or before WatchConnectivity has handed over
-/// anything newer. The copy can be days old: ``events(at:)`` drops a night
+/// anything newer. The copy can be days old: ``events(at:)`` drops an event
 /// whose day is over without waiting for the phone to say so.
 @MainActor @Observable
 final class WatchLibraryStore: NSObject {
@@ -26,9 +26,9 @@ final class WatchLibraryStore: NSObject {
 
     var showsLocalTime: Bool { library?.showsLocalTime ?? false }
 
-    /// The nights still to come at `now`, soonest first.
+    /// The events still to come at `now`, soonest first.
     func events(at now: Date) -> [WatchEvent] {
-        (library?.events ?? []).filter { Night($0, showsLocalTime: showsLocalTime, at: now).isListed }
+        (library?.events ?? []).filter { EventMoment($0, showsLocalTime: showsLocalTime, at: now).isListed }
     }
 
     func event(id: WatchEvent.ID) -> WatchEvent? {

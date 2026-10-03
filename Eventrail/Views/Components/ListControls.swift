@@ -49,7 +49,7 @@ func menuChoice<Value: Equatable>(_ selection: Binding<Value>,
     )
 }
 
-/// Which half of a list of events is on screen: the nights still ahead, or the
+/// Which half of a list of events is on screen: the events still ahead, or the
 /// ones gone.
 ///
 /// At the head of the list rather than in the capsule at its foot, because it
@@ -134,8 +134,8 @@ struct SelectionToolbar: ToolbarContent {
     /// Set where the act is worth asking about first; the trash acts at once
     /// where it is not.
     var confirmation: RemovalConfirmation?
-    /// Set where the rows have a read state — My Events' nights still ahead —
-    /// and drawn opposite the trash, where Following keeps its own.
+    /// Set where the rows have a read state — the events still ahead on My
+    /// Events — and drawn opposite the trash, where Following keeps its own.
     var markRead: MarkReadButton?
     let remove: () -> Void
 

@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 
 /// A bench for the Live Activity, in debug builds only, opened from the
-/// event sheet's menu: starts one for the event in front of it with its night
+/// event sheet's menu: starts one for the event in front of it with its times
 /// moved to just ahead of now, so every stage — and the island, the watch's
 /// Smart Stack and the Mac's menu bar — can be looked at without waiting for
 /// two hours before somebody's doors.
@@ -126,7 +126,7 @@ struct LiveActivityTestView: View {
         .presentationDetents([.medium, .large])
     }
 
-    // MARK: - The night asked for
+    // MARK: - The event asked for
 
     // Read as the steppers move, so the times beside them are always from now.
     private var starts: Date { Date.now.addingTimeInterval(TimeInterval(startsIn * 60)) }
@@ -135,17 +135,17 @@ struct LiveActivityTestView: View {
     private var opens: Date { (doors ?? starts).addingTimeInterval(-EventActivityStage.lead) }
 
     private func start() {
-        var night = event
-        night.doorsOpen = doors
-        night.startsAt = starts
-        night.endsAt = ends
+        var retimed = event
+        retimed.doorsOpen = doors
+        retimed.startsAt = starts
+        retimed.endsAt = ends
         let seat = seat
         let diagnostics = showsDiagnostics
         isStarting = true
         Task {
             defer { isStarting = false }
             do {
-                try await EventActivities.shared.startTest(for: night, seat: seat, diagnostics: diagnostics)
+                try await EventActivities.shared.startTest(for: retimed, seat: seat, diagnostics: diagnostics)
             } catch {
                 failure = error.localizedDescription
             }

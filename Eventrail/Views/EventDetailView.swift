@@ -7,7 +7,7 @@ import Translation
 /// about it. The two are kept visually distinct throughout.
 ///
 /// Laid out as `Eventrail v3.dc.html` draws it: the flyer small beside the
-/// title, the night's own clock in a card of its own, the reader's record as
+/// title, the event's own clock in a card of its own, the reader's record as
 /// two tiles that open ``TicketDetailsView``, then the page's description,
 /// billing, hall and links — and the actions in a bar along the bottom.
 ///
@@ -170,7 +170,7 @@ struct EventDetailView: View {
                     header
                     timelineCard
                     // Only for an event the reader keeps. Tracking answers
-                    // questions about a night they mean to be at — the ticket,
+                    // questions about an event they mean to be at — the ticket,
                     // the seat, what it cost — so on an event that is not in
                     // the library there is nothing for it to be about, and a
                     // date opened from Following or Search shows the facts
@@ -326,7 +326,7 @@ struct EventDetailView: View {
 
     // MARK: - Header
 
-    /// The flyer, and beside it what the night is called, when and where.
+    /// The flyer, and beside it what the event is called, when and where.
     ///
     /// The flyer at the size of a poster on a wall rather than across the
     /// width of the sheet: it is artwork for the event, and the sheet is read
@@ -661,7 +661,7 @@ struct EventDetailView: View {
     /// The offset of the clock this sheet's times are on, beside the switch
     /// that says which clock that is.
     ///
-    /// On every sheet rather than only on the nights abroad. On the venue's
+    /// On every sheet rather than only on the events abroad. On the venue's
     /// clock the times are the hall's, as Eventernote's members wrote them —
     /// 18:00 is 18:00 at the door rather than 18:00 wherever the reader is
     /// standing — and that is as true of a Tokyo date as of a Taipei one.
@@ -673,8 +673,8 @@ struct EventDetailView: View {
     /// adds is which clock it keeps.
     @ViewBuilder private var clockOffset: some View {
         // On the reader's own clock the offset is always known: it is this
-        // device's, on the night itself. On the venue's, only where there is
-        // one to give — see ``venueZone``. Without it the switch alone says
+        // device's, on the day of the event. On the venue's, only where there
+        // is one to give — see ``venueZone``. Without it the switch alone says
         // the times are the hall's, which is all that is known.
         let zone = clock == .local ? TimeZone.current : venueZone
         if let zone {
@@ -692,7 +692,7 @@ struct EventDetailView: View {
 
     /// Venue or Local: which clock this sheet prints on, for as long as it is
     /// open. It starts on Settings › Time Zone and goes back to it when the
-    /// sheet closes — a way of reading this one night, not a preference, so
+    /// sheet closes — a way of reading this one event, not a preference, so
     /// it moves no other screen and not the Live Activity either.
     ///
     /// A capsule of its own rather than a segmented picker, as the design
@@ -840,16 +840,16 @@ struct EventDetailView: View {
 
     /// How long the show runs, from its start to its published end.
     ///
-    /// Read in the order a night runs, so an end after midnight is the next
+    /// Read in the order an event runs, so an end after midnight is the next
     /// morning — see ``Event/inOrder(_:_:_:)`` — and not past
-    /// ``PassportStats/longestNight``, where the page's times are more likely
+    /// ``PassportStats/longestEvent``, where the page's times are more likely
     /// a typo than a show.
     private var runLine: Text {
         let times = Event.inOrder(event.doorsOpen, event.startsAt, event.endsAt)
         guard let starts = times.starts else { return Text("Start time not announced") }
         guard let ends = times.ends else { return Text("End time not announced") }
         let length = ends.timeIntervalSince(starts)
-        guard length > 0, length <= PassportStats.longestNight else {
+        guard length > 0, length <= PassportStats.longestEvent else {
             return Text("End time not announced")
         }
         let runs = Duration.seconds(length)
@@ -934,7 +934,7 @@ struct EventDetailView: View {
     }
 
     /// Where the ticket stands: in hand, still being tried for, or not yet —
-    /// and once the night is over, simply that the reader was there.
+    /// and once the event is over, simply that the reader was there.
     private var ticketValue: Text {
         if !isAhead { return Text("Attended") }
         if tracking.ticket == .purchased { return Text("Purchased") }
@@ -1081,7 +1081,7 @@ struct EventDetailView: View {
         EventActivities.shared.statuses[event.id]
     }
 
-    /// Whether the bar and the menu offer the Live Activity: for a night the
+    /// Whether the bar and the menu offer the Live Activity: for an event the
     /// reader holds a ticket for — see ``EventActivities/canOffer(_:tracking:inLibrary:at:)``
     /// — and, whatever has changed since, for one already asked for, so it
     /// can always be turned off from here.
@@ -1091,7 +1091,7 @@ struct EventDetailView: View {
     }
 
     /// A clock, with a tick on it once one is scheduled and filled in the
-    /// colour of a night under way once it is on — the design's plain, pale
+    /// colour of an event under way once it is on — the design's plain, pale
     /// and filled button.
     private var liveActivitySymbol: String {
         switch liveActivity {
@@ -1109,11 +1109,11 @@ struct EventDetailView: View {
             .joined(separator: "|")
     }
 
-    /// Turns the event's Live Activity on, at once, or off. Too early for it
-    /// to last the night it says from when it can be instead, in passing —
-    /// the notice pill and its error haptic, no alert to answer: the button
-    /// is there all along, so the reader learns the feature exists and when
-    /// to come back for it. See ``EventActivities/refusal(for:at:in:)``.
+    /// Turns the event's Live Activity on, at once, or off. Too early for it to
+    /// last until the event is over, it says from when it can be instead, in
+    /// passing — the notice pill and its error haptic, no alert to answer: the
+    /// button is there all along, so the reader learns the feature exists and
+    /// when to come back for it. See ``EventActivities/refusal(for:at:in:)``.
     private func toggleLiveActivity() {
         let activities = EventActivities.shared
         let event = event
@@ -1153,7 +1153,7 @@ struct EventDetailView: View {
     ///
     /// It is where everything the site has no field for ends up — ticket
     /// prices, seat types, the on-sale date, which stage each act is on — so
-    /// for most events it is the fullest thing published about the night. It
+    /// for most events it is the fullest thing published about the event. It
     /// also runs from one line to forty, which is why it opens collapsed: the
     /// billing and the hall below it should not sit under a wall of ticket
     /// terms the reader has already read once.
@@ -1395,7 +1395,7 @@ struct EventDetailView: View {
     // MARK: - Where the announcement was made
 
     /// 関連リンク and Twitterハッシュタグ: the pages the event was announced on,
-    /// and what to follow the night under.
+    /// and what to follow the event under.
     ///
     /// One card rather than two, because both answer the same question — where
     /// the rest of this is — and because most events publish one or the other
@@ -1630,7 +1630,7 @@ struct EventDetailView: View {
     ///
     /// Eventernote's event pages are written by its members rather than by the
     /// promoter, so how recently one was touched is part of reading it: an
-    /// upcoming night last edited two years ago has doors nobody has checked
+    /// upcoming event last edited two years ago has doors nobody has checked
     /// since. The handle is shown as the site prints it.
     private var provenance: Text {
         let source = Text("Event data imported from the public Eventernote page.")

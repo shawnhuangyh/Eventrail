@@ -3,7 +3,7 @@ import Testing
 @testable import Eventrail
 
 struct FollowingReadTests {
-    /// A night far enough ahead that pruning never reaches it.
+    /// An event far enough ahead that pruning never reaches it.
     private static let ahead = Date.now.addingTimeInterval(30 * 24 * 60 * 60)
 
     private func event(_ id: String = "1", startsAt: Date? = nil) -> Event {
@@ -45,7 +45,7 @@ struct FollowingReadTests {
         }
     }
 
-    @Test func aNightRetimedAtItsHallGivesTheSameFingerprint() throws {
+    @Test func anEventRetimedAtItsHallGivesTheSameFingerprint() throws {
         let listed = Fixtures.event(startsAt: Fixtures.date(2027, 5, 9, 18), performers: ["A"])
         let taipei = try #require(TimeZone(identifier: "Asia/Taipei"))
         let kept = listed.published(in: taipei)
@@ -142,7 +142,7 @@ struct FollowingReadTests {
 
     // MARK: - Pruning and restoring
 
-    @Test func aNightThatHasBeenIsPruned() {
+    @Test func anEventThatHasBeenIsPruned() {
         let past = Fixtures.event(id: "old", date: Date.now.addingTimeInterval(-10 * 24 * 60 * 60))
         let kept = event()
         let pruned = archive([past.id: read(past, at: .now), kept.id: read(kept, at: .now)]).pruned()

@@ -7,10 +7,10 @@ import Testing
 struct LibraryDatabaseTests {
     let earlier = Date.now.addingTimeInterval(-3600)
     let later = Date.now.addingTimeInterval(-60)
-    /// A night far enough ahead that pruning never reaches its read.
+    /// An event far enough ahead that pruning never reaches its read.
     let ahead = Date.now.addingTimeInterval(30 * 24 * 60 * 60)
 
-    /// Something in every part of the archive the store keeps, and one night
+    /// Something in every part of the archive the store keeps, and one event
     /// abroad with every field its page publishes.
     func library() -> LibraryArchive {
         var archive = LibraryArchive()
@@ -407,7 +407,7 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
-    @Test func aReadWhoseNightHasGoneIsDeleted() throws {
+    @Test func aReadWhoseEventHasGoneIsDeleted() throws {
         let (database, context) = try database()
         let past = Date.now.addingTimeInterval(-30 * 24 * 60 * 60)
         for (id, day) in [("gone", past), ("ahead", ahead)] {

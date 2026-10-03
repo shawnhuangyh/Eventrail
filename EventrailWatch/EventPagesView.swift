@@ -4,28 +4,28 @@ enum EventPage: Hashable {
     case countdown, seat, times
 }
 
-/// One night in three pages turned with the Crown — the countdown, the seat,
-/// the times — each washed in the colour of where the night stands.
+/// One event in three pages turned with the Crown — the countdown, the seat,
+/// the times — each washed in the colour of where the event stands.
 struct EventPagesView: View {
     let event: WatchEvent
     let showsLocalTime: Bool
     @Binding var page: EventPage
 
     var body: some View {
-        let changes = Night(event, showsLocalTime: showsLocalTime, at: .now).changes
-        TimelineView(NightSchedule(changes: changes, step: 1)) { context in
-            let night = Night(event, showsLocalTime: showsLocalTime, at: context.date)
+        let changes = EventMoment(event, showsLocalTime: showsLocalTime, at: .now).changes
+        TimelineView(StageSchedule(changes: changes, step: 1)) { context in
+            let moment = EventMoment(event, showsLocalTime: showsLocalTime, at: context.date)
             TabView(selection: $page) {
-                CountdownPage(night: night)
-                    .containerBackground(for: .tabView) { night.wash }
+                CountdownPage(moment: moment)
+                    .containerBackground(for: .tabView) { moment.wash }
                     .tag(EventPage.countdown)
-                SeatPage(night: night)
-                    .navigationTitle(night.shortDate)
-                    .containerBackground(for: .tabView) { night.wash }
+                SeatPage(moment: moment)
+                    .navigationTitle(moment.shortDate)
+                    .containerBackground(for: .tabView) { moment.wash }
                     .tag(EventPage.seat)
-                TimesPage(night: night)
-                    .navigationTitle(night.shortDate)
-                    .containerBackground(for: .tabView) { night.wash }
+                TimesPage(moment: moment)
+                    .navigationTitle(moment.shortDate)
+                    .containerBackground(for: .tabView) { moment.wash }
                     .tag(EventPage.times)
             }
             .tabViewStyle(.verticalPage)
@@ -57,28 +57,28 @@ private let highlight = Color(red: 1, green: 0xD6 / 255, blue: 0x0A / 255)
 /// A gauge from the doors to the end, the start at its top, with the count to
 /// whatever is next inside it and the two times it runs between beneath.
 struct CountdownPage: View {
-    let night: Night
+    let moment: EventMoment
 
     var body: some View {
         DesignCanvas { size, s in
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
-            let span = night.span
+            let span = moment.span
             ZStack(alignment: .top) {
-                NightGauge(fraction: night.fraction, tint: night.tint, lineWidth: 20 * s)
+                EventGauge(fraction: moment.fraction, tint: moment.tint, lineWidth: 20 * s)
                     .frame(width: 132 * s, height: 132 * s)
                     .position(center)
                 VStack(spacing: 4 * s) {
-                    night.gaugeLabel
+                    moment.gaugeLabel
                         .font(.system(size: 12.5 * s, weight: .semibold))
-                        .foregroundStyle(night.tint)
+                        .foregroundStyle(moment.tint)
                         // Higher up, where the ring closes in: "On now · ends
                         // in" ran into it at the block's own width.
                         .frame(maxWidth: 92 * s)
-                    night.gaugeValue
+                    moment.gaugeValue
                         .font(.system(size: 25 * s, weight: .bold))
                         .kerning(-0.5 * s)
                         .monospacedDigit()
-                    Text(verbatim: night.dayLine)
+                    Text(verbatim: moment.dayLine)
                         .font(.system(size: 14 * s, weight: .medium))
                         .foregroundStyle(.white.opacity(0.75))
                 }
@@ -115,7 +115,7 @@ struct CountdownPage: View {
 
 /// Two thirds of a ring, open at the foot: the doors at its left end, the
 /// start at its top — marked with a dot — and the end at its right.
-struct NightGauge: View {
+struct EventGauge: View {
     let fraction: Double
     let tint: Color
     let lineWidth: CGFloat
@@ -152,31 +152,31 @@ struct NightGauge: View {
 /// The class the seat was sold as, what it cost and whether the ticket is in
 /// hand, and the seat itself picked out to be read off at the door.
 struct SeatPage: View {
-    let night: Night
+    let moment: EventMoment
 
     var body: some View {
         DesignCanvas { _, s in
             VStack(alignment: .leading, spacing: 10 * s) {
                 VStack(alignment: .leading, spacing: 3 * s) {
-                    night.seatHeading
+                    moment.seatHeading
                         .font(.system(size: 30 * s, weight: .bold))
                         .kerning(-0.6 * s)
-                    Text(verbatim: night.event.venue)
+                    Text(verbatim: moment.event.venue)
                         .font(.system(size: 14 * s, weight: .medium))
                         .foregroundStyle(.white.opacity(0.88))
                 }
                 VStack(alignment: .leading, spacing: 3 * s) {
-                    night.costLine
+                    moment.costLine
                         .font(.system(size: 22 * s, weight: .semibold))
                         .monospacedDigit()
-                    night.ticketLine.text
+                    moment.ticketLine.text
                         .font(.system(size: 17.5 * s, weight: .medium))
-                        .foregroundStyle(night.ticketLine.color)
+                        .foregroundStyle(moment.ticketLine.color)
                 }
                 VStack(alignment: .leading, spacing: 4 * s) {
                     Text("Seat")
                         .font(.system(size: 14 * s, weight: .medium))
-                    Text(verbatim: night.event.seat.isEmpty ? "--" : night.event.seat)
+                    Text(verbatim: moment.event.seat.isEmpty ? "--" : moment.event.seat)
                         .font(.system(size: 18 * s, weight: .bold))
                         .monospacedDigit()
                         .foregroundStyle(.black)
@@ -196,30 +196,30 @@ struct SeatPage: View {
 
 // MARK: - 3 · Times
 
-/// What the night is doing, and its doors, start and end — what has gone by
+/// What the event is doing, and its doors, start and end — what has gone by
 /// greyed, what is next picked out.
 struct TimesPage: View {
-    let night: Night
+    let moment: EventMoment
 
     var body: some View {
         DesignCanvas { _, s in
             VStack(alignment: .leading, spacing: 8 * s) {
                 VStack(alignment: .leading, spacing: 3 * s) {
-                    night.timesHeading
+                    moment.timesHeading
                         .font(.system(size: 19 * s, weight: .semibold))
                         .kerning(-0.19 * s)
                         .monospacedDigit()
-                        .foregroundStyle(night.timesHeadingIsLive ? night.tint : .white.opacity(0.55))
-                    Text(verbatim: night.event.venue)
+                        .foregroundStyle(moment.timesHeadingIsLive ? moment.tint : .white.opacity(0.55))
+                    Text(verbatim: moment.event.venue)
                         .font(.system(size: 14 * s, weight: .medium))
                         .foregroundStyle(.white.opacity(0.88))
                 }
                 VStack(spacing: 0) {
-                    row("Doors", night.doors, index: 0, scale: s)
-                    row("Start", night.starts, index: 1, scale: s)
-                    row("End", night.ends, index: 2, scale: s)
+                    row("Doors", moment.doors, index: 0, scale: s)
+                    row("Start", moment.starts, index: 1, scale: s)
+                    row("End", moment.ends, index: 2, scale: s)
                 }
-                night.timesFooter
+                moment.timesFooter
                     .font(.system(size: 13 * s, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(.white.opacity(0.55))
@@ -233,12 +233,12 @@ struct TimesPage: View {
     }
 
     private func row(_ label: LocalizedStringKey, _ time: Date?, index: Int, scale s: CGFloat) -> some View {
-        let isNext = night.nextTime == index
+        let isNext = moment.nextTime == index
         return HStack(spacing: 6 * s) {
             Text(label)
                 .font(.system(size: 15 * s, weight: .medium))
             Spacer(minLength: 0)
-            Text(verbatim: night.time(time))
+            Text(verbatim: moment.time(time))
                 .font(.system(size: 18 * s, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(isNext ? Color.black : Color.white)
@@ -253,7 +253,7 @@ struct TimesPage: View {
                 .fill(.white.opacity(0.14))
                 .frame(height: 0.5)
         }
-        .opacity(night.hasPassed(index) ? 0.45 : 1)
+        .opacity(moment.hasPassed(index) ? 0.45 : 1)
     }
 }
 

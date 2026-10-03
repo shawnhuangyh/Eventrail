@@ -19,7 +19,7 @@ struct VenuePlacesTests {
     }
 
     /// London and Accra share an offset all winter and part in summer: one
-    /// name placed in both has no clock a summer night can be read on.
+    /// name placed in both has no clock a summer date can be read on.
     @Test func zonesThatPartForSummerAreDifferentClocks() {
         let zones = VenuePlaces.zonesByName([("Grand Hall", TimeZone(identifier: "Europe/London")!),
                                              ("Grand Hall", TimeZone(identifier: "Africa/Accra")!)])

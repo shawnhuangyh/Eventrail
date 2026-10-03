@@ -4,21 +4,21 @@ import SwiftUI
 import UIKit
 
 /// The Live Activities the app has started or scheduled — at most one per
-/// event — and what keeps each in step with its night.
+/// event — and what keeps each in step with the event it is for.
 ///
 /// **An activity is started from the event's sheet, at once, and never
-/// scheduled** — and only once, started then, it will last the night: the
-/// system ends an activity eight hours after it starts (``longest``), so the
-/// sheet refuses before ``earliestStart(of:)`` and says from when it can be
-/// (``refusal(for:at:in:)``). Not scheduled ahead, though iOS 26 could: **iOS
-/// ends every activity an app has, scheduled ones included, when the app is
-/// updated** (`liveactivitiesd` logs "Stopping uninstalled activity" as the
-/// new build is installed), and one scheduled weeks before was usually gone
-/// by the night. Only for a night the reader holds a ticket for, as the
-/// design has it, and only once the page has published a start: without one
-/// there is nothing to count down to.
+/// scheduled** — and only once, started then, it will last until the event is
+/// over: the system ends an activity eight hours after it starts (``longest``),
+/// so the sheet refuses before ``earliestStart(of:)`` and says from when it can
+/// be (``refusal(for:at:in:)``). Not scheduled ahead, though iOS 26 could:
+/// **iOS ends every activity an app has, scheduled ones included, when the app
+/// is updated** (`liveactivitiesd` logs "Stopping uninstalled activity" as the
+/// new build is installed), and one scheduled weeks before was usually gone by
+/// the day of the event. Only for an event the reader holds a ticket for, as
+/// the design has it, and only once the page has published a start: without
+/// one there is nothing to count down to.
 ///
-/// **The activity moves on through the night by itself.** It is drawn again
+/// **The activity moves on through the event by itself.** It is drawn again
 /// only when the app sends it something or its stale date passes, so the
 /// extension draws every stage still to come at once and the system shows
 /// each in its own stretch (see ``EventActivityAttributes/ContentState/phases(at:)``).
@@ -91,7 +91,7 @@ final class EventActivities {
 
     /// Why an activity was not started.
     enum Refusal: Error, Equatable {
-        /// It could be from a day still to come — the night's own, as a rule.
+        /// It could be from a day still to come — the event's own, as a rule.
         case beforeItsDay
         /// It can be later today, from `earliest` — see ``earliestStart(of:)``.
         case tooEarly(earliest: Date)
@@ -101,16 +101,16 @@ final class EventActivities {
     /// it starts, and takes it out of the Dynamic Island.
     static let longest: TimeInterval = 8 * 60 * 60
 
-    /// The earliest an activity can start and still be on until the night is
+    /// The earliest an activity can start and still be on until the event is
     /// over: ``longest`` before what it runs to. Started at ten for a show
     /// ending at eight, the system would end it at six, as the show began.
     static func earliestStart(of state: EventActivityAttributes.ContentState) -> Date {
         state.runsTo.addingTimeInterval(-longest)
     }
 
-    /// Why an activity cannot be started for the night at `now`, or nil where
+    /// Why an activity cannot be started for the event at `now`, or nil where
     /// it can: before ``earliestStart(of:)``, said as a time where that is
-    /// later today on the reader's `calendar` and as the night's day where it
+    /// later today on the reader's `calendar` and as the event's day where it
     /// is not.
     static func refusal(for event: Event, at now: Date = .now,
                         in calendar: Calendar = .current) -> Refusal? {
@@ -121,7 +121,7 @@ final class EventActivities {
     }
 
     /// Starts the event's activity, at once. Asks nothing where it already
-    /// has one, and refuses where, started now, it would end before the night
+    /// has one, and refuses where, started now, it would end before the event
     /// did — see ``refusal(for:at:in:)``.
     func start(for event: Event, tracking: Tracking) async throws {
         guard !Self.live.contains(where: { $0.attributes.eventID == event.id }) else { return }
@@ -154,7 +154,7 @@ final class EventActivities {
         scheduleWake()
     }
 
-    /// Brings every activity up to where its night now stands, and — where the
+    /// Brings every activity up to where its event now stands, and — where the
     /// library is at hand — to the event's latest times and the seat written
     /// since. Ends the ones that are over, and any whose event has left the
     /// library.
@@ -193,7 +193,8 @@ final class EventActivities {
                 if !Self.hasPoster(for: event.id) { await Self.keepPoster(for: event) }
             }
             // Pending is only ever one the debug bench scheduled, or an older
-            // build: still waiting, it stands where the night will at its start.
+            // build: still waiting, it stands where the event will at its
+            // start.
             state.stage = state.stage(at: activity.activityState == .pending
                                       ? max(now, activity.attributes.opens) : now)
             if state.stage == .wrapped {
@@ -256,7 +257,7 @@ final class EventActivities {
 
     // MARK: - What an activity says
 
-    /// The night's times as the activity reads them — in the order the night
+    /// The event's times as the activity reads them — in the order the event
     /// runs (``Event/inOrder(_:_:_:)``), an end before the start dropped, and
     /// no end published running for ``Event/assumedLength`` — and where it
     /// stands at `now`. Nil without a start.

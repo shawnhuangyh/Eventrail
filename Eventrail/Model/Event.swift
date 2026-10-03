@@ -80,7 +80,7 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     ///
     /// The one free-written field on an Eventernote event, and so where
     /// everything the site has no box for ends up: ticket prices and seat
-    /// types, the on-sale date, which tour the night belongs to, who is on
+    /// types, the on-sale date, which tour the event belongs to, who is on
     /// which stage. Kept with its line breaks, because most of them are
     /// written as a list rather than as a paragraph.
     var summary: String? = nil
@@ -91,7 +91,7 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     /// none, and the difference matters to ``merging(_:)``: a list row has no
     /// links and must not blank out what the event's own page supplied.
     var relatedLinks: [URL]? = nil
-    /// Twitterハッシュタグ: what to follow the night under.
+    /// Twitterハッシュタグ: what to follow the event under.
     var hashtags: [Hashtag]? = nil
     /// Who last edited the page, as the site's edit history names them.
     ///
@@ -125,8 +125,8 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
 
     /// The zone an event's times are read in until its hall says otherwise.
     ///
-    /// Eventernote is a Japanese site and nearly every night it publishes is in
-    /// Japan, which is one zone from 与那国 to 稚内. It carries the odd night
+    /// Eventernote is a Japanese site and nearly every event it publishes is in
+    /// Japan, which is one zone from 与那国 to 稚内. It carries the odd event
     /// abroad as well — a dome in Taipei, a hall in Shanghai — and its members
     /// write those in the hall's own clock, with nothing on the page to say so.
     /// So this is where every import starts, and ``published(in:)`` is what
@@ -168,7 +168,7 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     ///
     /// For a date whose hall's clock is not known: it is read on Tokyo time,
     /// and Tokyo's midnight is the morning of the same day in Los Angeles, so
-    /// ``isUpcoming`` would drop a night there before its doors opened. Kept
+    /// ``isUpcoming`` would drop an event there before its doors opened. Kept
     /// too long rather than taken away too soon.
     var isUpcomingAnywhere: Bool { isUpcomingAnywhere(asOf: .now) }
 
@@ -193,7 +193,7 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     }
 
     /// Whether the page's published end time has already gone by. False where
-    /// it published none — most nights — since nothing then says when it is
+    /// it published none — most events — since nothing then says when it is
     /// over, and the day's end is the one line ``isUpcoming`` can draw.
     ///
     /// An end earlier than the start is the next morning — see
@@ -214,7 +214,7 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     static let assumedLength: TimeInterval = 3 * 60 * 60
 
     /// Doors, start and end, each moved to the next day wherever it is earlier
-    /// than the one before it — how a night that runs past midnight has to be
+    /// than the one before it — how an event that runs past midnight has to be
     /// read, since the page prints a clock and no date. What
     /// ``EventernotePages`` stores, and what ``hasEnded`` reads older copies
     /// as.
@@ -233,12 +233,12 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
         return (doors, starts, after(ends))
     }
 
-    /// How many whole days from today to the night itself — 0 on the day, 1
+    /// How many whole days from today to the event itself — 0 on the day, 1
     /// for tomorrow — and nil once it has been.
     ///
     /// Counted as *written dates* rather than as an interval, for the reason
     /// ``localDay`` gives: the hall publishes a day and the reader reads it on
-    /// their own calendar, so a night that opens at 18:00 tomorrow is one day
+    /// their own calendar, so an event that opens at 18:00 tomorrow is one day
     /// away all through today rather than turning into two some time this
     /// evening. A hall abroad is counted on the day its own clock calls it,
     /// which is the day printed on the row beside this.
@@ -273,7 +273,7 @@ nonisolated extension Event {
     ///
     /// The year on every row rather than only on the rows that need one. Most
     /// of what these rows are is history: the Passport is nothing else, My
-    /// Events keeps every night that has been alongside the ones ahead, a
+    /// Events keeps every event that has been alongside the ones ahead, a
     /// performer's listing runs from next spring back to whenever the site
     /// first carried them, and the Following tab is as likely to be showing
     /// next year as this one. A row that printed only a day and a month left
@@ -299,7 +299,7 @@ nonisolated extension Event {
         return date.formatted(style)
     }
 
-    /// "GMT+9" — what `zone` is set to on the night of this event.
+    /// "GMT+9" — what `zone` is set to on the day of this event.
     ///
     /// The offset and no place beside it, though Foundation will gladly name
     /// one. **A zone identifier is the map provider's reading of where the
@@ -310,8 +310,8 @@ nonisolated extension Event {
     /// "Japan Time" either. The offset is the part this app is actually sure
     /// of, and it is the part that moves the times.
     ///
-    /// Read at the night itself rather than at today, so a summer date abroad
-    /// says the offset that night keeps rather than the one it keeps now.
+    /// Read at the event itself rather than at today, so a summer date abroad
+    /// says the offset that date keeps rather than the one it keeps now.
     func offsetLine(in zone: TimeZone) -> String {
         var style = Date.FormatStyle(date: .omitted, time: .omitted)
         style.timeZone = zone
@@ -352,7 +352,7 @@ nonisolated extension Event {
     ///
     /// An Eventernote page prints a wall clock and no zone: 開演 18:00 is
     /// 18:00 at the hall, and a hall in Taipei means 18:00 in Taipei. The
-    /// instants here are that clock read in a zone, so a night abroad is not a
+    /// instants here are that clock read in a zone, so an event abroad is not a
     /// different fact to import but the same one read again — which is all
     /// this does, once ``VenuePlaces`` has said which clock the hall keeps.
     ///
@@ -478,7 +478,7 @@ nonisolated extension Event {
 nonisolated extension Event {
     /// Whether the venue names a hall rather than standing in for one.
     ///
-    /// Eventernote files a night with no hall of its own under a placeholder
+    /// Eventernote files an event with no hall of its own under a placeholder
     /// venue whose name opens with `!_`: `!_東京都内某所` for an undisclosed
     /// room, `!_国内外各所 (ライブビューイング等)` for a stream or a screening,
     /// `!_海外某所・各所` for somewhere abroad. None of them is a place anybody

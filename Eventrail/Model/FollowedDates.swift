@@ -245,7 +245,7 @@ final class FollowedDates {
     /// published end — before anything is asked of Eventernote.
     ///
     /// The end time is in the cache already, so there is nothing to wait for:
-    /// a pull clears a finished night from the list the moment it starts, and
+    /// a pull clears a finished event from the list the moment it starts, and
     /// the listing it then reads would leave it out only because its day had
     /// not finished. ``events(for:)`` checks the same thing as it is read, for
     /// the redraws in between.
@@ -268,7 +268,7 @@ final class FollowedDates {
     /// Whether a date is over: on a row whose hall's clock is known, its day
     /// gone or its published end gone by. A row on an assumed clock waits for
     /// its day to be over everywhere, since read on Tokyo time its end — and
-    /// its day's — could be hours out either way: a Los Angeles night would
+    /// its day's — could be hours out either way: a Los Angeles event would
     /// go the morning it opens.
     private func isOver(_ event: Event) -> Bool {
         guard hallZone(event) != nil else { return !event.isUpcomingAnywhere }
@@ -285,7 +285,7 @@ final class FollowedDates {
 
     /// Bumped as the soonest date on screen goes over. Read by
     /// ``events(for:)``, so every screen listing the dates redraws then and
-    /// the night leaves while the reader is looking at it — nothing else
+    /// the event leaves while the reader is looking at it — nothing else
     /// changes at that moment to prompt a redraw.
     private var clockTick = 0
     @ObservationIgnored private var pendingTick: (at: Date, task: Task<Void, Never>)?
@@ -377,7 +377,7 @@ final class FollowedDates {
 
         for page in 1...Self.pageLimit {
             let result = try await client.events(forPerformer: performer, page: page)
-            // Not a night already over, though the page lists it: its end is
+            // Not an event already over, though the page lists it: its end is
             // published and gone by. Paging still stops on the day, below.
             for event in result.items where !isOver(onHallClock(event)) {
                 guard known.insert(event.id).inserted else { continue }
@@ -406,7 +406,7 @@ final class FollowedDates {
         var merged: [Event] = []
         var known: Set<Event.ID> = []
         for performer in performers {
-            // A night whose published end has gone by is over, though its day
+            // An event whose published end has gone by is over, though its day
             // is not: kept in the cache until the day ends, like every other
             // date, and left out of what the tab shows once it finishes.
             // Checked as the tab reads rather than when the listing was read,

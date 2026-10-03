@@ -25,7 +25,7 @@ struct FollowedDatesTests {
         #expect(followed.dates[performer.id]?.map(\.id) == ["abroad"])
     }
 
-    /// Nothing else changes as a night ends, so the list has to be told to
+    /// Nothing else changes as an event ends, so the list has to be told to
     /// redraw then, or it sits on screen until something unrelated moves.
     @Test func aScreenReadingTheDatesRedrawsAsTheSoonestEnds() async throws {
         let now = Date.now
@@ -83,7 +83,7 @@ struct FollowedDatesTests {
         #expect(!late.hasEnded)
     }
 
-    @Test func aNightWhoseEndHasPassedIsGoneThoughItsDayIsNot() {
+    @Test func anEventWhoseEndHasPassedIsGoneThoughItsDayIsNot() {
         let now = Date.now
         let over = Fixtures.event(id: "over", date: now, startsAt: now.addingTimeInterval(-3 * 3600),
                                   endsAt: now.addingTimeInterval(-60))
@@ -98,7 +98,7 @@ struct FollowedDatesTests {
 }
 
 extension FollowedDatesTests {
-    @Test func finishedNightsLeaveTheCacheItself() {
+    @Test func finishedEventsLeaveTheCacheItself() {
         let now = Date.now
         let over = Fixtures.event(id: "over", date: now, startsAt: now.addingTimeInterval(-3 * 3600),
                                   endsAt: now.addingTimeInterval(-60))

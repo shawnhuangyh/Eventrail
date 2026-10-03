@@ -497,7 +497,7 @@ final class VenuePlaces {
 
     /// Whether two zones read every clock the same way: the same offset now
     /// and in the depths of both halves of the year. Today's offset alone
-    /// would call London and Accra one clock all winter, and a summer night
+    /// would call London and Accra one clock all winter, and a summer date
     /// read on the wrong one ends an hour out. Shanghai and Taipei, which no
     /// transition ever parts, stay one.
     private nonisolated static func keepsTheSameClock(_ one: TimeZone, _ other: TimeZone) -> Bool {

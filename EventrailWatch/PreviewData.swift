@@ -1,8 +1,8 @@
 #if DEBUG
 import Foundation
 
-/// The design's own nights, for `#Preview` only — the first set an hour and a
-/// half before its doors, so the previews show a night under way.
+/// The design's own events, for `#Preview` only — the first set an hour and a
+/// half before its doors, so the previews show an event under way.
 extension WatchLibrary {
     static var preview: WatchLibrary {
         let tokyo = TimeZone(identifier: "Asia/Tokyo") ?? .gmt

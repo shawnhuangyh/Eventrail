@@ -47,7 +47,7 @@ struct EventActivityTests {
 
     /// 開場 23:30 開演 00:30 終演 02:00 — the start and the end are the next
     /// morning, as ``Event/inOrder(_:_:_:)`` reads them.
-    @Test func aNightPastMidnightRunsIntoTheNextMorning() throws {
+    @Test func anEventPastMidnightRunsIntoTheNextMorning() throws {
         let event = Fixtures.event(date: Fixtures.date(2027, 5, 9),
                                    doorsOpen: Fixtures.date(2027, 5, 9, 23, 30),
                                    startsAt: Fixtures.date(2027, 5, 9, 0, 30),
@@ -58,7 +58,7 @@ struct EventActivityTests {
         #expect(state.stage == .onNow)
     }
 
-    @Test func eachStageOfTheNight() throws {
+    @Test func eachStageOfTheEvent() throws {
         let stages = try [
             (Fixtures.date(2027, 5, 9, 16), EventActivityStage.beforeDoors),
             (Fixtures.date(2027, 5, 9, 17, 30), .doorsOpen),
@@ -72,7 +72,7 @@ struct EventActivityTests {
 
     /// Every stage still to come, each with its stretch — what the activity
     /// moves on through with nobody sending it anything.
-    @Test func laysOutTheRestOfTheNight() throws {
+    @Test func laysOutTheRestOfTheEvent() throws {
         let state = try state(of: event(), at: Fixtures.date(2027, 5, 9, 16))
         #expect(state.phases() == [
             EventActivityPhase(stage: .beforeDoors, until: Fixtures.date(2027, 5, 9, 17, 30)),
@@ -88,8 +88,8 @@ struct EventActivityTests {
     }
 
     /// Drawn again later than it was sent — gone stale, say — it starts from
-    /// where the night stands rather than where it stood.
-    @Test func drawnLateStartsFromWhereTheNightStands() throws {
+    /// where the event stands rather than where it stood.
+    @Test func drawnLateStartsFromWhereTheEventStands() throws {
         let state = try state(of: event(), at: Fixtures.date(2027, 5, 9, 16))
         let phases = state.phases(at: Fixtures.date(2027, 5, 9, 19, 10))
         #expect(phases.map(\.stage) == [.onNow, .wrapped])
@@ -141,13 +141,14 @@ struct EventActivityTests {
         #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 8, 20), in: reader) == .beforeItsDay)
     }
 
-    /// On the day itself, too early to last the night, it says from when.
-    @Test func isRefusedUntilItWouldLastTheNight() {
+    /// On the day itself, too early to last until the event is over, it says
+    /// from when.
+    @Test func isRefusedUntilItWouldLastToTheEnd() {
         #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 10), in: reader)
                 == .tooEarly(earliest: Fixtures.date(2027, 5, 9, 12, 30)))
     }
 
-    @Test func startsOnceItWouldLastTheNight() {
+    @Test func startsOnceItWouldLastToTheEnd() {
         #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 12, 30), in: reader) == nil)
         #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 19), in: reader) == nil)
     }

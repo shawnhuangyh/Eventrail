@@ -44,7 +44,7 @@ nonisolated enum PassportRanking: Hashable, Identifiable {
 /// Which end of the library the reader asked to see the whole of.
 ///
 /// A sheet rather than a pushed screen, and rather than the run of rows the
-/// card used to unfold in place: five nights is a glance, not a destination,
+/// card used to unfold in place: five events is a glance, not a destination,
 /// and growing the card by four rows pushed everything under it off screen
 /// while the reader was reading it.
 nonisolated enum PassportExtreme: Identifiable, Hashable {
@@ -92,9 +92,9 @@ struct EventPassportView: View {
     @State private var openExtreme: PassportExtreme?
     /// Which ranked list has its whole list open, if either.
     @State private var openRanking: PassportRanking?
-    /// Whether every recorded night is open, rather than the top five.
+    /// Whether every recorded event is open, rather than the top five.
     @State private var isShowingLotteries = false
-    /// The night whose own sheet is open, if the reader tapped one.
+    /// The event whose own sheet is open, if the reader tapped one.
     @State private var openEvent: Event?
 
     /// How much of each ranked list a card shows before sending the rest to a
@@ -166,8 +166,8 @@ struct EventPassportView: View {
         .sheet(isPresented: $isShowingLotteries) {
             PassportLotterySheet(rows: stats.topLotteries)
         }
-        // A night named on this screen is still an event, and the way to an
-        // event is the same sheet every list in the app ends in.
+        // An event named on this screen opens the same sheet every list in
+        // the app ends in.
         .eventSheet($openEvent)
     }
 
@@ -319,10 +319,10 @@ struct EventPassportView: View {
         longitudinalMeters: 2_500_000
     )
 
-    /// A hall drawn at its size: the more nights the reader has spent there,
+    /// A hall drawn at its size: the more events the reader has spent there,
     /// the larger and the stronger the dot.
     ///
-    /// One dot per hall rather than one per night — a hundred nights at the
+    /// One dot per hall rather than one per event — a hundred events at the
     /// Budōkan drawn as a hundred dots is one dot, and says a hundred times
     /// less than this does.
     private func dot(_ pin: Pin) -> some View {
@@ -425,7 +425,7 @@ struct EventPassportView: View {
     /// the whole slice, because Eventernote announces most dates long before it
     /// publishes a finish time.
     ///
-    /// The shortest and longest nights sit in this panel rather than their own:
+    /// The shortest and longest events sit in this panel rather than their own:
     /// they are the same measurement read at its extremes — a forty-minute
     /// in-store and a six-hour summer festival — and they are only worth
     /// printing once there are two timed events for them to be the ends of.
@@ -479,7 +479,7 @@ struct EventPassportView: View {
         cell(Text(value.formatted(format)), label: label, isFirst: isFirst)
     }
 
-    /// How long an average night runs — over the nights that can say, so the
+    /// How long an average event runs — over the events that can say, so the
     /// average is of the same events the total is.
     private func average(_ stats: PassportStats) -> some View {
         let seconds = stats.timedEvents > 0 ? stats.totalDuration / Double(stats.timedEvents) : 0
@@ -494,12 +494,12 @@ struct EventPassportView: View {
             .padding(.leading, isFirst ? 0 : 14)
     }
 
-    // MARK: - The briefest night and the longest
+    // MARK: - The briefest event and the longest
 
     /// One end of the library, ruled off from whatever sits above it — the
     /// breakdown for the shortest, the shortest for the longest.
     ///
-    /// The night itself, and a See All to the other four behind it. One row
+    /// The event itself, and a See All to the other four behind it. One row
     /// rather than five, because these two sit inside the time card now: the
     /// card is about the total, and ten rows of extremes under it would be the
     /// larger half of a panel that is not about them.
@@ -519,7 +519,7 @@ struct EventPassportView: View {
                     }
                 }
                 // The row itself is the target, with no chevron on it, the
-                // way a ranked row is: the whole line is the night.
+                // way a ranked row is: the whole line is the event.
                 Button { openEvent = first.event } label: { PassportSpanRow(span: first) }
                     .buttonStyle(.plain)
             }
@@ -531,17 +531,17 @@ struct EventPassportView: View {
 
     // MARK: - What the reader wrote down
 
-    /// The nights the reader applied hardest for.
+    /// The events the reader applied hardest for.
     ///
     /// The one card on this screen counted from something they typed rather
-    /// than from something Eventernote published. A night left blank is left
-    /// out; a night recorded as zero entries is a night somebody answered — a
+    /// than from something Eventernote published. An event left blank is left
+    /// out; an event recorded as zero entries is an event somebody answered — a
     /// seat bought the moment it went on sale — and is shown as the answer it
     /// is.
     ///
     /// Laid out the way the time card is: the card is named for the
     /// measurement rather than for the list, the readings of it sit under
-    /// that name, and the ranked nights are ruled off below them under a
+    /// that name, and the ranked events are ruled off below them under a
     /// heading of their own. The See All belongs to that heading, because it
     /// opens the list rather than the card.
     private func lotteryCard(_ stats: PassportStats) -> some View {
@@ -549,11 +549,11 @@ struct EventPassportView: View {
         let most = max(1, rows.first?.entries ?? 1)
         return VStack(alignment: .leading, spacing: 14) {
             CardHeader(title: "Lottery Entries")
-            // The three readings of the count, drawn as the time card draws
-            // its own: the hardest night, what an average one took, and how
-            // many nights either was counted over — because the total on the
-            // summary above is over the nights the reader answered for rather
-            // than over the slice.
+            // The three readings of the count, drawn as the time card draws its
+            // own: the event applied for hardest, what an average one took, and
+            // how many events either was counted over — because the total on
+            // the summary above is over the events the reader answered for
+            // rather than over the slice.
             HStack(spacing: 0) {
                 cell(Text(stats.mostLotteryEntries.formatted()),
                      label: "Most in One", isFirst: true)
@@ -575,7 +575,7 @@ struct EventPassportView: View {
                     }
                 }
                 ForEach(rows) { row in
-                    // A row is the night it names, the way the extremes in the
+                    // A row is the event it names, the way the extremes in the
                     // time card and the ranked cards below are: the whole line
                     // is the target.
                     Button { openEvent = row.event } label: {
@@ -734,7 +734,7 @@ private func passportReading(_ value: some View, label: LocalizedStringKey) -> s
 /// average, and the two ends of the library — and the reader should not have
 /// to work out that "2h 36m" and "23h 20m" are the same kind of thing.
 ///
-/// "6h 40m", and "45m" for a night under the hour: the leading "0h" is dropped
+/// "6h 40m", and "45m" for an event under the hour: the leading "0h" is dropped
 /// rather than printed.
 private struct DurationLabel: View {
     let seconds: TimeInterval
@@ -745,7 +745,7 @@ private struct DurationLabel: View {
     var body: some View {
         // A space in whatever size this is drawn at rather than a fixed
         // number of points: "24h 50m" at 30pt and the same figure at 15pt in
-        // a row of nights have to read as the same gap.
+        // a row of events have to read as the same gap.
         HStack(spacing: size * 0.3) {
             if minutes >= 60 { part(minutes / 60, unit: "h") }
             part(minutes % 60, unit: "m")
@@ -765,12 +765,12 @@ private struct DurationLabel: View {
     }
 }
 
-/// How many nights the slice holds, and how they fell — across the years,
+/// How many events the slice holds, and how they fell — across the years,
 /// across the year, or across the week.
 ///
 /// Its own card rather than another figure in the panel above, because it is
 /// the one reading on this screen that is a shape rather than a number: three
-/// nights every December and none in between is a fact about the reader that
+/// events every December and none in between is a fact about the reader that
 /// no total can print.
 ///
 /// The cut is the reader's to choose and is deliberately not remembered
@@ -900,7 +900,7 @@ private struct PassportChartStyle: ViewModifier {
                 AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                     AxisGridLine().foregroundStyle(.quaternary)
                     // Read as a Double as well as an Int: the counts are
-                    // whole nights, but a tick between two of them is the
+                    // whole events, but a tick between two of them is the
                     // axis's own to place and comes back as one.
                     AxisValueLabel {
                         if let count = value.as(Int.self) ?? value.as(Double.self).map(Int.init) {
@@ -933,7 +933,7 @@ private func axisName(_ label: String?, centered: Bool = false) -> some AxisMark
     }
 }
 
-/// One night and how long it ran.
+/// One event and how long it ran.
 ///
 /// Its own type rather than a method on the screen for the reason
 /// ``PassportRankRow`` is: the card shows one of these and the sheet behind
@@ -966,7 +966,7 @@ private struct PassportSpanRow: View {
     }
 }
 
-/// The whole of one end of the library — up to five nights, briefest or
+/// The whole of one end of the library — up to five events, briefest or
 /// longest first.
 ///
 /// A drawer rather than a pushed screen: the list is short and fixed, and the
@@ -976,7 +976,7 @@ private struct PassportExtremesSheet: View {
     let extreme: PassportExtreme
     let spans: [PassportStats.Span]
 
-    /// A row here opens the night it names, exactly as the row on the card
+    /// A row here opens the event it names, exactly as the row on the card
     /// does — a drawer over a drawer rather than a push, because an event's
     /// own sheet is what every list in the app opens, and the reader closes it
     /// back onto the list they tapped it from.
@@ -1146,7 +1146,7 @@ private struct PassportRankRow: View {
     /// The whole slice, which is what the share is taken of.
     let total: Int
     let tint: Color
-    /// Shown for performers and not for halls: "18 of your 128 nights" is worth
+    /// Shown for performers and not for halls: "18 of your 128 events" is worth
     /// saying about somebody the reader follows, where a hall's share of the
     /// library is not a thing anybody asks.
     let showsShare: Bool
@@ -1182,7 +1182,7 @@ private struct PassportRankRow: View {
     }
 }
 
-/// One night the reader applied for, how many times, and how that stands
+/// One event the reader applied for, how many times, and how that stands
 /// against the hardest they ever tried for a seat.
 private struct PassportLotteryRow: View {
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
@@ -1211,21 +1211,21 @@ private struct PassportLotteryRow: View {
                 .lineLimit(1)
         }
         // The gaps between the three lines are part of the row, so a tap
-        // between the bar and the date opens the night rather than nothing.
+        // between the bar and the date opens the event rather than nothing.
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Every night the reader wrote a lottery count on, behind the card's See All.
+/// Every event the reader wrote a lottery count on, behind the card's See All.
 ///
 /// No stack inside this one, unlike ``PassportRankingSheet``: a row here is a
-/// night rather than a name, and the card it came from does not open one
+/// event rather than a name, and the card it came from does not open one
 /// either.
 private struct PassportLotterySheet: View {
     let rows: [PassportStats.Lottery]
 
-    /// A row here opens the night it names, exactly as the row on the card
+    /// A row here opens the event it names, exactly as the row on the card
     /// does — a drawer over a drawer, the way ``PassportExtremesSheet`` opens
     /// one, so the reader closes the event back onto the list they tapped it
     /// from.
@@ -1235,9 +1235,6 @@ private struct PassportLotterySheet: View {
         let most = max(1, rows.first?.entries ?? 1)
 
         VStack(alignment: .leading, spacing: 0) {
-            // "event" rather than the "night" this file calls one everywhere
-            // else: the reader's word for what they applied for, and the word
-            // the other two drawers head their own counts with.
             PassportSheetHeader(eyebrow: Text("^[\(rows.count) event](inflect: true) recorded"),
                                 title: "Top Lottery Entries")
             ScrollView {
@@ -1263,18 +1260,18 @@ private struct PassportLotterySheet: View {
 
 // MARK: - What the reader paid
 
-/// What the reader paid for the nights they went to, and for which seats.
+/// What the reader paid for the events they went to, and for which seats.
 ///
 /// Counted, like the lottery card, from something they typed: every figure is
-/// over the nights a price was written on — ``PassportStats/tickets`` — and a
-/// night left blank is left out rather than read as free.
+/// over the events a price was written on — ``PassportStats/tickets`` — and a
+/// event left blank is left out rather than read as free.
 ///
 /// Its own type, as the events card is, because the seat-type filter over its
 /// two ends is state of its own — and, like the cadence there, deliberately
 /// not remembered between visits.
 private struct PassportSpendingCard: View {
     let stats: PassportStats
-    /// Opens a night on the screen's own event sheet.
+    /// Opens an event on the screen's own event sheet.
     let open: (Event) -> Void
 
     /// The class the dearest and cheapest are read over; nil for every ticket.
@@ -1315,7 +1312,7 @@ private struct PassportSpendingCard: View {
 
             types(styles)
             // Two tickets before there are two ends, for the reason the time
-            // card waits for two timed nights.
+            // card waits for two timed events.
             if stats.tickets.count >= 2 { extremes(styles) }
         }
         .padding(16)
@@ -1703,7 +1700,7 @@ nonisolated private struct HorizontalRule: Shape {
     }
 }
 
-/// One ticket: its class, the night, and what it cost.
+/// One ticket: its class, the event, and what it cost.
 ///
 /// Its own type for the reason ``PassportSpanRow`` is: the card shows two and
 /// the sheet behind its See All shows the rest.
@@ -1742,7 +1739,7 @@ private struct PassportTicketRow: View {
 /// either See All.
 ///
 /// A drawer with the rows ruled off, as ``PassportExtremesSheet`` draws its
-/// own: these are nights with a figure each, not a ranking with a bar.
+/// own: these are events with a figure each, not a ranking with a bar.
 private struct PassportTicketSheet: View {
     let tickets: [PassportStats.Ticket]
     let styles: SeatStyles

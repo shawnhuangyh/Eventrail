@@ -654,8 +654,8 @@ final class LibraryDatabase {
         Dictionary(rows.map { (key($0), $0) }, uniquingKeysWith: { preferring($0, $1) ? $0 : $1 })
     }
 
-    /// Deletes the Following reads of nights that have been — the tab no
-    /// longer lists them, and nothing will read them again. By the night
+    /// Deletes the Following reads of events that have been — the tab no
+    /// longer lists them, and nothing will read them again. By the event
     /// rather than by the stamp, so every device drops the same marks; a few
     /// days' grace covers a device whose clock or zone disagrees with the
     /// hall's.
@@ -714,7 +714,7 @@ final class LibraryDatabase {
             adopted.tracking[id] = legacy.tracking[id]
         }
         adopted.followingReads = legacy.followingReads?.filter { !marks.contains($0.key) }
-        // Nor the reads of nights that have been, which would only be deleted
+        // Nor the reads of events that have been, which would only be deleted
         // again by ``pruneReads(in:asOf:)``.
         adopted = adopted.pruned()
         guard !adopted.membership.isEmpty || !adopted.favorites.isEmpty || !adopted.tracking.isEmpty
