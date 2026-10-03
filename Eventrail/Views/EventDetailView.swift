@@ -1254,6 +1254,8 @@ struct EventDetailView: View {
         return nil
     }
 
+    private static let translateFont = UIFont.systemFont(ofSize: 12.5, weight: .semibold)
+
     private func translateButton(for summary: String) -> some View {
         let isShowing = showsTranslation && hasTranslation(of: summary)
         return Button {
@@ -1271,15 +1273,20 @@ struct EventDetailView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                if isTranslating {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Image(systemName: "translate")
-                        .font(.system(size: 11, weight: .semibold))
+            // On the words' baseline, so the card's header lines them up with
+            // its title — see ``SeeAllLabel``.
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Group {
+                    if isTranslating {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: "translate")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
                 }
+                .centredOnLine(of: Self.translateFont)
                 Text(isShowing ? "Show Original" : "Translate")
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(Font(Self.translateFont))
             }
             .foregroundStyle(Color.brandTint)
             .contentShape(.rect)

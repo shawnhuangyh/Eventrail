@@ -1607,12 +1607,17 @@ private struct PassportTicketTypeRow: View {
     /// The scale the spread is drawn on; nil where there is none.
     let axis: ClosedRange<Int>?
 
+    private static let nameFont = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            // The name, the count and the share on one baseline, as a ranking
+            // row sets them; the badge centred on their line beside them.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 SeatBadge(style: style)
+                    .centredOnLine(of: Self.nameFont)
                 style.label
-                    .font(.system(size: 13.5, weight: .semibold))
+                    .font(Font(Self.nameFont))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(type.count.formatted())

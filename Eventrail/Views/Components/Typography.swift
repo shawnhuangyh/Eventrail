@@ -121,15 +121,27 @@ struct SeeAllLabel: View {
                 .font(Font(Self.font))
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
-                // Still centred on the words' line, where it was drawn when
-                // the two were centred on each other: its middle where theirs
-                // is, measured from their baseline.
-                .alignmentGuide(.firstTextBaseline) {
-                    $0[VerticalAlignment.center] + (Self.font.ascender + Self.font.descender) / 2
-                }
+                .centredOnLine(of: Self.font)
         }
         .foregroundStyle(Color.brandTint)
         .contentShape(.rect)
+    }
+}
+
+extension View {
+    /// Beside words set in `font`, in a row lined up by their baseline: an
+    /// icon, a spinner or a badge, centred on the words' line as it would be
+    /// if the two were centred on each other.
+    ///
+    /// Centred on each other outright, a row takes the topmost baseline of
+    /// what is in it, and a smaller icon's sits higher than the words' — so
+    /// the words of a label made that way sit a point low beside a title.
+    /// This puts the icon's middle where the words' line has its middle,
+    /// measured from their baseline, and leaves the baseline to the words.
+    func centredOnLine(of font: UIFont) -> some View {
+        alignmentGuide(.firstTextBaseline) {
+            $0[VerticalAlignment.center] + (font.ascender + font.descender) / 2
+        }
     }
 }
 

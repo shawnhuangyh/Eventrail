@@ -406,7 +406,7 @@ struct SearchView: View {
     private var startingPoints: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !recentSearches.isEmpty {
-                HStack {
+                HStack(alignment: .firstTextBaseline) {
                     // Not a ``SectionLabel``: that carries its own inset, and
                     // this one is set by the row it shares with Clear.
                     Text("Recent")

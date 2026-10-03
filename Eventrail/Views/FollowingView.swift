@@ -482,7 +482,9 @@ struct FollowingView: View {
         Button {
             withAnimation(.snappy) { choose() }
         } label: {
-            HStack(spacing: 7) {
+            // The count on the name's baseline, as a count beside a title is
+            // everywhere else; centred on it, the smaller figure rode high.
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 label
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(isOn ? Color.brandTint : .secondary)
