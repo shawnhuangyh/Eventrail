@@ -1001,75 +1001,76 @@ struct EventDetailView: View {
         ToolbarSpacer(.flexible, placement: .bottomBar)
     }
 
-    /// Everything the bar has no room for. In the order the design lists it
-    /// top to bottom, whichever way the menu opens.
+    /// Everything the bar has no room for, and the bar's own actions again,
+    /// in groups a divider apart, the same groups a performer's and a hall's
+    /// menus keep: what the reader keeps about the event, where it is and
+    /// passing it on, the page it was read from — and last, whether it is in
+    /// the library at all. In that order whichever way the menu opens.
     private var moreMenu: some View {
         Menu {
-            Section {
-                if offersLiveActivity {
-                    Button(action: toggleLiveActivity) {
-                        Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
-                              systemImage: "clock")
-                    }
-                }
-                Button {
-                    withAnimation(.snappy) { store.toggleFavorite(event) }
-                } label: {
-                    Label(store.isFavorite(event) ? "Remove from Favorites" : "Add to Favorites",
-                          systemImage: store.isFavorite(event) ? "heart.fill" : "heart")
+            if offersLiveActivity {
+                Button(action: toggleLiveActivity) {
+                    Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                          systemImage: "clock")
                 }
             }
+            Button {
+                withAnimation(.snappy) { store.toggleFavorite(event) }
+            } label: {
+                Label(store.isFavorite(event) ? "Remove from Favorites" : "Add to Favorites",
+                      systemImage: store.isFavorite(event) ? "heart.fill" : "heart")
+            }
 
-            Section {
-                if hasVenue {
-                    Button {
-                        openVenueInMaps(directions: true)
-                    } label: {
-                        Label("Directions", systemImage: "location.fill")
-                    }
+            Divider()
+
+            if hasVenue {
+                Button {
+                    openVenueInMaps(directions: true)
+                } label: {
+                    Label("Directions", systemImage: "location.fill")
                 }
-                // Anything that changes the reader's Eventernote account
-                // happens on the official site, where they authenticate
-                // directly.
-                Link(destination: event.sourceURL) {
-                    Label("Open in Eventernote", systemImage: "safari")
-                }
-                // Beside the page it reads again, in a Task of its own: the
-                // menu does not wait for the read, and the notice says how it
-                // went.
-                RefreshMenuItem(readAt: store.lastRead(of: event), isRefreshing: isImporting) {
-                    Task { await refreshPage() }
-                }
-                ShareLink(item: event.sourceURL) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
+            }
+            ShareLink(item: event.sourceURL) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+
+            Divider()
+
+            // Anything that changes the reader's Eventernote account happens
+            // on the official site, where they authenticate directly.
+            Link(destination: event.sourceURL) {
+                Label("Open in Eventernote", systemImage: "safari")
+            }
+            // In a Task of its own: the menu does not wait for the read, and
+            // the notice says how it went.
+            RefreshMenuItem(isRefreshing: isImporting) {
+                Task { await refreshPage() }
             }
 
             #if DEBUG
-            Section {
-                Button {
-                    isTestingLiveActivity = true
-                } label: {
-                    Label { Text(verbatim: "Test Live Activity…") } icon: { Image(systemName: "hammer") }
-                }
+            Divider()
+            Button {
+                isTestingLiveActivity = true
+            } label: {
+                Label { Text(verbatim: "Test Live Activity…") } icon: { Image(systemName: "hammer") }
             }
             #endif
 
+            Divider()
+
             // The same place either way, so the menu keeps its shape as the
             // event goes in and out of the library.
-            Section {
-                if store.isInLibrary(event) {
-                    Button(role: .destructive) {
-                        withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
-                    } label: {
-                        Label { Text("Remove Event") } icon: { removalIcon }
-                    }
-                } else {
-                    Button {
-                        withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-                    } label: {
-                        Label("Add Event", systemImage: "plus")
-                    }
+            if store.isInLibrary(event) {
+                Button(role: .destructive) {
+                    withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+                } label: {
+                    Label { Text("Remove Event") } icon: { removalIcon }
+                }
+            } else {
+                Button {
+                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                } label: {
+                    Label("Add Event", systemImage: "plus")
                 }
             }
         } label: {
@@ -1622,7 +1623,8 @@ struct EventDetailView: View {
     private var footnote: some View {
         Footnote(isImporting
                  ? Text("Importing this event from its public Eventernote page…")
-                 : provenance)
+                 : provenance,
+                 updated: isImporting ? nil : store.lastRead(of: event))
             .padding(.horizontal, 26)
             .padding(.top, 2)
     }

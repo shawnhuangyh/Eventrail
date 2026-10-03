@@ -295,47 +295,30 @@ private struct RefreshNoticeBanner: View {
 }
 
 /// Refresh, in the ⋯ menu of a page read from Eventernote — an event's sheet,
-/// a performer's page, a hall's — with when the page was last read under its
-/// name: "Updated 2 hours ago".
+/// a performer's page, a hall's.
 ///
 /// In the menu rather than on a pull. An event's sheet is a sheet, and a pull
 /// down from its top is how a sheet is put away; a pull there that read the
 /// page instead was the gesture taken for something else. And the pages read
 /// themselves once their copy has gone stale, so reading one again by hand is
-/// an occasional want — a menu's — that the line under it lets the reader
-/// judge before asking. The performer's and the hall's pages work the same
-/// way, so a page read from the site is refreshed the same way wherever it is.
-/// The Following tab keeps its pull: it is a list, where a pull is expected
-/// and is nothing else.
+/// an occasional want — a menu's. The performer's and the hall's pages work
+/// the same way, so a page read from the site is refreshed the same way
+/// wherever it is. The Following tab keeps its pull: it is a list, where a
+/// pull is expected and is nothing else.
 ///
-/// The read it starts ends in a notice like every refresh the reader asks for
-/// — see ``RefreshNotices``.
+/// When the page was last read is said in the small print at its foot — see
+/// ``Footnote`` — where it can be read without opening anything. The read it starts ends in a notice like every refresh the
+/// reader asks for — see ``RefreshNotices``.
 struct RefreshMenuItem: View {
-    /// When what is on screen was read from Eventernote; nil before it has
-    /// been, when nothing goes under the name.
-    let readAt: Date?
-    /// Whether a read is going on now, by hand or by itself: the item says so
-    /// and cannot be chosen again until it has ended.
+    /// Whether a read is going on now, by hand or by itself: the item cannot
+    /// be chosen again until it has ended.
     let isRefreshing: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Label("Refresh", systemImage: "arrow.clockwise")
-            if isRefreshing {
-                Text("Refreshing…")
-            } else if let readAt {
-                Self.updated(readAt)
-            }
         }
         .disabled(isRefreshing)
-    }
-
-    /// "Updated 2 hours ago", or "Updated just now" inside the first minute,
-    /// where the relative style would count the seconds.
-    static func updated(_ readAt: Date, at now: Date = .now) -> Text {
-        let readAt = min(readAt, now)
-        guard now.timeIntervalSince(readAt) >= 60 else { return Text("Updated just now") }
-        return Text("Updated \(readAt.formatted(.relative(presentation: .named)))")
     }
 }

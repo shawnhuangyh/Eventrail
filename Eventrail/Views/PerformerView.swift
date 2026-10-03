@@ -305,11 +305,30 @@ struct PerformerView: View {
                 ShareLink(item: profile.pageURL)
                     .tint(.brandTint)
 
+                // Everything in the bar as well, as the sheet's menu has it, so
+                // the menu is the whole of what can be done here — in the
+                // sheet's groups: the reader's own, passing it on, and the
+                // page it was read from.
                 Menu {
+                    Button {
+                        withAnimation(.snappy) { store.toggleFollow(profile) }
+                    } label: {
+                        Label(isFollowing ? "Unfollow" : "Follow",
+                              systemImage: isFollowing ? "checkmark" : "plus")
+                    }
+
+                    Divider()
+
+                    ShareLink(item: profile.pageURL) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+
+                    Divider()
+
                     Link(destination: profile.pageURL) {
                         Label("Open in Eventernote", systemImage: "safari")
                     }
-                    RefreshMenuItem(readAt: readAt, isRefreshing: running != nil) {
+                    RefreshMenuItem(isRefreshing: running != nil) {
                         imagesCheckedSince = .now
                         Task { await refresh(byHand: true) }
                     }
@@ -517,7 +536,8 @@ struct PerformerView: View {
     // MARK: - Provenance
 
     private var footnote: some View {
-        Footnote(Text("Appearances come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back."))
+        Footnote(Text("Appearances come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back."),
+                 updated: readAt)
             .padding(.horizontal, 26)
             .padding(.top, 2)
     }

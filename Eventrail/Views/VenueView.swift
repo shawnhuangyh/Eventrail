@@ -325,11 +325,26 @@ struct VenueView: View {
                 ShareLink(item: profile.pageURL)
                     .tint(.brandTint)
 
+                // Everything in the bar as well, as the sheet's menu has it, so
+                // the menu is the whole of what can be done here — in the
+                // sheet's groups: where it is and passing it on, then the page
+                // it was read from.
                 Menu {
+                    Button {
+                        VenueDirections.open(profile.name, at: place, directions: true, with: openURL)
+                    } label: {
+                        Label("Directions", systemImage: "location.fill")
+                    }
+                    ShareLink(item: profile.pageURL) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+
+                    Divider()
+
                     Link(destination: profile.pageURL) {
                         Label("Open in Eventernote", systemImage: "safari")
                     }
-                    RefreshMenuItem(readAt: readAt, isRefreshing: running != nil) {
+                    RefreshMenuItem(isRefreshing: running != nil) {
                         imagesCheckedSince = .now
                         Task { await refresh(byHand: true) }
                     }
@@ -635,7 +650,8 @@ struct VenueView: View {
     // MARK: - Provenance
 
     private var footnote: some View {
-        Footnote(Text("Venue details and events come from publicly accessible Eventernote pages. The map is drawn from the published address — nothing is written back."))
+        Footnote(Text("Venue details and events come from publicly accessible Eventernote pages. The map is drawn from the published address — nothing is written back."),
+                 updated: readAt)
             .padding(.horizontal, 26)
             .padding(.top, 2)
     }

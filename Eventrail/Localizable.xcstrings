@@ -7000,28 +7000,6 @@
         }
       }
     },
-    "Refreshing…" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更新中…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在刷新…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在重新整理…"
-          }
-        }
-      }
-    },
     "Remove" : {
       "localizations" : {
         "ja" : {
@@ -9508,46 +9486,46 @@
         }
       }
     },
-    "Updated %@" : {
+    "Updated %@." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@に更新"
+            "value" : "%@に更新しました。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@更新"
+            "value" : "%@更新。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@更新"
+            "value" : "%@更新。"
           }
         }
       }
     },
-    "Updated just now" : {
+    "Updated just now." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "たった今更新"
+            "value" : "たった今更新しました。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刚刚更新"
+            "value" : "刚刚更新。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "剛剛更新"
+            "value" : "剛剛更新。"
           }
         }
       }

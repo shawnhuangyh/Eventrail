@@ -155,19 +155,49 @@ extension View {
 ///
 /// It takes a `Text` rather than a key because one of them says two different
 /// things depending on whether an import is still running.
+///
+/// Under a page read from Eventernote — an event's sheet, a performer's page,
+/// a hall's — it opens with when that page was read: "Updated 2 hours ago."
+/// Here rather than under Refresh in the page's menu, where it could be read
+/// only by opening the menu; first, so it is read as the age of the copy on
+/// screen rather than of anything the sentences after it name.
 struct Footnote: View {
     let text: Text
+    /// When the page under this was read from Eventernote; nil where it is
+    /// not such a page, or has not been read yet.
+    let updated: Date?
 
-    init(_ text: Text) {
+    init(_ text: Text, updated: Date? = nil) {
         self.text = text
+        self.updated = updated
     }
 
     var body: some View {
+        if let updated {
+            // Redrawn by the minute, so a page left open does not go on
+            // saying "just now".
+            TimelineView(.everyMinute) { _ in
+                styled(Text("\(Self.updated(updated)) \(text)"))
+            }
+        } else {
+            styled(text)
+        }
+    }
+
+    private func styled(_ text: Text) -> some View {
         text
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "Updated 2 hours ago.", or "Updated just now." inside the first minute,
+    /// where the relative style would count the seconds.
+    private static func updated(_ readAt: Date) -> Text {
+        let readAt = min(readAt, .now)
+        guard Date.now.timeIntervalSince(readAt) >= 60 else { return Text("Updated just now.") }
+        return Text("Updated \(readAt.formatted(.relative(presentation: .named))).")
     }
 }
 
