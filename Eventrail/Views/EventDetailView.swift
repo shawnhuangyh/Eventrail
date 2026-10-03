@@ -199,13 +199,9 @@ struct EventDetailView: View {
                 .padding(.bottom, 32)
             }
             .ignoresSafeArea(edges: .top)
-            // The sheet's own, and not only for the sheets that had none. A
-            // `.refreshable` is carried down the environment into whatever a
-            // screen presents, so a sheet opened from the Following tab used
-            // to answer a pull by re-reading every followed performer's
-            // listing — and one opened from My Events, whose list has no
-            // refresh, by doing nothing. Pulling on an event reads that event.
-            .refreshable { await refreshPage() }
+            // No pull: a pull down from the top of a sheet is how it is put
+            // away. The page is read again from Refresh in the menu instead —
+            // see ``RefreshMenuItem``.
 
             closeButton
                 .padding(.horizontal, 20)
@@ -246,7 +242,7 @@ struct EventDetailView: View {
         // whole, the way the system shows any picture.
         .quickLookPreview($previewedFlyer)
         // Written again with the flyer, so the file opened is the picture on
-        // the sheet — a pull asks the host about both at once.
+        // the sheet — a Refresh asks the host about both at once.
         .task(id: FlyerLoad(url: event.imageURL, name: event.title, checkedSince: imagesCheckedSince)) {
             guard let url = event.imageURL else {
                 flyerFile = nil
@@ -298,7 +294,7 @@ struct EventDetailView: View {
         await readPage(byHand: false)
     }
 
-    /// Reads the event's own page again because the reader pulled for it —
+    /// Reads the event's own page again because the reader chose Refresh —
     /// however recently it was read, since that is the reader asking. What is
     /// on screen stays if the page cannot be had, with the reason under it.
     private func refreshPage() async {
@@ -306,7 +302,7 @@ struct EventDetailView: View {
     }
 
     /// The one read both of those make, and what it says when it is done: a
-    /// notice — either way for a pull, only on failure otherwise — and on
+    /// notice — either way for a Refresh, only on failure otherwise — and on
     /// failure a line under the copy that stayed, which outlasts the notice
     /// since the reader is still looking at that copy after it has gone.
     private func readPage(byHand: Bool) async {
@@ -1037,6 +1033,12 @@ struct EventDetailView: View {
                 // directly.
                 Link(destination: event.sourceURL) {
                     Label("Open in Eventernote", systemImage: "safari")
+                }
+                // Beside the page it reads again, in a Task of its own: the
+                // menu does not wait for the read, and the notice says how it
+                // went.
+                RefreshMenuItem(readAt: store.lastRead(of: event), isRefreshing: isImporting) {
+                    Task { await refreshPage() }
                 }
                 ShareLink(item: event.sourceURL) {
                     Label("Share", systemImage: "square.and.arrow.up")

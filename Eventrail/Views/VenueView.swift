@@ -61,15 +61,15 @@ struct VenueView: View {
     @State private var place: VenuePlaces.Placing?
     /// Why the last read did not replace what is on screen, if it did not.
     @State private var refreshFailure: String?
-    /// The read going on now, so a pull can wait for it — see
+    /// The read going on now, so a Refresh can wait for it — see
     /// ``refresh(byHand:)``. It ends in what its notice would say, and each
     /// caller decides whether to say it.
     @State private var running: Task<RefreshNotice?, Never>?
     /// When what is on screen was read, so coming back to the app can tell
     /// whether it has gone stale meanwhile.
     @State private var readAt: Date?
-    /// When the page was last pulled down, so the flyers on it are asked about
-    /// again with the rows — see ``EnvironmentValues/imagesCheckedSince``.
+    /// When the page was last refreshed by hand, so the flyers on it are asked
+    /// about again with the rows — see ``EnvironmentValues/imagesCheckedSince``.
     @State private var imagesCheckedSince: Date?
 
     /// Finding the page behind a hall's name fails in two ways that read very
@@ -127,13 +127,6 @@ struct VenueView: View {
         .toolbar(.hidden, for: .tabBar)
         .eventSheet($openEvent)
         .task { await open() }
-        // The page's own, so a hall reached from the Following tab does not
-        // answer a pull by re-reading every followed listing — the tab's
-        // `.refreshable` is carried down the stack otherwise.
-        .refreshable {
-            imagesCheckedSince = .now
-            await refresh(byHand: true)
-        }
         // A page left open while the reader was away is owed the check it
         // made as it opened: past the window, it reads again.
         .onChange(of: scenePhase) { _, phase in
@@ -167,12 +160,12 @@ struct VenueView: View {
         await refresh(byHand: false)
     }
 
-    /// Reads the page again, whatever is held — what pulling it down asks for,
-    /// and what opening a stale one does by itself.
+    /// Reads the page again, whatever is held — what Refresh in its menu asks
+    /// for, and what opening a stale one does by itself.
     ///
-    /// A pull that lands while a read is already going waits for that one and
+    /// A Refresh chosen while a read is already going waits for that one and
     /// ends with it, rather than returning at once with nothing to say — and
-    /// says it as a pull would, since the reader asked.
+    /// says it as a Refresh would, since the reader asked.
     private func refresh(byHand: Bool) async {
         let task: Task<RefreshNotice?, Never>
         if let running {
@@ -311,9 +304,10 @@ struct VenueView: View {
     // MARK: - Actions
 
     /// What the reader can do with the hall, in a bar along the bottom of the
-    /// page as an event's sheet has one: the way there, the page shared, and
-    /// the page on Eventernote. One capsule at the leading edge, with the
-    /// space beside it left empty for the page to show through.
+    /// page as an event's sheet has one: the way there, the page shared, and —
+    /// in a ⋯ menu, as on the sheet — the page opened on Eventernote or read
+    /// again. One capsule at the leading edge, with the space beside it left
+    /// empty for the page to show through.
     ///
     /// Only once the hall's page is found: a name the site files no hall
     /// under has no page to share or open.
@@ -331,9 +325,18 @@ struct VenueView: View {
                 ShareLink(item: profile.pageURL)
                     .tint(.brandTint)
 
-                Link(destination: profile.pageURL) {
-                    Label("Open in Eventernote", systemImage: "safari")
+                Menu {
+                    Link(destination: profile.pageURL) {
+                        Label("Open in Eventernote", systemImage: "safari")
+                    }
+                    RefreshMenuItem(readAt: readAt, isRefreshing: running != nil) {
+                        imagesCheckedSince = .now
+                        Task { await refresh(byHand: true) }
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis")
                 }
+                .menuOrder(.fixed)
                 .tint(.brandTint)
             }
             ToolbarSpacer(.flexible, placement: .bottomBar)

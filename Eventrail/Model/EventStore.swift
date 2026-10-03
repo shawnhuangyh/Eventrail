@@ -794,6 +794,19 @@ final class EventStore {
         return !pageReads.isFresh(event.id)
     }
 
+    /// When the event's page was last read from Eventernote, for the line
+    /// under Refresh in its sheet's menu.
+    ///
+    /// The later of this device's last read and the copy's own ``Event/readAt``.
+    /// Neither alone: `readAt` moves only when a read finds something new — a
+    /// read that finds the page unchanged writes nothing — so a page just
+    /// refreshed would still say days; and this device's stamps are kept a
+    /// week and gone after Clear Cache, where the copy may have been read on
+    /// another device since.
+    func lastRead(of event: Event) -> Date? {
+        [pageReads?.lastRead(event.id), event.readAt].compactMap(\.self).max()
+    }
+
     /// How one read of an event's page ended, for the sheet that asked.
     enum PageRead {
         case updated
