@@ -107,13 +107,26 @@ extension CardHeader where Trailing == EmptyView {
 /// a performer's listing hands its already-read feed to the screen behind the
 /// arrow. What the reader sees is the same either way, which is the part that
 /// belongs here.
+///
+/// It sits on the words' baseline, so a header lines "See All" up with its
+/// title. Centred on the words as it used to be, the label took its baseline
+/// from the smaller chevron instead, and the words sat a point below the
+/// title beside them.
 struct SeeAllLabel: View {
+    private static let font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text("See All")
-                .font(.system(size: 13, weight: .semibold))
+                .font(Font(Self.font))
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
+                // Still centred on the words' line, where it was drawn when
+                // the two were centred on each other: its middle where theirs
+                // is, measured from their baseline.
+                .alignmentGuide(.firstTextBaseline) {
+                    $0[VerticalAlignment.center] + (Self.font.ascender + Self.font.descender) / 2
+                }
         }
         .foregroundStyle(Color.brandTint)
         .contentShape(.rect)
