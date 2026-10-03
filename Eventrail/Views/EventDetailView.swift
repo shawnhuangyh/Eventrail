@@ -20,7 +20,14 @@ struct EventDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
+    /// Where this sheet starts; ``clockChoice`` is where the reader took it.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+    /// The other clock, where the reader picked it on this sheet's switch —
+    /// for as long as the sheet is open, and never written back to Settings.
+    /// Nil follows Settings. See ``clock``.
+    @State private var clockChoice: TimeDisplay?
+    @Namespace private var clockSwitchSpace
+    @Environment(\.colorScheme) private var colorScheme
 
     private let source: Event
     @State private var isImporting = false
@@ -459,9 +466,19 @@ struct EventDetailView: View {
 
     // MARK: - The event's clock
 
+    /// The clock this sheet prints on: Settings › Time Zone, until the reader
+    /// picks the other on the timeline card's switch.
+    private var clock: TimeDisplay { clockChoice ?? timeDisplay }
+
+    /// Picking the clock Settings already names goes back to following it, so
+    /// a sheet switched there and back is no different from one never touched.
+    private func choose(_ option: TimeDisplay) {
+        clockChoice = option == timeDisplay ? nil : option
+    }
+
     /// The event as it is printed on the chosen clock — see
     /// ``Event/shown(on:)``. Only ever formatted.
-    private var shown: Event { event.shown(on: timeDisplay) }
+    private var shown: Event { event.shown(on: clock) }
 
     /// How far off the event is, its doors, start and end on one line, and how
     /// long it runs — and on the day itself, how far along it has got.
@@ -484,14 +501,24 @@ struct EventDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     statusDot(tint, pulsing: progress.isUnderway)
+                    // Wraps rather than cutting off where the switch leaves it
+                    // too little room: a countdown is no use with its end gone.
                     headline(for: progress, at: now)
                         .font(.system(size: 20, weight: .bold))
                         .kerning(-0.4)
                         .monospacedDigit()
                         .foregroundStyle(tint)
                         .contentTransition(.numericText())
-                    Spacer(minLength: 8)
-                    zoneCaption
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // The offset and the switch on one baseline, so the two
+                    // small lines read as one, and together centred on the
+                    // headline's capitals rather than sitting on its baseline,
+                    // as the dot before it is.
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        clockOffset
+                        clockSwitch
+                    }
+                    .alignmentGuide(.firstTextBaseline) { $0[.firstTextBaseline] + 3 }
                 }
                 if let detail = detail(for: progress, at: now) {
                     detail
@@ -631,39 +658,81 @@ struct EventDetailView: View {
             .accessibilityHidden(true)
     }
 
-    /// Which clock every time on this sheet is on.
+    /// The offset of the clock this sheet's times are on, beside the switch
+    /// that says which clock that is.
     ///
-    /// On every sheet rather than only on the nights abroad. The times here
-    /// are the hall's, as Eventernote's members wrote them — 18:00 is 18:00 at
-    /// the door rather than 18:00 wherever the reader is standing — and that
-    /// is as true of a Tokyo date as of a Taipei one.
+    /// On every sheet rather than only on the nights abroad. On the venue's
+    /// clock the times are the hall's, as Eventernote's members wrote them —
+    /// 18:00 is 18:00 at the door rather than 18:00 wherever the reader is
+    /// standing — and that is as true of a Tokyo date as of a Taipei one.
     ///
-    /// The venue's clock rather than a place name, for the reason
+    /// The offset rather than a place name, for the reason
     /// ``Event/offsetLine(in:)`` gives: the name would be the map provider's
     /// and the provider is the reader's, so a Taipei hall comes back named for
-    /// the mainland. The hall is named on this same sheet; what the caption
+    /// the mainland. The hall is named on this same sheet; what the offset
     /// adds is which clock it keeps.
-    private var zoneCaption: some View {
-        Group {
-            // On the reader's own clock the offset is always known: it is
-            // this device's, on the night itself.
-            if timeDisplay == .local {
-                Text("My time · \(event.offsetLine(in: .current))")
-            // The offset only where there is one to give — see ``venueZone``.
-            } else if let zone = venueZone {
-                Text("Venue time · \(event.offsetLine(in: zone))")
-            } else {
-                Text("Venue time")
+    @ViewBuilder private var clockOffset: some View {
+        // On the reader's own clock the offset is always known: it is this
+        // device's, on the night itself. On the venue's, only where there is
+        // one to give — see ``venueZone``. Without it the switch alone says
+        // the times are the hall's, which is all that is known.
+        let zone = clock == .local ? TimeZone.current : venueZone
+        if let zone {
+            let offset = event.offsetLine(in: zone)
+            Text(verbatim: offset)
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+                .fixedSize()
+                .accessibilityLabel(clock == .local
+                    ? Text("Times shown in local time, \(offset)")
+                    : Text("Times shown in the venue's own time, \(offset)"))
+        }
+    }
+
+    /// Venue or Local: which clock this sheet prints on, for as long as it is
+    /// open. It starts on Settings › Time Zone and goes back to it when the
+    /// sheet closes — a way of reading this one night, not a preference, so
+    /// it moves no other screen and not the Live Activity either.
+    ///
+    /// A capsule of its own rather than a segmented picker, as the design
+    /// draws it: the system's control is too tall and too wide to sit beside
+    /// the headline. VoiceOver is handed the picker it stands for.
+    private var clockSwitch: some View {
+        HStack(spacing: 2) {
+            ForEach(TimeDisplay.allCases) { option in
+                let isOn = clock == option
+                Button {
+                    withAnimation(.snappy) { choose(option) }
+                } label: {
+                    Text(option.shortLabel)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(isOn ? Color.primary : .secondary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background {
+                            if isOn {
+                                Capsule()
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.2) : .white)
+                                    .shadow(color: .black.opacity(0.1), radius: 1.5, y: 1)
+                                    .matchedGeometryEffect(id: "clock", in: clockSwitchSpace)
+                            }
+                        }
+                        .contentShape(.capsule)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .font(.system(size: 12, weight: .medium))
-        .foregroundStyle(.tertiary)
-        .accessibilityLabel(
-            timeDisplay == .local
-                ? Text("Times shown in your own time, \(event.offsetLine(in: .current))")
-                : venueZone.map { Text("Times shown in the venue's own time, \(event.offsetLine(in: $0))") }
-                ?? Text("Times shown in the venue's own time")
-        )
+        .padding(2)
+        .background(Color.primary.opacity(0.07), in: .capsule)
+        .fixedSize()
+        .accessibilityRepresentation {
+            Picker("Time Zone", selection: Binding(get: { clock }, set: choose)) {
+                ForEach(TimeDisplay.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+        }
     }
 
     /// Which clock this sheet's times are on, where the app has established it

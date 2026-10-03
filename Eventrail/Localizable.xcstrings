@@ -4690,6 +4690,50 @@
         }
       }
     },
+    "Local" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地"
+          }
+        }
+      }
+    },
+    "Local Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末の時間"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地時間"
+          }
+        }
+      }
+    },
     "Longest Event" : {
       "localizations" : {
         "ja" : {
@@ -5104,50 +5148,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "我的活動"
-          }
-        }
-      }
-    },
-    "My Time" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末の時間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地时间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地時間"
-          }
-        }
-      }
-    },
-    "My time · %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "端末の時間・%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地时间 · %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地時間 · %@"
           }
         }
       }
@@ -8870,24 +8870,24 @@
         }
       }
     },
-    "Times shown in the venue's own time" : {
+    "Times shown in local time, %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "時刻は現地時間で表示"
+            "value" : "時刻は端末の時間（%@）で表示"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "时间以现地时间显示"
+            "value" : "时间以本地时间显示，%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "時間以現地時間顯示"
+            "value" : "時間以本地時間顯示，%@"
           }
         }
       }
@@ -8910,28 +8910,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間以現地時間顯示，%@"
-          }
-        }
-      }
-    },
-    "Times shown in your own time, %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時刻は端末の時間（%@）で表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "时间以本地时间显示，%@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時間以本地時間顯示，%@"
           }
         }
       }
@@ -9552,6 +9530,28 @@
         }
       }
     },
+    "Venue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現地"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现地"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現地"
+          }
+        }
+      }
+    },
     "Venue details and events come from publicly accessible Eventernote pages. The map is drawn from the published address — nothing is written back." : {
       "localizations" : {
         "ja" : {
@@ -9618,28 +9618,6 @@
         }
       }
     },
-    "Venue time" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "现地时间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間"
-          }
-        }
-      }
-    },
     "Venue Time" : {
       "localizations" : {
         "ja" : {
@@ -9658,28 +9636,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現地時間"
-          }
-        }
-      }
-    },
-    "Venue time · %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間・%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "现地时间 · %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現地時間 · %@"
           }
         }
       }

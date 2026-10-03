@@ -69,7 +69,7 @@ final class FollowedDates {
     /// nothing about where the hall is: read as it came, a 21:00 finish in
     /// Taipei is an hour early and one in Los Angeles is the morning before
     /// the show. So a row whose hall's clock is known is re-read on it before
-    /// it is shown or judged over — which also puts My Time right for it —
+    /// it is shown or judged over — which also puts Local Time right for it —
     /// and a row whose clock is not stays as it came and leaves only when its
     /// day is over everywhere (``Event/isUpcomingAnywhere``). Handed in by
     /// ``RootView``; nil until then, the safe answer.

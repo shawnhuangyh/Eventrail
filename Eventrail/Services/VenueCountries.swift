@@ -55,7 +55,7 @@ nonisolated enum VenueCountries {
     /// OpenStreetMap answers with a country and no zone, and Maps — which does
     /// carry one — is not being asked. A country spanning several zones is left
     /// out rather than guessed at: the hall then stays on the clock its members
-    /// wrote, and the sheet says "Venue time" with no offset, which is true.
+    /// wrote, and the sheet shows no offset beside its clock switch, which is true.
     static func timeZone(forCountry code: String) -> TimeZone? {
         singleZones[code.lowercased()].flatMap(TimeZone.init(identifier:))
     }

@@ -24,7 +24,15 @@ enum TimeDisplay: String, CaseIterable, Identifiable {
     var label: LocalizedStringKey {
         switch self {
         case .venue: "Venue Time"
-        case .local: "My Time"
+        case .local: "Local Time"
+        }
+    }
+
+    /// The same, short enough for the switch on an event's timeline card.
+    var shortLabel: LocalizedStringKey {
+        switch self {
+        case .venue: "Venue"
+        case .local: "Local"
         }
     }
 }
