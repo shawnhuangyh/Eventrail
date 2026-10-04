@@ -333,28 +333,6 @@
         }
       }
     },
-    "%@ · Default · Venue" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@・デフォルト・現地"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · 默认 · 现地"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · 預設 · 現地"
-          }
-        }
-      }
-    },
     "%@ · Venue" : {
       "localizations" : {
         "ja" : {

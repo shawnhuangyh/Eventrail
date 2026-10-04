@@ -39,14 +39,12 @@ struct CurrencyChoices: View {
     }
 
     /// "New Taiwan Dollar", with "Default" or "Venue" after it where the
-    /// currency is either.
+    /// currency is either — Venue alone where it is both: that it is the
+    /// hall's is the news, the reader knows their own default.
     private func subtitle(of code: String) -> Text {
         let name = Text(verbatim: Currencies.name(of: code))
-        switch (code == defaultCurrency, code == venue) {
-        case (true, true): return Text("\(name) · Default · Venue")
-        case (true, false): return Text("\(name) · Default")
-        case (false, true): return Text("\(name) · Venue")
-        case (false, false): return name
-        }
+        if code == venue { return Text("\(name) · Venue") }
+        if code == defaultCurrency { return Text("\(name) · Default") }
+        return name
     }
 }
