@@ -209,7 +209,7 @@ struct EventDetailView: View {
         }
         .washBackground()
         .sheet(isPresented: $isEditingTicket) {
-            TicketDetailsView(event: event)
+            TicketDetailsView(event: event, tracking: store.tracking(for: event))
         }
         #if DEBUG
         .sheet(isPresented: $isTestingLiveActivity) {
@@ -573,8 +573,9 @@ struct EventDetailView: View {
     private var isAhead: Bool { event.isUpcoming }
 
     /// Whether there is a ticket to say anything about: a past event had one,
-    /// and one still to come has one once the reader says it was bought.
-    private var hasTicket: Bool { !isAhead || tracking.ticket == .purchased }
+    /// and one still to come has one once a lottery is won or a first-come
+    /// round got (``Tracking/hasTicket``).
+    private var hasTicket: Bool { !isAhead || tracking.hasTicket }
 
     /// The colour the card is in: amber while the event is to come, green
     /// with the doors open, orange in the last minutes before the start, the
@@ -929,38 +930,78 @@ struct EventDetailView: View {
         .accessibilityValue(Text("\(value), \(detail)"))
     }
 
-    /// Where the ticket stands: in hand, still being tried for, or not yet —
-    /// and once the event is over, simply that the reader was there.
+    /// Where the ticket stands, read from the lottery entries: won (or got,
+    /// first come), waiting on a result — saying when it comes — lost, or
+    /// not tried for yet; and once the event is over, simply that the reader
+    /// was there. A win is the ticket, so it takes the ticket's orange.
     private var ticketValue: Text {
         if !isAhead { return Text("Attended") }
-        if tracking.ticket == .purchased { return Text("Purchased") }
-        if tracking.lotteryEntries != nil { return Text("In the lottery") }
-        return Text("No ticket yet")
+        switch tracking.lotteryStanding {
+        case .won:
+            let won = tracking.wonLottery
+            return LotteryText.result(won?.outcome ?? .won(nil), firstCome: won?.isFirstCome ?? false)
+        case .pending:
+            if let day = tracking.nextResults()?.day {
+                return Text("Results \(Text(verbatim: LotteryText.short(day)))")
+            }
+            return Text("In the lottery")
+        case .lost: return Text("Not won")
+        case nil: return Text("No ticket yet")
+        }
     }
 
     private var ticketTint: Color {
         if !isAhead { return .trackAttended }
-        if tracking.ticket == .purchased { return .trackTicket }
-        if tracking.lotteryEntries != nil { return .trackInterest }
-        return .secondary
+        switch tracking.lotteryStanding {
+        case .won: return .trackTicket
+        case .pending: return .trackInterest
+        case .lost, nil: return .secondary
+        }
     }
 
-    /// What it cost and what it took, where either was written down.
+    /// The line under it: what the ticket cost — or, with no cost written,
+    /// what was won — and the round it came from; how far off the results
+    /// are; how many times the lotteries were applied for. Whatever was
+    /// written down.
     private var ticketDetail: Text {
         var parts: [Text] = []
-        if let price = tracking.price { parts.append(Text(verbatim: price.formatted)) }
-        if let entries = tracking.lotteryEntries { parts.append(Text("^[\(entries) entry](inflect: true)")) }
+        let applications = tracking.lotteryApplications
+        let applied = Text("^[\(applications) entry](inflect: true)")
+        if !isAhead {
+            if let price = tracking.price { parts.append(Text(verbatim: price.formatted)) }
+            if applications > 0 { parts.append(applied) }
+        } else {
+            switch tracking.lotteryStanding {
+            case .won:
+                let entry = tracking.wonLottery
+                if let price = tracking.price {
+                    parts.append(Text(verbatim: price.formatted))
+                } else if let choice = entry?.wonChoice {
+                    parts.append(LotteryText.won(choice))
+                }
+                if let entry, !entry.round.isEmpty { parts.append(LotteryText.round(of: entry)) }
+            case .pending:
+                if let entry = tracking.nextResults(), let day = entry.day {
+                    parts.append(Text(verbatim: LotteryText.relative(day)))
+                    if !entry.round.isEmpty { parts.append(LotteryText.round(of: entry)) }
+                } else if applications > 0 {
+                    parts.append(applied)
+                }
+            case .lost:
+                if applications > 0 { parts.append(applied) }
+            case nil:
+                break
+            }
+        }
         guard let first = parts.first else { return Text("Tap to Edit") }
         return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
     }
 
-    /// The class the seat was sold as, where it was written down — in the
+    /// The class of seat the ticket is (``Tracking/ticketClass``) — in the
     /// reader's language where it is one of the chips, as written otherwise.
     private var seatDetail: Text {
-        if !tracking.seatClass.isEmpty {
-            return SeatClass(rawValue: tracking.seatClass).map { Text($0.label) }
-                ?? Text(verbatim: tracking.seatClass)
-        }
+        let seatClass = tracking.ticketClass
+        if !seatClass.isEmpty { return LotteryText.seatClass(seatClass) }
         return tracking.seat.isEmpty ? Text("Tap to Edit") : Text("Your seat")
     }
 

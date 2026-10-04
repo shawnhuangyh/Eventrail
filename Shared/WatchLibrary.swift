@@ -56,6 +56,22 @@ nonisolated struct WatchEvent: Codable, Hashable, Identifiable, Sendable {
     /// The ISO 4217 code ``cost`` is in. Nil where no cost is written, and in
     /// a copy kept from before costs had currencies, which was yen.
     let currency: String?
-    /// Nil is "not written down".
+    /// How many lotteries were entered; nil is "not written down".
     let lotteryEntries: Int?
+    /// Where those lotteries stand, as ``LotteryStanding``'s raw value. Text
+    /// rather than the case, so a standing a later phone sends reads as none
+    /// rather than failing the whole library; nil where none is written down,
+    /// and in a copy kept from before lotteries had results.
+    let lottery: String?
+}
+
+/// Where the reader's lotteries for one event stand taken together — see
+/// `Tracking.lotteryStanding`.
+nonisolated enum LotteryStanding: String, Sendable {
+    /// At least one was won.
+    case won
+    /// None was won, and at least one is still to be announced.
+    case pending
+    /// Every one was lost.
+    case lost
 }

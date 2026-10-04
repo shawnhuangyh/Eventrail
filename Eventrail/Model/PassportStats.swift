@@ -213,9 +213,9 @@ nonisolated struct PassportStats {
     let firstEvent: Date?
     let lastEvent: Date?
 
-    // MARK: - Reading the lottery count back
+    // MARK: - Reading the lotteries back
 
-    /// How many events the reader wrote a lottery count on.
+    /// How many events the reader wrote a lottery entry on.
     ///
     /// What every other lottery figure is counted over: ``lotteryEntries`` is
     /// a total over the events they answered for, not over the slice, and the
@@ -341,11 +341,13 @@ nonisolated struct PassportStats {
         topVenues = Self.ranked(venueCounts) { venuePrefectures[$0] }
 
         let lotteries = events.compactMap { event -> Lottery? in
-            // A count written down at all is an event the reader applied for:
-            // zero is "not written down" too, and never reaches this — see
-            // ``Tracking/lotteryEntries``. So these are the events every
-            // figure below is counted over.
-            guard let entries = tracking(event).lotteryEntries else { return nil }
+            // A lottery round written down at all is an event the reader
+            // applied for, as many times as its applications say — see
+            // ``Tracking/lotteryApplications``. So these are the events every
+            // figure below is counted over; a first-come round alone is not
+            // one of them.
+            let entries = tracking(event).lotteryApplications
+            guard entries > 0 else { return nil }
             return Lottery(event: event, entries: entries)
         }
         topLotteries = lotteries.sorted {
@@ -365,7 +367,7 @@ nonisolated struct PassportStats {
                 return nil
             }
             return Ticket(event: event, price: price, paid: paid,
-                          seatClass: record.seatClass.trimmingCharacters(in: .whitespacesAndNewlines))
+                          seatClass: record.ticketClass.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         unconvertedTickets = unconverted
         let paidCurrencies = Set(tickets.map(\.paid.currency))

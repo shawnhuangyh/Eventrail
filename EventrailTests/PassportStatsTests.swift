@@ -30,7 +30,15 @@ struct PassportStatsTests {
 
     let stats = PassportStats(events: Self.events) {
         var tracking = Tracking()
-        tracking.lotteryEntries = Self.lottery[$0.id]
+        // Split over two rounds where there are enough, so the figures are
+        // the applications added up rather than the rounds counted; and a
+        // first-come round beside them, which adds nothing.
+        if let count = Self.lottery[$0.id] {
+            tracking.lotteries = count > 1
+                ? [LotteryEntry(round: "最速先行抽選", applications: count - 1), LotteryEntry(round: "プレイガイド先行")]
+                : [LotteryEntry(applications: count)]
+            tracking.lotteries.append(LotteryEntry(round: "一般発売", applications: 4))
+        }
         return tracking
     }
 

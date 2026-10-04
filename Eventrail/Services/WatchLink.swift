@@ -111,12 +111,13 @@ nonisolated extension WatchEvent {
             starts: times.starts,
             ends: times.ends,
             timeZone: event.timeZone,
-            hasTicket: tracking.ticket == .purchased,
+            hasTicket: tracking.hasTicket,
             seat: tracking.seat.trimmingCharacters(in: .whitespacesAndNewlines),
-            seatClass: tracking.seatClass.trimmingCharacters(in: .whitespacesAndNewlines),
+            seatClass: tracking.ticketClass.trimmingCharacters(in: .whitespacesAndNewlines),
             cost: tracking.price?.amount,
             currency: tracking.price?.currency,
-            lotteryEntries: tracking.lotteryEntries
+            lotteryEntries: tracking.lotteryApplications > 0 ? tracking.lotteryApplications : nil,
+            lottery: tracking.lotteryStanding?.rawValue
         )
     }
 }

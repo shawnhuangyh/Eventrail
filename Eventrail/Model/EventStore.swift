@@ -553,7 +553,7 @@ final class EventStore {
     func status(for event: Event) -> TrackingStatus {
         let isKept = isInLibrary(event)
         if isKept, !event.isUpcoming { return .attended }
-        if tracking(for: event).ticket == .purchased { return .ticketed }
+        if tracking(for: event).hasTicket { return .ticketed }
         return isKept ? .planned : .untracked
     }
 

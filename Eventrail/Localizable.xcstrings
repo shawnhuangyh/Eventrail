@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ Choice" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@希望"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@志愿"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@志願"
+          }
+        }
+      }
+    },
     "%@ going on Eventernote" : {
       "localizations" : {
         "ja" : {
@@ -355,6 +377,28 @@
         }
       }
     },
+    "%@ × %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ × %2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ × %2$lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ × %2$lld"
+          }
+        }
+      }
+    },
     "%@, %@" : {
       "localizations" : {
         "ja" : {
@@ -531,6 +575,28 @@
         }
       }
     },
+    "%lld pending" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果待ち%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个等待结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個等待結果"
+          }
+        }
+      }
+    },
     "%lld performers" : {
       "localizations" : {
         "ja" : {
@@ -571,6 +637,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 條跟蹤記錄"
+          }
+        }
+      }
+    },
+    "%lld won" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選%lld回"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中 %lld 次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中 %lld 次"
           }
         }
       }
@@ -1345,6 +1433,50 @@
         }
       }
     },
+    "Add %@ Choice" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@希望を追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加%@志愿"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增%@志願"
+          }
+        }
+      }
+    },
+    "Add Entry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增"
+          }
+        }
+      }
+    },
     "Add Event" : {
       "localizations" : {
         "ja" : {
@@ -1363,6 +1495,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新增活動"
+          }
+        }
+      }
+    },
+    "Add Lottery Entry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選応募を追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增抽選"
+          }
+        }
+      }
+    },
+    "Add Seat" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座席を追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加座位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增座位"
+          }
+        }
+      }
+    },
+    "Add another lottery entry?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選応募をさらに追加しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还要再添加一条抽选吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還要再新增一筆抽選嗎？"
           }
         }
       }
@@ -2181,6 +2379,28 @@
         }
       }
     },
+    "Choices" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "希望"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "志愿"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "志願"
+          }
+        }
+      }
+    },
     "Chūgoku, Shikoku, Kyūshū and Okinawa" : {
       "localizations" : {
         "ja" : {
@@ -2687,6 +2907,28 @@
         }
       }
     },
+    "Delete" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除"
+          }
+        }
+      }
+    },
     "Delete All Events" : {
       "localizations" : {
         "ja" : {
@@ -2793,6 +3035,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "關閉即時動態"
+          }
+        }
+      }
+    },
+    "Discard Changes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更を破棄"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放弃更改"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捨棄變更"
+          }
+        }
+      }
+    },
+    "Discard Entry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応募を破棄"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放弃这条抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捨棄這筆抽選"
+          }
+        }
+      }
+    },
+    "Discard this entry?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この応募を破棄しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要放弃这条抽选吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要捨棄這筆抽選嗎？"
+          }
+        }
+      }
+    },
+    "Discard your changes?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更を破棄しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要放弃所做的更改吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要捨棄所做的變更嗎？"
           }
         }
       }
@@ -2929,6 +3259,29 @@
         }
       }
     },
+    "Earliest Presale Lottery" : {
+      "comment" : "A ticket sale round: the first lottery, applied for with a code packed in a CD or Blu-ray, 最速先行抽選.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最速先行抽選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最速先行抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最速先行抽選"
+          }
+        }
+      }
+    },
     "Edits and cancellations follow your library, and the events you have been to are filled in too." : {
       "localizations" : {
         "ja" : {
@@ -3057,6 +3410,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 結束"
+          }
+        }
+      }
+    },
+    "Entries" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応募回数"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选次数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選次數"
           }
         }
       }
@@ -3831,12 +4206,12 @@
         }
       }
     },
-    "Fewer lottery entries" : {
+    "Fewer entries" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽選の応募回数を減らす"
+            "value" : "応募回数を減らす"
           }
         },
         "zh-Hans" : {
@@ -3849,6 +4224,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "減少抽選次數"
+          }
+        }
+      }
+    },
+    "Fewer tickets" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枚数を減らす"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "减少张数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "減少張數"
           }
         }
       }
@@ -3937,6 +4334,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請入座"
+          }
+        }
+      }
+    },
+    "First Lottery" : {
+      "comment" : "A ticket sale round: the ticket agencies' lottery after the earliest one, プレイガイド先行.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレイガイド先行"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一轮抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一輪抽選"
           }
         }
       }
@@ -4140,6 +4560,29 @@
         }
       }
     },
+    "General Sale" : {
+      "comment" : "A ticket sale round: the general sale, first come first served, 一般発売.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般発売"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般发售"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般發售"
+          }
+        }
+      }
+    },
     "General Seat" : {
       "localizations" : {
         "ja" : {
@@ -4224,6 +4667,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前往方式"
+          }
+        }
+      }
+    },
+    "Got Tickets" : {
+      "comment" : "How a first-come ticket sale went: tickets were got.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確保"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抢到了"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搶到了"
           }
         }
       }
@@ -4536,6 +5002,28 @@
         }
       }
     },
+    "In order of preference" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "希望順"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按志愿顺序"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "依志願順序"
+          }
+        }
+      }
+    },
     "In the lottery" : {
       "localizations" : {
         "ja" : {
@@ -4708,6 +5196,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保留在日曆中"
+          }
+        }
+      }
+    },
+    "Keep Editing" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集を続ける"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续编辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續編輯"
           }
         }
       }
@@ -5064,24 +5574,68 @@
         }
       }
     },
-    "Lottery entries" : {
+    "Lost" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽選応募回数"
+            "value" : "落選"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽选次数"
+            "value" : "未抽中"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽選次數"
+            "value" : "未抽中"
+          }
+        }
+      }
+    },
+    "Lotteries" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選"
+          }
+        }
+      }
+    },
+    "Lottery" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選"
           }
         }
       }
@@ -5104,6 +5658,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "抽選次數"
+          }
+        }
+      }
+    },
+    "Lottery Entry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選応募"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选记录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選紀錄"
           }
         }
       }
@@ -5350,12 +5926,12 @@
         }
       }
     },
-    "More lottery entries" : {
+    "More entries" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽選の応募回数を増やす"
+            "value" : "応募回数を増やす"
           }
         },
         "zh-Hans" : {
@@ -5368,6 +5944,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "增加抽選次數"
+          }
+        }
+      }
+    },
+    "More tickets" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枚数を増やす"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "增加张数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "增加張數"
           }
         }
       }
@@ -5834,6 +6432,50 @@
         }
       }
     },
+    "No Result" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果未記入"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未记录结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未記錄結果"
+          }
+        }
+      }
+    },
+    "No results day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発表日未設定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未设公布日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未設公布日"
+          }
+        }
+      }
+    },
     "No ticket yet" : {
       "localizations" : {
         "ja" : {
@@ -6032,24 +6674,46 @@
         }
       }
     },
-    "Not purchased" : {
+    "Not Set" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未購入"
+            "value" : "未設定"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未购票"
+            "value" : "未设置"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未購票"
+            "value" : "未設定"
+          }
+        }
+      }
+    },
+    "Not won" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "落選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未抽中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未抽中"
           }
         }
       }
@@ -6402,6 +7066,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "演出中"
+          }
+        }
+      }
+    },
+    "One entry for each lottery applied to — the choices ranked and how it went." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応募した抽選ごとに1件。希望順と結果を記録できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次抽选记一条——按志愿顺序，并记下结果。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次抽選記一筆——依志願順序，並記下結果。"
           }
         }
       }
@@ -6846,6 +7532,28 @@
         }
       }
     },
+    "Pending" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果待ち"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待結果"
+          }
+        }
+      }
+    },
     "Performers" : {
       "localizations" : {
         "ja" : {
@@ -6996,28 +7704,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "由場館發布"
-          }
-        }
-      }
-    },
-    "Purchased" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "購入済み"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已购票"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已購票"
           }
         }
       }
@@ -7330,6 +8016,28 @@
         }
       }
     },
+    "Remove %@ Choice" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@希望を削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除%@志愿"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除%@志願"
+          }
+        }
+      }
+    },
     "Remove %lld events from your favorites?" : {
       "localizations" : {
         "ja" : {
@@ -7616,6 +8324,117 @@
         }
       }
     },
+    "Restricted-View Sale" : {
+      "comment" : "A ticket sale round: seats with part of the stage hidden, sold last, first come first served, 見切れ席.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見切れ席"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "见切发售"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見切發售"
+          }
+        }
+      }
+    },
+    "Result" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果"
+          }
+        }
+      }
+    },
+    "Results %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 結果発表"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 公布结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 公布結果"
+          }
+        }
+      }
+    },
+    "Results %@ · %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 結果発表 · %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 公布结果 · %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 公布結果 · %2$@"
+          }
+        }
+      }
+    },
+    "Results Announced" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当落発表日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果公布日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果公布日"
+          }
+        }
+      }
+    },
     "Results come from publicly accessible event pages. Nothing you tag here is written back to Eventernote." : {
       "localizations" : {
         "ja" : {
@@ -7634,6 +8453,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "結果來自公開可存取的活動頁面。你在這裡標記的任何內容都不會寫回 Eventernote。"
+          }
+        }
+      }
+    },
+    "Round" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受付"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选轮次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選輪次"
           }
         }
       }
@@ -7898,6 +8739,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "座位圖"
+          }
+        }
+      }
+    },
+    "Second Lottery" : {
+      "comment" : "A ticket sale round: the ticket agencies' second lottery, プレイガイド二次先行.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレイガイド二次先行"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "二轮抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "二輪抽選"
           }
         }
       }
@@ -9046,6 +9910,28 @@
         }
       }
     },
+    "This new entry will not be added." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この新しい応募は追加されません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这条新抽选不会被添加。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這筆新抽選不會加入。"
+          }
+        }
+      }
+    },
     "This removes them from your other devices as well. Anything your Eventernote account still lists comes back on the next refresh; the rest you can add again from Search." : {
       "localizations" : {
         "ja" : {
@@ -9262,6 +10148,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間待定"
+          }
+        }
+      }
+    },
+    "Tickets from %lld rounds — the highest class, %@, is used." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld回分のチケットがあります — 最も高い席種の%@を使用しています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有 %lld 轮的门票 — 采用其中最高的座位等级：%@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有 %lld 輪的門票 — 採用其中最高的座位等級：%@。"
           }
         }
       }
@@ -10344,6 +11252,94 @@
         }
       }
     },
+    "Won" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中"
+          }
+        }
+      }
+    },
+    "Won %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 当選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中 %@"
+          }
+        }
+      }
+    },
+    "Won %@ Choice" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@希望で当選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@志愿抽中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@志願抽中"
+          }
+        }
+      }
+    },
+    "Won and Lost can be picked once the results are out." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当落発表日から「当選」「落選」を選べます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果公布后才能选择“抽中”或“未抽中”。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果公布後才能選擇「抽中」或「未抽中」。"
+          }
+        }
+      }
+    },
     "Year" : {
       "localizations" : {
         "ja" : {
@@ -10384,6 +11380,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "年"
+          }
+        }
+      }
+    },
+    "You already have a ticket for this event." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このイベントのチケットはすでにあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已经有这场活动的门票了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已經有這場活動的門票了。"
           }
         }
       }
@@ -10472,6 +11490,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的 Eventernote 實時歷史與即將到來的演出——儲存在此裝置上，掌握在你手中。"
+          }
+        }
+      }
+    },
+    "Your changes to this entry will not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この応募への変更は保存されません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对这条抽选所做的更改不会保存。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對這筆抽選所做的變更不會儲存。"
+          }
+        }
+      }
+    },
+    "Your changes to this ticket will not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このチケットへの変更は保存されません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对这张票所做的更改不会保存。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對這張票所做的變更不會儲存。"
           }
         }
       }

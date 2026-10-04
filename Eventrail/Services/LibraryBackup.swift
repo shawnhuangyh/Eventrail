@@ -70,7 +70,11 @@ nonisolated struct LibraryBackup: Sendable {
     /// can carry cents. A build that has never heard of either would read a
     /// $49.99 ticket as ¥49 — or fail on the cents — so it is told to refuse
     /// the file instead.
-    static let currentFormat: UInt8 = 9
+    ///
+    /// 10: a tracking record's lottery count is a list of entries — each
+    /// round, its results day, the seats asked for and how it went. A build
+    /// that has never heard of them would read the list as no lottery at all.
+    static let currentFormat: UInt8 = 10
 
     var app: String
     var created: Date

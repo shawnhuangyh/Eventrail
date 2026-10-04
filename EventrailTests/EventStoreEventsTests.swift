@@ -108,7 +108,8 @@ struct EventStoreEventsTests {
         #expect(store.isInLibrary(event))
         #expect(store.isFavorite(event))
         #expect(store.tracking(for: event).note == "front row")
-        #expect(store.tracking(for: event).ticket == .purchased)
+        // Marked bought by that build, the ticket reads as a won entry.
+        #expect(store.tracking(for: event).hasTicket)
     }
 
     /// Only the part given is dated: adding an event says nothing about its

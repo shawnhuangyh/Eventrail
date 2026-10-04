@@ -102,7 +102,7 @@ final class LibraryEvent {
 }
 
 /// Everything the reader owns about one event: whether it is in the library,
-/// whether it is hearted, and the ticket, seat, seat class, cost, lottery count
+/// whether it is hearted, and the ticket, seat, seat class, cost, lotteries
 /// and note they wrote on it.
 ///
 /// One record, written only when one of those changes — by the reader, or by
@@ -152,7 +152,15 @@ final class LibraryEntry {
     var costHundredths: Int?
     /// ``Tracking/currency``: empty for yen written before costs had one.
     var costCurrency: String = ""
+    /// How many lotteries were entered, as builds before each was an entry
+    /// kept it. Read only where ``lotteries`` holds nothing, as one entry
+    /// applied for that many times, and emptied the first time the entry is
+    /// written again — see ``tracking``.
     var lotteryEntries: Int?
+    /// ``Tracking/lotteries`` as JSON, its keys sorted — see
+    /// ``LotteryEntry/columnText(of:)``. Text rather than data, so the
+    /// Console shows what a record holds. Empty for none.
+    var lotteries: String = ""
     var note: String = ""
     /// When the reader last changed any of it — which of two entries for one
     /// event is kept. Written to the millisecond, as CloudKit keeps it — see
@@ -331,9 +339,11 @@ extension LibraryEvent {
             for (field, date) in trackingEdits {
                 if let field = Tracking.Field(rawValue: field) { edits[field] = date }
             }
-            let record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
-                                  cost: cost.map { Decimal($0) }, lotteryEntries: lotteryEntries,
+            var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
+                                  cost: cost.map { Decimal($0) },
+                                  lotteries: LotteryEntry.carriedOver(count: lotteryEntries),
                                   note: note, edits: edits)
+            record.foldLegacyTicket()
             archive.tracking[eventID] = Stamped(record, at: trackingChanged)
         }
         if let readChanged {
@@ -458,9 +468,15 @@ extension LibraryEntry {
     var tracking: Tracking {
         get {
             let amount = costHundredths.map { Decimal($0) / 100 } ?? cost.map { Decimal($0) }
-            return Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat, seatClass: seatClass,
-                            cost: amount, lotteryEntries: lotteryEntries, note: note,
-                            currency: costCurrency)
+            let entries = LotteryEntry.entries(inColumn: lotteries)
+                ?? LotteryEntry.carriedOver(count: lotteryEntries)
+            var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
+                                  seatClass: seatClass, cost: amount, lotteries: entries, note: note,
+                                  currency: costCurrency)
+            // A ticket an older build marked bought reads as a won entry, and
+            // is written so — the ticket column emptied — with the next write.
+            record.foldLegacyTicket()
+            return record
         }
         set {
             update(\.ticket, to: newValue.ticket.rawValue)
@@ -471,7 +487,10 @@ extension LibraryEntry {
             // The cost now lives in the two columns above, so the old one is
             // emptied rather than left to be read back over an emptied cost.
             update(\.cost, to: nil)
-            update(\.lotteryEntries, to: newValue.lotteryEntries)
+            update(\.lotteries, to: LotteryEntry.columnText(of: newValue.lotteries))
+            // Emptied for the reason the old cost column is: a list taken
+            // down to nothing must not read back as the count again.
+            update(\.lotteryEntries, to: nil)
             update(\.note, to: newValue.note)
         }
     }
