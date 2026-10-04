@@ -105,7 +105,7 @@ struct SettingsView: View {
             .presentationDragIndicator(.visible)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done", systemImage: "checkmark") { dismiss() }
                 }
             }
             .fullScreenCover(isPresented: $isReplayingWelcome) {
