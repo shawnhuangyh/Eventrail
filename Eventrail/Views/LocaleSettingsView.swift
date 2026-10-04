@@ -1,37 +1,73 @@
 import SwiftUI
 
-/// The two languages the app speaks in, pushed from Settings: the one the
-/// whole app is drawn in, and the one an event's description is translated
-/// into.
+/// How the app reads to this reader, pushed from Settings: the two languages
+/// it speaks in — the one the whole app is drawn in, and the one an event's
+/// description is translated into — and the currency it counts money in.
 ///
-/// One screen, and one card on it, because both answer "what language do I
+/// The languages share one card, because both answer "what language do I
 /// read this in", and the second only makes sense beside the first — its
-/// default is the first.
-struct LanguageSettingsView: View {
+/// default is the first. The currency is a card of its own under them.
+struct LocaleSettingsView: View {
     /// Per device — see ``TranslationTarget``.
     @AppStorage(TranslationTarget.storageKey) private var target = ""
+    /// Per device — see ``Currencies/storageKey``.
+    @AppStorage(Currencies.storageKey) private var currency = Currencies.yen
     /// What the system can translate into, minus Japanese. Asked for as the
     /// screen opens; empty on a device with no translation at all.
     @State private var languages: [Locale.Language] = []
 
     var body: some View {
         ScrollView {
-            // One card: both rows answer "what language do I read this in",
-            // and the second's default is the first.
-            VStack(spacing: 0) {
-                appLanguageRow
-                SettingRowDivider()
-                translationRow
+            VStack(alignment: .leading, spacing: 8) {
+                SectionLabel(label: "Language")
+                    .padding(.top, 14)
+                // One card: both rows answer "what language do I read this
+                // in", and the second's default is the first.
+                VStack(spacing: 0) {
+                    appLanguageRow
+                    SettingRowDivider()
+                    translationRow
+                }
+                .glassPanel(interactive: true)
+
+                SectionLabel(label: "Currency")
+                    .padding(.top, 14)
+                currencyRow
+                    .glassPanel(interactive: true)
+                // The one row here that says what it does: "default" reads as
+                // the currency every ticket is in, when each ticket keeps its
+                // own and this only decides what the Passport adds up in.
+                Footnote(Self.currencyNote)
+                    .padding(.horizontal, 6)
+                    .padding(.top, 2)
             }
-            .glassPanel(interactive: true)
             .padding(.horizontal, 16)
-            .padding(.top, 14)
             .padding(.bottom, 40)
         }
         .washBackground()
-        .navigationTitle("Language")
+        .navigationTitle("Locale")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadLanguages() }
+    }
+
+    static let currencyNote = Text("Ticket spending in the Event Passport is shown in this currency. Each ticket's cost can be in any currency — choose it on the ticket; new ones start in this one.")
+
+    /// What the Event Passport adds its tickets up in, and what a cost typed
+    /// on a ticket starts in — chosen from a menu on the value, as Translate
+    /// Into is, for the same reason.
+    private var currencyRow: some View {
+        SettingRowLabel("banknote", "Default Currency") {
+            Menu {
+                CurrencyChoices(selection: $currency)
+            } label: {
+                SettingRowValue(Text(verbatim: currency), accessory: "chevron.up.chevron.down")
+                    .fixedSize()
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(Text(verbatim: Currencies.name(of: currency)))
+        }
+        .settingRowPadding()
+        .sensoryFeedback(.selection, trigger: currency)
     }
 
     /// iOS keeps an app's language on the app's own page in the Settings app,

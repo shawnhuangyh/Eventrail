@@ -97,7 +97,7 @@ struct PassportStatsTests {
         ]
         let stats = PassportStats(events: Self.events) {
             var tracking = Tracking()
-            tracking.cost = costs[$0.id]?.0
+            tracking.cost = costs[$0.id]?.0.map { Decimal($0) }
             tracking.seatClass = costs[$0.id]?.1 ?? ""
             return tracking
         }
@@ -121,11 +121,78 @@ struct PassportStatsTests {
         ]
         let stats = PassportStats(events: Self.events) {
             var tracking = Tracking()
-            tracking.cost = classes[$0.id]?.0
+            tracking.cost = classes[$0.id].map { Decimal($0.0) }
             tracking.seatClass = classes[$0.id]?.1 ?? ""
             return tracking
         }
         #expect(stats.ticketTypes.map(\.seatClass) == ["S席", "A席", ""])
+    }
+
+    // MARK: - Tickets in other currencies
+
+    /// A euro buys 180 yen, 36 Taiwan dollars and 7.5 yuan.
+    static let rates = CurrencyRates(base: "EUR", rates: ["JPY": 180, "TWD": 36, "CNY": 7.5],
+                                     published: .now, readAt: .now)
+
+    func stats(paying paid: [Event.ID: Money], in currency: String,
+               at rates: CurrencyRates?) -> PassportStats {
+        PassportStats(events: Self.events, currency: currency, rates: rates) { event in
+            var tracking = Tracking()
+            tracking.cost = paid[event.id]?.amount
+            tracking.currency = paid[event.id]?.currency ?? ""
+            return tracking
+        }
+    }
+
+    /// Yen and Taiwan dollars added up in yen, through the euro: NT$1,000 is
+    /// 1000 / 36 euros, which is 5,000 yen.
+    @Test func addsUpTicketsPaidInSeveralCurrencies() {
+        let stats = stats(paying: ["a": Money(amount: 9000, currency: "JPY"),
+                                   "b": Money(amount: 1000, currency: "TWD")],
+                          in: "JPY", at: Self.rates)
+        #expect(stats.tickets.map(\.id) == ["a", "b"])
+        #expect(abs(stats.ticketSpending - 14_000) < 0.001)
+        #expect(stats.isConverted)
+        #expect(stats.unconvertedTickets == 0)
+        // Paid in two currencies, so there is no one figure as it was paid.
+        #expect(stats.paidCurrency == nil)
+        #expect(!stats.showsPaid)
+        #expect(stats.paidSpending == nil)
+    }
+
+    /// Every ticket paid in yen and read in yuan: each figure can also say
+    /// what it was in yen, exactly.
+    @Test func readsYenInAnotherCurrency() {
+        let stats = stats(paying: ["a": Money(amount: 9000, currency: "JPY"),
+                                   "b": Money(amount: 18000, currency: "JPY")],
+                          in: "CNY", at: Self.rates)
+        #expect(abs(stats.ticketSpending - 1125) < 0.001)
+        #expect(stats.paidCurrency == "JPY")
+        #expect(stats.showsPaid)
+        #expect(stats.paidSpending == Money(amount: 27000, currency: "JPY"))
+        #expect(stats.averagePaid == 13500)
+        #expect(stats.tickets.first?.paid == Money(amount: 18000, currency: "JPY"))
+        #expect(stats.ticketTypes.first?.paidAverage == Money(amount: 13500, currency: "JPY"))
+    }
+
+    /// With no rates on the device, a ticket paid in another currency is left
+    /// out and counted — never read as though it were yen.
+    @Test func leavesOutWhatTheRatesCannotConvert() {
+        let stats = stats(paying: ["a": Money(amount: 9000, currency: "JPY"),
+                                   "b": Money(amount: 1000, currency: "TWD")],
+                          in: "JPY", at: nil)
+        #expect(stats.tickets.map(\.id) == ["a"])
+        #expect(stats.ticketSpending == 9000)
+        #expect(stats.unconvertedTickets == 1)
+        #expect(!stats.isConverted)
+    }
+
+    @Test func readsRatesThroughTheirBase() {
+        #expect(Self.rates.rate(from: "JPY", to: "JPY") == 1)
+        #expect(Self.rates.rate(from: "EUR", to: "TWD") == 36)
+        #expect(Self.rates.rate(from: "TWD", to: "EUR") == 1.0 / 36)
+        #expect(Self.rates.rate(from: "TWD", to: "JPY") == 5)
+        #expect(Self.rates.rate(from: "JPY", to: "XYZ") == nil)
     }
 
     @Test func tallyByYearFillsTheGaps() {

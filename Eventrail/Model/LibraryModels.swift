@@ -139,7 +139,19 @@ final class LibraryEntry {
     var ticket: String = TicketStatus.none.rawValue
     var seat: String = ""
     var seatClass: String = ""
+    /// What the ticket cost in whole yen, as builds before costs had a
+    /// currency kept it. Read only where ``costHundredths`` is nil, and
+    /// emptied the first time the entry is written again — see ``tracking``.
     var cost: Int?
+    /// ``Tracking/cost`` in hundredths of its currency: ¥9,900 is 990000 and
+    /// $49.99 is 4999.
+    ///
+    /// A whole number rather than a `Decimal` column, because a whole number
+    /// is a CloudKit field of a kind every build and the Console read the same,
+    /// and a hundredth is as fine as any currency a ticket is sold in divides.
+    var costHundredths: Int?
+    /// ``Tracking/currency``: empty for yen written before costs had one.
+    var costCurrency: String = ""
     var lotteryEntries: Int?
     var note: String = ""
     /// When the reader last changed any of it — which of two entries for one
@@ -320,7 +332,8 @@ extension LibraryEvent {
                 if let field = Tracking.Field(rawValue: field) { edits[field] = date }
             }
             let record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
-                                  cost: cost, lotteryEntries: lotteryEntries, note: note, edits: edits)
+                                  cost: cost.map { Decimal($0) }, lotteryEntries: lotteryEntries,
+                                  note: note, edits: edits)
             archive.tracking[eventID] = Stamped(record, at: trackingChanged)
         }
         if let readChanged {
@@ -444,17 +457,31 @@ extension LibraryEntry {
 
     var tracking: Tracking {
         get {
-            Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat, seatClass: seatClass,
-                     cost: cost, lotteryEntries: lotteryEntries, note: note)
+            let amount = costHundredths.map { Decimal($0) / 100 } ?? cost.map { Decimal($0) }
+            return Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat, seatClass: seatClass,
+                            cost: amount, lotteryEntries: lotteryEntries, note: note,
+                            currency: costCurrency)
         }
         set {
             update(\.ticket, to: newValue.ticket.rawValue)
             update(\.seat, to: newValue.seat)
             update(\.seatClass, to: newValue.seatClass)
-            update(\.cost, to: newValue.cost)
+            update(\.costHundredths, to: newValue.cost.map(Self.hundredths(of:)))
+            update(\.costCurrency, to: newValue.currency)
+            // The cost now lives in the two columns above, so the old one is
+            // emptied rather than left to be read back over an emptied cost.
+            update(\.cost, to: nil)
             update(\.lotteryEntries, to: newValue.lotteryEntries)
             update(\.note, to: newValue.note)
         }
+    }
+
+    /// An amount in hundredths, to the nearest one.
+    private static func hundredths(of amount: Decimal) -> Int {
+        var scaled = amount * 100
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &scaled, 0, .plain)
+        return NSDecimalNumber(decimal: rounded).intValue
     }
 
     /// The event as it stood when the reader last wrote here — what the entry

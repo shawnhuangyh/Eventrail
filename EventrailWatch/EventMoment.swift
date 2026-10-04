@@ -240,7 +240,11 @@ struct EventMoment {
     /// What it cost, or how many entries went into the lottery.
     var costLine: Text {
         if let cost = event.cost {
-            return Text(cost, format: .currency(code: "JPY").precision(.fractionLength(0)))
+            // Cents only where there are any: ¥8,800, $49.99.
+            var whole = Decimal(), value = cost
+            NSDecimalRound(&whole, &value, 0, .plain)
+            return Text(cost, format: .currency(code: event.currency ?? "JPY")
+                .precision(.fractionLength(whole == cost ? 0 : 2)))
         }
         if let entries = event.lotteryEntries, entries > 0 {
             return Text("^[\(entries) entry](inflect: true)")

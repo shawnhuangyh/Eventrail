@@ -948,7 +948,7 @@ struct EventDetailView: View {
     /// What it cost and what it took, where either was written down.
     private var ticketDetail: Text {
         var parts: [Text] = []
-        if let cost = tracking.cost { parts.append(Text(verbatim: YenAmount().format(cost))) }
+        if let price = tracking.price { parts.append(Text(verbatim: price.formatted)) }
         if let entries = tracking.lotteryEntries { parts.append(Text("^[\(entries) entry](inflect: true)")) }
         guard let first = parts.first else { return Text("Tap to Edit") }
         return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }

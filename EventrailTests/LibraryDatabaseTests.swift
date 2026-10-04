@@ -31,6 +31,8 @@ struct LibraryDatabaseTests {
         abroad.readAt = later
         archive.events["4"] = abroad
         archive.membership["4"] = Stamped(true, at: later)
+        archive.tracking["4"] = Stamped(Tracking(ticket: .purchased, cost: Decimal(string: "1280.5"),
+                                                 currency: "TWD"), at: later)
         archive.membership["gone"] = Stamped(false, at: later)
         archive.tracking["1"] = Stamped(Tracking(ticket: .purchased, seat: "A12", seatClass: "S席", cost: 9000,
                                                  lotteryEntries: 3, note: "front row"), at: earlier)
@@ -280,6 +282,28 @@ struct LibraryDatabaseTests {
         let kept = try #require(try entries("1", in: context).first)
         #expect(!kept.inLibrary)
         #expect(kept.tracking.note == "front row")
+        withExtendedLifetime(database) {}
+    }
+
+    /// A cost an older build wrote is whole yen in the old column. It reads
+    /// back as yen, and the next write moves it into the two new columns
+    /// rather than leaving it to be read back over an emptied cost.
+    @Test func aCostInTheOldColumnIsYenAndMovesOnTheNextWrite() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.cost = 9900
+        #expect(entry.tracking.price == Money(amount: 9900, currency: "JPY"))
+
+        entry.tracking = entry.tracking
+        #expect(entry.cost == nil)
+        #expect(entry.costHundredths == 990_000)
+        #expect(entry.tracking.price == Money(amount: 9900, currency: "JPY"))
+
+        var emptied = entry.tracking
+        emptied.cost = nil
+        entry.tracking = emptied
+        #expect(entry.tracking.price == nil)
         withExtendedLifetime(database) {}
     }
 

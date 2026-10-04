@@ -118,7 +118,11 @@ nonisolated struct PassportStats {
     /// One event the reader wrote a price on, and the class of seat it bought.
     struct Ticket: Identifiable, Hashable {
         let event: Event
-        let price: Int
+        /// What it cost in ``PassportStats/currency`` — exactly what was
+        /// paid where it was paid in that, converted where it was not.
+        let price: Double
+        /// What was paid, as the reader wrote it.
+        let paid: Money
         /// ``Tracking/seatClass`` as written, trimmed; empty where it was not.
         let seatClass: String
 
@@ -131,13 +135,27 @@ nonisolated struct PassportStats {
         /// whatever they typed — and empty for the tickets that name none.
         let seatClass: String
         let count: Int
-        let spent: Int
-        let lowest: Int
-        let highest: Int
+        /// In ``PassportStats/currency``, like every figure here.
+        let spent: Double
+        let lowest: Double
+        let highest: Double
+        /// The cheapest and the dearest of the class as they were paid — the
+        /// range the card offers in the currency the tickets were bought in.
+        let lowestPaid: Money
+        let highestPaid: Money
+        /// ``spent`` as it was paid, where the class was all paid in one
+        /// currency; nil where it was paid in several.
+        let paidSpent: Money?
 
         var id: String { seatClass }
 
-        var average: Double { Double(spent) / Double(count) }
+        var average: Double { spent / Double(count) }
+
+        /// ``average`` as it was paid, where the class was all paid in one
+        /// currency.
+        var paidAverage: Money? {
+            paidSpent.map { Money(amount: $0.amount / Decimal(count), currency: $0.currency) }
+        }
     }
 
     /// The scoped events themselves, most recent first.
@@ -166,8 +184,24 @@ nonisolated struct PassportStats {
     let topPerformers: [Ranking]
     let topVenues: [Ranking]
     let topLotteries: [Lottery]
-    /// Every event with a price written on it, dearest first.
+    /// The currency every price below is in: the reader's default, or the one
+    /// chosen on the spending card.
+    let currency: String
+    /// Every event with a price written on it that could be put into
+    /// ``currency``, dearest first.
     let tickets: [Ticket]
+    /// The one currency every ticket in ``tickets`` was paid in, or nil where
+    /// they were paid in several.
+    ///
+    /// Where it is not ``currency``, the card can print each figure as it was
+    /// paid under the one converted — a total of yen and Taiwan dollars has no
+    /// such figure, so it prints none.
+    let paidCurrency: String?
+    /// How many tickets were paid in a currency the rates could not put into
+    /// ``currency`` — none held yet on this device, or one the rates do not
+    /// carry — and so are in no figure here. The card says so rather than
+    /// letting a total read as the whole of it.
+    let unconvertedTickets: Int
     /// Those tickets by the class of seat they bought, most tickets first and
     /// the ones that name no class last.
     let ticketTypes: [TicketType]
@@ -212,15 +246,35 @@ nonisolated struct PassportStats {
     /// the slice, for the reason the lottery figures are: an event with no
     /// price written is not a free event — ``Tracking/cost`` keeps zero for
     /// that — but an event nobody answered for.
-    var ticketSpending: Int { tickets.reduce(0) { $0 + $1.price } }
+    var ticketSpending: Double { tickets.reduce(0) { $0 + $1.price } }
 
     var averageTicketPrice: Double {
-        tickets.isEmpty ? 0 : Double(ticketSpending) / Double(tickets.count)
+        tickets.isEmpty ? 0 : ticketSpending / Double(tickets.count)
     }
 
     /// Read off the two ends of ``tickets``, which is already sorted by price.
-    var highestTicketPrice: Int? { tickets.first?.price }
-    var lowestTicketPrice: Int? { tickets.last?.price }
+    var highestTicketPrice: Double? { tickets.first?.price }
+    var lowestTicketPrice: Double? { tickets.last?.price }
+
+    /// Whether the figures are in a currency the tickets were not all paid
+    /// in, so that each can be read as it was paid as well.
+    var showsPaid: Bool { paidCurrency.map { $0 != currency } ?? false }
+
+    /// ``ticketSpending`` as it was paid, exactly, where it was all paid in
+    /// one currency.
+    var paidSpending: Money? {
+        paidCurrency.map { code in Money(amount: tickets.reduce(0) { $0 + $1.paid.amount }, currency: code) }
+    }
+
+    /// ``averageTicketPrice`` as it was paid, where it was all paid in one
+    /// currency.
+    var averagePaid: Double? {
+        paidSpending.map { $0.amount.doubleValue / Double(tickets.count) }
+    }
+
+    /// Whether any figure here was converted — what the card says the day of
+    /// the rates for.
+    var isConverted: Bool { tickets.contains { $0.paid.currency != currency } }
 
     // MARK: - Reading the library
 
@@ -230,7 +284,13 @@ nonisolated struct PassportStats {
     /// here is a fact about the event, and this keeps the one thing that is
     /// the reader's own at arm's length — which is what lets the whole type
     /// stay `nonisolated` and testable without an `EventStore` behind it.
-    init(events attended: [Event], tracking: (Event) -> Tracking) {
+    ///
+    /// The prices are added up in `currency`, through `rates` wherever a
+    /// ticket was paid in another; a ticket the rates cannot convert is left
+    /// out and counted in ``unconvertedTickets``. With no rates at all, a
+    /// library kept in one currency still adds up in that one.
+    init(events attended: [Event], currency: String = Currencies.yen, rates: CurrencyRates? = nil,
+         tracking: (Event) -> Tracking) {
         let events = attended.sorted { $0.sortDate > $1.sortDate }
         self.events = events
         totalEvents = events.count
@@ -293,14 +353,23 @@ nonisolated struct PassportStats {
         }
         lotteryEntries = lotteries.reduce(0) { $0 + $1.entries }
 
+        self.currency = currency
+        var unconverted = 0
         let tickets = events.compactMap { event -> Ticket? in
             // Zero is a price — a seat won or given — and is counted; only a
             // price never written leaves the event out.
             let record = tracking(event)
-            guard let price = record.cost else { return nil }
-            return Ticket(event: event, price: price,
+            guard let paid = record.price else { return nil }
+            guard let price = paid.converted(to: currency, at: rates) else {
+                unconverted += 1
+                return nil
+            }
+            return Ticket(event: event, price: price, paid: paid,
                           seatClass: record.seatClass.trimmingCharacters(in: .whitespacesAndNewlines))
         }
+        unconvertedTickets = unconverted
+        let paidCurrencies = Set(tickets.map(\.paid.currency))
+        paidCurrency = paidCurrencies.count == 1 ? paidCurrencies.first : nil
         // Equal prices fall back on the date, newest first, and then the id,
         // so the dearest and the cheapest stay put across a redraw.
         self.tickets = tickets.sorted {
@@ -320,10 +389,18 @@ nonisolated struct PassportStats {
     private static func types(of tickets: [Ticket]) -> [TicketType] {
         Dictionary(grouping: tickets, by: \.seatClass)
             .map { seatClass, tickets in
-                let prices = tickets.map(\.price)
+                // Already dearest first, so its two ends are the class's.
+                let sorted = tickets.sorted { $0.price > $1.price }
+                let dearest = sorted[0], cheapest = sorted[sorted.count - 1]
+                let currencies = Set(tickets.map(\.paid.currency))
+                let paidSpent = currencies.count == 1
+                    ? Money(amount: tickets.reduce(0) { $0 + $1.paid.amount }, currency: dearest.paid.currency)
+                    : nil
                 return TicketType(seatClass: seatClass, count: tickets.count,
-                                  spent: prices.reduce(0, +),
-                                  lowest: prices.min() ?? 0, highest: prices.max() ?? 0)
+                                  spent: tickets.reduce(0) { $0 + $1.price },
+                                  lowest: cheapest.price, highest: dearest.price,
+                                  lowestPaid: cheapest.paid, highestPaid: dearest.paid,
+                                  paidSpent: paidSpent)
             }
             .sorted {
                 if $0.seatClass.isEmpty != $1.seatClass.isEmpty { return $1.seatClass.isEmpty }

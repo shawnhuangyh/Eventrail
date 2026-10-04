@@ -96,6 +96,13 @@ struct EventPassportView: View {
     @State private var isShowingLotteries = false
     /// The event whose own sheet is open, if the reader tapped one.
     @State private var openEvent: Event?
+    /// What the spending card adds up in, unless the reader picked another on
+    /// the card — see ``Currencies/storageKey``.
+    @AppStorage(Currencies.storageKey) private var defaultCurrency = Currencies.yen
+    /// The currency picked on the spending card; nil follows Settings.
+    /// Deliberately not remembered between visits, for the reason
+    /// ``PassportScope`` is not.
+    @State private var spendingCurrency: String?
 
     /// How much of each ranked list a card shows before sending the rest to a
     /// screen of its own — the same five the Me tab's cards show, for the same
@@ -107,8 +114,21 @@ struct EventPassportView: View {
     private var attended: [Event] { store.events(of: kept, where: \.inLibrary).attended }
 
     private var stats: PassportStats {
-        PassportStats(events: PassportStats.events(attended, in: scope)) {
+        PassportStats(events: PassportStats.events(attended, in: scope), currency: currency,
+                      rates: ExchangeRates.shared.rates) {
             store.tracking(for: $0)
+        }
+    }
+
+    private var currency: String { spendingCurrency ?? defaultCurrency }
+
+    /// Whether any ticket the reader went to was paid in a currency other
+    /// than the one the card adds up in — the only time the rates are asked
+    /// for. Over the whole library rather than the year, so a year chip does
+    /// not set off a read.
+    private var needsRates: Bool {
+        attended.contains { event in
+            store.tracking(for: event).price.map { $0.currency != currency } ?? false
         }
     }
 
@@ -123,8 +143,12 @@ struct EventPassportView: View {
                     PassportEventsCard(stats: stats)
                     timeCard(stats)
                     if !stats.topLotteries.isEmpty { lotteryCard(stats) }
-                    if !stats.tickets.isEmpty {
-                        PassportSpendingCard(stats: stats) { openEvent = $0 }
+                    if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
+                        PassportSpendingCard(
+                            stats: stats,
+                            currency: Binding(get: { currency }, set: { spendingCurrency = $0 }),
+                            defaultCurrency: defaultCurrency
+                        ) { openEvent = $0 }
                     }
                     if !stats.topPerformers.isEmpty { performersCard(stats) }
                     if !stats.topVenues.isEmpty { venuesCard(stats) }
@@ -140,6 +164,9 @@ struct EventPassportView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top) { yearBar }
         .task(id: store.revision) { readPlacings() }
+        .task(id: needsRates) {
+            if needsRates { await ExchangeRates.shared.refreshIfStale() }
+        }
         // A year is only ever offered while the reader has something in it, so
         // a removal here or a merge from another device can take the chosen one
         // away underneath the screen — leaving nine cards filtered to a year
@@ -1266,11 +1293,21 @@ private struct PassportLotterySheet: View {
 /// over the events a price was written on — ``PassportStats/tickets`` — and a
 /// event left blank is left out rather than read as free.
 ///
+/// In one currency, chosen from the menu in its corner: the reader's default
+/// as it opens, and any other for as long as the screen is up. A ticket paid
+/// in another is converted at today's rates, and the card says which day's;
+/// where every ticket was paid in one currency, each figure also says what it
+/// was in that one, small under it.
+///
 /// Its own type, as the events card is, because the seat-type filter over its
 /// two ends is state of its own — and, like the cadence there, deliberately
 /// not remembered between visits.
 private struct PassportSpendingCard: View {
     let stats: PassportStats
+    /// The currency the card adds up in.
+    @Binding var currency: String
+    /// Settings' — marked Default in the menu.
+    let defaultCurrency: String
     /// Opens an event on the screen's own event sheet.
     let open: (Event) -> Void
 
@@ -1293,52 +1330,133 @@ private struct PassportSpendingCard: View {
     var body: some View {
         let styles = SeatStyle.styles(for: stats.ticketTypes)
         VStack(alignment: .leading, spacing: 14) {
-            CardHeader(title: "Ticket Spending")
-            headline
+            CardHeader(title: "Ticket Spending", caption: caption) { currencyMenu }
 
-            // Each at its own width with equal gaps between, rather than in
-            // quarters: a count of tickets is a digit or two and a price is
-            // seven characters, so equal columns left a hole after the count
-            // and the three prices all but touching.
-            HStack(alignment: .top, spacing: 0) {
-                passportReading(Text(stats.tickets.count.formatted()), label: "Tickets")
-                Spacer(minLength: 12)
-                passportReading(Text(yen(stats.averageTicketPrice)), label: "Avg. Price")
-                Spacer(minLength: 12)
-                passportReading(Text(yen(stats.highestTicketPrice)), label: "Highest")
-                Spacer(minLength: 12)
-                passportReading(Text(yen(stats.lowestTicketPrice)), label: "Lowest")
+            if !stats.tickets.isEmpty {
+                headline
+
+                // Each at its own width with equal gaps between, rather than
+                // in quarters: a count of tickets is a digit or two and a
+                // price is seven characters, so equal columns left a hole
+                // after the count and the three prices all but touching.
+                HStack(alignment: .top, spacing: 0) {
+                    passportReading(Text(stats.tickets.count.formatted()), label: "Tickets")
+                    Spacer(minLength: 12)
+                    PassportPriceReading(value: money(stats.averageTicketPrice),
+                                         paid: paid(stats.averagePaid), label: "Avg. Price")
+                    Spacer(minLength: 12)
+                    PassportPriceReading(value: money(stats.highestTicketPrice),
+                                         paid: paid(stats.tickets.first?.paid), label: "Highest")
+                    Spacer(minLength: 12)
+                    PassportPriceReading(value: money(stats.lowestTicketPrice),
+                                         paid: paid(stats.tickets.last?.paid), label: "Lowest")
+                }
+
+                types(styles)
+                // Two tickets before there are two ends, for the reason the
+                // time card waits for two timed events.
+                if stats.tickets.count >= 2 { extremes(styles) }
             }
-
-            types(styles)
-            // Two tickets before there are two ends, for the reason the time
-            // card waits for two timed events.
-            if stats.tickets.count >= 2 { extremes(styles) }
         }
         .padding(16)
         .glassPanel(cornerRadius: 28)
         .sheet(isPresented: $isShowingTickets) {
-            PassportTicketSheet(tickets: filtered, styles: styles,
+            PassportTicketSheet(tickets: filtered, currency: stats.currency, styles: styles,
                                 seatType: filter.map { styles[$0].label })
         }
     }
 
-    /// The total, its ¥ dimmed in front of it the way the time card dims its
-    /// units after.
+    /// What the figures were counted over, where that is not simply every
+    /// ticket in the currency they were paid in: the tickets left out for
+    /// want of a rate, or else, where the tickets were paid in several
+    /// currencies, the day of the rates they were converted at.
+    ///
+    /// Not that day where they were all paid in one: there the card converts
+    /// in every currency but that one, and a line that came and went with the
+    /// menu would move everything under it. Paid in several, the card converts
+    /// whichever currency it is read in, so the line stays put.
+    private var caption: Text? {
+        if stats.unconvertedTickets > 0 {
+            if ExchangeRates.shared.isReading { return Text("Getting exchange rates…") }
+            return Text("^[\(stats.unconvertedTickets) ticket](inflect: true) not counted — no exchange rate yet")
+        }
+        guard stats.isConverted, stats.paidCurrency == nil else { return nil }
+        return exchangeRatesLine()
+    }
+
+    /// The currency the card adds up in, as a capsule in the header's corner
+    /// that opens the menu of them — see ``CurrencyChoices``.
+    private var currencyMenu: some View {
+        Menu {
+            CurrencyChoices(selection: $currency, defaultCurrency: defaultCurrency)
+        } label: {
+            HStack(spacing: 5) {
+                Text(verbatim: currency)
+                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(Color.brandTint)
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(Color(.secondarySystemGroupedBackground), in: .capsule)
+            .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Currency"))
+        .accessibilityValue(Text(verbatim: Currencies.name(of: currency)))
+        .sensoryFeedback(.selection, trigger: currency)
+    }
+
+    /// The total, its symbol dimmed beside it the way the time card dims its
+    /// units after — and, where it was all paid in another currency, what it
+    /// came to there.
     private var headline: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text(verbatim: "¥")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.tertiary)
-            Text(stats.ticketSpending.formatted())
-                .font(.system(size: 40, weight: .bold))
-                .kerning(-1.4)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+        let parts = Currencies.parts(whole: stats.ticketSpending, in: stats.currency)
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                if !parts.before.isEmpty { symbol(parts.before) }
+                Text(verbatim: parts.figures)
+                    .font(.system(size: 40, weight: .bold))
+                    .kerning(-1.4)
+                    .monospacedDigit()
+                if !parts.after.isEmpty { symbol(parts.after) }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .layoutPriority(1)
+            if stats.showsPaid, let paid = stats.paidSpending {
+                Text(verbatim: paid.formatted)
+                    .font(.system(size: 15, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: yen(stats.ticketSpending)))
+        .accessibilityLabel(Text(verbatim: money(stats.ticketSpending)))
+    }
+
+    private func symbol(_ text: String) -> some View {
+        Text(verbatim: text)
+            .font(.system(size: 24, weight: .bold))
+            .foregroundStyle(.tertiary)
+    }
+
+    private func money(_ amount: Double?) -> String {
+        amount.map { Currencies.format(whole: $0, in: stats.currency) } ?? "—"
+    }
+
+    /// A figure as it was paid, where the card offers those at all.
+    private func paid(_ money: Money?) -> String? {
+        guard stats.showsPaid, let money else { return nil }
+        return money.formatted
+    }
+
+    private func paid(_ amount: Double?) -> String? {
+        guard stats.showsPaid, let amount, let code = stats.paidCurrency else { return nil }
+        return Currencies.format(whole: amount, in: code)
     }
 
     // MARK: By the class of seat
@@ -1358,14 +1476,21 @@ private struct PassportSpendingCard: View {
 
             ForEach(stats.ticketTypes) { type in
                 PassportTicketTypeRow(type: type, style: styles[type.seatClass],
-                                      total: stats.tickets.count, axis: axis)
+                                      total: stats.tickets.count, axis: axis,
+                                      currency: stats.currency, showsPaid: stats.showsPaid)
             }
 
             if let axis {
-                HStack {
-                    Text(verbatim: yen(axis.lowerBound))
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(verbatim: money(axis.lowerBound))
+                    if let cheapest = paid(stats.tickets.last?.paid) {
+                        Text(verbatim: cheapest).foregroundStyle(.quaternary)
+                    }
                     Spacer(minLength: 8)
-                    Text(verbatim: yen(axis.upperBound))
+                    if let dearest = paid(stats.tickets.first?.paid) {
+                        Text(verbatim: dearest).foregroundStyle(.quaternary)
+                    }
+                    Text(verbatim: money(axis.upperBound))
                 }
                 .font(.system(size: 9.5, weight: .medium))
                 .monospacedDigit()
@@ -1388,7 +1513,7 @@ private struct PassportSpendingCard: View {
     /// The cheapest ticket to the dearest, which every class's range is drawn
     /// on. Nil where every ticket cost the same: a scale with one point on it
     /// puts every dot in one place and says nothing the averages do not.
-    private var priceAxis: ClosedRange<Int>? {
+    private var priceAxis: ClosedRange<Double>? {
         guard let lowest = stats.lowestTicketPrice, let highest = stats.highestTicketPrice,
               highest > lowest else { return nil }
         return lowest ... highest
@@ -1474,7 +1599,8 @@ private struct PassportSpendingCard: View {
                 }
             }
             Button { open(ticket.event) } label: {
-                PassportTicketRow(ticket: ticket, style: styles[ticket.seatClass])
+                PassportTicketRow(ticket: ticket, currency: stats.currency,
+                                  style: styles[ticket.seatClass])
             }
             .buttonStyle(.plain)
         }
@@ -1482,15 +1608,70 @@ private struct PassportSpendingCard: View {
     }
 }
 
-/// An amount of yen as every price in the app is written, or a dash where
-/// there is none to write.
-private func yen(_ amount: Int?) -> String {
-    amount.map { YenAmount().format($0) } ?? "—"
+/// One of the spending card's three prices, converted into the card's
+/// currency — and, where every ticket was paid in one other currency, an ⓘ
+/// beside it that opens what it was there.
+///
+/// A popover rather than a second line under the figure, so the card is the
+/// same height in every currency it is read in: a line that came and went
+/// with the menu moved everything below it.
+private struct PassportPriceReading: View {
+    let value: String
+    /// As it was paid; nil where the card offers no such figure.
+    let paid: String?
+    let label: LocalizedStringKey
+
+    @State private var isShowingPaid = false
+
+    var body: some View {
+        if let paid {
+            Button { isShowingPaid = true } label: {
+                passportReading(
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(verbatim: value)
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    },
+                    label: label)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isShowingPaid) {
+                PassportPaidPopover(paid: paid)
+            }
+            .accessibilityHint(Text("Shows the price as it was paid"))
+        } else {
+            passportReading(Text(verbatim: value), label: label)
+        }
+    }
 }
 
-/// An average to the nearest yen: a ticket is never sold for a fraction of one.
-private func yen(_ amount: Double) -> String {
-    yen(Int(amount.rounded()))
+/// What a converted figure was as it was paid, opened from the ⓘ beside a
+/// price or a range — the figure and nothing else, since the ⓘ it hangs
+/// off already says what it is.
+private struct PassportPaidPopover: View {
+    let paid: String
+
+    var body: some View {
+        Text(verbatim: paid)
+            .font(.system(size: 15, weight: .bold))
+            .monospacedDigit()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .presentationCompactAdaptation(.popover)
+    }
+}
+
+/// "At exchange rates of Oct 3" — the day of the rates every conversion on
+/// the card was made at, or nil before any are held.
+///
+/// The day as Frankfurter names it, which is a date and not an instant: read
+/// in the reader's own zone, the 3rd is the 2nd west of Greenwich.
+private func exchangeRatesLine() -> Text? {
+    guard let rates = ExchangeRates.shared.rates else { return nil }
+    var day = Date.FormatStyle.dateTime.month(.abbreviated).day()
+    day.timeZone = .gmt
+    return Text("At exchange rates of \(rates.published.formatted(day))")
 }
 
 /// How the card draws one class of seat: its name in the reader's language,
@@ -1602,7 +1783,15 @@ private struct PassportTicketTypeRow: View {
     /// Every ticket in the slice, which the share is taken of.
     let total: Int
     /// The scale the spread is drawn on; nil where there is none.
-    let axis: ClosedRange<Int>?
+    let axis: ClosedRange<Double>?
+    /// The currency the figures are in.
+    let currency: String
+    /// Whether every ticket was paid in one other currency, so the average
+    /// can say what it was there and the range can open onto it.
+    let showsPaid: Bool
+
+    /// Whether the range as it was paid is open over the row.
+    @State private var isShowingPaidRange = false
 
     private static let nameFont = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
 
@@ -1634,11 +1823,17 @@ private struct PassportTicketTypeRow: View {
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Avg. \(Text(verbatim: yen(type.average)).fontWeight(.semibold).foregroundStyle(.primary))")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text("Avg. \(Text(verbatim: money(type.average)).fontWeight(.semibold).foregroundStyle(.primary))")
+                    if showsPaid, let paid = type.paidAverage {
+                        Text(verbatim: Currencies.format(whole: paid.amount.doubleValue, in: paid.currency))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 // One price is its own average, already printed beside it.
                 if type.highest > type.lowest {
-                    Text(verbatim: "\(yen(type.lowest))–\(yen(type.highest))")
+                    if showsPaid { paidRangeButton } else { Text(verbatim: range) }
                 }
             }
             .font(.system(size: 11.5))
@@ -1649,13 +1844,42 @@ private struct PassportTicketTypeRow: View {
         }
         .accessibilityElement(children: .combine)
     }
+
+    private var range: String { "\(money(type.lowest))–\(money(type.highest))" }
+
+    private var paidRange: String { "\(type.lowestPaid.formatted)–\(type.highestPaid.formatted)" }
+
+    /// The range, with a tap that shows it as it was paid — too long a line
+    /// to print beside the converted one in a row this narrow.
+    private var paidRangeButton: some View {
+        Button { isShowingPaidRange = true } label: {
+            // On the text's baseline, as the prices' ⓘ is: centred, the
+            // symbol hung below the line and the row grew in every currency
+            // but the one its tickets were paid in.
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(verbatim: range)
+                Image(systemName: "info.circle")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $isShowingPaidRange) {
+            PassportPaidPopover(paid: paidRange)
+        }
+        .accessibilityLabel(Text(verbatim: range))
+        .accessibilityHint(Text("Shows the range as it was paid"))
+    }
+
+    private func money(_ amount: Double) -> String {
+        Currencies.format(whole: amount, in: currency)
+    }
 }
 
 /// A class's cheapest ticket to its dearest, as a span on the card's scale,
 /// and a dot at what an average one cost.
 private struct PassportPriceRange: View {
     let type: PassportStats.TicketType
-    let axis: ClosedRange<Int>
+    let axis: ClosedRange<Double>
     let color: Color
 
     var body: some View {
@@ -1678,15 +1902,15 @@ private struct PassportPriceRange: View {
                         .fill(Color(.systemBackground).opacity(0.95))
                         .frame(width: 14, height: 14)
                 }
-                .position(x: 5 + fraction(Int(type.average.rounded())) * inner, y: middle)
+                .position(x: 5 + fraction(type.average) * inner, y: middle)
         }
         .frame(height: 6)
         .background(Capsule().fill(.quaternary))
         .accessibilityHidden(true)
     }
 
-    private func fraction(_ price: Int) -> CGFloat {
-        CGFloat(price - axis.lowerBound) / CGFloat(axis.upperBound - axis.lowerBound)
+    private func fraction(_ price: Double) -> CGFloat {
+        CGFloat((price - axis.lowerBound) / (axis.upperBound - axis.lowerBound))
     }
 }
 
@@ -1708,6 +1932,8 @@ private struct PassportTicketRow: View {
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
     let ticket: PassportStats.Ticket
+    /// The currency the card adds up in.
+    let currency: String
     let style: SeatStyle
 
     var body: some View {
@@ -1725,14 +1951,28 @@ private struct PassportTicketRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(verbatim: yen(ticket.price))
-                .font(.system(size: 15, weight: .bold))
-                .kerning(-0.3)
-                .monospacedDigit()
+            // Exactly as paid where it was paid in the card's currency; else
+            // converted, with what was paid under it.
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(verbatim: isConverted
+                     ? Currencies.format(whole: ticket.price, in: currency)
+                     : ticket.paid.formatted)
+                    .font(.system(size: 15, weight: .bold))
+                    .kerning(-0.3)
+                if isConverted {
+                    Text(verbatim: ticket.paid.formatted)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .monospacedDigit()
+            .lineLimit(1)
         }
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
+
+    private var isConverted: Bool { ticket.paid.currency != currency }
 }
 
 /// Every ticket under the card's seat-type filter, dearest first, behind
@@ -1742,6 +1982,8 @@ private struct PassportTicketRow: View {
 /// own: these are events with a figure each, not a ranking with a bar.
 private struct PassportTicketSheet: View {
     let tickets: [PassportStats.Ticket]
+    /// The currency the card adds up in.
+    let currency: String
     let styles: SeatStyles
     /// The class the card was filtered to, named in the eyebrow; nil for all.
     let seatType: Text?
@@ -1756,7 +1998,8 @@ private struct PassportTicketSheet: View {
                     ForEach(Array(tickets.enumerated()), id: \.element.id) { index, ticket in
                         if index > 0 { Divider() }
                         Button { openEvent = ticket.event } label: {
-                            PassportTicketRow(ticket: ticket, style: styles[ticket.seatClass])
+                            PassportTicketRow(ticket: ticket, currency: currency,
+                                              style: styles[ticket.seatClass])
                                 .padding(.vertical, 12)
                         }
                         .buttonStyle(.plain)

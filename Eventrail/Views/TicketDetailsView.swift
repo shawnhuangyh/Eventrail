@@ -14,6 +14,13 @@ import SwiftUI
 struct TicketDetailsView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    /// What a cost typed on a ticket with none starts in, and what the hint
+    /// under the field converts into — see ``Currencies/storageKey``.
+    @AppStorage(Currencies.storageKey) private var defaultCurrency = Currencies.yen
+    /// A currency picked before any amount was typed. Held here rather than
+    /// written down: a currency is half of the answer "what it cost", and
+    /// without the amount it says nothing — see ``Tracking/currency``.
+    @State private var pendingCurrency: String?
 
     let event: Event
 
@@ -137,14 +144,121 @@ struct TicketDetailsView: View {
         }
     }
 
+    /// What the ticket cost, and in what: the amount typed, the currency's
+    /// symbol before it and the currency chosen from a menu after it, and —
+    /// where that is not the reader's default — about what it comes to there.
     private var costSection: some View {
-        section("Cost") {
-            field(symbol: "yensign.circle") {
-                TextField("Cost", value: tracking.cost, format: .yen,
-                          prompt: Text(verbatim: "¥0"))
-                    .keyboardType(.numberPad)
+        let currency = fieldCurrency
+        return section("Cost") {
+            field(trailingInset: 6) {
+                Text(verbatim: Currencies.symbol(of: currency))
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize()
+                    .frame(minWidth: 20)
+                    .accessibilityHidden(true)
+            } content: {
+                TextField("Cost", value: cost, format: .money(in: currency),
+                          prompt: Text(verbatim: "0"))
+                    .keyboardType(Currencies.fractionDigits(of: currency) > 0 ? .decimalPad : .numberPad)
+                    .monospacedDigit()
+                    // A new field for a new currency, so the amount is
+                    // written again with that currency's decimals.
+                    .id(currency)
+                currencyMenu(currency)
+            }
+            if let conversion {
+                Text(verbatim: conversion)
+                    .font(.system(size: 13))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
             }
         }
+        .task(id: needsRates) {
+            if needsRates { await ExchangeRates.shared.refreshIfStale() }
+        }
+    }
+
+    /// The currency the field is in: the cost's own once one is written, and
+    /// otherwise the one picked for it or the reader's default.
+    private var fieldCurrency: String {
+        tracking.wrappedValue.price?.currency ?? pendingCurrency ?? defaultCurrency
+    }
+
+    /// The amount, written down with the currency the field shows — and an
+    /// amount taken away takes its currency with it, since the two are one
+    /// answer. The field stays in that currency for the next one typed.
+    private var cost: Binding<Decimal?> {
+        Binding(
+            get: { tracking.wrappedValue.cost },
+            set: { amount in
+                let currency = fieldCurrency
+                var record = tracking.wrappedValue
+                record.cost = amount
+                record.currency = amount == nil ? "" : currency
+                if amount == nil { pendingCurrency = currency }
+                tracking.wrappedValue = record
+            }
+        )
+    }
+
+    /// The currency chosen from the menu: written beside an amount already
+    /// there — the reader correcting what it was paid in, so the amount is
+    /// kept rather than converted — or held for the one still to be typed.
+    private var currency: Binding<String> {
+        Binding(
+            get: { fieldCurrency },
+            set: { code in
+                if tracking.wrappedValue.cost != nil {
+                    tracking.currency.wrappedValue = code
+                } else {
+                    pendingCurrency = code
+                }
+            }
+        )
+    }
+
+    /// The menu after the amount, drawn as the lottery stepper is — a control
+    /// inside the field. The reader's default and the currency of the hall's
+    /// country first, each saying which it is — see ``CurrencyChoices``.
+    private func currencyMenu(_ selected: String) -> some View {
+        Menu {
+            CurrencyChoices(selection: currency, defaultCurrency: defaultCurrency,
+                            venue: Currencies.atVenue(of: event))
+        } label: {
+            HStack(spacing: 4) {
+                Text(verbatim: selected)
+                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(Color.brandTint)
+            .padding(.leading, 12)
+            .padding(.trailing, 8)
+            .frame(height: 34)
+            .background(Color(.secondarySystemGroupedBackground),
+                        in: .rect(cornerRadius: 10, style: .continuous))
+            .shadow(color: .black.opacity(0.1), radius: 1.5, y: 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Currency"))
+        .accessibilityValue(Text(verbatim: Currencies.name(of: selected)))
+        .sensoryFeedback(.selection, trigger: selected)
+    }
+
+    /// About what the cost comes to in the reader's default currency, where it
+    /// was paid in another and the rates are in.
+    private var conversion: String? {
+        guard let price = tracking.wrappedValue.price, price.currency != defaultCurrency,
+              let converted = price.converted(to: defaultCurrency, at: ExchangeRates.shared.rates)
+        else { return nil }
+        return "≈ " + Currencies.format(whole: converted, in: defaultCurrency)
+    }
+
+    private var needsRates: Bool {
+        guard let price = tracking.wrappedValue.price else { return false }
+        return price.currency != defaultCurrency
     }
 
     /// The one answer that is not a line at all, so it is given room to grow.
@@ -229,12 +343,25 @@ struct TicketDetailsView: View {
         trailingInset: CGFloat = 14,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        HStack(spacing: 10) {
+        field(trailingInset: trailingInset) {
             Image(systemName: symbol)
                 .font(.system(size: 15))
                 .foregroundStyle(.tertiary)
                 .frame(width: 20)
                 .accessibilityHidden(true)
+        } content: {
+            content()
+        }
+    }
+
+    /// A one-line field, with whatever says what it holds at its leading edge.
+    private func field<Leading: View, Content: View>(
+        trailingInset: CGFloat = 14,
+        @ViewBuilder leading: () -> Leading,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 10) {
+            leading()
             content()
         }
         .textFieldStyle(.plain)

@@ -105,7 +105,7 @@ struct AboutView: View {
     private var footnote: some View {
         // One paragraph: whose the records are, where the facts come from, and
         // the credits 国土地理院 and OpenStreetMap ask for as a condition of use.
-        Footnote(Text("Your notes, seats and costs stay on this device and, with iCloud Sync on, in your own iCloud — there is no Eventrail server. Event details are read from Eventernote's public pages and never written back; Eventrail is not affiliated with Eventernote. Venues are placed by Apple Maps, the address search of the Geospatial Information Authority of Japan (国土地理院) and OpenStreetMap — © OpenStreetMap contributors, ODbL."))
+        Footnote(Text("Your notes, seats and costs stay on this device and, with iCloud Sync on, in your own iCloud — there is no Eventrail server. Event details are read from Eventernote's public pages and never written back; Eventrail is not affiliated with Eventernote. Venues are placed by Apple Maps, the address search of the Geospatial Information Authority of Japan (国土地理院) and OpenStreetMap — © OpenStreetMap contributors, ODbL. Exchange rates are the central banks' reference rates, as Frankfurter publishes them."))
         .padding(.horizontal, 8)
         .padding(.top, 6)
     }

@@ -50,8 +50,12 @@ nonisolated struct WatchEvent: Codable, Hashable, Identifiable, Sendable {
     /// As the ticket prints it — see `Tracking`. Empty where not written down.
     let seat: String
     let seatClass: String
-    /// Whole yen; nil is "not written down".
-    let cost: Int?
+    /// In ``currency``; nil is "not written down". A copy the watch kept
+    /// from before costs had currencies holds whole yen, which reads the same.
+    let cost: Decimal?
+    /// The ISO 4217 code ``cost`` is in. Nil where no cost is written, and in
+    /// a copy kept from before costs had currencies, which was yen.
+    let currency: String?
     /// Nil is "not written down".
     let lotteryEntries: Int?
 }

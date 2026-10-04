@@ -13,8 +13,25 @@ struct TrackingTests {
         #expect(tracking.seat == "")
         #expect(tracking.seatClass == "")
         #expect(tracking.cost == nil)
+        #expect(tracking.currency == "")
         #expect(tracking.lotteryEntries == nil)
         #expect(tracking.edits.isEmpty)
+    }
+
+    /// Every cost written before a ticket had a currency was whole yen.
+    @Test func aCostWrittenBeforeCurrenciesIsYen() throws {
+        let json = #"{"ticket":"purchased","cost":9900}"#
+        let tracking = try JSONDecoder().decode(Tracking.self, from: Data(json.utf8))
+        #expect(tracking.cost == 9900)
+        #expect(tracking.price == Money(amount: 9900, currency: "JPY"))
+    }
+
+    /// Cents survive the trip exactly — not as 49.990000000000002.
+    @Test func aCostWithCentsRoundTripsExactly() throws {
+        let tracking = Tracking(cost: Decimal(string: "49.99"), currency: "USD")
+        let decoded = try JSONDecoder().decode(Tracking.self, from: JSONEncoder().encode(tracking))
+        #expect(decoded.cost == Decimal(string: "49.99"))
+        #expect(decoded.price == Money(amount: Decimal(string: "49.99")!, currency: "USD"))
     }
 
     @Test func decodesAnEmptyRecordAndIgnoresDroppedKeys() throws {
@@ -31,7 +48,8 @@ struct TrackingTests {
     }
 
     @Test func roundTripsThroughJSON() throws {
-        var tracking = Tracking(ticket: .purchased, seat: "1階 L列 23番", seatClass: "A席", cost: 9900, note: "x")
+        var tracking = Tracking(ticket: .purchased, seat: "1階 L列 23番", seatClass: "A席", cost: 9900, note: "x",
+                                currency: "TWD")
         tracking.lotteryEntries = 3
         tracking.edits = [.note: Date(timeIntervalSince1970: 1_000)]
         let decoded = try JSONDecoder().decode(Tracking.self, from: JSONEncoder().encode(tracking))
@@ -76,6 +94,16 @@ struct TrackingTests {
         #expect(iPad.merging(phone).value.cost == 2000)
     }
 
+    /// An amount and its currency are one answer: a merge never takes the
+    /// amount from one device and the currency from the other.
+    @Test func aCostAndItsCurrencyAreSettledTogether() {
+        let base = Stamped(Tracking(cost: 9900, currency: "JPY"), at: t0)
+        let phone = base.edited(to: Tracking(cost: 9900, currency: "TWD"), at: t1)
+        let iPad = base.edited(to: Tracking(cost: 12000, currency: "JPY"), at: t2)
+        #expect(phone.merging(iPad).value.price == Money(amount: 12000, currency: "JPY"))
+        #expect(iPad.merging(phone).value.price == Money(amount: 12000, currency: "JPY"))
+    }
+
     @Test func twoDevicesEditingTheSameAnswerTakeTheLaterWrite() {
         let base = Stamped(Tracking(note: "a"), at: t0)
         let phone = base.edited(to: Tracking(note: "phone"), at: t1)
@@ -117,9 +145,31 @@ struct TrackingTests {
         ("", nil),
         ("free", nil),
         ("1234567890123", 123_456_789),
+        // Yen has no decimals, so a point typed is not one.
+        ("12.5", 125),
     ])
     func parsesYen(typed: String, expected: Int?) {
-        #expect(YenAmount().parseStrategy.parse(typed) == expected)
+        let style = MoneyAmount(fractionDigits: 0, locale: Locale(identifier: "en_US"))
+        #expect(style.parseStrategy.parse(typed) == expected.map { Decimal($0) })
+    }
+
+    @Test(arguments: [
+        ("49.99", "49.99" as String?),
+        ("1,234.5", "1234.5"),
+        ("０．５", "0.5"),
+        (".75", "0.75"),
+        ("12.345", "12.34"),
+        ("", nil),
+    ])
+    func parsesCents(typed: String, expected: String?) {
+        let style = MoneyAmount(fractionDigits: 2, locale: Locale(identifier: "en_US"))
+        #expect(style.parseStrategy.parse(typed) == expected.flatMap { Decimal(string: $0) })
+    }
+
+    /// A locale whose decimal point is a comma reads its own point.
+    @Test func parsesTheLocalesOwnDecimalPoint() {
+        let style = MoneyAmount(fractionDigits: 2, locale: Locale(identifier: "de_DE"))
+        #expect(style.parseStrategy.parse("1.234,50") == Decimal(string: "1234.5"))
     }
 
     @Test(arguments: [
@@ -134,12 +184,15 @@ struct TrackingTests {
     }
 
     @Test func formatsNothingAsAnEmptyField() {
-        #expect(YenAmount().format(nil) == "")
+        #expect(MoneyAmount(fractionDigits: 0).format(nil) == "")
         #expect(EntryCount().format(nil) == "")
     }
 
-    @Test func yenFormatReadsBackAsTheSameAmount() {
-        let style = YenAmount()
-        #expect(style.parseStrategy.parse(style.format(9900)) == 9900)
+    @Test func moneyFormatReadsBackAsTheSameAmount() {
+        let yen = MoneyAmount(fractionDigits: 0)
+        #expect(yen.parseStrategy.parse(yen.format(9900)) == 9900)
+        let dollars = MoneyAmount(fractionDigits: 2)
+        let amount = Decimal(string: "1234.56")!
+        #expect(dollars.parseStrategy.parse(dollars.format(amount)) == amount)
     }
 }

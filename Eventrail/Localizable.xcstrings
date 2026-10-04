@@ -289,6 +289,72 @@
         }
       }
     },
+    "%@ · Default" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@・デフォルト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 默认"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 預設"
+          }
+        }
+      }
+    },
+    "%@ · Default · Venue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@・デフォルト・現地"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 默认 · 现地"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 預設 · 現地"
+          }
+        }
+      }
+    },
+    "%@ · Venue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@・現地"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 现地"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 現地"
+          }
+        }
+      }
+    },
     "%@, %@" : {
       "localizations" : {
         "ja" : {
@@ -923,6 +989,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 張門票"
+          }
+        }
+      }
+    },
+    "^[%lld ticket](inflect: true) not counted — no exchange rate yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld枚は未集計 — 為替レートがまだありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 张门票未计入——尚无汇率"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 張門票未計入——尚無匯率"
           }
         }
       }
@@ -1675,6 +1763,28 @@
         }
       }
     },
+    "At exchange rates of %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の為替レートで換算"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 %@ 的汇率换算"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 %@ 的匯率換算"
+          }
+        }
+      }
+    },
     "Attended" : {
       "localizations" : {
         "ja" : {
@@ -2401,6 +2511,28 @@
         }
       }
     },
+    "Currency" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通貨"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "货币"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貨幣"
+          }
+        }
+      }
+    },
     "Danger Zone" : {
       "localizations" : {
         "ja" : {
@@ -2529,6 +2661,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "天"
+          }
+        }
+      }
+    },
+    "Default Currency" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デフォルトの通貨"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认货币"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預設貨幣"
           }
         }
       }
@@ -4030,6 +4184,28 @@
         }
       }
     },
+    "Getting exchange rates…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "為替レートを取得中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在获取汇率…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在取得匯率…"
+          }
+        }
+      }
+    },
     "Getting there" : {
       "localizations" : {
         "ja" : {
@@ -4796,6 +4972,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本地時間"
+          }
+        }
+      }
+    },
+    "Locale" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語と通貨"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言与货币"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語言與貨幣"
           }
         }
       }
@@ -8144,6 +8342,50 @@
         }
       }
     },
+    "Shows the price as it was paid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支払った通貨での価格を表示します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示按支付货币计的价格"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示按支付貨幣計的價格"
+          }
+        }
+      }
+    },
+    "Shows the range as it was paid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支払った通貨での価格帯を表示します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示按支付货币计的价格区间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示按支付貨幣計的價格區間"
+          }
+        }
+      }
+    },
     "Sign in to iCloud to sync" : {
       "localizations" : {
         "ja" : {
@@ -8910,6 +9152,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "門票花費"
+          }
+        }
+      }
+    },
+    "Ticket spending in the Event Passport is shown in this currency. Each ticket's cost can be in any currency — choose it on the ticket; new ones start in this one." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントパスポートのチケット代はこの通貨で表示されます。各チケットの料金はチケットごとに好きな通貨で記録でき、新しく入力するときはこの通貨から始まります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活动护照中的门票花费以此货币显示。每张门票的票价都可以在该门票中单独选择货币，新填写时默认使用此货币。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活動護照中的門票花費以此貨幣顯示。每張門票的票價都可以在該門票中單獨選擇貨幣，新填寫時預設使用此貨幣。"
           }
         }
       }
@@ -10278,24 +10542,24 @@
         }
       }
     },
-    "Your notes, seats and costs stay on this device and, with iCloud Sync on, in your own iCloud — there is no Eventrail server. Event details are read from Eventernote's public pages and never written back; Eventrail is not affiliated with Eventernote. Venues are placed by Apple Maps, the address search of the Geospatial Information Authority of Japan (国土地理院) and OpenStreetMap — © OpenStreetMap contributors, ODbL." : {
+    "Your notes, seats and costs stay on this device and, with iCloud Sync on, in your own iCloud — there is no Eventrail server. Event details are read from Eventernote's public pages and never written back; Eventrail is not affiliated with Eventernote. Venues are placed by Apple Maps, the address search of the Geospatial Information Authority of Japan (国土地理院) and OpenStreetMap — © OpenStreetMap contributors, ODbL. Exchange rates are the central banks' reference rates, as Frankfurter publishes them." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "メモ、座席、料金はこのデバイスに保存され、iCloud同期をオンにすると自分のiCloudにも保存されます。Eventrailのサーバーはありません。イベント情報はEventernoteの公開ページから取得し、書き戻すことはありません。EventrailはEventernoteと提携していません。会場の位置はAppleマップ、国土地理院の住所検索、OpenStreetMapで特定しています — © OpenStreetMap contributors, ODbL。"
+            "value" : "メモ、座席、料金はこのデバイスに保存され、iCloud同期をオンにすると自分のiCloudにも保存されます。Eventrailのサーバーはありません。イベント情報はEventernoteの公開ページから取得し、書き戻すことはありません。EventrailはEventernoteと提携していません。会場の位置はAppleマップ、国土地理院の住所検索、OpenStreetMapで特定しています — © OpenStreetMap contributors, ODbL。為替レートは各国の中央銀行の参照レートで、Frankfurterが公開しているものです。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的备注、座位和票价保存在此设备上；开启 iCloud 同步后，也会存入你自己的 iCloud——Eventrail 没有服务器。活动详情读取自 Eventernote 的公开页面，绝不会写回；Eventrail 与 Eventernote 无关联。场馆位置由 Apple 地图、日本国土地理院（国土地理院）的地址搜索和 OpenStreetMap 确定——© OpenStreetMap 贡献者，ODbL。"
+            "value" : "你的备注、座位和票价保存在此设备上；开启 iCloud 同步后，也会存入你自己的 iCloud——Eventrail 没有服务器。活动详情读取自 Eventernote 的公开页面，绝不会写回；Eventrail 与 Eventernote 无关联。场馆位置由 Apple 地图、日本国土地理院（国土地理院）的地址搜索和 OpenStreetMap 确定——© OpenStreetMap 贡献者，ODbL。汇率为各国央行的参考汇率，由 Frankfurter 发布。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的備註、座位和票價儲存在此裝置上；開啟 iCloud 同步後，也會存入你自己的 iCloud——Eventrail 沒有伺服器。活動詳情讀取自 Eventernote 的公開頁面，絕不會寫回；Eventrail 與 Eventernote 無關聯。場館位置由 Apple 地圖、日本國土地理院（國土地理院）的地址搜尋和 OpenStreetMap 確定——© OpenStreetMap 貢獻者，ODbL。"
+            "value" : "你的備註、座位和票價儲存在此裝置上；開啟 iCloud 同步後，也會存入你自己的 iCloud——Eventrail 沒有伺服器。活動詳情讀取自 Eventernote 的公開頁面，絕不會寫回；Eventrail 與 Eventernote 無關聯。場館位置由 Apple 地圖、日本國土地理院（國土地理院）的地址搜尋和 OpenStreetMap 確定——© OpenStreetMap 貢獻者，ODbL。匯率為各國央行的參考匯率，由 Frankfurter 發布。"
           }
         }
       }

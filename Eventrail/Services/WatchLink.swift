@@ -114,7 +114,8 @@ nonisolated extension WatchEvent {
             hasTicket: tracking.ticket == .purchased,
             seat: tracking.seat.trimmingCharacters(in: .whitespacesAndNewlines),
             seatClass: tracking.seatClass.trimmingCharacters(in: .whitespacesAndNewlines),
-            cost: tracking.cost,
+            cost: tracking.price?.amount,
+            currency: tracking.price?.currency,
             lotteryEntries: tracking.lotteryEntries
         )
     }

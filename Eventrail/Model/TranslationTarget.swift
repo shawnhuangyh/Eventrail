@@ -2,7 +2,7 @@ import Foundation
 import Translation
 
 /// Which language an event's 概要 is translated into — see
-/// ``EventDetailView``'s description card and ``LanguageSettingsView``.
+/// ``EventDetailView``'s description card and ``LocaleSettingsView``.
 ///
 /// Stored per device as a language identifier, empty for "the app's own
 /// language", which is the default: most readers want the description in the

@@ -69,7 +69,8 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
 /// below reads every key as optional — a synthesized one treats a key an older
 /// record does not carry as a corrupt file, and takes the whole library with
 /// it. So an older record simply has no seat, no seat class, no cost and no
-/// lottery count: nothing written down.
+/// lottery count: nothing written down — and a cost with no currency, which
+/// is yen.
 nonisolated struct Tracking: Hashable, Codable {
     var ticket: TicketStatus = .none
     /// Where the reader sat, as the ticket prints it.
@@ -88,12 +89,16 @@ nonisolated struct Tracking: Hashable, Codable {
     /// than as a case, so a class the chips do not offer reads back as itself.
     /// Empty is "not written down".
     var seatClass: String = ""
-    /// What the ticket cost, in whole yen.
+    /// What the ticket cost, in ``currency``, exactly as the reader typed it.
     ///
     /// Nil is "not written down", which is not the same as free — a lottery
     /// seat or an invite really does cost nothing, and it is worth being able
     /// to record that.
-    var cost: Int?
+    ///
+    /// A `Decimal`, because a ticket abroad is sold for 49.99. A record written
+    /// before then holds a whole number of yen here, which reads back as the
+    /// same number — see ``currency``.
+    var cost: Decimal?
     /// How many entries the reader put into the lottery for this event.
     ///
     /// Nil is "not written down", and so is zero: an event the reader applied
@@ -117,6 +122,17 @@ nonisolated struct Tracking: Hashable, Codable {
         didSet { if lotteryEntries == 0 { lotteryEntries = nil } }
     }
     var note: String = ""
+    /// The ISO 4217 code ``cost`` is in — JPY, TWD, USD — chosen beside it on
+    /// the ticket sheet.
+    ///
+    /// Empty on a record written before a cost had a currency, when every cost
+    /// was yen — which is what ``price`` reads it as — and wherever no cost is
+    /// written: a currency is half of the answer "what it cost", and means
+    /// nothing without the amount. So it is not an answer of its own in
+    /// ``Field`` but rides with ``cost``, settled and dated as one: ¥9,900 and
+    /// $99 are two answers, and a merge taking the amount from one device and
+    /// the currency from the other would make a third nobody gave.
+    var currency: String = ""
     /// When each answer above was last written, where that is older than the
     /// record holding it.
     ///
@@ -141,7 +157,8 @@ nonisolated struct Tracking: Hashable, Codable {
     /// A field added to this struct belongs here too, and the switches in
     /// ``sameAnswer(for:as:)`` and ``take(_:from:)`` will not compile until it
     /// is — which is the point of naming them rather than reaching for a
-    /// key path.
+    /// key path. The one exception is ``currency``, which is part of the
+    /// ``cost`` answer rather than an answer of its own.
     nonisolated enum Field: String, CaseIterable, Codable, CodingKeyRepresentable, Hashable, Sendable {
         case ticket, seat, seatClass, cost, lotteryEntries, note
     }
@@ -155,6 +172,14 @@ nonisolated struct Tracking: Hashable, Codable {
         ticket == .none && seat.isEmpty && seatClass.isEmpty && cost == nil
             && lotteryEntries == nil && note.isEmpty
     }
+
+    /// What the ticket cost and what in, or nil where nothing is written.
+    ///
+    /// The one place an empty ``currency`` is read as yen: everything that
+    /// reads a cost back reads it through here.
+    var price: Money? {
+        cost.map { Money(amount: $0, currency: currency.isEmpty ? Currencies.yen : currency) }
+    }
 }
 
 nonisolated extension Tracking {
@@ -164,7 +189,7 @@ nonisolated extension Tracking {
         case .ticket: ticket == other.ticket
         case .seat: seat == other.seat
         case .seatClass: seatClass == other.seatClass
-        case .cost: cost == other.cost
+        case .cost: cost == other.cost && currency == other.currency
         case .lotteryEntries: lotteryEntries == other.lotteryEntries
         case .note: note == other.note
         }
@@ -176,7 +201,9 @@ nonisolated extension Tracking {
         case .ticket: ticket = other.ticket
         case .seat: seat = other.seat
         case .seatClass: seatClass = other.seatClass
-        case .cost: cost = other.cost
+        case .cost:
+            cost = other.cost
+            currency = other.currency
         case .lotteryEntries: lotteryEntries = other.lotteryEntries
         case .note: note = other.note
         }
@@ -270,7 +297,9 @@ nonisolated extension Tracking {
             ticket: try record.decodeIfPresent(TicketStatus.self, forKey: .ticket) ?? .none,
             seat: try record.decodeIfPresent(String.self, forKey: .seat) ?? "",
             seatClass: try record.decodeIfPresent(String.self, forKey: .seatClass) ?? "",
-            cost: try record.decodeIfPresent(Int.self, forKey: .cost),
+            // Read as a `Decimal` whether it was written as one or, before
+            // costs had currencies, as a whole number of yen.
+            cost: try record.decodeIfPresent(Decimal.self, forKey: .cost),
             // Zeroes written before that became "not written down" are read
             // as nothing, because a property observer does not run here. A
             // record is always written whole, so the key goes on the next
@@ -279,49 +308,16 @@ nonisolated extension Tracking {
                 .decodeIfPresent(Int.self, forKey: .lotteryEntries)
                 .flatMap { entries -> Int? in entries == 0 ? nil : entries },
             note: try record.decodeIfPresent(String.self, forKey: .note) ?? "",
+            currency: try record.decodeIfPresent(String.self, forKey: .currency) ?? "",
             edits: try record.decodeIfPresent([Field: Date].self, forKey: .edits) ?? [:])
     }
 }
 
-/// Writes an amount of yen into a text field, and reads one back out.
-///
-/// Yen because Eventernote lists Japanese events at Japanese halls and prices
-/// every one of them in yen; a currency of its own per ticket would be a second
-/// field to fill in for the sake of the evening somebody spends abroad.
-///
-/// `TextField(value:format:)` insists the value and the style agree on a type,
-/// and no built-in style takes an optional — hence this one. Parsing reads the
-/// digits out of whatever is in the field and ignores the rest, so the ¥ and
-/// the separators the style itself wrote survive an edit, and a full-width
-/// １２３４ from a Japanese keyboard is the same number as 1234.
-nonisolated struct YenAmount: ParseableFormatStyle {
-    var parseStrategy: Strategy { Strategy() }
-
-    func format(_ value: Int?) -> String {
-        value.map { $0.formatted(.currency(code: "JPY")) } ?? ""
-    }
-
-    nonisolated struct Strategy: ParseStrategy {
-        /// Nine digits is ¥999,999,999. Past that the reader is leaning on a
-        /// key rather than recording a ticket, and the arithmetic would
-        /// eventually overflow.
-        func parse(_ value: String) -> Int? {
-            let digits = value.compactMap(\.wholeNumberValue).prefix(9)
-            guard !digits.isEmpty else { return nil }
-            return digits.reduce(0) { $0 * 10 + $1 }
-        }
-    }
-}
-
-nonisolated extension FormatStyle where Self == YenAmount {
-    static var yen: YenAmount { YenAmount() }
-}
-
 /// Writes a count of lottery entries into a text field, and reads one back out.
 ///
-/// The same shape as ``YenAmount`` and for one of the same two reasons: no
+/// The same shape as ``MoneyAmount`` and for one of the same two reasons: no
 /// built-in style takes an optional, and the field has to be able to hold
-/// nothing. Where the two part company is zero — ``YenAmount`` keeps it,
+/// nothing. Where the two part company is zero — ``MoneyAmount`` keeps it,
 /// because a free ticket is an answer, and this one does not.
 nonisolated struct EntryCount: ParseableFormatStyle {
     var parseStrategy: Strategy { Strategy() }
