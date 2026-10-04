@@ -72,9 +72,9 @@ nonisolated enum PassportExtreme: Identifiable, Hashable {
 /// every hall they have stood in, and what the library adds up to around it.
 ///
 /// Everything here is read off ``EventStore/attendedEvents`` — the library's
-/// own past — and nothing on this screen asks Eventernote anything. The one
-/// number the reader wrote themselves is the lottery count, and it says what it
-/// was counted out of rather than presenting a part-filled column as a total.
+/// own past — and nothing on this screen asks Eventernote anything. What the
+/// reader wrote themselves — the lotteries and the prices — says what it was
+/// counted out of rather than presenting a part-filled column as a total.
 ///
 /// One scrolling page with the year filter kept at the top of it, because the
 /// filter governs every card below: a chip that scrolled away would leave the
@@ -142,7 +142,11 @@ struct EventPassportView: View {
                     summaryCard(stats)
                     PassportEventsCard(stats: stats)
                     timeCard(stats)
-                    if !stats.topLotteries.isEmpty { lotteryCard(stats) }
+                    if !stats.topLotteries.isEmpty {
+                        PassportLotteryCard(stats: stats, limit: Self.cardLimit) {
+                            isShowingLotteries = true
+                        } open: { openEvent = $0 }
+                    }
                     if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
                         PassportSpendingCard(
                             stats: stats,
@@ -554,69 +558,6 @@ struct EventPassportView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .top) { Divider() }
         }
-    }
-
-    // MARK: - What the reader wrote down
-
-    /// The events the reader applied hardest for.
-    ///
-    /// The one card on this screen counted from something they typed rather
-    /// than from something Eventernote published. An event left blank is left
-    /// out; an event recorded as zero entries is an event somebody answered — a
-    /// seat bought the moment it went on sale — and is shown as the answer it
-    /// is.
-    ///
-    /// Laid out the way the time card is: the card is named for the
-    /// measurement rather than for the list, the readings of it sit under
-    /// that name, and the ranked events are ruled off below them under a
-    /// heading of their own. The See All belongs to that heading, because it
-    /// opens the list rather than the card.
-    private func lotteryCard(_ stats: PassportStats) -> some View {
-        let rows = Array(stats.topLotteries.prefix(Self.cardLimit))
-        let most = max(1, rows.first?.entries ?? 1)
-        return VStack(alignment: .leading, spacing: 14) {
-            CardHeader(title: "Lottery Entries")
-            // The three readings of the count, drawn as the time card draws its
-            // own: the event applied for hardest, what an average one took, and
-            // how many events either was counted over — because the total on
-            // the summary above is over the events the reader answered for
-            // rather than over the slice.
-            HStack(spacing: 0) {
-                cell(Text(stats.mostLotteryEntries.formatted()),
-                     label: "Most in One", isFirst: true)
-                cell(Text(stats.averageLotteryEntries
-                        .formatted(.number.precision(.fractionLength(1)))),
-                     label: "Avg. Entries", isFirst: false)
-                cell(Text(stats.lotteryEvents.formatted()),
-                     label: "Recorded", isFirst: false)
-            }
-
-            VStack(alignment: .leading, spacing: 11) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("Top Lottery Entries")
-                        .font(.system(size: 15.5, weight: .bold))
-                    Spacer(minLength: 8)
-                    if stats.topLotteries.count > Self.cardLimit {
-                        Button { isShowingLotteries = true } label: { SeeAllLabel() }
-                            .buttonStyle(.plain)
-                    }
-                }
-                ForEach(rows) { row in
-                    // A row is the event it names, the way the extremes in the
-                    // time card and the ranked cards below are: the whole line
-                    // is the target.
-                    Button { openEvent = row.event } label: {
-                        PassportLotteryRow(row: row, most: most)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.top, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .top) { Divider() }
-        }
-        .padding(16)
-        .glassPanel(cornerRadius: 28)
     }
 
     // MARK: - Who, and where
@@ -1209,8 +1150,9 @@ private struct PassportRankRow: View {
     }
 }
 
-/// One event the reader applied for, how many times, and how that stands
-/// against the hardest they ever tried for a seat.
+/// One event the reader applied for: how each round went, a dot each in the
+/// order the sale ran them, how many times, and how that stands against the
+/// hardest they ever tried for a seat.
 private struct PassportLotteryRow: View {
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
@@ -1220,11 +1162,12 @@ private struct PassportLotteryRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(spacing: 8) {
                 Text(verbatim: row.event.title)
                     .font(.system(size: 13.5, weight: .semibold))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                LotteryDots(outcomes: row.outcomes)
                 Text(row.entries.formatted())
                     .font(.system(size: 13, weight: .bold))
                     .monospacedDigit()
@@ -1241,6 +1184,24 @@ private struct PassportLotteryRow: View {
         // between the bar and the date opens the event rather than nothing.
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// How an event's rounds went, a dot each, in the order the sale ran them —
+/// two grey and an orange is a seat won at the third try.
+private struct LotteryDots: View {
+    let outcomes: [LotteryResult]
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(outcomes.indices, id: \.self) { index in
+                Circle()
+                    .fill(LotteryOutcome(outcomes[index]).color)
+                    .frame(width: 7, height: 7)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(LotteryOutcome.summary(of: outcomes))
     }
 }
 
@@ -1282,6 +1243,431 @@ private struct PassportLotterySheet: View {
         .washBackground()
         .presentationDetents([.medium, .large])
         .eventSheet($openEvent)
+    }
+}
+
+// MARK: - How the lotteries went
+
+/// How the reader's lotteries went, as `Eventrail v4.dc.html` draws the card:
+/// the win rate over every round drawn and how the rounds went, how many
+/// rounds and applications that was and how many rounds a win took — then the
+/// same rounds by the round of the sale and by the class of seat asked for,
+/// and the events applied for hardest.
+///
+/// Counted from what the reader wrote on each event's rounds, and over the
+/// lotteries alone (``LotteryEntry/isLottery``): a first-come round is a seat
+/// got, not a draw. Every rate is out of the rounds whose result was written
+/// down, and says so; a round left without one is No Result, the ticket
+/// sheet's own word for a lottery still pending once its event is over, and
+/// is drawn apart from a loss rather than read as one.
+private struct PassportLotteryCard: View {
+    let stats: PassportStats
+    /// How many of the events applied for hardest the card shows.
+    let limit: Int
+    let seeAll: () -> Void
+    let open: (Event) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            CardHeader(title: "Lottery Entries")
+            headline
+            outcomes
+            readings
+            if !stats.lotteryRounds.isEmpty { byRound }
+            if !stats.lotterySeats.isEmpty { bySeat }
+            topEntries
+        }
+        .padding(16)
+        .glassPanel(cornerRadius: 28)
+    }
+
+    /// The win rate, large, and what it was out of beside it.
+    private var headline: some View {
+        let tally = stats.lotteryTally
+        return HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Win Rate")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                LotteryRate(rate: tally.winRate, size: 36)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("of ^[\(tally.drawn) drawn round](inflect: true)")
+                Text("across ^[\(stats.lotteryEvents) event](inflect: true)")
+            }
+            .font(.system(size: 11.5))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.trailing)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Every round in one bar, won against lost, and the count of each.
+    private var outcomes: some View {
+        let tally = stats.lotteryTally
+        var kinds: [(LotteryOutcome, Int)] = [(.won, tally.won), (.lost, tally.lost)]
+        if tally.unknown > 0 { kinds.append((.unknown, tally.unknown)) }
+        return VStack(alignment: .leading, spacing: 10) {
+            PassportSplitBar(parts: kinds.map { .init(count: $0.1, color: $0.0.color) }, height: 10)
+            FlowLayout(spacing: 16, lineSpacing: 6) {
+                ForEach(kinds, id: \.0) { kind, count in
+                    LotteryLegendItem(kind: kind, label: kind.label, count: count)
+                }
+            }
+        }
+    }
+
+    /// The three readings under the rate, at the time card's widths.
+    private var readings: some View {
+        HStack(spacing: 0) {
+            reading(Text(stats.lotteryTally.rounds.formatted()), label: "Rounds", isFirst: true)
+            reading(Text(stats.lotteryEntries.formatted()), label: "Entries", isFirst: false)
+            reading(stats.roundsToWin.map { Text($0.formatted(.number.precision(.fractionLength(1)))) }
+                        ?? Text(verbatim: "–"),
+                    label: "Rounds to Win", isFirst: false)
+        }
+        .padding(.top, 14)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    private func reading(_ value: Text, label: LocalizedStringKey, isFirst: Bool) -> some View {
+        passportReading(value, label: label)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, isFirst ? 0 : 14)
+    }
+
+    /// Each round of a sale, in the order a sale runs them.
+    private var byRound: some View {
+        section(spacing: 13) {
+            Text("By Round")
+                .font(.system(size: 15.5, weight: .bold))
+            ForEach(stats.lotteryRounds) { round in
+                let tally = round.tally
+                LotteryTallyRow(
+                    rate: tally.winRate,
+                    parts: [(.won, tally.won), (.lost, tally.lost), (.unknown, tally.unknown)]
+                ) {
+                    Group {
+                        if round.round.isEmpty {
+                            Text("Unspecified")
+                        } else {
+                            Text(verbatim: LotteryRound.label(of: round.round))
+                        }
+                    }
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .lineLimit(1)
+                } line: {
+                    LotteryLine.join([
+                        Text("^[\(tally.rounds) round](inflect: true)"),
+                        Text("\(tally.won) won"),
+                    ] + (tally.unknown > 0 ? [Text("\(tally.unknown) no result")] : []))
+                }
+            }
+        }
+    }
+
+    /// Each class of seat asked for, won in it against won in another.
+    private var bySeat: some View {
+        let hasUnknown = stats.lotterySeats.contains { $0.unknown > 0 }
+        let kinds: [LotteryOutcome] = [.won, .otherSeat, .lost] + (hasUnknown ? [.unknown] : [])
+        return section(spacing: 13) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("By Seat")
+                    .font(.system(size: 15.5, weight: .bold))
+                if stats.hasRankedChoices && stats.namedWins > 0 {
+                    Text("First choice won \(stats.firstChoiceWins) of ^[\(stats.namedWins) win](inflect: true)")
+                        .font(.system(size: 11.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                FlowLayout(spacing: 14, lineSpacing: 6) {
+                    ForEach(kinds, id: \.self) { kind in
+                        LotteryLegendItem(kind: kind, label: kind == .won ? "This seat" : kind.label, count: nil)
+                    }
+                }
+                .padding(.top, 4)
+            }
+            ForEach(stats.lotterySeats) { seat in
+                LotteryTallyRow(
+                    rate: seat.winRate,
+                    parts: [(.won, seat.won), (.otherSeat, seat.otherSeat), (.lost, seat.lost),
+                            (.unknown, seat.unknown)],
+                    badge: LotterySeatBadge(seatClass: seat.seatClass)
+                ) {
+                    LotterySeatName(seatClass: seat.seatClass)
+                } line: {
+                    LotteryLine.join([
+                        Text("^[\(seat.rounds) round](inflect: true)"),
+                        Text("\(seat.won) won"),
+                        Text("\(seat.otherSeat) other seat"),
+                    ] + (seat.unknown > 0 ? [Text("\(seat.unknown) no result")] : []))
+                }
+            }
+        }
+    }
+
+    /// The events applied for hardest, and a See All to the rest.
+    private var topEntries: some View {
+        let rows = Array(stats.topLotteries.prefix(limit))
+        let most = max(1, rows.first?.entries ?? 1)
+        return section(spacing: 11) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Top Lottery Entries")
+                    .font(.system(size: 15.5, weight: .bold))
+                Spacer(minLength: 8)
+                if stats.topLotteries.count > limit {
+                    Button(action: seeAll) { SeeAllLabel() }
+                        .buttonStyle(.plain)
+                }
+            }
+            ForEach(rows) { row in
+                // A row is the event it names, the way the extremes in the
+                // time card and the ranked cards below are: the whole line is
+                // the target.
+                Button { open(row.event) } label: { PassportLotteryRow(row: row, most: most) }
+                    .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// A part of the card ruled off from the one above it.
+    private func section(spacing: CGFloat, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: spacing, content: content)
+            .padding(.top, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .top) { Divider() }
+    }
+}
+
+/// What a lottery round came to, as the lottery card counts it, and the
+/// colour it is drawn in: the ticket's orange for a win, grey for a loss, and
+/// next to nothing for a round nobody wrote a result on.
+private enum LotteryOutcome: Hashable {
+    case won
+    /// Won, in another class the round asked for — only By Seat says this.
+    case otherSeat
+    case lost
+    case unknown
+
+    init(_ result: LotteryResult) {
+        switch result {
+        case .won: self = .won
+        case .lost: self = .lost
+        case .pending: self = .unknown
+        }
+    }
+
+    var label: LocalizedStringKey {
+        switch self {
+        case .won: "Won"
+        case .otherSeat: "Other seat"
+        case .lost: "Lost"
+        case .unknown: "No Result"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .won: .trackTicket
+        case .otherSeat: .trackTicket.opacity(0.3)
+        case .lost: Color(.systemGray3)
+        case .unknown: .primary.opacity(0.12)
+        }
+    }
+
+    /// The dots of ``LotteryDots`` said aloud: how many of each.
+    static func summary(of outcomes: [LotteryResult]) -> Text {
+        var tally = PassportStats.LotteryTally()
+        outcomes.forEach { tally.count($0) }
+        return LotteryLine.join([
+            tally.won > 0 ? Text("\(tally.won) won") : nil,
+            tally.lost > 0 ? Text("\(tally.lost) lost") : nil,
+            tally.unknown > 0 ? Text("\(tally.unknown) no result") : nil,
+        ].compactMap { $0 })
+    }
+}
+
+/// The lines under a lottery card's rows, run together.
+private enum LotteryLine {
+    static func join(_ parts: [Text]) -> Text {
+        guard let first = parts.first else { return Text(verbatim: "") }
+        return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
+    }
+}
+
+/// A win rate, in the ticket's orange — a dash where nothing was drawn.
+private struct LotteryRate: View {
+    let rate: Double?
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let rate {
+                Text(rate.formatted(.percent.precision(.fractionLength(0))))
+            } else {
+                Text(verbatim: "–")
+            }
+        }
+        .font(.system(size: size, weight: .bold))
+        .kerning(-size * 0.03)
+        .monospacedDigit()
+        .foregroundStyle(Color.trackTicket)
+        .lineLimit(1)
+        .fixedSize()
+    }
+}
+
+/// One colour of a lottery bar named: its dot, its name and, where the bar
+/// is the card's own, how many.
+private struct LotteryLegendItem: View {
+    let kind: LotteryOutcome
+    let label: LocalizedStringKey
+    let count: Int?
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(kind.color)
+                .frame(width: 7, height: 7)
+            Text(label)
+                .foregroundStyle(.secondary)
+            if let count {
+                Text(count.formatted())
+                    .fontWeight(.bold)
+                    .monospacedDigit()
+            }
+        }
+        .font(.system(size: count == nil ? 11 : 11.5, weight: .medium))
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One round of a sale or one class of seat: its name and what it came to,
+/// the rate beside them, and the rounds as one bar under them.
+private struct LotteryTallyRow<Badge: View, Name: View>: View {
+    let rate: Double?
+    let parts: [(LotteryOutcome, Int)]
+    let badge: Badge
+    let name: Name
+    let line: Text
+
+    init(rate: Double?, parts: [(LotteryOutcome, Int)], badge: Badge,
+         @ViewBuilder name: () -> Name, line: () -> Text) {
+        self.rate = rate
+        self.parts = parts
+        self.badge = badge
+        self.name = name()
+        self.line = line()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                badge
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        name
+                        line
+                            .font(.system(size: 11.5))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    LotteryRate(rate: rate, size: 15)
+                }
+            }
+            PassportSplitBar(parts: parts.map { .init(count: $0.1, color: $0.0.color) }, height: 6)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension LotteryTallyRow where Badge == EmptyView {
+    init(rate: Double?, parts: [(LotteryOutcome, Int)],
+         @ViewBuilder name: () -> Name, line: () -> Text) {
+        self.init(rate: rate, parts: parts, badge: EmptyView(), name: name, line: line)
+    }
+}
+
+/// A class of seat as the reader reads it, and as the ticket prints it beside
+/// that where the two differ — S Seat S席 in English, S席 alone in Japanese.
+private struct LotterySeatName: View {
+    let seatClass: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if let listed = SeatClass(rawValue: seatClass) {
+                Text(listed.label)
+                    .font(.system(size: 13.5, weight: .semibold))
+                if listed.name != seatClass {
+                    Text(verbatim: seatClass)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                Text(verbatim: seatClass)
+                    .font(.system(size: 13.5, weight: .semibold))
+            }
+        }
+        .lineLimit(1)
+    }
+}
+
+/// A class of seat's letter on a square of the ticket's orange.
+private struct LotterySeatBadge: View {
+    let seatClass: String
+
+    var body: some View {
+        Group {
+            if let listed = SeatClass(rawValue: seatClass) {
+                listed.badge
+            } else {
+                Text(verbatim: seatClass.prefix(1).uppercased())
+            }
+        }
+        .font(.system(size: 13, weight: .bold))
+        .foregroundStyle(Color.trackTicket)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .padding(.horizontal, 2)
+        .frame(width: 28, height: 28)
+        .background(Color.trackTicket.opacity(0.12), in: .rect(cornerRadius: 9))
+        .accessibilityHidden(true)
+    }
+}
+
+/// A count split into its parts, each a capsule of its own two points from
+/// the next, as the lottery card draws how its rounds went. A part with
+/// nothing in it is left out, and every other one is at least a dot wide.
+private struct PassportSplitBar: View {
+    struct Part {
+        let count: Int
+        let color: Color
+    }
+
+    let parts: [Part]
+    let height: CGFloat
+
+    var body: some View {
+        let shown = parts.filter { $0.count > 0 }
+        GeometryReader { proxy in
+            let gaps = CGFloat(max(0, shown.count - 1)) * 2
+            let free = max(0, proxy.size.width - gaps - CGFloat(shown.count) * 4)
+            let total = CGFloat(max(1, shown.reduce(0) { $0 + $1.count }))
+            HStack(spacing: 2) {
+                ForEach(shown.indices, id: \.self) { index in
+                    Capsule()
+                        .fill(shown[index].color)
+                        .frame(width: 4 + free * CGFloat(shown[index].count) / total)
+                }
+            }
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
     }
 }
 

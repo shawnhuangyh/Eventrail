@@ -31,6 +31,17 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
         }
     }
 
+    /// ``label`` as a string, to tell whether it reads any differently from
+    /// the class as the ticket prints it — S Seat beside S席, and nothing
+    /// beside it in Japanese.
+    var name: String {
+        switch self {
+        case .s: String(localized: "S Seat")
+        case .a: String(localized: "A Seat")
+        case .general: String(localized: "General Seat")
+        }
+    }
+
     /// What the chip's badge says: the letter where the class has one, and a
     /// letter for the one that has none in English.
     var badge: Text {

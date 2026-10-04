@@ -92,9 +92,62 @@ struct PassportStatsTests {
     @Test func countsLotteriesOverTheEventsTheyWereWrittenOn() {
         #expect(stats.lotteryEvents == 2)
         #expect(stats.lotteryEntries == 7)
-        #expect(stats.mostLotteryEntries == 5)
-        #expect(stats.averageLotteryEntries == 3.5)
         #expect(stats.topLotteries.map(\.event.id) == ["a", "b"])
+        // Nothing was drawn, so there is no rate — rather than a 0%.
+        #expect(stats.lotteryTally == PassportStats.LotteryTally(won: 0, lost: 0, unknown: 4))
+        #expect(stats.lotteryTally.winRate == nil)
+        #expect(stats.roundsToWin == nil)
+        #expect(stats.lotteryRounds.map(\.round) == ["最速先行抽選", "プレイガイド先行"])
+    }
+
+    /// Three lotteries won at the second try, one won at the first beside a
+    /// seat got on general sale, a ticket from before entries, and a count
+    /// carried over with no result.
+    @Test func readsHowTheLotteriesWent() {
+        let s = LotteryChoice(seatClass: "S席"), a = LotteryChoice(seatClass: "A席")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            // Written out of order: read in the order the sale ran them.
+            "a": [
+                LotteryEntry(round: "プレイガイド二次先行", choices: [LotteryChoice(seatClass: "S席")], result: .lost),
+                LotteryEntry(round: "最速先行抽選", choices: [s, a], result: .lost),
+                LotteryEntry(round: "プレイガイド先行", choices: [s, a], result: .won(a.id)),
+            ],
+            "b": [
+                LotteryEntry(round: "最速先行抽選", choices: [s, a], result: .won(s.id)),
+                LotteryEntry(round: "一般発売", applications: 2, choices: [LotteryChoice(seatClass: "A席")]),
+            ],
+            "c": [LotteryEntry(id: LotteryEntry.carriedOverTicketID, applications: 0, result: .won(nil))],
+            "d": [LotteryEntry(applications: 3)],
+        ]
+        let stats = PassportStats(events: Self.events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+
+        // The general sale is a seat got and the old ticket a seat held:
+        // neither is a draw.
+        #expect(stats.lotteryTally == PassportStats.LotteryTally(won: 2, lost: 2, unknown: 1))
+        #expect(stats.lotteryTally.winRate == 0.5)
+        #expect(stats.lotteryEvents == 3)
+        #expect(stats.lotteryEntries == 7)
+        // Ties on applications go to the newer event.
+        #expect(stats.topLotteries.map(\.event.id) == ["d", "a", "b"])
+        #expect(stats.topLotteries[1].outcomes == [.lost, .won(a.id), .lost])
+        #expect(stats.roundsToWin == 1.5)
+
+        #expect(stats.lotteryRounds.map(\.round) == ["最速先行抽選", "プレイガイド先行", "プレイガイド二次先行", ""])
+        #expect(stats.lotteryRounds[0].tally == PassportStats.LotteryTally(won: 1, lost: 1))
+
+        // An S seat asked for in four rounds and won in one; an A seat asked
+        // for in three, won in one, and lost to an S seat in another.
+        #expect(stats.lotterySeats.map(\.seatClass) == ["S席", "A席"])
+        #expect(stats.lotterySeats[0] == PassportStats.SeatTally(seatClass: "S席", won: 1, otherSeat: 1, lost: 2))
+        #expect(stats.lotterySeats[0].winRate == 0.25)
+        #expect(stats.lotterySeats[1] == PassportStats.SeatTally(seatClass: "A席", won: 1, otherSeat: 1, lost: 1))
+        #expect(stats.namedWins == 2)
+        #expect(stats.firstChoiceWins == 1)
+        #expect(stats.hasRankedChoices)
     }
 
     /// Prices on three of four events — one of them free — across two
@@ -225,7 +278,8 @@ struct PassportStatsTests {
     @Test func anEmptyLibraryAddsUpToNothing() {
         let empty = PassportStats(events: []) { _ in Tracking() }
         #expect(empty.totalEvents == 0)
-        #expect(empty.averageLotteryEntries == 0)
+        #expect(empty.topLotteries.isEmpty)
+        #expect(empty.lotteryTally.winRate == nil)
         #expect(empty.tickets.isEmpty)
         #expect(empty.averageTicketPrice == 0)
         #expect(empty.highestTicketPrice == nil)

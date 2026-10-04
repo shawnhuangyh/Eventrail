@@ -107,12 +107,82 @@ nonisolated struct PassportStats {
         var id: Event.ID { event.id }
     }
 
-    /// One event the reader applied for, and how many times they did.
+    /// One event the reader applied for: how many times, and how each round
+    /// of its sale went.
     struct Lottery: Identifiable, Hashable {
         let event: Event
+        /// The applications over its lottery rounds.
         let entries: Int
+        /// How each lottery round went, in the order the sale ran them — a
+        /// dot each on the card.
+        let outcomes: [LotteryResult]
 
         var id: Event.ID { event.id }
+
+        /// How many rounds it took to win: every round up to and including
+        /// the first one won, nil where none was. A round tried after the win
+        /// — a second seat — is not part of getting the first.
+        var roundsToWin: Int? {
+            outcomes.firstIndex { if case .won = $0 { true } else { false } }.map { $0 + 1 }
+        }
+    }
+
+    /// How a run of lottery rounds went.
+    ///
+    /// A round nobody wrote a result on is counted apart rather than as a
+    /// loss: every event here is over, so it is not waiting on anything — the
+    /// ticket sheet says No Result — but nor did anybody say it was lost.
+    struct LotteryTally: Hashable {
+        var won = 0
+        var lost = 0
+        var unknown = 0
+
+        var rounds: Int { won + lost + unknown }
+        /// The rounds whose result was written down — what a win rate is out
+        /// of.
+        var drawn: Int { won + lost }
+        /// Nil where nothing was drawn, rather than a 0% nobody earned.
+        var winRate: Double? { drawn > 0 ? Double(won) / Double(drawn) : nil }
+
+        mutating func count(_ outcome: LotteryResult) {
+            switch outcome {
+            case .won: won += 1
+            case .lost: lost += 1
+            case .pending: unknown += 1
+            }
+        }
+    }
+
+    /// One round of a sale, over every event it was tried in.
+    struct RoundTally: Identifiable, Hashable {
+        /// As written — 最速先行抽選 — and empty for the rounds that name none,
+        /// as a lottery count carried over from before entries does.
+        let round: String
+        let tally: LotteryTally
+
+        var id: String { round }
+    }
+
+    /// One class of seat, over every lottery round that asked for it.
+    ///
+    /// A round won in another class it asked for is no win for this one:
+    /// the win rate is the wins *in this class* out of the drawn rounds that
+    /// named it.
+    struct SeatTally: Identifiable, Hashable {
+        /// As written, trimmed — S席 as the chip wrote it, or whatever was
+        /// typed.
+        let seatClass: String
+        var won = 0
+        /// Won with another choice of the same round.
+        var otherSeat = 0
+        var lost = 0
+        var unknown = 0
+
+        var id: String { seatClass }
+
+        var rounds: Int { won + otherSeat + lost + unknown }
+        var drawn: Int { rounds - unknown }
+        var winRate: Double? { drawn > 0 ? Double(won) / Double(drawn) : nil }
     }
 
     /// One event the reader wrote a price on, and the class of seat it bought.
@@ -183,7 +253,25 @@ nonisolated struct PassportStats {
 
     let topPerformers: [Ranking]
     let topVenues: [Ranking]
+    /// Every event with a lottery round on it, most applications first.
     let topLotteries: [Lottery]
+    /// How every lottery round on those events went.
+    let lotteryTally: LotteryTally
+    /// The same rounds by the round of the sale they were, in the order a
+    /// sale runs them.
+    let lotteryRounds: [RoundTally]
+    /// The same rounds by each class of seat they asked for: the three the
+    /// chips offer in their order, then any typed, most rounds first. A
+    /// round asking for no class is in none of them, and so is one won with
+    /// no choice named, which says nothing about any class.
+    let lotterySeats: [SeatTally]
+    /// The rounds won with a choice named, and how many of those were won
+    /// with the first.
+    let namedWins: Int
+    let firstChoiceWins: Int
+    /// Whether any round asked for more than one choice — without one, every
+    /// win is a first choice's and saying so says nothing.
+    let hasRankedChoices: Bool
     /// The currency every price below is in: the reader's default, or the one
     /// chosen on the spending card.
     let currency: String
@@ -222,20 +310,11 @@ nonisolated struct PassportStats {
     /// screen says so rather than letting a part-filled column read as a whole.
     var lotteryEvents: Int { topLotteries.count }
 
-    /// The most entries the reader put into any one event.
-    ///
-    /// Read off the front of ``topLotteries``, which is already sorted by
-    /// entries: the hardest they ever tried for a seat is the first row of the
-    /// list, and counting it a second way is how the two drift apart.
-    var mostLotteryEntries: Int { topLotteries.first?.entries ?? 0 }
-
-    /// How many entries an average recorded event took.
-    ///
-    /// Over ``lotteryEvents`` rather than over the slice, for the reason
-    /// `Avg. Time` is over the timed events: an event they never wrote a count
-    /// on is not an event they entered nothing for.
-    var averageLotteryEntries: Double {
-        lotteryEvents > 0 ? Double(lotteryEntries) / Double(lotteryEvents) : 0
+    /// How many rounds a win took on average, over the events one was won
+    /// at — see ``Lottery/roundsToWin``. Nil where none was.
+    var roundsToWin: Double? {
+        let wins = topLotteries.compactMap(\.roundsToWin)
+        return wins.isEmpty ? nil : Double(wins.reduce(0, +)) / Double(wins.count)
     }
 
     // MARK: - Reading the cost back
@@ -340,20 +419,71 @@ nonisolated struct PassportStats {
         topPerformers = Self.ranked(performerCounts) { _ in nil }
         topVenues = Self.ranked(venueCounts) { venuePrefectures[$0] }
 
+        var lotteryTally = LotteryTally()
+        var rounds: [String: LotteryTally] = [:]
+        var seats: [String: SeatTally] = [:]
+        var namedWins = 0, firstChoiceWins = 0
+        var hasRankedChoices = false
         let lotteries = events.compactMap { event -> Lottery? in
             // A lottery round written down at all is an event the reader
             // applied for, as many times as its applications say — see
             // ``Tracking/lotteryApplications``. So these are the events every
             // figure below is counted over; a first-come round alone is not
             // one of them.
-            let entries = tracking(event).lotteryApplications
-            guard entries > 0 else { return nil }
-            return Lottery(event: event, entries: entries)
+            let entries = tracking(event).lotteryRounds
+            guard !entries.isEmpty else { return nil }
+            for entry in entries {
+                lotteryTally.count(entry.outcome)
+                rounds[entry.round, default: LotteryTally()].count(entry.outcome)
+                hasRankedChoices = hasRankedChoices || entry.choices.count > 1
+                let won = entry.wonChoice
+                if let won {
+                    namedWins += 1
+                    if won.id == entry.choices.first?.id { firstChoiceWins += 1 }
+                }
+                if entry.isWon && won == nil { continue }
+                // Once per class however many choices named it: a round that
+                // asked for two S seats and then one is one S-seat round.
+                let wonClass = won.map { Self.trimmed($0.seatClass) }
+                for seatClass in Set(entry.choices.map { Self.trimmed($0.seatClass) }) where !seatClass.isEmpty {
+                    var seat = seats[seatClass] ?? SeatTally(seatClass: seatClass)
+                    switch entry.outcome {
+                    case .won where wonClass == seatClass: seat.won += 1
+                    case .won: seat.otherSeat += 1
+                    case .lost: seat.lost += 1
+                    case .pending: seat.unknown += 1
+                    }
+                    seats[seatClass] = seat
+                }
+            }
+            return Lottery(event: event, entries: entries.reduce(0) { $0 + $1.applications },
+                           outcomes: entries.map(\.outcome))
         }
         topLotteries = lotteries.sorted {
             $0.entries == $1.entries ? $0.event.sortDate > $1.event.sortDate : $0.entries > $1.entries
         }
         lotteryEntries = lotteries.reduce(0) { $0 + $1.entries }
+        self.lotteryTally = lotteryTally
+        // A sale's rounds in its own order; one a later build names after
+        // them, and the rounds that name none last, as the spending card puts
+        // the tickets that name no class.
+        lotteryRounds = rounds
+            .map { RoundTally(round: $0.key, tally: $0.value) }
+            .sorted {
+                let left = (LotteryRound.order(of: $0.round), $0.round.isEmpty ? 1 : 0, -$0.tally.rounds)
+                let right = (LotteryRound.order(of: $1.round), $1.round.isEmpty ? 1 : 0, -$1.tally.rounds)
+                return left == right ? $0.round < $1.round : left < right
+            }
+        // The chips' three in the chips' order, so an S seat is where it was
+        // on every slice; a class typed after them, most rounds first.
+        lotterySeats = seats.values.sorted {
+            let left = (SeatClass.order(of: $0.seatClass), -$0.rounds)
+            let right = (SeatClass.order(of: $1.seatClass), -$1.rounds)
+            return left == right ? $0.seatClass < $1.seatClass : left < right
+        }
+        self.namedWins = namedWins
+        self.firstChoiceWins = firstChoiceWins
+        self.hasRankedChoices = hasRankedChoices
 
         self.currency = currency
         var unconverted = 0
@@ -380,6 +510,10 @@ nonisolated struct PassportStats {
             return $0.event.id < $1.event.id
         }
         ticketTypes = Self.types(of: tickets)
+    }
+
+    private static func trimmed(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Tickets gathered by the class they bought.

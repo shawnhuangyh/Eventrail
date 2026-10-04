@@ -245,11 +245,16 @@ extension View {
 /// Lays chips out left to right, wrapping to a new line when they run out of room.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
+    /// The gap between two lines, where it is not ``spacing`` — a legend
+    /// spaces its items wider than it spaces its lines.
+    var lineSpacing: CGFloat?
+
+    private var lineGap: CGFloat { lineSpacing ?? spacing }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let rows = rows(within: proposal.width ?? .infinity, subviews: subviews)
         let width = proposal.width ?? rows.map(\.width).max() ?? 0
-        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
+        let height = rows.map(\.height).reduce(0, +) + lineGap * CGFloat(max(rows.count - 1, 0))
         return CGSize(width: width, height: height)
     }
 
@@ -267,7 +272,7 @@ struct FlowLayout: Layout {
                 )
                 x += size.width + spacing
             }
-            y += row.height + spacing
+            y += row.height + lineGap
         }
     }
 

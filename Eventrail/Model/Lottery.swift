@@ -76,6 +76,13 @@ nonisolated struct LotteryEntry: Hashable, Identifiable, Sendable {
 
     var isPending: Bool { outcome == .pending }
 
+    /// Whether this is a lottery the reader applied in, which every lottery
+    /// figure counts: not a first-come round, and not a ticket carried over
+    /// from before entries (``Tracking/foldLegacyTicket()``), which names no
+    /// round and no applications — a seat held, not a draw anybody wrote
+    /// down, and counted as one it would put a win into every win rate.
+    var isLottery: Bool { !isFirstCome && !(round.isEmpty && applications == 0) }
+
     /// Takes one choice out, and the result with it where the lottery was
     /// won with that choice: a win with nothing left to say what was won is
     /// a result nobody gave.
@@ -251,7 +258,21 @@ nonisolated extension Tracking {
     /// round — what the Passport's lottery figures and the watch count. A
     /// first-come round is not applied for, and adds nothing.
     var lotteryApplications: Int {
-        lotteries.filter { !$0.isFirstCome }.reduce(0) { $0 + $1.applications }
+        lotteries.filter(\.isLottery).reduce(0) { $0 + $1.applications }
+    }
+
+    /// The rounds that were lotteries (``LotteryEntry/isLottery``), in the
+    /// order the sale ran them — rounds the list holds out of order, or two
+    /// of one round, keep the order they were written in among themselves.
+    /// What the Passport reads how the reader's lotteries went from.
+    var lotteryRounds: [LotteryEntry] {
+        lotteries.enumerated()
+            .filter { $0.element.isLottery }
+            .sorted {
+                (LotteryRound.order(of: $0.element.round), $0.offset)
+                    < (LotteryRound.order(of: $1.element.round), $1.offset)
+            }
+            .map(\.element)
     }
 
     /// Where the reader's lotteries stand taken together: won where any was,
