@@ -10,9 +10,11 @@ import SwiftUI
 /// checkmark at the head of its action bar.
 ///
 /// Always an explicit choice: nothing found on Eventernote joins the library by
-/// being looked at.
+/// being looked at. Taking one out is asked first, as everywhere
+/// (``SwiftUI/View/confirmingRemoval(isPresented:remove:)``).
 struct LibraryToggle: View {
     @Environment(EventStore.self) private var store
+    @State private var isConfirmingRemoval = false
 
     let event: Event
 
@@ -20,7 +22,11 @@ struct LibraryToggle: View {
 
     var body: some View {
         Button {
-            withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+            if isSaved {
+                isConfirmingRemoval = true
+            } else {
+                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+            }
         } label: {
             Image(systemName: isSaved ? "checkmark" : "plus")
                 .font(.system(size: 17, weight: .semibold))
@@ -31,6 +37,40 @@ struct LibraryToggle: View {
         .buttonStyle(.plain)
         .glassCircle(interactive: true)
         .accessibilityLabel(isSaved ? "Remove from my events" : "Add to my events")
+        .confirmingRemoval(isPresented: $isConfirmingRemoval) {
+            withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+        }
+    }
+}
+
+// MARK: - Taking an event out
+
+/// What taking events out of the library is asked as, wherever it is done:
+/// the trash, a swipe, the event sheet's button and menu, the checkmark on a
+/// search result or a followed date. Each says what goes with the event —
+/// everything the reader wrote on it, on every device — and that the linked
+/// account can bring the event back but not that.
+enum EventRemoval {
+    static var message: Text {
+        Text("Its lottery entries, ticket details and notes are deleted too, on all your devices. If your Eventernote account still lists the event, it comes back on the next refresh, without them.")
+    }
+
+    static var messageForSeveral: Text {
+        Text("Their lottery entries, ticket details and notes are deleted too, on all your devices. Anything your Eventernote account still lists comes back on the next refresh, without them; the rest you can add again from Search.")
+    }
+}
+
+extension View {
+    /// Asks before one event leaves the library. Hung off whatever asked, so
+    /// the dialog points at it.
+    func confirmingRemoval(isPresented: Binding<Bool>, remove: @escaping () -> Void) -> some View {
+        confirmationDialog("Remove this event from your library?", isPresented: isPresented,
+                           titleVisibility: .visible) {
+            Button("Remove", role: .destructive, action: remove)
+            Button("Keep it", role: .cancel) {}
+        } message: {
+            EventRemoval.message
+        }
     }
 }
 

@@ -591,35 +591,39 @@ final class EventStore {
 
     /// Copying an event found in search into the library is always explicit: an
     /// import never does it silently. Taking one back out is explicit too, and
-    /// answers only for this device and the reader's other ones — an event the
-    /// linked account still lists is imported again on the next refresh.
+    /// is a removal like any other — see ``remove(_:)``.
     func toggleLibraryMembership(_ event: Event) {
-        if isInLibrary(event) {
-            edit(event, keepingFacts: false) { $0.inLibrary = false }
-        } else {
-            // Nothing to write down: being in the library is what says the
-            // reader means to go, which is what a tracking record used to be
-            // opened to say for it.
-            edit(event) { $0.inLibrary = true }
-            placeAdded(event)
+        guard !isInLibrary(event) else {
+            remove(CollectionOfOne(event))
+            return
         }
+        // Nothing to write down: being in the library is what says the reader
+        // means to go, which is what a tracking record used to be opened to
+        // say for it.
+        edit(event) { $0.inLibrary = true }
+        placeAdded(event)
         save()
     }
 
-    /// Takes events out of the library in one go.
+    /// Takes events out of the library, and everything the reader wrote on
+    /// them with them: the lotteries, the ticket, the seat, the cost and the
+    /// note. Every screen asks first and says so.
     ///
-    /// Each one's entry says so rather than going, exactly as a single removal
-    /// does: the other device has to be told a removal happened, or it would
-    /// hand all of them straight back. It answers for the reader's devices and
-    /// not for Eventernote — an event still on the linked account is imported
-    /// again by the next refresh. A note written on one outlives it, so that
-    /// adding it back brings the note back.
+    /// Each one's entry says so rather than going: the other device has to be
+    /// told a removal happened, or it would hand all of them straight back —
+    /// and its record is emptied rather than left, so it travels too. It
+    /// answers for the reader's devices and not for Eventernote — an event
+    /// still on the linked account is imported again by the next refresh,
+    /// with nothing written on it.
     ///
     /// Favorites are left alone. Hearting an event says "keep this in front of
     /// me", which is a separate answer from whether it is in the library.
     func remove(_ events: some Sequence<Event>) {
         for event in events {
-            edit(event, keepingFacts: false) { $0.inLibrary = false }
+            edit(event, keepingFacts: false) {
+                $0.inLibrary = false
+                $0.tracking = Tracking()
+            }
         }
         save()
     }
@@ -631,12 +635,9 @@ final class EventStore {
     ///
     /// Favorites go too here, unlike a removal of some events: a reader who
     /// asked for every event to go should not be left looking at a Favorites
-    /// card that still lists a few. Tracking goes for the same reason, and it is
-    /// the one place it does: a single removal keeps the note typed on an event
-    /// so re-adding it brings the note back, but there is nothing to come back
-    /// to once the reader has asked for all of it to go — and an import that
-    /// restores the events would otherwise restore them wearing ticket badges
-    /// the reader thought they had just deleted.
+    /// card that still lists a few. Tracking goes as it does with any removal —
+    /// an import that restores the events would otherwise restore them wearing
+    /// ticket badges the reader thought they had just deleted.
     ///
     /// Each record is emptied rather than dropped, for the same reason a removal
     /// is: a dropped record would let the other device's copy come straight back.

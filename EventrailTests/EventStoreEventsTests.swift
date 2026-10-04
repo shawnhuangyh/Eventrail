@@ -177,15 +177,31 @@ struct EventStoreEventsTests {
         #expect(entry.modified > .distantPast)
     }
 
-    /// A note outlives its event, so adding it back brings the note back.
-    @Test func aRemovalKeepsTheNote() throws {
+    /// Taken out, an event takes what was written on it along — its
+    /// lotteries, its ticket and its note — so adding it back starts clean.
+    @Test func aRemovalEmptiesTheRecord() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.toggleLibraryMembership(event)
+        store.toggleFavorite(event)
+        store.setTracking(Tracking(seat: "A1", cost: 9900, lotteries: [LotteryEntry(result: .won(nil))],
+                                   note: "front row"), for: event)
+        store.remove([event])
+        #expect(!store.isInLibrary(event))
+        #expect(store.tracking(for: event).isEmpty)
+        // The heart is a separate answer.
+        #expect(store.isFavorite(event))
+    }
+
+    /// The sheet's own button is a removal like the trash.
+    @Test func theToggleEmptiesTheRecordToo() throws {
         let store = store()
         let event = Fixtures.event(id: "1")
         store.toggleLibraryMembership(event)
         store.setTracking(Tracking(note: "front row"), for: event)
-        store.remove([event])
+        store.toggleLibraryMembership(event)
         #expect(!store.isInLibrary(event))
-        #expect(store.tracking(for: event).note == "front row")
+        #expect(store.tracking(for: event).isEmpty)
     }
 
     @Test func askingTwiceGivesTheSame() throws {

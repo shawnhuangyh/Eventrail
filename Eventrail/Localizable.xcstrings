@@ -5222,6 +5222,28 @@
         }
       }
     },
+    "Its lottery entries, ticket details and notes are deleted too, on all your devices. If your Eventernote account still lists the event, it comes back on the next refresh, without them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このイベントの抽選応募、チケット詳細、メモも、すべてのデバイスから削除されます。Eventernoteアカウントにまだ残っているイベントは次回の更新で戻りますが、これらは戻りません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的抽选记录、门票详情和备注也会从你的所有设备中删除。如果 Eventernote 账号中仍列出此活动，它会在下次刷新时恢复，但这些内容不会恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的抽選紀錄、門票詳情和備註也會從你的所有裝置中刪除。如果 Eventernote 帳號中仍列出此活動，它會在下次重新整理時恢復，但這些內容不會恢復。"
+          }
+        }
+      }
+    },
     "Just Added" : {
       "localizations" : {
         "ja" : {
@@ -10086,6 +10108,28 @@
         }
       }
     },
+    "Their lottery entries, ticket details and notes are deleted too, on all your devices. Anything your Eventernote account still lists comes back on the next refresh, without them; the rest you can add again from Search." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これらのイベントの抽選応募、チケット詳細、メモも、すべてのデバイスから削除されます。Eventernoteアカウントに残っているイベントは次回の更新で戻りますが、これらは戻りません。それ以外は「検索」から追加し直せます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它们的抽选记录、门票详情和备注也会从你的所有设备中删除。Eventernote 账号中仍列出的活动会在下次刷新时恢复，但这些内容不会恢复；其余活动可从“搜索”重新添加。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它們的抽選紀錄、門票詳情和備註也會從你的所有裝置中刪除。Eventernote 帳號中仍列出的活動會在下次重新整理時恢復，但這些內容不會恢復；其餘活動可從“搜尋”重新新增。"
+          }
+        }
+      }
+    },
     "This device has no calendar account to add Eventrail's calendar to" : {
       "localizations" : {
         "ja" : {
@@ -10104,28 +10148,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此裝置上沒有可新增 Eventrail 日曆的日曆帳號"
-          }
-        }
-      }
-    },
-    "This removes them from your other devices as well. Anything your Eventernote account still lists comes back on the next refresh; the rest you can add again from Search." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ほかのデバイスからも削除されます。Eventernoteアカウントに残っているものは次回の更新で復元され、それ以外は「検索」から追加し直せます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这也会将它们从你的其他设备中移除。Eventernote 账号中仍列出的内容会在下次刷新时恢复；其余内容可从“搜索”重新添加。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這也會將它們從你的其他裝置中移除。Eventernote 帳號中仍列出的內容會在下次重新整理時恢復；其餘內容可從“搜尋”重新新增。"
           }
         }
       }

@@ -42,6 +42,9 @@ struct EventDetailView: View {
     @State private var isSummaryExpanded = false
     /// Whether ``TicketDetailsView`` is up over this sheet.
     @State private var isEditingTicket = false
+    /// Whether the bar's button or the menu has asked to take the event out —
+    /// one question for both, hung off the button.
+    @State private var isConfirmingRemoval = false
     /// What has been pushed onto this sheet's stack — a performer, a hall. The
     /// refresh notices are drawn above the action bar while nothing is, and
     /// over the whole stack once something is; see ``body``.
@@ -1016,13 +1019,20 @@ struct EventDetailView: View {
     private var actionBar: some ToolbarContent {
         ToolbarItemGroup(placement: .bottomBar) {
             Button {
-                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                if store.isInLibrary(event) {
+                    isConfirmingRemoval = true
+                } else {
+                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                }
             } label: {
                 Label(store.isInLibrary(event) ? "Remove from my events" : "Add to my events",
                       systemImage: store.isInLibrary(event) ? "checkmark" : "plus")
                     .contentTransition(.symbolEffect(.replace))
             }
             .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
+            .confirmingRemoval(isPresented: $isConfirmingRemoval) {
+                withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+            }
 
             if offersLiveActivity {
                 Button(action: toggleLiveActivity) {
@@ -1102,8 +1112,10 @@ struct EventDetailView: View {
             // The same place either way, so the menu keeps its shape as the
             // event goes in and out of the library.
             if store.isInLibrary(event) {
+                // Asked from the bar's button beside the menu, which the menu
+                // has closed over by the time the question is up.
                 Button(role: .destructive) {
-                    withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+                    isConfirmingRemoval = true
                 } label: {
                     Label { Text("Remove Event") } icon: { removalIcon }
                 }

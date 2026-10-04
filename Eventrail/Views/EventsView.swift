@@ -19,6 +19,8 @@ struct EventsView: View {
     @State private var isSelecting = false
     @State private var selection: Set<Event.ID> = []
     @State private var isConfirmingRemoval = false
+    /// The row a swipe asked to take out, while its question is open.
+    @State private var swipedAway: Event.ID?
 
     private var library: [Event] { store.events(of: kept, where: \.inLibrary) }
 
@@ -62,7 +64,7 @@ struct EventsView: View {
                         confirmation: RemovalConfirmation(
                             isPresented: $isConfirmingRemoval,
                             title: removalTitle,
-                            message: Text("This removes them from your other devices as well. Anything your Eventernote account still lists comes back on the next refresh; the rest you can add again from Search."),
+                            message: selection.count == 1 ? EventRemoval.message : EventRemoval.messageForSeveral,
                             confirmTitle: "Remove",
                             cancelTitle: "Keep them",
                             confirm: {
@@ -146,17 +148,19 @@ struct EventsView: View {
                                 }
                             }
                             // Every row, past or ahead: the one-row form of the
-                            // selection bar's trash. Not asked about first, as no
-                            // swipe to delete on iOS is — what the account
-                            // still lists comes back on the next refresh, and the
-                            // rest is a search away.
+                            // selection bar's trash, and asked about first like
+                            // it, since what the reader wrote on the event goes
+                            // with it. No destructive role: that sends the row
+                            // off the screen before the answer is in.
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button("Remove", systemImage: "trash", role: .destructive) {
-                                    withAnimation(.snappy) { store.remove([event]) }
-                                }
-                                // Said outright: the role alone left the button
-                                // in the app's tint rather than the system red.
-                                .tint(.red)
+                                Button("Remove", systemImage: "trash") { swipedAway = event.id }
+                                    .tint(.red)
+                            }
+                            .confirmingRemoval(isPresented: Binding(
+                                get: { swipedAway == event.id },
+                                set: { if !$0 { swipedAway = nil } }
+                            )) {
+                                withAnimation(.snappy) { store.remove([event]) }
                             }
                     }
                 } header: {
