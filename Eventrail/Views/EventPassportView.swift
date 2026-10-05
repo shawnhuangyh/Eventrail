@@ -1095,7 +1095,16 @@ private struct PassportSheetHeader: View {
     @Environment(\.dismiss) private var dismiss
 
     let eyebrow: Text
-    let title: LocalizedStringKey
+    let title: Text
+
+    init(eyebrow: Text, title: Text) {
+        self.eyebrow = eyebrow
+        self.title = title
+    }
+
+    init(eyebrow: Text, title: LocalizedStringKey) {
+        self.init(eyebrow: eyebrow, title: Text(title))
+    }
 
     var body: some View {
         HStack(alignment: .top) {
@@ -1104,7 +1113,7 @@ private struct PassportSheetHeader: View {
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                Text(title)
+                title
                     .font(.system(size: 24, weight: .bold))
             }
             Spacer(minLength: 12)
@@ -1722,22 +1731,19 @@ private struct PassportSpendingCard: View {
 
     /// The class the dearest and cheapest are read over; nil for every ticket.
     @State private var seatFilter: String?
-    /// The end whose See All is open, which decides the order its list runs in.
-    @State private var openEnd: PriceEnd?
+    /// The list of tickets open over the card, if any.
+    @State private var openList: TicketList?
 
-    /// The two ends of the filtered tickets, each opening the whole list from
-    /// its own end: dearest first under Highest, cheapest first under Lowest.
-    private enum PriceEnd: Identifiable {
+    /// What a list of tickets behind the card holds, and the order it runs in.
+    private enum TicketList: Identifiable, Hashable {
+        /// Every ticket under the chips, from the end whose See All opened
+        /// it: dearest first under Highest, cheapest first under Lowest.
         case highest, lowest
+        /// Every ticket of one class, dearest first — a row under By Ticket
+        /// Type, tapped.
+        case seatClass(String)
 
         var id: Self { self }
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .highest: "Highest Price"
-            case .lowest: "Lowest Price"
-            }
-        }
     }
 
     /// The chosen class, unless the year filter has just taken it away
@@ -1785,12 +1791,25 @@ private struct PassportSpendingCard: View {
         }
         .padding(16)
         .glassPanel(cornerRadius: 28)
-        .sheet(item: $openEnd) { end in
-            // Reversed rather than sorted again, so the first row is the one
-            // the card shows as the cheapest, ties and all.
-            PassportTicketSheet(tickets: end == .lowest ? filtered.reversed() : filtered,
-                                title: end.title, currency: stats.currency, styles: styles,
-                                seatType: filter.map { styles[$0].label })
+        .sheet(item: $openList) { list in
+            switch list {
+            case .highest:
+                PassportTicketSheet(tickets: filtered, title: Text("Highest Price"),
+                                    currency: stats.currency, styles: styles,
+                                    seatType: filter.map { styles[$0].label })
+            case .lowest:
+                // Reversed rather than sorted again, so the first row is the
+                // one the card shows as the cheapest, ties and all.
+                PassportTicketSheet(tickets: filtered.reversed(), title: Text("Lowest Price"),
+                                    currency: stats.currency, styles: styles,
+                                    seatType: filter.map { styles[$0].label })
+            case .seatClass(let seatClass):
+                // Every ticket of the class whatever the chips say: the row
+                // tapped is the slice's, not the filtered ends'.
+                PassportTicketSheet(tickets: stats.tickets.filter { $0.seatClass == seatClass },
+                                    title: styles[seatClass].label,
+                                    currency: stats.currency, styles: styles, seatType: nil)
+            }
         }
     }
 
@@ -1902,10 +1921,17 @@ private struct PassportSpendingCard: View {
                 PassportShareBar.Part(count: $0.count, color: styles[$0.seatClass].color)
             })
 
+            // Each opens its own tickets. The range's ⓘ inside a row is a
+            // button of its own and keeps its tap.
             ForEach(stats.ticketTypes) { type in
-                PassportTicketTypeRow(type: type, style: styles[type.seatClass],
-                                      total: stats.tickets.count, axis: axis,
-                                      currency: stats.currency, showsPaid: stats.showsPaid)
+                Button { openList = .seatClass(type.seatClass) } label: {
+                    PassportTicketTypeRow(type: type, style: styles[type.seatClass],
+                                          total: stats.tickets.count, axis: axis,
+                                          currency: stats.currency, showsPaid: stats.showsPaid)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text("Shows the tickets of this type"))
             }
 
             if let axis {
@@ -1955,11 +1981,11 @@ private struct PassportSpendingCard: View {
             if stats.ticketTypes.count > 1 { chips(styles) }
 
             if let dearest = tickets.first {
-                end(tickets.count > 1 ? PriceEnd.highest.title : "Price", opening: .highest,
+                end(tickets.count > 1 ? "Highest Price" : "Price", opening: .highest,
                     ticket: dearest, of: tickets, styles: styles)
             }
             if tickets.count > 1, let cheapest = tickets.last {
-                end(PriceEnd.lowest.title, opening: .lowest, ticket: cheapest, of: tickets, styles: styles)
+                end("Lowest Price", opening: .lowest, ticket: cheapest, of: tickets, styles: styles)
                     .padding(.top, 14)
                     .overlay(alignment: .top) { Divider() }
             }
@@ -2031,7 +2057,7 @@ private struct PassportSpendingCard: View {
     /// One end of the filtered tickets, with a See All to the rest of them
     /// once there are more than the two ends show.
     private func end(
-        _ title: LocalizedStringKey, opening list: PriceEnd, ticket: PassportStats.Ticket,
+        _ title: LocalizedStringKey, opening list: TicketList, ticket: PassportStats.Ticket,
         of tickets: [PassportStats.Ticket], styles: SeatStyles
     ) -> some View {
         VStack(alignment: .leading, spacing: 11) {
@@ -2040,7 +2066,7 @@ private struct PassportSpendingCard: View {
                     .font(.system(size: 15.5, weight: .bold))
                 Spacer(minLength: 8)
                 if tickets.count > 2 {
-                    Button { openEnd = list } label: { SeeAllLabel() }
+                    Button { openList = list } label: { SeeAllLabel() }
                         .buttonStyle(.plain)
                 }
             }
@@ -2421,16 +2447,18 @@ private struct PassportTicketRow: View {
     private var isConverted: Bool { ticket.paid.currency != currency }
 }
 
-/// Every ticket under the card's seat-type filter, behind either See All —
-/// dearest first behind Highest Price and cheapest first behind Lowest, each
-/// titled for the end it was opened from, as ``PassportExtremesSheet`` is.
+/// A list of the card's tickets: every ticket under its seat-type filter,
+/// behind either See All — dearest first behind Highest Price and cheapest
+/// first behind Lowest, each titled for the end it was opened from, as
+/// ``PassportExtremesSheet`` is — or every ticket of one class, dearest
+/// first, behind its row under By Ticket Type and titled with its name.
 ///
 /// A drawer with the rows ruled off, as ``PassportExtremesSheet`` draws its
 /// own: these are events with a figure each, not a ranking with a bar.
 private struct PassportTicketSheet: View {
     /// In the order they are listed.
     let tickets: [PassportStats.Ticket]
-    let title: LocalizedStringKey
+    let title: Text
     /// The currency the card adds up in.
     let currency: String
     let styles: SeatStyles

@@ -9624,6 +9624,28 @@
         }
       }
     },
+    "Shows the tickets of this type" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この種類のチケットを表示します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示这一类型的门票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示這一類型的門票"
+          }
+        }
+      }
+    },
     "Sign in to iCloud to sync" : {
       "localizations" : {
         "ja" : {
