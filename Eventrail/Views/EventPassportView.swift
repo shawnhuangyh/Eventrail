@@ -94,7 +94,6 @@ struct EventPassportView: View {
     /// Which ranked list has its whole list open, if either.
     @State private var openRanking: PassportRanking?
     /// Whether every recorded event is open, rather than the top five.
-    @State private var isShowingLotteries = false
     /// The event whose own sheet is open, if the reader tapped one.
     @State private var openEvent: Event?
     /// What the spending card adds up in, unless the reader picked another on
@@ -155,9 +154,7 @@ struct EventPassportView: View {
                 // Under the empty state too: lotteries tried for and lost are
                 // the reader's record before any ticket is.
                 if !stats.topLotteries.isEmpty {
-                    PassportLotteryCard(stats: stats, limit: Self.cardLimit) {
-                        isShowingLotteries = true
-                    } open: { openEvent = $0 }
+                    PassportLotteryCard(stats: stats, limit: Self.cardLimit) { openEvent = $0 }
                 }
                 if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
                     PassportSpendingCard(
@@ -205,9 +202,6 @@ struct EventPassportView: View {
             PassportExtremesSheet(extreme: extreme, spans: extreme.spans(of: stats))
         }
         .sheet(item: $openRanking) { PassportRankingSheet(ranking: $0) }
-        .sheet(isPresented: $isShowingLotteries) {
-            PassportLotterySheet(rows: stats.topLotteries)
-        }
         .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
         // An event named on this screen opens the same sheet every list in
         // the app ends in.
@@ -1188,7 +1182,7 @@ private struct PassportRankRow: View {
 private struct PassportLotteryRow: View {
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
-    let row: PassportStats.Lottery
+    let row: LotteryListRow
     /// The most entries in the list, which is what the bar is drawn against.
     let most: Int
 
@@ -1219,16 +1213,39 @@ private struct PassportLotteryRow: View {
     }
 }
 
+/// One event in a list of the lottery card's: how many times it was applied
+/// for and how each round went — every round, under Top Lottery Entries, or
+/// the rounds a row of By Round or By Seat counted, behind that row.
+private struct LotteryListRow: Identifiable {
+    let event: Event
+    let entries: Int
+    let outcomes: [LotteryOutcome]
+
+    var id: Event.ID { event.id }
+
+    init(_ lottery: PassportStats.Lottery) {
+        event = lottery.event
+        entries = lottery.entries
+        outcomes = lottery.outcomes.map(LotteryOutcome.init)
+    }
+
+    init(_ counted: PassportStats.LotteryEvent) {
+        event = counted.event
+        entries = counted.entries
+        outcomes = counted.outcomes.map(LotteryOutcome.init)
+    }
+}
+
 /// How an event's rounds went, a dot each, in the order the sale ran them —
 /// two grey and an orange is a seat won at the third try.
 private struct LotteryDots: View {
-    let outcomes: [LotteryResult]
+    let outcomes: [LotteryOutcome]
 
     var body: some View {
         HStack(spacing: 3) {
             ForEach(outcomes.indices, id: \.self) { index in
                 Circle()
-                    .fill(LotteryOutcome(outcomes[index]).color)
+                    .fill(outcomes[index].color)
                     .frame(width: 7, height: 7)
             }
         }
@@ -1237,13 +1254,18 @@ private struct LotteryDots: View {
     }
 }
 
-/// Every event the reader wrote a lottery count on, behind the card's See All.
+/// A list of the card's events: every event the reader wrote a lottery round
+/// on, behind Top Lottery Entries' See All, most applications first — or the
+/// events behind one row of By Round or By Seat, newest first, each with only
+/// the rounds that row counted.
 ///
 /// No stack inside this one, unlike ``PassportRankingSheet``: a row here is a
 /// event rather than a name, and the card it came from does not open one
 /// either.
 private struct PassportLotterySheet: View {
-    let rows: [PassportStats.Lottery]
+    let title: Text
+    let eyebrow: Text
+    let rows: [LotteryListRow]
 
     /// A row here opens the event it names, exactly as the row on the card
     /// does — a drawer over a drawer, the way ``PassportExtremesSheet`` opens
@@ -1252,11 +1274,10 @@ private struct PassportLotterySheet: View {
     @State private var openEvent: Event?
 
     var body: some View {
-        let most = max(1, rows.first?.entries ?? 1)
+        let most = max(1, rows.map(\.entries).max() ?? 1)
 
         VStack(alignment: .leading, spacing: 0) {
-            PassportSheetHeader(eyebrow: Text("^[\(rows.count) event](inflect: true) recorded"),
-                                title: "Top Lottery Entries")
+            PassportSheetHeader(eyebrow: eyebrow, title: title)
             ScrollView {
                 VStack(spacing: 13) {
                     ForEach(rows) { row in
@@ -1296,8 +1317,22 @@ private struct PassportLotteryCard: View {
     let stats: PassportStats
     /// How many of the events applied for hardest the card shows.
     let limit: Int
-    let seeAll: () -> Void
     let open: (Event) -> Void
+
+    /// The list of events open over the card, if any.
+    @State private var openList: LotteryList?
+
+    /// What a list of events behind the card holds.
+    private enum LotteryList: Identifiable, Hashable {
+        /// Every event applied for, behind Top Lottery Entries' See All.
+        case top
+        /// The events behind a row of By Round, by the round as written.
+        case round(String)
+        /// The events behind a row of By Seat, by the class as written.
+        case seat(String)
+
+        var id: Self { self }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1311,6 +1346,35 @@ private struct PassportLotteryCard: View {
         }
         .padding(16)
         .glassPanel(cornerRadius: 28)
+        .sheet(item: $openList) { list in
+            switch list {
+            case .top:
+                PassportLotterySheet(title: Text("Top Lottery Entries"),
+                                     eyebrow: Text("^[\(stats.topLotteries.count) event](inflect: true) recorded"),
+                                     rows: stats.topLotteries.map(LotteryListRow.init))
+            case .round(let round):
+                let rows = (stats.roundEvents[round] ?? []).map(LotteryListRow.init)
+                PassportLotterySheet(title: Self.roundName(round),
+                                     eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
+            case .seat(let seatClass):
+                let rows = (stats.seatEvents[seatClass] ?? []).map(LotteryListRow.init)
+                PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
+                                     eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
+            }
+        }
+    }
+
+    /// A round of the sale as the reader reads it, and Unspecified for the
+    /// rounds that name none.
+    private static func roundName(_ round: String) -> Text {
+        round.isEmpty ? Text("Unspecified") : Text(verbatim: LotteryRound.label(of: round))
+    }
+
+    /// A row of By Round or By Seat, opening the events it counted.
+    private func listing(_ list: LotteryList, @ViewBuilder row: () -> some View) -> some View {
+        Button { openList = list } label: { row().contentShape(.rect) }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Shows the events counted here"))
     }
 
     /// The win rate, large, and what it was out of beside it.
@@ -1377,24 +1441,20 @@ private struct PassportLotteryCard: View {
                 .font(.system(size: 15.5, weight: .bold))
             ForEach(stats.lotteryRounds) { round in
                 let tally = round.tally
-                LotteryTallyRow(
-                    rate: tally.winRate,
-                    parts: [(.won, tally.won), (.lost, tally.lost), (.unknown, tally.unknown)]
-                ) {
-                    Group {
-                        if round.round.isEmpty {
-                            Text("Unspecified")
-                        } else {
-                            Text(verbatim: LotteryRound.label(of: round.round))
-                        }
+                listing(.round(round.round)) {
+                    LotteryTallyRow(
+                        rate: tally.winRate,
+                        parts: [(.won, tally.won), (.lost, tally.lost), (.unknown, tally.unknown)]
+                    ) {
+                        Self.roundName(round.round)
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .lineLimit(1)
+                    } line: {
+                        LotteryLine.join([
+                            Text("^[\(tally.rounds) round](inflect: true)"),
+                            Text("\(tally.won) won"),
+                        ] + (tally.unknown > 0 ? [Text("\(tally.unknown) no result")] : []))
                     }
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .lineLimit(1)
-                } line: {
-                    LotteryLine.join([
-                        Text("^[\(tally.rounds) round](inflect: true)"),
-                        Text("\(tally.won) won"),
-                    ] + (tally.unknown > 0 ? [Text("\(tally.unknown) no result")] : []))
                 }
             }
         }
@@ -1430,21 +1490,23 @@ private struct PassportLotteryCard: View {
             let styles = SeatStyle.styles(for: stats)
             ForEach(stats.lotterySeats) { seat in
                 let style = styles[seat.seatClass]
-                LotteryTallyRow(
-                    rate: seat.winRate,
-                    parts: [(.won, seat.won), (.otherSeat, seat.otherSeat), (.lost, seat.lost),
-                            (.unknown, seat.unknown)],
-                    badge: SeatBadge(style: style)
-                ) {
-                    style.label
-                        .font(Font(SeatBadge.nameFont))
-                        .lineLimit(1)
-                } line: {
-                    LotteryLine.join([
-                        Text("^[\(seat.rounds) round](inflect: true)"),
-                        Text("\(seat.won) won"),
-                    ] + (seat.otherSeat > 0 ? [Text("\(seat.otherSeat) other seat")] : [])
-                      + (seat.unknown > 0 ? [Text("\(seat.unknown) no result")] : []))
+                listing(.seat(seat.seatClass)) {
+                    LotteryTallyRow(
+                        rate: seat.winRate,
+                        parts: [(.won, seat.won), (.otherSeat, seat.otherSeat), (.lost, seat.lost),
+                                (.unknown, seat.unknown)],
+                        badge: SeatBadge(style: style)
+                    ) {
+                        style.label
+                            .font(Font(SeatBadge.nameFont))
+                            .lineLimit(1)
+                    } line: {
+                        LotteryLine.join([
+                            Text("^[\(seat.rounds) round](inflect: true)"),
+                            Text("\(seat.won) won"),
+                        ] + (seat.otherSeat > 0 ? [Text("\(seat.otherSeat) other seat")] : [])
+                          + (seat.unknown > 0 ? [Text("\(seat.unknown) no result")] : []))
+                    }
                 }
             }
         }
@@ -1460,7 +1522,7 @@ private struct PassportLotteryCard: View {
                     .font(.system(size: 15.5, weight: .bold))
                 Spacer(minLength: 8)
                 if stats.topLotteries.count > limit {
-                    Button(action: seeAll) { SeeAllLabel() }
+                    Button { openList = .top } label: { SeeAllLabel() }
                         .buttonStyle(.plain)
                 }
             }
@@ -1468,7 +1530,7 @@ private struct PassportLotteryCard: View {
                 // A row is the event it names, the way the extremes in the
                 // time card and the ranked cards below are: the whole line is
                 // the target.
-                Button { open(row.event) } label: { PassportLotteryRow(row: row, most: most) }
+                Button { open(row.event) } label: { PassportLotteryRow(row: LotteryListRow(row), most: most) }
                     .buttonStyle(.plain)
             }
         }
@@ -1494,10 +1556,15 @@ private enum LotteryOutcome: Hashable {
     case unknown
 
     init(_ result: LotteryResult) {
-        switch result {
+        self.init(PassportStats.RoundOutcome(result))
+    }
+
+    init(_ outcome: PassportStats.RoundOutcome) {
+        switch outcome {
         case .won: self = .won
+        case .otherSeat: self = .otherSeat
         case .lost: self = .lost
-        case .pending: self = .unknown
+        case .noResult: self = .unknown
         }
     }
 
@@ -1520,13 +1587,14 @@ private enum LotteryOutcome: Hashable {
     }
 
     /// The dots of ``LotteryDots`` said aloud: how many of each.
-    static func summary(of outcomes: [LotteryResult]) -> Text {
-        var tally = PassportStats.LotteryTally()
-        outcomes.forEach { tally.count($0) }
+    static func summary(of outcomes: [LotteryOutcome]) -> Text {
+        func count(_ kind: LotteryOutcome) -> Int { outcomes.filter { $0 == kind }.count }
+        let won = count(.won), other = count(.otherSeat), lost = count(.lost), unknown = count(.unknown)
         return LotteryLine.join([
-            tally.won > 0 ? Text("\(tally.won) won") : nil,
-            tally.lost > 0 ? Text("\(tally.lost) lost") : nil,
-            tally.unknown > 0 ? Text("\(tally.unknown) no result") : nil,
+            won > 0 ? Text("\(won) won") : nil,
+            other > 0 ? Text("\(other) other seat") : nil,
+            lost > 0 ? Text("\(lost) lost") : nil,
+            unknown > 0 ? Text("\(unknown) no result") : nil,
         ].compactMap { $0 })
     }
 }

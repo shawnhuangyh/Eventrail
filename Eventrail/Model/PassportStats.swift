@@ -155,6 +155,32 @@ nonisolated struct PassportStats {
         }
     }
 
+    /// How one lottery round went, as By Round and By Seat count it. Other
+    /// seat is By Seat's alone: the round won with a lower class it asked
+    /// for (``SeatTally``).
+    enum RoundOutcome: Hashable {
+        case won, otherSeat, lost, noResult
+
+        init(_ result: LotteryResult) {
+            switch result {
+            case .won: self = .won
+            case .lost: self = .lost
+            case .pending: self = .noResult
+            }
+        }
+    }
+
+    /// One event behind a row of By Round or By Seat: the applications over
+    /// the rounds of its the row counted, and how each of them went, in the
+    /// order the sale ran them.
+    struct LotteryEvent: Identifiable, Hashable {
+        let event: Event
+        let entries: Int
+        let outcomes: [RoundOutcome]
+
+        var id: Event.ID { event.id }
+    }
+
     /// One round of a sale, over every event it was tried in.
     struct RoundTally: Identifiable, Hashable {
         /// As written — 最速先行抽選 — and empty for the rounds that name none,
@@ -189,6 +215,15 @@ nonisolated struct PassportStats {
         var rounds: Int { won + otherSeat + lost + unknown }
         var drawn: Int { rounds - unknown }
         var winRate: Double? { drawn > 0 ? Double(won) / Double(drawn) : nil }
+
+        mutating func count(_ outcome: RoundOutcome) {
+            switch outcome {
+            case .won: won += 1
+            case .otherSeat: otherSeat += 1
+            case .lost: lost += 1
+            case .noResult: unknown += 1
+            }
+        }
     }
 
     /// One event the reader wrote a price on, and the class of seat it bought.
@@ -271,6 +306,12 @@ nonisolated struct PassportStats {
     /// round asking for no class is in none of them, and so is one won with
     /// no choice named, which says nothing about any class.
     let lotterySeats: [SeatTally]
+    /// The events behind each of ``lotteryRounds`` and of ``lotterySeats``,
+    /// newest first, by the round and by the class as written: each with only
+    /// the rounds its row counted, so an event whose S seat was won higher
+    /// is not among A's.
+    let roundEvents: [String: [LotteryEvent]]
+    let seatEvents: [String: [LotteryEvent]]
     /// The rounds won with a choice named, and how many of those were won
     /// with the first.
     let namedWins: Int
@@ -435,6 +476,8 @@ nonisolated struct PassportStats {
         var seats: [String: SeatTally] = [:]
         var namedWins = 0, firstChoiceWins = 0
         var hasRankedChoices = false
+        var roundEvents: [String: [LotteryEvent]] = [:]
+        var seatEvents: [String: [LotteryEvent]] = [:]
         let tried = applied.map { $0.sorted { $0.sortDate > $1.sortDate } } ?? events
         let lotteries = tried.compactMap { event -> Lottery? in
             // A lottery round written down at all is an event the reader
@@ -444,9 +487,15 @@ nonisolated struct PassportStats {
             // one of them.
             let entries = tracking(event).lotteryRounds
             guard !entries.isEmpty else { return nil }
+            // What this event adds to each row's list, by the round and by
+            // the class: the applications and each round's outcome.
+            var byRound: [String: (entries: Int, outcomes: [RoundOutcome])] = [:]
+            var bySeat: [String: (entries: Int, outcomes: [RoundOutcome])] = [:]
             for entry in entries {
                 lotteryTally.count(entry.outcome)
                 rounds[entry.round, default: LotteryTally()].count(entry.outcome)
+                byRound[entry.round, default: (0, [])].entries += entry.applications
+                byRound[entry.round, default: (0, [])].outcomes.append(RoundOutcome(entry.outcome))
                 hasRankedChoices = hasRankedChoices || entry.choices.count > 1
                 let won = entry.wonChoice
                 if let won {
@@ -458,20 +507,30 @@ nonisolated struct PassportStats {
                 // asked for two S seats and then one is one S-seat round.
                 let wonClass = won.map { Self.trimmed($0.seatClass) }
                 for seatClass in Set(entry.choices.map { Self.trimmed($0.seatClass) }) where !seatClass.isEmpty {
-                    var seat = seats[seatClass] ?? SeatTally(seatClass: seatClass)
+                    let outcome: RoundOutcome
                     switch entry.outcome {
-                    case .won where wonClass == seatClass: seat.won += 1
+                    case .won where wonClass == seatClass: outcome = .won
                     case .won:
                         // Leaves the class out of this round altogether,
                         // made or not: a class whose only round was won
                         // higher has nothing to say.
                         if let won, Self.ranks(won, above: seatClass, in: entry.choices) { continue }
-                        seat.otherSeat += 1
-                    case .lost: seat.lost += 1
-                    case .pending: seat.unknown += 1
+                        outcome = .otherSeat
+                    case .lost: outcome = .lost
+                    case .pending: outcome = .noResult
                     }
-                    seats[seatClass] = seat
+                    seats[seatClass, default: SeatTally(seatClass: seatClass)].count(outcome)
+                    bySeat[seatClass, default: (0, [])].entries += entry.applications
+                    bySeat[seatClass, default: (0, [])].outcomes.append(outcome)
                 }
+            }
+            for (round, row) in byRound {
+                roundEvents[round, default: []].append(
+                    LotteryEvent(event: event, entries: row.entries, outcomes: row.outcomes))
+            }
+            for (seatClass, row) in bySeat {
+                seatEvents[seatClass, default: []].append(
+                    LotteryEvent(event: event, entries: row.entries, outcomes: row.outcomes))
             }
             return Lottery(event: event, entries: entries.reduce(0) { $0 + $1.applications },
                            outcomes: entries.map(\.outcome))
@@ -498,6 +557,8 @@ nonisolated struct PassportStats {
             let right = (SeatClass.order(of: $1.seatClass), -$1.rounds)
             return left == right ? $0.seatClass < $1.seatClass : left < right
         }
+        self.roundEvents = roundEvents
+        self.seatEvents = seatEvents
         self.namedWins = namedWins
         self.firstChoiceWins = firstChoiceWins
         self.hasRankedChoices = hasRankedChoices

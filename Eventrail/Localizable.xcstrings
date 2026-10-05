@@ -9580,6 +9580,28 @@
         }
       }
     },
+    "Shows the events counted here" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここに数えられたイベントを表示します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示计入这里的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示計入這裡的活動"
+          }
+        }
+      }
+    },
     "Shows the price as it was paid" : {
       "localizations" : {
         "ja" : {

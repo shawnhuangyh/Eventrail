@@ -190,6 +190,14 @@ struct PassportStatsTests {
             PassportStats.SeatTally(seatClass: "一般席", won: 1, lost: 1),
         ])
         #expect(stats.lotterySeats[2].winRate == 0.5)
+
+        // Behind each row, newest first, the events it counted and how each
+        // went for it: the round won with an S seat is not among A's.
+        #expect(stats.roundEvents[""]?.map(\.event.id) == ["c", "b", "a"])
+        #expect(stats.seatEvents["A席"]?.map(\.event.id) == ["c", "b"])
+        #expect(stats.seatEvents["A席"]?.map(\.outcomes) == [[.lost], [.otherSeat]])
+        #expect(stats.seatEvents["一般席"]?.map(\.outcomes) == [[.lost], [.won]])
+        #expect(stats.seatEvents["S席"]?.map(\.outcomes) == [[.lost], [.otherSeat], [.won]])
     }
 
     /// Classes the chips do not offer have no tier, so the order the round
