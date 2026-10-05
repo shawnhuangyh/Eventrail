@@ -39,13 +39,10 @@ extension Sequence where Element == FollowedPerformer {
 }
 
 extension Sequence where Element == Event {
-    /// What the reader went to: the library's own past.
-    ///
-    /// Keeping an event is what says they mean to go, so an event still in the
-    /// library once its date has passed is one they went to. Nothing else is
-    /// recorded, and nothing else needs to be — an event they did not go to is
-    /// one they take out.
-    var attended: [Event] { filter { !$0.isUpcoming } }
+    /// The events whose day is over — the library's past, every event the
+    /// reader meant to go to, ticket or not. What they went to is the part of
+    /// it they held a ticket for (``EventStore/hasAttended(_:)``).
+    var past: [Event] { filter { !$0.isUpcoming } }
 
     /// Upcoming first, soonest first, and then the past, most recent first —
     /// the order the favourites are listed in, the same the library uses.

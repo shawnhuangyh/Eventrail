@@ -575,22 +575,22 @@ struct EventDetailView: View {
     /// reads the event's own times through ``EventProgress``.
     private var isAhead: Bool { event.isUpcoming }
 
-    /// Whether there is a ticket to say anything about: a past event had one,
-    /// and one still to come has one once a lottery is won or a first-come
-    /// round got (``Tracking/hasTicket``).
-    private var hasTicket: Bool { !isAhead || tracking.hasTicket }
+    /// Whether there is a ticket to say anything about: a lottery won or a
+    /// first-come round got (``Tracking/hasTicket``), past or ahead alike.
+    /// With it and the day over, the reader went.
+    private var hasTicket: Bool { tracking.hasTicket }
 
     /// The colour the card is in: amber while the event is to come, green
     /// with the doors open, orange in the last minutes before the start, the
-    /// heart's red on stage — and once it is over, green if the reader kept
-    /// it, since they went.
+    /// heart's red on stage — and once it is over, green if the reader held a
+    /// ticket, since they went.
     private func tint(for progress: EventProgress, at now: Date) -> Color {
         switch progress.phase {
         case .ahead, .today, .beforeDoors, .beforeShow: .trackTicket
         case .doorsOpen(let starts):
             starts.timeIntervalSince(now) <= Self.startingSoon ? .orange : .trackAttended
         case .onNow: .favorite
-        case .wrapped, .over: store.isInLibrary(event) ? .trackAttended : .secondary
+        case .wrapped, .over: hasTicket ? .trackAttended : .secondary
         }
     }
 
@@ -599,7 +599,7 @@ struct EventDetailView: View {
 
     /// What the card opens on: how far off the event is, where it has got to
     /// on the day, or — once the day is over — whether the reader went, which
-    /// is whether it is in the library.
+    /// is whether they held a ticket.
     private func headline(for progress: EventProgress, at now: Date) -> Text {
         switch progress.phase {
         case .ahead(1): Text("Tomorrow")
@@ -613,7 +613,7 @@ struct EventDetailView: View {
                 : Text("Doors open")
         case .onNow: Text("On now")
         case .wrapped: Text("That's a wrap")
-        case .over: store.isInLibrary(event) ? Text("Attended") : Text("Ended")
+        case .over: hasTicket ? Text("Attended") : Text("Ended")
         }
     }
 
@@ -935,29 +935,32 @@ struct EventDetailView: View {
 
     /// Where the ticket stands, read from the lottery entries: won (or got,
     /// first come), waiting on a result — saying when it comes — lost, or
-    /// not tried for yet; and once the event is over, simply that the reader
-    /// was there. A win is the ticket, so it takes the ticket's orange.
+    /// not tried for yet; and once the event is over with a ticket held,
+    /// simply that the reader was there. Over without one, a lottery still
+    /// waiting is one whose result was never written down, as the ticket
+    /// sheet says. A win is the ticket, so it takes the ticket's orange.
     private var ticketValue: Text {
-        if !isAhead { return Text("Attended") }
+        if !isAhead, hasTicket { return Text("Attended") }
         switch tracking.lotteryStanding {
         case .won:
             let won = tracking.wonLottery
             return LotteryText.result(won?.outcome ?? .won(nil), firstCome: won?.isFirstCome ?? false)
         case .pending:
+            guard isAhead else { return Text("No Result") }
             if let day = tracking.nextResults()?.day {
                 return Text("Results \(Text(verbatim: LotteryText.short(day)))")
             }
             return Text("In the lottery")
         case .lost: return Text("Not won")
-        case nil: return Text("No ticket yet")
+        case nil: return isAhead ? Text("No ticket yet") : Text("No Ticket")
         }
     }
 
     private var ticketTint: Color {
-        if !isAhead { return .trackAttended }
+        if !isAhead, hasTicket { return .trackAttended }
         switch tracking.lotteryStanding {
         case .won: return .trackTicket
-        case .pending: return .trackInterest
+        case .pending: return isAhead ? .trackInterest : .secondary
         case .lost, nil: return .secondary
         }
     }
@@ -971,7 +974,7 @@ struct EventDetailView: View {
         let applications = tracking.lotteryApplications
         let applied = Text("^[\(applications) entry](inflect: true)")
         if !isAhead {
-            if let price = tracking.price { parts.append(Text(verbatim: price.formatted)) }
+            if hasTicket, let price = tracking.price { parts.append(Text(verbatim: price.formatted)) }
             if applications > 0 { parts.append(applied) }
         } else {
             switch tracking.lotteryStanding {

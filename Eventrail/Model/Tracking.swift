@@ -348,12 +348,15 @@ nonisolated extension Tracking {
 
 /// The single badge shown on a row.
 ///
-/// Read from where the event stands rather than from anything the reader filled
-/// in: in the library or not, past or still to come, ticket in hand or not.
+/// Read from where the event stands and from the rounds the reader wrote
+/// down: in the library or not, past or still to come, ticket in hand or not.
 /// ``EventStore/status(for:)`` is the one place it is worked out, because it is
 /// the only place that knows whether the event is in the library.
 enum TrackingStatus: Hashable {
     case untracked, planned, ticketed, attended
+    /// Kept, past, and no ticket recorded — not attended, since only a ticket
+    /// says that (``EventStore/hasAttended(_:)``).
+    case unticketed
 
     var label: LocalizedStringKey {
         switch self {
@@ -361,12 +364,13 @@ enum TrackingStatus: Hashable {
         case .planned: "Planning"
         case .ticketed: "Ticketed"
         case .attended: "Attended"
+        case .unticketed: "No Ticket"
         }
     }
 
     var tint: Color {
         switch self {
-        case .untracked: .secondary
+        case .untracked, .unticketed: .secondary
         case .planned: .trackInterest
         case .ticketed: .trackTicket
         case .attended: .trackAttended

@@ -544,17 +544,27 @@ final class EventStore {
 
     /// The one badge a row wears, read from where the event stands.
     ///
-    /// An event in the library that has already happened is one the reader
-    /// went to — that is what putting it there means, and it is why there is
-    /// no attendance to record. Still to come, the ticket is the only thing
-    /// left that the library does not already say. An event nobody has kept is
-    /// untracked however its date reads, so a past search result does not
-    /// announce itself as attended.
+    /// The ticket decides it (``Tracking/hasTicket``: a lottery won or a
+    /// first-come round got): held, the event is ticketed until its day is
+    /// over and attended after (``hasAttended(_:)``). Without one, a kept
+    /// event is planned while it is ahead and has no ticket once it is past;
+    /// an event nobody has kept and nobody holds a ticket for is untracked
+    /// however its date reads.
     func status(for event: Event) -> TrackingStatus {
         let isKept = isInLibrary(event)
-        if isKept, !event.isUpcoming { return .attended }
-        if tracking(for: event).hasTicket { return .ticketed }
-        return isKept ? .planned : .untracked
+        if tracking(for: event).hasTicket { return event.isUpcoming ? .ticketed : .attended }
+        guard isKept else { return .untracked }
+        return event.isUpcoming ? .planned : .unticketed
+    }
+
+    /// Whether the reader went: a ticket in hand and the event's day over.
+    ///
+    /// The ticket is the one thing that says so. Keeping an event says the
+    /// reader means to go, not that they got in — the library's past is every
+    /// event they meant to go to, won or not — and an event they went to
+    /// without a round recorded is one whose win has not been written down.
+    func hasAttended(_ event: Event) -> Bool {
+        !event.isUpcoming && tracking(for: event).hasTicket
     }
 
     func isInLibrary(_ event: Event) -> Bool { entries[event.id]?.inLibrary == true }

@@ -76,14 +76,11 @@ struct TicketDetailsView: View {
         dismiss()
     }
 
-    /// Whether there is a ticket to say anything about.
-    ///
-    /// Not asked for a past event: the event happened, so the ticket existed.
-    /// Still to come, it is there once a lottery is won or a first-come round
-    /// got — the entries say it, and nothing else asks (``Tracking/hasTicket``).
-    private var hasTicket: Bool {
-        !event.isUpcoming || tracking.wrappedValue.hasTicket
-    }
+    /// Whether there is a ticket to say anything about: once a lottery is won
+    /// or a first-come round got — the entries say it, and nothing else asks
+    /// (``Tracking/hasTicket``). Past or ahead alike: an event over is not one
+    /// the reader went to until a round says they had a ticket.
+    private var hasTicket: Bool { tracking.wrappedValue.hasTicket }
 
     var body: some View {
         NavigationStack(path: $path) {

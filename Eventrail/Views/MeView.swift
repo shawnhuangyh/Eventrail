@@ -322,16 +322,16 @@ struct MeView: View {
     /// push as readily as the See All does.
     ///
     /// The three are the Passport's own numbers rather than the library's:
-    /// every one is counted over the events already been to, so a date still
-    /// ahead moves nothing here until it has passed, and the card says what
-    /// the screen behind it says.
+    /// every one is counted over the events already been to — a ticket held
+    /// and the date passed — so a date still ahead moves nothing here until it
+    /// has passed, and the card says what the screen behind it says.
     private var passportCard: some View {
         NavigationLink(value: PassportLink.passport) {
             VStack(alignment: .leading, spacing: 14) {
                 CardHeader(title: "Event Passport") { SeeAllLabel() }
 
                 HStack(spacing: 0) {
-                    let attended = library.attended
+                    let attended = library.filter(store.hasAttended)
                     passportTile(attended.count, tint: .trackInterest,
                                  label: "Events attended", isFirst: true)
                     passportTile(Set(attended.map(\.venue)).count, tint: .trackTicket,

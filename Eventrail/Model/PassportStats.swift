@@ -59,13 +59,15 @@ nonisolated enum PassportCadence: CaseIterable, Identifiable, Hashable {
 /// Everything the Passport says about one slice of the reader's past, worked
 /// out in one pass over it.
 ///
-/// **What counts is what the library already says.** An event the reader keeps
-/// once its date has gone by is one they went to — that is what keeping it
-/// means, and it is why ``Tracking`` has no attendance field for this to read.
-/// So the Passport is a reading of the library's own past and nothing else:
+/// **What counts is what the reader's record already says.** An event they
+/// went to is one they held a ticket for once its date had gone by
+/// (``EventStore/hasAttended(_:)``) — a lottery won or a first-come round got
+/// — which is why ``Tracking`` has no attendance field for this to read. So
+/// the Passport is a reading of the library's own past and nothing else:
 /// nothing here asks Eventernote anything, and nothing here is a second record
-/// the reader has to maintain. An event they did not go to is one they take
-/// out of My Events, which is the same gesture that has always meant that.
+/// the reader has to maintain. The lotteries are read over the whole of that
+/// past rather than only what was attended, since a round lost is as much a
+/// part of how they went as a round won.
 ///
 /// Computed rather than stored, and cheap enough to be: it is a handful of
 /// passes over a few hundred events, and storing it would mean keeping it in
@@ -368,7 +370,12 @@ nonisolated struct PassportStats {
     /// ticket was paid in another; a ticket the rates cannot convert is left
     /// out and counted in ``unconvertedTickets``. With no rates at all, a
     /// library kept in one currency still adds up in that one.
-    init(events attended: [Event], currency: String = Currencies.yen, rates: CurrencyRates? = nil,
+    ///
+    /// The lottery figures are counted over `applied` where it is given — the
+    /// whole of the slice's past, every event the reader tried for whether or
+    /// not they won — and over the attended events otherwise.
+    init(events attended: [Event], lotteriesOf applied: [Event]? = nil,
+         currency: String = Currencies.yen, rates: CurrencyRates? = nil,
          tracking: (Event) -> Tracking) {
         let events = attended.sorted { $0.sortDate > $1.sortDate }
         self.events = events
@@ -424,7 +431,8 @@ nonisolated struct PassportStats {
         var seats: [String: SeatTally] = [:]
         var namedWins = 0, firstChoiceWins = 0
         var hasRankedChoices = false
-        let lotteries = events.compactMap { event -> Lottery? in
+        let tried = applied.map { $0.sorted { $0.sortDate > $1.sortDate } } ?? events
+        let lotteries = tried.compactMap { event -> Lottery? in
             // A lottery round written down at all is an event the reader
             // applied for, as many times as its applications say — see
             // ``Tracking/lotteryApplications``. So these are the events every

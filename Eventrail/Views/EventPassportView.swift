@@ -71,8 +71,9 @@ nonisolated enum PassportExtreme: Identifiable, Hashable {
 /// The reader's own record of where they have been: a map of the country with
 /// every hall they have stood in, and what the library adds up to around it.
 ///
-/// Everything here is read off ``EventStore/attendedEvents`` — the library's
-/// own past — and nothing on this screen asks Eventernote anything. What the
+/// Everything here is read off the library's own past — what was attended
+/// in it (``EventStore/hasAttended(_:)``), and the lotteries over all of it —
+/// and nothing on this screen asks Eventernote anything. What the
 /// reader wrote themselves — the lotteries and the prices — says what it was
 /// counted out of rather than presenting a part-filled column as a total.
 ///
@@ -111,11 +112,17 @@ struct EventPassportView: View {
 
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
-    private var attended: [Event] { store.events(of: kept, where: \.inLibrary).attended }
+    /// Every kept event whose day is over, ticket or not — what the lottery
+    /// card is counted over.
+    private var past: [Event] { store.events(of: kept, where: \.inLibrary).past }
+
+    /// What the reader went to: the past they held a ticket for.
+    private var attended: [Event] { past.filter(store.hasAttended) }
 
     private var stats: PassportStats {
-        PassportStats(events: PassportStats.events(attended, in: scope), currency: currency,
-                      rates: ExchangeRates.shared.rates) {
+        PassportStats(events: PassportStats.events(attended, in: scope),
+                      lotteriesOf: PassportStats.events(past, in: scope),
+                      currency: currency, rates: ExchangeRates.shared.rates) {
             store.tracking(for: $0)
         }
     }
@@ -134,32 +141,34 @@ struct EventPassportView: View {
 
     var body: some View {
         ScrollView {
-            if attended.isEmpty {
-                emptyState
-            } else {
-                let stats = self.stats
-                VStack(spacing: 14) {
+            let stats = self.stats
+            VStack(spacing: 14) {
+                if attended.isEmpty {
+                    emptyState
+                } else {
                     summaryCard(stats)
                     PassportEventsCard(stats: stats)
                     timeCard(stats)
-                    if !stats.topLotteries.isEmpty {
-                        PassportLotteryCard(stats: stats, limit: Self.cardLimit) {
-                            isShowingLotteries = true
-                        } open: { openEvent = $0 }
-                    }
-                    if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
-                        PassportSpendingCard(
-                            stats: stats,
-                            currency: Binding(get: { currency }, set: { spendingCurrency = $0 }),
-                            defaultCurrency: defaultCurrency
-                        ) { openEvent = $0 }
-                    }
-                    if !stats.topPerformers.isEmpty { performersCard(stats) }
-                    if !stats.topVenues.isEmpty { venuesCard(stats) }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                // Under the empty state too: lotteries tried for and lost are
+                // the reader's record before any ticket is.
+                if !stats.topLotteries.isEmpty {
+                    PassportLotteryCard(stats: stats, limit: Self.cardLimit) {
+                        isShowingLotteries = true
+                    } open: { openEvent = $0 }
+                }
+                if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
+                    PassportSpendingCard(
+                        stats: stats,
+                        currency: Binding(get: { currency }, set: { spendingCurrency = $0 }),
+                        defaultCurrency: defaultCurrency
+                    ) { openEvent = $0 }
+                }
+                if !stats.topPerformers.isEmpty { performersCard(stats) }
+                if !stats.topVenues.isEmpty { venuesCard(stats) }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
         }
         .washBackground()
         .navigationTitle("Event Passport")
@@ -614,7 +623,7 @@ struct EventPassportView: View {
                 .foregroundStyle(.tertiary)
             Text("Nothing to stamp yet")
                 .font(.system(size: 17, weight: .bold))
-            Text("Add the events you have been to from My Events or from Search. Once their date has passed they are counted here.")
+            Text("Record your ticket for each event you go to — a lottery won or a seat got — in its Ticket Details. Once its date has passed it is counted here.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -623,8 +632,7 @@ struct EventPassportView: View {
         .padding(28)
         .frame(maxWidth: .infinity)
         .glassPanel(cornerRadius: 28)
-        .padding(.horizontal, 16)
-        .padding(.top, 40)
+        .padding(.top, 30)
     }
 
     // MARK: - Placing the halls
@@ -1004,7 +1012,8 @@ private struct PassportRankingSheet: View {
     /// Read here rather than handed in, for the reason the screen reads it:
     /// one slice, derived from the library, so nothing can be stale.
     private var stats: PassportStats {
-        PassportStats(events: PassportStats.events(store.events(of: kept, where: \.inLibrary).attended, in: ranking.scope)) {
+        PassportStats(events: PassportStats.events(store.events(of: kept, where: \.inLibrary).filter(store.hasAttended),
+                                                  in: ranking.scope)) {
             store.tracking(for: $0)
         }
     }

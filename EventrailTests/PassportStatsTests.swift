@@ -100,6 +100,23 @@ struct PassportStatsTests {
         #expect(stats.lotteryRounds.map(\.round) == ["最速先行抽選", "プレイガイド先行"])
     }
 
+    /// The Passport hands the attended events and the whole past apart: a
+    /// lottery lost on an event never attended still counts, and the event
+    /// itself does not.
+    @Test func countsLotteriesOverThePastItIsHanded() {
+        let lost = Fixtures.event(id: "lost", date: Fixtures.date(2025, 2, 1))
+        let won = Fixtures.event(id: "won", date: Fixtures.date(2025, 3, 1))
+        let records: [Event.ID: Tracking] = [
+            "lost": Tracking(lotteries: [LotteryEntry(applications: 3, result: .lost)]),
+            "won": Tracking(lotteries: [LotteryEntry(applications: 1, result: .won(nil))]),
+        ]
+        let stats = PassportStats(events: [won], lotteriesOf: [lost, won]) { records[$0.id] ?? Tracking() }
+        #expect(stats.totalEvents == 1)
+        #expect(stats.lotteryEntries == 4)
+        #expect(stats.lotteryTally == PassportStats.LotteryTally(won: 1, lost: 1, unknown: 0))
+        #expect(stats.topLotteries.map(\.event.id) == ["lost", "won"])
+    }
+
     /// Three lotteries won at the second try, one won at the first beside a
     /// seat got on general sale, a ticket from before entries, and a count
     /// carried over with no result.

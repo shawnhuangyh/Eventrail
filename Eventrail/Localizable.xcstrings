@@ -1653,28 +1653,6 @@
         }
       }
     },
-    "Add the events you have been to from My Events or from Search. Once their date has passed they are counted here." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "参加したイベントを「マイイベント」または「検索」から追加してください。開催日を過ぎると、ここに集計されます。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从“我的活动”或“搜索”添加你参加过的活动。活动日期过后，它们会被计入这里。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "從“我的活動”或“搜尋”新增你參加過的活動。活動日期過後，它們會被計入這裡。"
-          }
-        }
-      }
-    },
     "Add to Favorites" : {
       "localizations" : {
         "ja" : {
@@ -6608,6 +6586,28 @@
         }
       }
     },
+    "No Ticket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットなし"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無票"
+          }
+        }
+      }
+    },
     "No ticket yet" : {
       "localizations" : {
         "ja" : {
@@ -8012,6 +8012,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近"
+          }
+        }
+      }
+    },
+    "Record your ticket for each event you go to — a lottery won or a seat got — in its Ticket Details. Once its date has passed it is counted here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加するイベントごとに、当選した抽選や確保した席をチケット詳細に記録してください。開催日を過ぎると、ここに集計されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在每场要去的活动的“门票详情”里记下你的票——抽中的抽选或抢到的座位。活动日期过后，它会被计入这里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在每場要去的活動的「門票詳情」裡記下你的票——抽中的抽選或搶到的座位。活動日期過後，它會被計入這裡。"
           }
         }
       }

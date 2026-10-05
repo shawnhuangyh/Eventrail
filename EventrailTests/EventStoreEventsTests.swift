@@ -204,6 +204,39 @@ struct EventStoreEventsTests {
         #expect(store.tracking(for: event).isEmpty)
     }
 
+    /// Only a ticket says the reader went: a kept event whose day is over
+    /// is not attended until a round won or got is written on it.
+    @Test func attendedIsATicketAndTheDayOver() {
+        let store = store()
+        let past = Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))
+        let ahead = Fixtures.event(id: "2", date: Fixtures.date(2099, 6, 1))
+        store.toggleLibraryMembership(past)
+        store.toggleLibraryMembership(ahead)
+        #expect(!store.hasAttended(past))
+        #expect(store.status(for: past) == .unticketed)
+        #expect(store.status(for: ahead) == .planned)
+
+        let won = Tracking(lotteries: [LotteryEntry(applications: 2, result: .won(nil))])
+        store.setTracking(won, for: past)
+        store.setTracking(won, for: ahead)
+        #expect(store.hasAttended(past))
+        #expect(store.status(for: past) == .attended)
+        #expect(!store.hasAttended(ahead))
+        #expect(store.status(for: ahead) == .ticketed)
+
+        // A lottery lost is no ticket, past or not.
+        store.setTracking(Tracking(lotteries: [LotteryEntry(result: .lost)]), for: past)
+        #expect(!store.hasAttended(past))
+        #expect(store.status(for: past) == .unticketed)
+    }
+
+    /// Nobody kept it and nobody holds a ticket: nothing to say, however its
+    /// date reads.
+    @Test func aPastEventNobodyKeptIsUntracked() {
+        let store = store()
+        #expect(store.status(for: Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))) == .untracked)
+    }
+
     @Test func askingTwiceGivesTheSame() throws {
         let store = store()
         for id in ["1", "2", "3"] { store.toggleLibraryMembership(Fixtures.event(id: id)) }

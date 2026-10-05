@@ -416,8 +416,8 @@ struct PerformerView: View {
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
             StatTile(tint: .trackAttended,
-                     value: store.events(of: kept, where: \.inLibrary).attended.count { event in
-                         event.performers.contains { $0.name == link.name }
+                     value: store.events(of: kept, where: \.inLibrary).count { event in
+                         store.hasAttended(event) && event.performers.contains { $0.name == link.name }
                      }.formatted(),
                      label: "You attended")
             StatTile(tint: .trackTicket, value: feed.total.formatted(),
