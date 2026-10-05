@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Which of a run of past events the reader went to — offered at the head of
-/// My Events' Past once an import has brought in events with no ticket
-/// written down, and from the Passport while it has nothing to stamp.
+/// My Events' Past once an import has brought in events with nothing written
+/// on their Ticket Details (``EventStore/awaitsTicket(_:)``), and from the
+/// Passport while it has nothing to stamp.
 ///
 /// Only a ticket says the reader went (``EventStore/hasAttended(_:)``), and an
 /// account's history carries none, so a history imported whole is a Passport
@@ -139,8 +140,9 @@ struct TicketReviewList: Identifiable {
 }
 
 /// The row at the head of My Events' Past that offers ``TicketReviewView``:
-/// how many past events have arrived with no ticket since the reader last
-/// went through them, and a way to put the offer away until more do.
+/// how many past events have arrived with nothing written down since the
+/// reader last went through them, and a way to put the offer away until
+/// more do.
 struct TicketReviewPrompt: View {
     let count: Int
     let open: () -> Void

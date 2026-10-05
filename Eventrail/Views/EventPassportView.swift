@@ -628,9 +628,10 @@ struct EventPassportView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            // Every past event with none, not only what has come since the
-            // last pass: an empty Passport is the reader asking where it went.
-            let unticketed = past.filter { !store.tracking(for: $0).hasTicket }
+            // Every past event with nothing written down, not only what has
+            // come since the last pass: an empty Passport is the reader asking
+            // where it went.
+            let unticketed = past.filter(store.awaitsTicket)
             if !unticketed.isEmpty {
                 Button("Record Tickets") {
                     reviewing = TicketReviewList(events: unticketed)
