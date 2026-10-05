@@ -454,13 +454,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中 %lld 次"
+            "value" : "落选 %lld 次"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中 %lld 次"
+            "value" : "落選 %lld 次"
           }
         }
       }
@@ -608,13 +608,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中其他票种 %lld 次"
+            "value" : "中选其他票种 %lld 次"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中其他票種 %lld 次"
+            "value" : "中選其他票種 %lld 次"
           }
         }
       }
@@ -696,13 +696,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中 %lld 次"
+            "value" : "中选 %lld 次"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中 %lld 次"
+            "value" : "中選 %lld 次"
           }
         }
       }
@@ -938,13 +938,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld 场过去的活动没有记录门票"
+            "value" : "%lld 场已结束的活动没有记录门票"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld 場過去的活動沒有記錄門票"
+            "value" : "%lld 場已結束的活動沒有記錄門票"
           }
         }
       }
@@ -1730,13 +1730,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "添加到我的活动"
+            "value" : "加入行程"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新增到我的活動"
+            "value" : "加入行程"
           }
         }
       }
@@ -4503,13 +4503,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中 %2$lld 次，其中第一志愿 %1$lld 次"
+            "value" : "中选 %2$lld 次，其中第一志愿 %1$lld 次"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中 %2$lld 次，其中第一志願 %1$lld 次"
+            "value" : "中選 %2$lld 次，其中第一志願 %1$lld 次"
           }
         }
       }
@@ -5783,13 +5783,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中"
+            "value" : "落选"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中"
+            "value" : "落選"
           }
         }
       }
@@ -6201,13 +6201,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "我的活动"
+            "value" : "行程"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "我的活動"
+            "value" : "行程"
           }
         }
       }
@@ -6597,13 +6597,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有过去的活动"
+            "value" : "没有已结束的活动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "沒有過去的活動"
+            "value" : "沒有已結束的活動"
           }
         }
       }
@@ -6751,13 +6751,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有即将到来的活动"
+            "value" : "没有未开始的活动"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "沒有即將到來的活動"
+            "value" : "沒有未開始的活動"
           }
         }
       }
@@ -6949,13 +6949,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中"
+            "value" : "落选"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中"
+            "value" : "落選"
           }
         }
       }
@@ -7785,13 +7785,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "过去"
+            "value" : "已结束"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "過去"
+            "value" : "已結束"
           }
         }
       }
@@ -8203,13 +8203,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在每场要去的活动的“门票详情”里记下你的票——抽中的抽选或抢到的座位。活动日期过后，它会被计入这里。"
+            "value" : "在每场要去的活动的“门票详情”里记下你的票——中选的抽选或抢到的座位。活动日期过后，它会被计入这里。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在每場要去的活動的「門票詳情」裡記下你的票——抽中的抽選或搶到的座位。活動日期過後，它會被計入這裡。"
+            "value" : "在每場要去的活動的「門票詳情」裡記下你的票——中選的抽選或搶到的座位。活動日期過後，它會被計入這裡。"
           }
         }
       }
@@ -8511,13 +8511,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从我的活动中移除"
+            "value" : "从行程中移除"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "從我的活動中移除"
+            "value" : "從行程中移除"
           }
         }
       }
@@ -8864,13 +8864,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中所需轮数"
+            "value" : "中选所需轮数"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中所需輪數"
+            "value" : "中選所需輪數"
           }
         }
       }
@@ -11131,13 +11131,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "即将到来"
+            "value" : "未开始"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "即將到來"
+            "value" : "未開始"
           }
         }
       }
@@ -11725,13 +11725,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中"
+            "value" : "中选"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中"
+            "value" : "中選"
           }
         }
       }
@@ -11747,13 +11747,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中 %@"
+            "value" : "中选 %@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中 %@"
+            "value" : "中選 %@"
           }
         }
       }
@@ -11769,13 +11769,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@志愿抽中"
+            "value" : "%@志愿中选"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@志願抽中"
+            "value" : "%@志願中選"
           }
         }
       }
@@ -11791,13 +11791,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "结果公布后才能选择“抽中”或“未抽中”。"
+            "value" : "结果公布后才能选择“中选”或“落选”。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "結果公布後才能選擇「抽中」或「未抽中」。"
+            "value" : "結果公布後才能選擇「中選」或「落選」。"
           }
         }
       }
