@@ -198,6 +198,11 @@ struct PassportStatsTests {
         #expect(stats.seatEvents["A席"]?.map(\.outcomes) == [[.lost], [.otherSeat]])
         #expect(stats.seatEvents["一般席"]?.map(\.outcomes) == [[.lost], [.won]])
         #expect(stats.seatEvents["S席"]?.map(\.outcomes) == [[.lost], [.otherSeat], [.won]])
+        // Each class's dots run to the choice that asked for it, the choices
+        // before it as they went: A, asked second, carries S before it.
+        #expect(stats.seatEvents["S席"]?.map(\.choices) == [[[.lost]], [[.otherSeat]], [[.won]]])
+        #expect(stats.seatEvents["A席"]?.map(\.choices) == [[[.lost, .lost]], [[.lost, .otherSeat]]])
+        #expect(stats.seatEvents["一般席"]?.map(\.choices) == [[[.lost, .lost, .lost]], [[.lost, .lost, .won]]])
     }
 
     /// A round's dots are its choices: each before the one won lost, the one

@@ -1230,13 +1230,12 @@ private struct LotteryListRow: Identifiable {
         outcomes = lottery.choices.joined().map(LotteryOutcome.init)
     }
 
-    /// One of the events behind a row of By Round, marked choice by choice,
-    /// or of By Seat, marked by how each round went for that class.
-    init(_ counted: PassportStats.LotteryEvent, byChoice: Bool) {
+    /// One of the events behind a row of By Round or By Seat, marked choice
+    /// by choice as that row counts them.
+    init(_ counted: PassportStats.LotteryEvent) {
         event = counted.event
         entries = counted.entries
-        outcomes = byChoice ? counted.choices.joined().map(LotteryOutcome.init)
-                            : counted.outcomes.map(LotteryOutcome.init)
+        outcomes = counted.choices.joined().map(LotteryOutcome.init)
     }
 }
 
@@ -1244,10 +1243,11 @@ private struct LotteryListRow: Identifiable {
 /// drawn as `Eventrail v4.dc.html` draws them: filled, in the colours of the
 /// legend over them.
 ///
-/// Under Top Lottery Entries and By Round a dot is a choice — each choice
+/// A dot is a choice. Under Top Lottery Entries and By Round: each choice
 /// before the one won grey, the one won orange, nothing after it, so a seat
-/// won with the first choice is one orange dot. Under By Seat it is a round,
-/// by how it went for that class.
+/// won with the first choice is one orange dot. Under By Seat: every choice
+/// up to the one that asked for that class, the last in the colour of how
+/// it went for the class — orange, or tan where a lower one was won.
 private struct LotteryDots: View {
     let outcomes: [LotteryOutcome]
 
@@ -1363,11 +1363,11 @@ private struct PassportLotteryCard: View {
                                      eyebrow: Text("^[\(stats.topLotteries.count) event](inflect: true) recorded"),
                                      rows: stats.topLotteries.map(LotteryListRow.init))
             case .round(let round):
-                let rows = (stats.roundEvents[round] ?? []).map { LotteryListRow($0, byChoice: true) }
+                let rows = (stats.roundEvents[round] ?? []).map(LotteryListRow.init)
                 PassportLotterySheet(title: Self.roundName(round),
                                      eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
             case .seat(let seatClass):
-                let rows = (stats.seatEvents[seatClass] ?? []).map { LotteryListRow($0, byChoice: false) }
+                let rows = (stats.seatEvents[seatClass] ?? []).map(LotteryListRow.init)
                 PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
                                      eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
             }

@@ -313,7 +313,8 @@ nonisolated struct PassportStats {
     /// The events behind each of ``lotteryRounds`` and of ``lotterySeats``,
     /// newest first, by the round and by the class as written: each with only
     /// the rounds its row counted, so an event whose S seat was won higher
-    /// is not among A's.
+    /// is not among A's — marked choice by choice, by ``choiceMarks(of:)``
+    /// behind a round and ``seatMarks(of:for:outcome:)`` behind a class.
     let roundEvents: [String: [LotteryEvent]]
     let seatEvents: [String: [LotteryEvent]]
     /// The rounds won with a choice named, and how many of those were won
@@ -527,7 +528,8 @@ nonisolated struct PassportStats {
                     seats[seatClass, default: SeatTally(seatClass: seatClass)].count(outcome)
                     bySeat[seatClass, default: (0, [], [])].entries += entry.applications
                     bySeat[seatClass, default: (0, [], [])].outcomes.append(outcome)
-                    bySeat[seatClass, default: (0, [], [])].choices.append(Self.choiceMarks(of: entry))
+                    bySeat[seatClass, default: (0, [], [])].choices.append(
+                        Self.seatMarks(of: entry, for: seatClass, outcome: outcome))
                 }
             }
             for (round, row) in byRound {
@@ -615,6 +617,26 @@ nonisolated struct PassportStats {
         case .lost: return Array(repeating: .lost, count: tried)
         case .pending: return Array(repeating: .noResult, count: tried)
         }
+    }
+
+    /// How one lottery round went for one class of seat, choice by choice:
+    /// every choice up to the one that asked for it — the one won with it,
+    /// where it was, and otherwise the last that named it — so a class asked
+    /// for second carries how the first went before it. The choices before
+    /// it as they went, and its own as By Seat counts it: won, other seat,
+    /// lost or no result.
+    static func seatMarks(of entry: LotteryEntry, for seatClass: String,
+                          outcome: RoundOutcome) -> [RoundOutcome] {
+        let wonID: LotteryChoice.ID? = if case .won(let id) = entry.outcome { id } else { nil }
+        let wonHere = entry.choices.firstIndex { $0.id == wonID && trimmed($0.seatClass) == seatClass }
+        guard let own = wonHere ?? entry.choices.lastIndex(where: { trimmed($0.seatClass) == seatClass })
+        else { return [outcome] }
+        let before = entry.choices.prefix(own).map { choice -> RoundOutcome in
+            if choice.id == wonID { return .won }
+            if case .pending = entry.outcome { return .noResult }
+            return .lost
+        }
+        return before + [outcome]
     }
 
     /// Whether the choice a round was won with stands above `asked`, another
