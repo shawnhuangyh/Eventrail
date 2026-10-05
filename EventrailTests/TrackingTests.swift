@@ -275,6 +275,28 @@ struct TrackingTests {
         #expect(!Tracking(seat: "A12", cost: 9900).hasTicket)
     }
 
+    /// Recording a ticket held adds one entry with no round and no
+    /// applications — attended, and no lottery figure moved — and nothing
+    /// where a ticket is already there.
+    @Test func recordingATicketAddsOneThatMovesNoLotteryFigure() {
+        var tracking = Tracking(lotteries: [LotteryEntry(applications: 3, result: .lost)])
+        tracking.recordTicket()
+        #expect(tracking.hasTicket)
+        #expect(tracking.lotteries.count == 2)
+        #expect(tracking.lotteryApplications == 3)
+        #expect(tracking.lotteryRounds.count == 1)
+
+        let held = tracking
+        tracking.recordTicket()
+        #expect(tracking == held)
+
+        // The same entry taken to a loss since is won again, not added twice.
+        var lost = Tracking(lotteries: [LotteryEntry.ticketHeld])
+        lost.lotteries[0].result = .lost
+        lost.recordTicket()
+        #expect(lost.lotteries == [LotteryEntry.ticketHeld])
+    }
+
     @Test func theNextResultsAreTheSoonestStillToCome() {
         let now = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 4, hour: 12))!
         func day(_ d: Int) -> CalendarDay { CalendarDay(year: 2026, month: 10, day: d) }

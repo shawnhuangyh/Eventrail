@@ -100,6 +100,8 @@ struct EventPassportView: View {
     /// What the spending card adds up in, unless the reader picked another on
     /// the card — see ``Currencies/storageKey``.
     @AppStorage(Currencies.storageKey) private var defaultCurrency = Currencies.yen
+    /// What ``TicketReviewView`` is going through, while it is open.
+    @State private var reviewing: TicketReviewList?
     /// The currency picked on the spending card; nil follows Settings.
     /// Deliberately not remembered between visits, for the reason
     /// ``PassportScope`` is not.
@@ -206,6 +208,7 @@ struct EventPassportView: View {
         .sheet(isPresented: $isShowingLotteries) {
             PassportLotterySheet(rows: stats.topLotteries)
         }
+        .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
         // An event named on this screen opens the same sheet every list in
         // the app ends in.
         .eventSheet($openEvent)
@@ -628,6 +631,17 @@ struct EventPassportView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+            // Every past event with none, not only what has come since the
+            // last pass: an empty Passport is the reader asking where it went.
+            let unticketed = past.filter { !store.tracking(for: $0).hasTicket }
+            if !unticketed.isEmpty {
+                Button("Record Tickets") {
+                    reviewing = TicketReviewList(events: unticketed)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Color.brandTint)
+                .padding(.top, 6)
+            }
         }
         .padding(28)
         .frame(maxWidth: .infinity)

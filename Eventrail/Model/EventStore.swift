@@ -567,6 +567,20 @@ final class EventStore {
         !event.isUpcoming && tracking(for: event).hasTicket
     }
 
+    /// The past events here with no ticket written down that joined the
+    /// library, or whose day ended, after `reviewed` — what My Events offers
+    /// to go through once an import has brought them in (``TicketReviewView``).
+    ///
+    /// Read cheapest first: past every review but the first, the dates leave
+    /// almost nothing for the record to be read for.
+    func awaitingTickets(_ events: some Sequence<Event>, since reviewed: Date) -> [Event] {
+        events.filter { event in
+            guard !event.isUpcoming else { return false }
+            let added = entries[event.id]?.changed(.inLibrary) ?? .distantPast
+            return max(added, event.dayEnds) > reviewed && !tracking(for: event).hasTicket
+        }
+    }
+
     func isInLibrary(_ event: Event) -> Bool { entries[event.id]?.inLibrary == true }
 
     func isFavorite(_ event: Event) -> Bool { entries[event.id]?.isFavorite == true }
@@ -591,6 +605,20 @@ final class EventStore {
 
     func setTracking(_ tracking: Tracking, for event: Event) {
         edit(event) { $0.tracking = tracking }
+        save()
+    }
+
+    /// Writes down a ticket held for each of these that has none, its round
+    /// left unwritten (``Tracking/recordTicket()``) — the reader saying they
+    /// went to the lot, from My Events or from ``TicketReviewView``. One save
+    /// for all of them.
+    func recordTickets(for events: some Sequence<Event>) {
+        for event in events {
+            var record = tracking(for: event)
+            guard !record.hasTicket else { continue }
+            record.recordTicket()
+            edit(event) { $0.tracking = record }
+        }
         save()
     }
 

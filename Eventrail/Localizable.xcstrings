@@ -927,6 +927,28 @@
         }
       }
     },
+    "^[%lld past event](inflect: true) without a ticket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケット未記録の過去のイベント %lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 场过去的活动没有记录门票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 場過去的活動沒有記錄門票"
+          }
+        }
+      }
+    },
     "^[%lld performer](inflect: true)" : {
       "localizations" : {
         "ja" : {
@@ -3343,6 +3365,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每個活動都會以正確的日期和場館寫入日曆，並在開場時提醒你。"
+          }
+        }
+      }
+    },
+    "Each one picked counts as attended. Its round can be filled in later from the event's Ticket Details." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだイベントは参加済みとして数えられます。どの抽選・販売で取ったかは、あとからイベントのチケット詳細で記入できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选中的活动会计为已参加。是哪一轮抽选或发售拿到的票，之后可以在活动的“门票详情”里补充。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選中的活動會計為已參加。是哪一輪抽選或發售拿到的票，之後可以在活動的「門票詳情」裡補充。"
           }
         }
       }
@@ -5882,6 +5926,28 @@
         }
       }
     },
+    "Mark as Attended" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加済みにする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已参加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標示為已參加"
+          }
+        }
+      }
+    },
     "Mark as Read" : {
       "localizations" : {
         "ja" : {
@@ -6740,6 +6806,28 @@
         }
       }
     },
+    "Not Now" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今はしない"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以后再说"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以後再說"
+          }
+        }
+      }
+    },
     "Not on Eventernote" : {
       "localizations" : {
         "ja" : {
@@ -7400,6 +7488,28 @@
         }
       }
     },
+    "Opens the list to record tickets" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットを記録するリストを開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开列表以记录门票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開列表以記錄門票"
+          }
+        }
+      }
+    },
     "Opens the performer" : {
       "localizations" : {
         "ja" : {
@@ -7796,6 +7906,28 @@
         }
       }
     },
+    "Pick the ones you went to" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加したものを選んでください"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选出你去过的场次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選出你去過的場次"
+          }
+        }
+      }
+    },
     "Pick up where you left off" : {
       "localizations" : {
         "ja" : {
@@ -8012,6 +8144,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近"
+          }
+        }
+      }
+    },
+    "Record Tickets" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットを記録"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记录门票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記錄門票"
           }
         }
       }
@@ -11468,6 +11622,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間"
+          }
+        }
+      }
+    },
+    "Which of these did you go to?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このうち参加したイベントは？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其中哪些你去过？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其中哪些你去過？"
           }
         }
       }

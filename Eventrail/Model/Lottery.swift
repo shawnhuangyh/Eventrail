@@ -251,6 +251,17 @@ nonisolated extension LotteryEntry {
     /// The id of the entry a ticket held before entries stands for, where no
     /// entry carried over could take it — see ``Tracking/foldLegacyTicket()``.
     static let carriedOverTicketID = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+
+    /// A ticket held with nothing else known: no round and no applications,
+    /// so it counts in no lottery figure. What a ticket from before entries
+    /// is folded into, and what the reader records for an event they went to
+    /// without saying how the seat was got (``Tracking/recordTicket()``).
+    ///
+    /// Its id is fixed, so two devices recording the same event write the
+    /// same list rather than two answers to settle between.
+    static var ticketHeld: LotteryEntry {
+        LotteryEntry(id: carriedOverTicketID, applications: 0, result: .won(nil))
+    }
 }
 
 nonisolated extension Tracking {
@@ -336,6 +347,19 @@ nonisolated extension Tracking {
         }
     }
 
+    /// Writes down a ticket held where there is none — the reader saying they
+    /// went, with the round left for the ticket sheet (``LotteryEntry/ticketHeld``).
+    /// Where that entry is already here and was since marked otherwise, it is
+    /// won again rather than added twice.
+    mutating func recordTicket() {
+        guard !hasTicket else { return }
+        if let held = lotteries.firstIndex(where: { $0.id == LotteryEntry.carriedOverTicketID }) {
+            lotteries[held].result = .won(nil)
+        } else {
+            lotteries.append(.ticketHeld)
+        }
+    }
+
     /// A ticket an older record says the reader held, said the way the
     /// entries say it now: the entry carried over from a lottery count won,
     /// where it is still waiting — "applied that many times, and got one" —
@@ -355,8 +379,7 @@ nonisolated extension Tracking {
             }) {
                 lotteries[carried].result = .won(nil)
             } else {
-                lotteries.append(LotteryEntry(id: LotteryEntry.carriedOverTicketID, applications: 0,
-                                              result: .won(nil)))
+                lotteries.append(.ticketHeld)
             }
         }
         // The list now holds both answers, so it is as old as the newer of

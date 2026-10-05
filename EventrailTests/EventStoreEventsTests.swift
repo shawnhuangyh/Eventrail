@@ -237,6 +237,40 @@ struct EventStoreEventsTests {
         #expect(store.status(for: Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))) == .untracked)
     }
 
+    /// A run of past events marked at once: each without a ticket gains one,
+    /// and one already won keeps its own record as it was.
+    @Test func recordingTicketsLeavesOnesAlreadyHeld() {
+        let store = store()
+        let first = Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))
+        let second = Fixtures.event(id: "2", date: Fixtures.date(2025, 7, 1))
+        store.toggleLibraryMembership(first)
+        store.toggleLibraryMembership(second)
+        let won = Tracking(lotteries: [LotteryEntry(round: "最速先行抽選", applications: 2, result: .won(nil))])
+        store.setTracking(won, for: second)
+
+        store.recordTickets(for: [first, second])
+        #expect(store.hasAttended(first))
+        #expect(store.tracking(for: first).lotteries == [LotteryEntry.ticketHeld])
+        #expect(store.tracking(for: second).lotteries == won.lotteries)
+    }
+
+    /// What My Events offers to go through: past, kept, no ticket, and
+    /// arrived since the last pass — not before it, and not once ticketed.
+    @Test func eventsAwaitTicketsOnlySinceTheLastPass() {
+        let store = store()
+        let past = Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))
+        let ahead = Fixtures.event(id: "2", date: Fixtures.date(2099, 6, 1))
+        let before = Date.now.addingTimeInterval(-60)
+        store.toggleLibraryMembership(past)
+        store.toggleLibraryMembership(ahead)
+
+        #expect(store.awaitingTickets([past, ahead], since: before).map(\.id) == ["1"])
+        #expect(store.awaitingTickets([past, ahead], since: .now.addingTimeInterval(60)).isEmpty)
+
+        store.recordTickets(for: [past])
+        #expect(store.awaitingTickets([past, ahead], since: before).isEmpty)
+    }
+
     @Test func askingTwiceGivesTheSame() throws {
         let store = store()
         for id in ["1", "2", "3"] { store.toggleLibraryMembership(Fixtures.event(id: id)) }
