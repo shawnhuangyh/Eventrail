@@ -1213,6 +1213,28 @@
         }
       }
     },
+    "^[%lld timed event](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間の分かるイベント%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 场有时长记录的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 場有時長記錄的活動"
+          }
+        }
+      }
+    },
     "^[%lld upcoming event](inflect: true)" : {
       "localizations" : {
         "ja" : {
@@ -10742,28 +10764,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "東京及周邊六縣"
-          }
-        }
-      }
-    },
-    "Top ^[%lld event](inflect: true)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上位%lldイベント"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "前 %lld 场活动"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "前 %lld 場活動"
           }
         }
       }

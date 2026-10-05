@@ -52,8 +52,7 @@ struct PassportStatsTests {
     @Test func measuresOnlyEventsWithBothEnds() {
         #expect(stats.timedEvents == 2)
         #expect(stats.totalDuration == 5 * 3600)
-        #expect(stats.shortest.map(\.event.id) == ["b"])
-        #expect(stats.longest.map(\.event.id) == ["a"])
+        #expect(stats.spans.map(\.event.id) == ["b", "a"])
     }
 
     @Test func ranksPerformersOncePerEvent() {
@@ -408,7 +407,7 @@ struct PassportStatsTests {
         let stats = PassportStats(events: events) { _ in Tracking() }
         #expect(stats.timedEvents == 1)
         #expect(stats.totalDuration == 7 * 3600)
-        #expect(stats.longest.map(\.event.id) == ["allnight"])
+        #expect(stats.spans.map(\.event.id) == ["allnight"])
     }
 
     /// Events of equal length keep one order: by the date, then the id.
@@ -419,7 +418,6 @@ struct PassportStatsTests {
                            endsAt: Fixtures.date(2024, 1, 1 + index, 20, 0))
         }
         let stats = PassportStats(events: events) { _ in Tracking() }
-        #expect(stats.shortest.map(\.event.id) == ["x", "w"])
-        #expect(stats.longest.map(\.event.id) == ["u", "v"])
+        #expect(stats.spans.map(\.event.id) == ["x", "w", "v", "u"])
     }
 }
