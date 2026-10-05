@@ -1434,7 +1434,7 @@ private struct PassportLotteryCard: View {
                     rate: seat.winRate,
                     parts: [(.won, seat.won), (.otherSeat, seat.otherSeat), (.lost, seat.lost),
                             (.unknown, seat.unknown)],
-                    badge: SeatBadge(style: style).centredOnLine(of: SeatBadge.nameFont)
+                    badge: SeatBadge(style: style)
                 ) {
                     style.label
                         .font(Font(SeatBadge.nameFont))
@@ -1607,9 +1607,10 @@ private struct LotteryTallyRow<Badge: View, Name: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // On the name's line rather than centred on the two, as the
-            // spending card sets its badges.
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            // Centred on the name and the line under it, which it heads
+            // together. The spending card sets its badge on the name's line
+            // alone, since there the next line comes after the bar.
+            HStack(spacing: 8) {
                 badge
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
