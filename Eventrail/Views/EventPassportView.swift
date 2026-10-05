@@ -1421,14 +1421,20 @@ private struct PassportLotteryCard: View {
                 }
                 .padding(.top, 4)
             }
+            // Badged and named as the spending card's classes are, from the
+            // same styles, so an S seat is the same red letter on both.
+            let styles = SeatStyle.styles(for: stats)
             ForEach(stats.lotterySeats) { seat in
+                let style = styles[seat.seatClass]
                 LotteryTallyRow(
                     rate: seat.winRate,
                     parts: [(.won, seat.won), (.otherSeat, seat.otherSeat), (.lost, seat.lost),
                             (.unknown, seat.unknown)],
-                    badge: LotterySeatBadge(seatClass: seat.seatClass)
+                    badge: SeatBadge(style: style).centredOnLine(of: SeatBadge.nameFont)
                 ) {
-                    LotterySeatName(seatClass: seat.seatClass)
+                    style.label
+                        .font(Font(SeatBadge.nameFont))
+                        .lineLimit(1)
                 } line: {
                     LotteryLine.join([
                         Text("^[\(seat.rounds) round](inflect: true)"),
@@ -1597,7 +1603,9 @@ private struct LotteryTallyRow<Badge: View, Name: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
+            // On the name's line rather than centred on the two, as the
+            // spending card sets its badges.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 badge
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -1622,53 +1630,6 @@ extension LotteryTallyRow where Badge == EmptyView {
     init(rate: Double?, parts: [(LotteryOutcome, Int)],
          @ViewBuilder name: () -> Name, line: () -> Text) {
         self.init(rate: rate, parts: parts, badge: EmptyView(), name: name, line: line)
-    }
-}
-
-/// A class of seat as the reader reads it, and as the ticket prints it beside
-/// that where the two differ — S Seat S席 in English, S席 alone in Japanese.
-private struct LotterySeatName: View {
-    let seatClass: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            if let listed = SeatClass(rawValue: seatClass) {
-                Text(listed.label)
-                    .font(.system(size: 13.5, weight: .semibold))
-                if listed.name != seatClass {
-                    Text(verbatim: seatClass)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.tertiary)
-                }
-            } else {
-                Text(verbatim: seatClass)
-                    .font(.system(size: 13.5, weight: .semibold))
-            }
-        }
-        .lineLimit(1)
-    }
-}
-
-/// A class of seat's letter on a square of the ticket's orange.
-private struct LotterySeatBadge: View {
-    let seatClass: String
-
-    var body: some View {
-        Group {
-            if let listed = SeatClass(rawValue: seatClass) {
-                listed.badge
-            } else {
-                Text(verbatim: seatClass.prefix(1).uppercased())
-            }
-        }
-        .font(.system(size: 13, weight: .bold))
-        .foregroundStyle(Color.trackTicket)
-        .lineLimit(1)
-        .minimumScaleFactor(0.6)
-        .padding(.horizontal, 2)
-        .frame(width: 28, height: 28)
-        .background(Color.trackTicket.opacity(0.12), in: .rect(cornerRadius: 9))
-        .accessibilityHidden(true)
     }
 }
 
@@ -1759,7 +1720,7 @@ private struct PassportSpendingCard: View {
     }
 
     var body: some View {
-        let styles = SeatStyle.styles(for: stats.ticketTypes)
+        let styles = SeatStyle.styles(for: stats)
         VStack(alignment: .leading, spacing: 14) {
             CardHeader(title: "Ticket Spending", caption: caption) { currencyMenu }
 
@@ -2159,23 +2120,27 @@ private struct SeatStyle {
                                        badge: Text(verbatim: "–"),
                                        color: Color(.systemGray2))
 
-    /// A style for every class in the slice.
+    /// A style for every class in the slice — the spending card's and the
+    /// lottery card's alike, so the two draw a class the same way.
     ///
     /// The three classes the ticket sheet offers keep one colour each whatever
     /// the year, so an S seat is the same red on every slice. A class the
     /// reader typed is named as typed, badged with its first letter, and given
-    /// the next of the spare colours in the order the card lists it.
-    static func styles(for types: [PassportStats.TicketType]) -> SeatStyles {
+    /// the next of the spare colours: the spending card's classes in the order
+    /// it lists them first, so its colours do not move for the lottery card's,
+    /// and then the classes only a lottery asked for.
+    static func styles(for stats: PassportStats) -> SeatStyles {
         var styles: [String: SeatStyle] = [:]
         var spare = 0
-        for type in types where !type.seatClass.isEmpty {
-            if let listed = SeatClass(rawValue: type.seatClass) {
-                styles[type.seatClass] = SeatStyle(label: Text(listed.label), badge: listed.badge,
-                                                   color: color(of: listed))
+        let classes = stats.ticketTypes.map(\.seatClass) + stats.lotterySeats.map(\.seatClass)
+        for seatClass in classes where !seatClass.isEmpty && styles[seatClass] == nil {
+            if let listed = SeatClass(rawValue: seatClass) {
+                styles[seatClass] = SeatStyle(label: Text(listed.label), badge: listed.badge,
+                                              color: color(of: listed))
             } else {
-                styles[type.seatClass] = SeatStyle(
-                    label: Text(verbatim: type.seatClass),
-                    badge: Text(verbatim: type.seatClass.prefix(1).uppercased()),
+                styles[seatClass] = SeatStyle(
+                    label: Text(verbatim: seatClass),
+                    badge: Text(verbatim: seatClass.prefix(1).uppercased()),
                     color: spareColors[spare % spareColors.count])
                 spare += 1
             }
@@ -2204,6 +2169,9 @@ private struct SeatStyles {
 /// A class of seat's badge: its letter on its colour.
 private struct SeatBadge: View {
     let style: SeatStyle
+
+    /// The name it stands beside, whose line it is centred on.
+    static let nameFont = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
 
     var body: some View {
         style.badge
@@ -2265,17 +2233,15 @@ private struct PassportTicketTypeRow: View {
     /// Whether the range as it was paid is open over the row.
     @State private var isShowingPaidRange = false
 
-    private static let nameFont = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // The name, the count and the share on one baseline, as a ranking
             // row sets them; the badge centred on their line beside them.
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 SeatBadge(style: style)
-                    .centredOnLine(of: Self.nameFont)
+                    .centredOnLine(of: SeatBadge.nameFont)
                 style.label
-                    .font(Font(Self.nameFont))
+                    .font(Font(SeatBadge.nameFont))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(type.count.formatted())
