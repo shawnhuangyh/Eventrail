@@ -10394,28 +10394,6 @@
         }
       }
     },
-    "Ticket Prices" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "チケット価格"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "门票价格"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "門票價格"
-          }
-        }
-      }
-    },
     "Ticket Spending" : {
       "localizations" : {
         "ja" : {
