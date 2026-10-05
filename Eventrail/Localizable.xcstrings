@@ -4603,6 +4603,28 @@
         }
       }
     },
+    "Followed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォロー中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关注"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已關注"
+          }
+        }
+      }
+    },
     "Following" : {
       "localizations" : {
         "ja" : {

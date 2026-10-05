@@ -1,6 +1,7 @@
 import SwiftUI
 import Photos
 import QuickLook
+import SwiftData
 import Translation
 
 /// One event: what Eventernote publishes about it, and what the reader records
@@ -28,6 +29,9 @@ struct EventDetailView: View {
     @State private var clockChoice: TimeDisplay?
     @Namespace private var clockSwitchSpace
     @Environment(\.colorScheme) private var colorScheme
+    /// Who the reader follows, so the Performers card can say which of the
+    /// billed names are theirs — see ``isFollowed(_:)``.
+    @Query(FollowedPerformer.followed) private var followedRows: [FollowedPerformer]
 
     private let source: Event
     @State private var isImporting = false
@@ -1563,9 +1567,18 @@ struct EventDetailView: View {
                 ForEach(event.performers) { performer in
                     NavigationLink(value: PerformerLink.billed(name: performer.name)) {
                         HStack(spacing: 12) {
-                            Text(performer.name)
-                                .font(.system(size: 14, weight: .semibold))
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(performer.name)
+                                    .font(.system(size: 14, weight: .semibold))
+
+                                if isFollowed(performer) {
+                                    Image(systemName: "person.fill.checkmark")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color.trackAttended)
+                                        .accessibilityLabel("Followed")
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 11, weight: .semibold))
@@ -1583,6 +1596,16 @@ struct EventDetailView: View {
         .padding(18)
         .glassPanel(cornerRadius: 28)
         .padding(.horizontal, 18)
+    }
+
+    /// Whether a billed name is somebody the reader follows: the same actor
+    /// where the page linked one, or else the same name exactly — the rule
+    /// opening the row looks the name up by, so the mark is never on a row
+    /// that would open somebody else.
+    private func isFollowed(_ performer: Performer) -> Bool {
+        followedRows.contains { row in
+            if let actorID = performer.actorID { row.actorID == actorID } else { row.name == performer.name }
+        }
     }
 
     // MARK: - Venue
