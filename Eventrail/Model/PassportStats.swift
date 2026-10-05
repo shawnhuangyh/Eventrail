@@ -115,9 +115,11 @@ nonisolated struct PassportStats {
         let event: Event
         /// The applications over its lottery rounds.
         let entries: Int
-        /// How each lottery round went, in the order the sale ran them — a
-        /// dot each on the card.
+        /// How each lottery round went, in the order the sale ran them.
         let outcomes: [LotteryResult]
+        /// The same rounds choice by choice, for the dots on the card
+        /// (``PassportStats/choiceMarks(of:)``).
+        let choices: [[RoundOutcome]]
 
         var id: Event.ID { event.id }
 
@@ -177,6 +179,8 @@ nonisolated struct PassportStats {
         let event: Event
         let entries: Int
         let outcomes: [RoundOutcome]
+        /// The same rounds choice by choice (``PassportStats/choiceMarks(of:)``).
+        let choices: [[RoundOutcome]]
 
         var id: Event.ID { event.id }
     }
@@ -489,13 +493,14 @@ nonisolated struct PassportStats {
             guard !entries.isEmpty else { return nil }
             // What this event adds to each row's list, by the round and by
             // the class: the applications and each round's outcome.
-            var byRound: [String: (entries: Int, outcomes: [RoundOutcome])] = [:]
-            var bySeat: [String: (entries: Int, outcomes: [RoundOutcome])] = [:]
+            var byRound: [String: (entries: Int, outcomes: [RoundOutcome], choices: [[RoundOutcome]])] = [:]
+            var bySeat: [String: (entries: Int, outcomes: [RoundOutcome], choices: [[RoundOutcome]])] = [:]
             for entry in entries {
                 lotteryTally.count(entry.outcome)
                 rounds[entry.round, default: LotteryTally()].count(entry.outcome)
-                byRound[entry.round, default: (0, [])].entries += entry.applications
-                byRound[entry.round, default: (0, [])].outcomes.append(RoundOutcome(entry.outcome))
+                byRound[entry.round, default: (0, [], [])].entries += entry.applications
+                byRound[entry.round, default: (0, [], [])].outcomes.append(RoundOutcome(entry.outcome))
+                byRound[entry.round, default: (0, [], [])].choices.append(Self.choiceMarks(of: entry))
                 hasRankedChoices = hasRankedChoices || entry.choices.count > 1
                 let won = entry.wonChoice
                 if let won {
@@ -520,20 +525,21 @@ nonisolated struct PassportStats {
                     case .pending: outcome = .noResult
                     }
                     seats[seatClass, default: SeatTally(seatClass: seatClass)].count(outcome)
-                    bySeat[seatClass, default: (0, [])].entries += entry.applications
-                    bySeat[seatClass, default: (0, [])].outcomes.append(outcome)
+                    bySeat[seatClass, default: (0, [], [])].entries += entry.applications
+                    bySeat[seatClass, default: (0, [], [])].outcomes.append(outcome)
+                    bySeat[seatClass, default: (0, [], [])].choices.append(Self.choiceMarks(of: entry))
                 }
             }
             for (round, row) in byRound {
                 roundEvents[round, default: []].append(
-                    LotteryEvent(event: event, entries: row.entries, outcomes: row.outcomes))
+                    LotteryEvent(event: event, entries: row.entries, outcomes: row.outcomes, choices: row.choices))
             }
             for (seatClass, row) in bySeat {
                 seatEvents[seatClass, default: []].append(
-                    LotteryEvent(event: event, entries: row.entries, outcomes: row.outcomes))
+                    LotteryEvent(event: event, entries: row.entries, outcomes: row.outcomes, choices: row.choices))
             }
             return Lottery(event: event, entries: entries.reduce(0) { $0 + $1.applications },
-                           outcomes: entries.map(\.outcome))
+                           outcomes: entries.map(\.outcome), choices: entries.map(Self.choiceMarks(of:)))
         }
         topLotteries = lotteries.sorted {
             $0.entries == $1.entries ? $0.event.sortDate > $1.event.sortDate : $0.entries > $1.entries
@@ -592,6 +598,23 @@ nonisolated struct PassportStats {
 
     private static func trimmed(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// How one lottery round went choice by choice, in the order the reader
+    /// ranked them: every choice lost where the round was, each choice before
+    /// the one won lost and that one won — nothing after it, so a round won
+    /// with its first choice is one mark — and every choice without a result
+    /// where none was written. A round naming no choice, or won with none
+    /// named, is one mark for the round.
+    static func choiceMarks(of entry: LotteryEntry) -> [RoundOutcome] {
+        let tried = max(1, entry.choices.count)
+        switch entry.outcome {
+        case .won(let id):
+            guard let id, let index = entry.choices.firstIndex(where: { $0.id == id }) else { return [.won] }
+            return Array(repeating: .lost, count: index) + [.won]
+        case .lost: return Array(repeating: .lost, count: tried)
+        case .pending: return Array(repeating: .noResult, count: tried)
+        }
     }
 
     /// Whether the choice a round was won with stands above `asked`, another

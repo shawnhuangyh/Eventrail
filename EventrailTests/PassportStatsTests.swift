@@ -200,6 +200,21 @@ struct PassportStatsTests {
         #expect(stats.seatEvents["S席"]?.map(\.outcomes) == [[.lost], [.otherSeat], [.won]])
     }
 
+    /// A round's dots are its choices: each before the one won lost, the one
+    /// won, and nothing after it; every choice where it was lost or has no
+    /// result; and one for a round with no choice, or won with none named.
+    @Test func marksARoundChoiceByChoice() {
+        let s = LotteryChoice(seatClass: "S席"), a = LotteryChoice(seatClass: "A席"),
+            general = LotteryChoice(seatClass: "一般席")
+        func marks(_ entry: LotteryEntry) -> [PassportStats.RoundOutcome] { PassportStats.choiceMarks(of: entry) }
+        #expect(marks(LotteryEntry(choices: [s, a, general], result: .won(general.id))) == [.lost, .lost, .won])
+        #expect(marks(LotteryEntry(choices: [s, a, general], result: .won(s.id))) == [.won])
+        #expect(marks(LotteryEntry(choices: [s, a, general], result: .lost)) == [.lost, .lost, .lost])
+        #expect(marks(LotteryEntry(choices: [s, a])) == [.noResult, .noResult])
+        #expect(marks(LotteryEntry(applications: 3)) == [.noResult])
+        #expect(marks(LotteryEntry(choices: [s, a], result: .won(nil))) == [.won])
+    }
+
     /// Classes the chips do not offer have no tier, so the order the round
     /// ranked them in stands for one.
     @Test func typedClassesAreRankedByTheRoundsChoices() {
