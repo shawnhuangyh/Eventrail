@@ -1608,8 +1608,7 @@ private struct LotteryTallyRow<Badge: View, Name: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Centred on the name and the line under it, which it heads
-            // together. The spending card sets its badge on the name's line
-            // alone, since there the next line comes after the bar.
+            // together, as the spending card centres its own.
             HStack(spacing: 8) {
                 badge
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -2175,7 +2174,7 @@ private struct SeatStyles {
 private struct SeatBadge: View {
     let style: SeatStyle
 
-    /// The name it stands beside, whose line it is centred on.
+    /// The name it stands beside.
     static let nameFont = UIFont.systemFont(ofSize: 13.5, weight: .semibold)
 
     var body: some View {
@@ -2239,12 +2238,21 @@ private struct PassportTicketTypeRow: View {
     @State private var isShowingPaidRange = false
 
     var body: some View {
+        // The badge centred on everything it heads — the name, the spread
+        // and the average — as the lottery card centres its own on the two
+        // lines beside it.
+        HStack(spacing: 8) {
+            SeatBadge(style: style)
+            details
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var details: some View {
         VStack(alignment: .leading, spacing: 8) {
             // The name, the count and the share on one baseline, as a ranking
-            // row sets them; the badge centred on their line beside them.
+            // row sets them.
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                SeatBadge(style: style)
-                    .centredOnLine(of: SeatBadge.nameFont)
                 style.label
                     .font(Font(SeatBadge.nameFont))
                     .lineLimit(1)
@@ -2262,7 +2270,6 @@ private struct PassportTicketTypeRow: View {
 
             if let axis {
                 PassportPriceRange(type: type, axis: axis, color: style.color)
-                    .padding(.leading, 30)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -2283,9 +2290,7 @@ private struct PassportTicketTypeRow: View {
             .monospacedDigit()
             .foregroundStyle(.secondary)
             .lineLimit(1)
-            .padding(.leading, 30)
         }
-        .accessibilityElement(children: .combine)
     }
 
     private var range: String { "\(money(type.lowest))–\(money(type.highest))" }
