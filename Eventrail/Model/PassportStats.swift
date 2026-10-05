@@ -167,15 +167,19 @@ nonisolated struct PassportStats {
 
     /// One class of seat, over every lottery round that asked for it.
     ///
-    /// A round won in another class it asked for is no win for this one:
-    /// the win rate is the wins *in this class* out of the drawn rounds that
-    /// named it.
+    /// A round won in another class it asked for is no win for this one, and
+    /// which way the other class lies decides what it is instead. Won higher
+    /// — an S seat on a round that also asked for A and General — it is not
+    /// counted here at all: the round was never this class's to win. Won
+    /// lower, it is an other seat: this class was not won, but the round was.
+    /// So General, the lowest class, is only ever won or lost. The win rate is
+    /// the wins *in this class* out of the drawn rounds counted for it.
     struct SeatTally: Identifiable, Hashable {
         /// As written, trimmed — S席 as the chip wrote it, or whatever was
         /// typed.
         let seatClass: String
         var won = 0
-        /// Won with another choice of the same round.
+        /// Won with a lower class the same round asked for.
         var otherSeat = 0
         var lost = 0
         var unknown = 0
@@ -457,7 +461,12 @@ nonisolated struct PassportStats {
                     var seat = seats[seatClass] ?? SeatTally(seatClass: seatClass)
                     switch entry.outcome {
                     case .won where wonClass == seatClass: seat.won += 1
-                    case .won: seat.otherSeat += 1
+                    case .won:
+                        // Leaves the class out of this round altogether,
+                        // made or not: a class whose only round was won
+                        // higher has nothing to say.
+                        if let won, Self.ranks(won, above: seatClass, in: entry.choices) { continue }
+                        seat.otherSeat += 1
                     case .lost: seat.lost += 1
                     case .pending: seat.unknown += 1
                     }
@@ -522,6 +531,22 @@ nonisolated struct PassportStats {
 
     private static func trimmed(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Whether the choice a round was won with stands above `asked`, another
+    /// class the round asked for: by the class where both are ones the chips
+    /// offer — S above A above General — and otherwise by the order the
+    /// round's choices were ranked in, since a class the reader typed has no
+    /// place among them.
+    private static func ranks(_ won: LotteryChoice, above asked: String, in choices: [LotteryChoice]) -> Bool {
+        let wonClass = trimmed(won.seatClass)
+        if SeatClass(rawValue: wonClass) != nil, SeatClass(rawValue: asked) != nil {
+            return SeatClass.order(of: wonClass) < SeatClass.order(of: asked)
+        }
+        guard let wonIndex = choices.firstIndex(where: { $0.id == won.id }),
+              let askedIndex = choices.firstIndex(where: { trimmed($0.seatClass) == asked })
+        else { return false }
+        return wonIndex < askedIndex
     }
 
     /// Tickets gathered by the class they bought.

@@ -156,15 +156,59 @@ struct PassportStatsTests {
         #expect(stats.lotteryRounds.map(\.round) == ["最速先行抽選", "プレイガイド先行", "プレイガイド二次先行", ""])
         #expect(stats.lotteryRounds[0].tally == PassportStats.LotteryTally(won: 1, lost: 1))
 
-        // An S seat asked for in four rounds and won in one; an A seat asked
-        // for in three, won in one, and lost to an S seat in another.
+        // An S seat asked for in four rounds, won in one and won lower, an A
+        // seat, in another. The A seat's round won with an S seat is not one
+        // of its rounds at all, so it was won in one of two.
         #expect(stats.lotterySeats.map(\.seatClass) == ["S席", "A席"])
         #expect(stats.lotterySeats[0] == PassportStats.SeatTally(seatClass: "S席", won: 1, otherSeat: 1, lost: 2))
         #expect(stats.lotterySeats[0].winRate == 0.25)
-        #expect(stats.lotterySeats[1] == PassportStats.SeatTally(seatClass: "A席", won: 1, otherSeat: 1, lost: 1))
+        #expect(stats.lotterySeats[1] == PassportStats.SeatTally(seatClass: "A席", won: 1, lost: 1))
         #expect(stats.namedWins == 2)
         #expect(stats.firstChoiceWins == 1)
         #expect(stats.hasRankedChoices)
+    }
+
+    /// S, A and General asked for at once: won in S, the round is not one of
+    /// A's or General's; won in General, it is an other seat for S and A;
+    /// lost, it is lost for all three. General is never an other seat.
+    @Test func aRoundWonHigherIsNoRoundOfTheLowerClasses() {
+        let s = LotteryChoice(seatClass: "S席"), a = LotteryChoice(seatClass: "A席"),
+            general = LotteryChoice(seatClass: "一般席")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            "a": [LotteryEntry(choices: [s, a, general], result: .won(s.id))],
+            "b": [LotteryEntry(choices: [s, a, general], result: .won(general.id))],
+            "c": [LotteryEntry(choices: [s, a, general], result: .lost)],
+        ]
+        let stats = PassportStats(events: Self.events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+        #expect(stats.lotterySeats == [
+            PassportStats.SeatTally(seatClass: "S席", won: 1, otherSeat: 1, lost: 1),
+            PassportStats.SeatTally(seatClass: "A席", otherSeat: 1, lost: 1),
+            PassportStats.SeatTally(seatClass: "一般席", won: 1, lost: 1),
+        ])
+        #expect(stats.lotterySeats[2].winRate == 0.5)
+    }
+
+    /// Classes the chips do not offer have no tier, so the order the round
+    /// ranked them in stands for one.
+    @Test func typedClassesAreRankedByTheRoundsChoices() {
+        let box = LotteryChoice(seatClass: "BOX席"), standing = LotteryChoice(seatClass: "立見")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            "a": [LotteryEntry(choices: [box, standing], result: .won(box.id))],
+            "b": [LotteryEntry(choices: [box, standing], result: .won(standing.id))],
+        ]
+        let stats = PassportStats(events: Self.events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+        #expect(Set(stats.lotterySeats) == [
+            PassportStats.SeatTally(seatClass: "BOX席", won: 1, otherSeat: 1),
+            PassportStats.SeatTally(seatClass: "立見", won: 1),
+        ])
     }
 
     /// Prices on three of four events — one of them free — across two

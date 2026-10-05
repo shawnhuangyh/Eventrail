@@ -1402,8 +1402,12 @@ private struct PassportLotteryCard: View {
 
     /// Each class of seat asked for, won in it against won in another.
     private var bySeat: some View {
+        // Each kind only where a seat has some: General is never an other
+        // seat, and a library that won only the classes it asked for has none.
+        let hasOther = stats.lotterySeats.contains { $0.otherSeat > 0 }
         let hasUnknown = stats.lotterySeats.contains { $0.unknown > 0 }
-        let kinds: [LotteryOutcome] = [.won, .otherSeat, .lost] + (hasUnknown ? [.unknown] : [])
+        let kinds: [LotteryOutcome] = [.won] + (hasOther ? [.otherSeat] : []) + [.lost]
+            + (hasUnknown ? [.unknown] : [])
         return section(spacing: 13) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("By Seat")
@@ -1439,8 +1443,8 @@ private struct PassportLotteryCard: View {
                     LotteryLine.join([
                         Text("^[\(seat.rounds) round](inflect: true)"),
                         Text("\(seat.won) won"),
-                        Text("\(seat.otherSeat) other seat"),
-                    ] + (seat.unknown > 0 ? [Text("\(seat.unknown) no result")] : []))
+                    ] + (seat.otherSeat > 0 ? [Text("\(seat.otherSeat) other seat")] : [])
+                      + (seat.unknown > 0 ? [Text("\(seat.unknown) no result")] : []))
                 }
             }
         }
@@ -1484,7 +1488,7 @@ private struct PassportLotteryCard: View {
 /// next to nothing for a round nobody wrote a result on.
 private enum LotteryOutcome: Hashable {
     case won
-    /// Won, in another class the round asked for — only By Seat says this.
+    /// Won, in a lower class the round asked for — only By Seat says this.
     case otherSeat
     case lost
     case unknown
