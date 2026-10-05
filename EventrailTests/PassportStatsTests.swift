@@ -204,6 +204,48 @@ struct PassportStatsTests {
         #expect(stats.seatEvents["一般席"]?.map(\.choices) == [[[.lost, .lost, .lost]], [[.lost, .lost, .won]]])
     }
 
+    /// A win took every application over the rounds up to and including the
+    /// first one won, filed under the class that round won: not the rounds
+    /// after it, which are a second seat, nor a win with no applications
+    /// written down. A win naming no class goes last, as Unspecified.
+    @Test func countsTheEntriesEachWinTook() {
+        let s = LotteryChoice(seatClass: "S席"), a = LotteryChoice(seatClass: "A席")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            // Written out of order: the sale ran 最速先行 (lost) before
+            // プレイガイド先行 (won in A), and the 二次 after it is a second seat.
+            "a": [
+                LotteryEntry(round: "プレイガイド二次先行", applications: 9, choices: [s], result: .won(s.id)),
+                LotteryEntry(round: "プレイガイド先行", applications: 2, choices: [s, a], result: .won(a.id)),
+                LotteryEntry(round: "最速先行抽選", applications: 5, choices: [s, a], result: .lost),
+            ],
+            "b": [LotteryEntry(round: "最速先行抽選", applications: 3, choices: [s, a], result: .won(s.id))],
+            "c": [LotteryEntry(round: "最速先行抽選", applications: 1, choices: [a], result: .won(a.id))],
+            "d": [LotteryEntry(applications: 4, result: .won(nil))],
+            "e": [LotteryEntry(round: "最速先行抽選", applications: 0, choices: [s], result: .won(s.id))],
+            "f": [LotteryEntry(round: "最速先行抽選", applications: 6, choices: [s], result: .lost)],
+        ]
+        let events = ["a", "b", "c", "d", "e", "f"].enumerated().map {
+            Fixtures.event(id: $0.element, date: Fixtures.date(2025, 1, $0.offset + 1))
+        }
+        let stats = PassportStats(events: events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+
+        #expect(stats.winTypes.map(\.seatClass) == ["S席", "A席", ""])
+        #expect(stats.winTypes[0].wins.map(\.entries) == [3])
+        // Most applications first.
+        #expect(stats.winTypes[1].wins.map(\.event.id) == ["a", "c"])
+        #expect(stats.winTypes[1].wins.map(\.entries) == [7, 1])
+        #expect(stats.winTypes[1].wins[0].outcomes == [.lost, .won])
+        #expect(stats.winTypes[1].average == 4)
+        #expect(stats.winTypes[2].wins.map(\.entries) == [4])
+        #expect(stats.lotteryWins == 4)
+        #expect(stats.entriesToWin == 3.75)
+        #expect(stats.entriesToWinScale == 1 ... 7)
+    }
+
     /// A round's dots are its choices: each before the one won lost, the one
     /// won, and nothing after it; every choice where it was lost or has no
     /// result; and one for a round with no choice, or won with none named.

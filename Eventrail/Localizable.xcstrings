@@ -2181,6 +2181,28 @@
         }
       }
     },
+    "Avg. %@ across ^[%lld win](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選%2$lld回・平均%1$@回"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中选 %2$lld 次，平均 %1$@ 次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中選 %2$lld 次，平均 %1$@ 次"
+          }
+        }
+      }
+    },
     "Avg. Price" : {
       "localizations" : {
         "ja" : {
@@ -3586,6 +3608,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "抽選次數"
+          }
+        }
+      }
+    },
+    "Entries to Win" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選までの応募回数"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中选所需抽选次数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中選所需抽選次數"
           }
         }
       }

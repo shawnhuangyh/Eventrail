@@ -230,6 +230,26 @@ nonisolated struct PassportStats {
         }
     }
 
+    /// The events one class of seat was won in, and how many applications
+    /// each win took: every application over the rounds up to and including
+    /// the first one won, in the order the sale ran them — the rounds
+    /// ``Lottery/roundsToWin`` counts, and the class that round won.
+    struct WinType: Identifiable, Hashable {
+        /// The class the first win got, as written, trimmed — and empty
+        /// where it names none, as a count carried over from before entries
+        /// does.
+        let seatClass: String
+        /// Most applications first, each with the rounds that took.
+        let wins: [LotteryEvent]
+
+        var id: String { seatClass }
+
+        var count: Int { wins.count }
+        var most: Int { wins.first?.entries ?? 0 }
+        var fewest: Int { wins.last?.entries ?? 0 }
+        var average: Double { Double(wins.reduce(0) { $0 + $1.entries }) / Double(max(1, count)) }
+    }
+
     /// One event the reader wrote a price on, and the class of seat it bought.
     struct Ticket: Identifiable, Hashable {
         let event: Event
@@ -317,6 +337,11 @@ nonisolated struct PassportStats {
     /// behind a round and ``seatMarks(of:for:outcome:)`` behind a class.
     let roundEvents: [String: [LotteryEvent]]
     let seatEvents: [String: [LotteryEvent]]
+    /// The events a lottery was won at, by the class the first win got: the
+    /// three the chips offer in their order, then any typed, most wins
+    /// first, and the wins that name no class last. An event whose rounds up
+    /// to the win have no applications written down is in none of them.
+    let winTypes: [WinType]
     /// The rounds won with a choice named, and how many of those were won
     /// with the first.
     let namedWins: Int
@@ -367,6 +392,25 @@ nonisolated struct PassportStats {
     var roundsToWin: Double? {
         let wins = topLotteries.compactMap(\.roundsToWin)
         return wins.isEmpty ? nil : Double(wins.reduce(0, +)) / Double(wins.count)
+    }
+
+    /// The wins in ``winTypes``, one an event.
+    var lotteryWins: Int { winTypes.reduce(0) { $0 + $1.count } }
+
+    /// How many applications a win took on average, over ``winTypes``. Nil
+    /// where none was won.
+    var entriesToWin: Double? {
+        guard lotteryWins > 0 else { return nil }
+        return Double(winTypes.reduce(0) { $0 + $1.wins.reduce(0) { $0 + $1.entries } }) / Double(lotteryWins)
+    }
+
+    /// The fewest applications a win took to the most, which every class's
+    /// spread is drawn on. Nil where every win took the same: a scale with
+    /// one point on it says nothing the averages do not.
+    var entriesToWinScale: ClosedRange<Int>? {
+        guard let fewest = winTypes.map(\.fewest).min(), let most = winTypes.map(\.most).max(),
+              most > fewest else { return nil }
+        return fewest ... most
     }
 
     // MARK: - Reading the cost back
@@ -475,6 +519,7 @@ nonisolated struct PassportStats {
         var hasRankedChoices = false
         var roundEvents: [String: [LotteryEvent]] = [:]
         var seatEvents: [String: [LotteryEvent]] = [:]
+        var winEvents: [String: [LotteryEvent]] = [:]
         let tried = applied.map { $0.sorted { $0.sortDate > $1.sortDate } } ?? events
         let lotteries = tried.compactMap { event -> Lottery? in
             // A lottery round written down at all is an event the reader
@@ -532,6 +577,19 @@ nonisolated struct PassportStats {
                 seatEvents[seatClass, default: []].append(
                     LotteryEvent(event: event, entries: row.entries, outcomes: row.outcomes, choices: row.choices))
             }
+            // What getting the seat took: the rounds up to and including the
+            // first won, as Rounds to Win counts them, filed under the class
+            // that round won. A round tried after it is a second seat.
+            if let first = entries.firstIndex(where: \.isWon) {
+                let toWin = entries[...first]
+                let applications = toWin.reduce(0) { $0 + $1.applications }
+                if applications > 0 {
+                    winEvents[Self.trimmed(entries[first].wonChoice?.seatClass ?? ""), default: []].append(
+                        LotteryEvent(event: event, entries: applications,
+                                     outcomes: toWin.map { RoundOutcome($0.outcome) },
+                                     choices: toWin.map(Self.choiceMarks(of:))))
+                }
+            }
             return Lottery(event: event, entries: entries.reduce(0) { $0 + $1.applications },
                            outcomes: entries.map(\.outcome), choices: entries.map(Self.choiceMarks(of:)))
         }
@@ -559,6 +617,23 @@ nonisolated struct PassportStats {
         }
         self.roundEvents = roundEvents
         self.seatEvents = seatEvents
+        // Within a class most applications first, as the dearest ticket
+        // heads its class; ties newest first, then by id, so a redraw never
+        // swaps two.
+        winTypes = winEvents
+            .map { seatClass, wins in
+                WinType(seatClass: seatClass, wins: wins.sorted {
+                    if $0.entries != $1.entries { return $0.entries > $1.entries }
+                    if $0.event.sortDate != $1.event.sortDate { return $0.event.sortDate > $1.event.sortDate }
+                    return $0.event.id < $1.event.id
+                })
+            }
+            .sorted {
+                if $0.seatClass.isEmpty != $1.seatClass.isEmpty { return $1.seatClass.isEmpty }
+                let left = (SeatClass.order(of: $0.seatClass), -$0.count)
+                let right = (SeatClass.order(of: $1.seatClass), -$1.count)
+                return left == right ? $0.seatClass < $1.seatClass : left < right
+            }
         self.namedWins = namedWins
         self.firstChoiceWins = firstChoiceWins
         self.hasRankedChoices = hasRankedChoices
