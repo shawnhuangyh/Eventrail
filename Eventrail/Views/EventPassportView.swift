@@ -41,12 +41,15 @@ nonisolated enum PassportRanking: Hashable, Identifiable {
     }
 }
 
-/// Which end of the library the reader asked to see the whole of.
+/// Which end of the library the reader asked to see the whole of from.
+///
+/// Both ends open every timed event, from their own end, as Highest and
+/// Lowest Price open every ticket: a See All that stopped at five would be
+/// the one on the screen that did not show all.
 ///
 /// A sheet rather than a pushed screen, and rather than the run of rows the
-/// card used to unfold in place: five events is a glance, not a destination,
-/// and growing the card by four rows pushed everything under it off screen
-/// while the reader was reading it.
+/// card used to unfold in place: growing the card pushed everything under it
+/// off screen while the reader was reading it.
 nonisolated enum PassportExtreme: Identifiable, Hashable {
     case shortest
     case longest
@@ -62,8 +65,8 @@ nonisolated enum PassportExtreme: Identifiable, Hashable {
 
     func spans(of stats: PassportStats) -> [PassportStats.Span] {
         switch self {
-        case .shortest: stats.shortest
-        case .longest: stats.longest
+        case .shortest: stats.spans
+        case .longest: stats.spans.reversed()
         }
     }
 }
@@ -489,8 +492,8 @@ struct EventPassportView: View {
             }
 
             if stats.timedEvents >= 2 {
-                extremes(.shortest, stats.shortest)
-                extremes(.longest, stats.longest)
+                extremes(.shortest, PassportExtreme.shortest.spans(of: stats))
+                extremes(.longest, PassportExtreme.longest.spans(of: stats))
             }
         }
         .padding(16)
@@ -536,7 +539,7 @@ struct EventPassportView: View {
     /// One end of the library, ruled off from whatever sits above it — the
     /// breakdown for the shortest, the shortest for the longest.
     ///
-    /// The event itself, and a See All to the other four behind it. One row
+    /// The event itself, and a See All to the rest behind it. One row
     /// rather than five, because these two sit inside the time card now: the
     /// card is about the total, and ten rows of extremes under it would be the
     /// larger half of a panel that is not about them.
@@ -625,9 +628,10 @@ struct EventPassportView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            // Every past event with none, not only what has come since the
-            // last pass: an empty Passport is the reader asking where it went.
-            let unticketed = past.filter { !store.tracking(for: $0).hasTicket }
+            // Every past event with nothing written down, not only what has
+            // come since the last pass: an empty Passport is the reader asking
+            // where it went.
+            let unticketed = past.filter(store.awaitsTicket)
             if !unticketed.isEmpty {
                 Button("Record Tickets") {
                     reviewing = TicketReviewList(events: unticketed)
@@ -921,7 +925,7 @@ private func axisName(_ label: String?, centered: Bool = false) -> some AxisMark
 ///
 /// Its own type rather than a method on the screen for the reason
 /// ``PassportRankRow`` is: the card shows one of these and the sheet behind
-/// its See All shows five, and they are the two things most likely to drift.
+/// its See All shows the rest, and they are the two things most likely to drift.
 private struct PassportSpanRow: View {
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
@@ -950,12 +954,12 @@ private struct PassportSpanRow: View {
     }
 }
 
-/// The whole of one end of the library — up to five events, briefest or
-/// longest first.
+/// Every timed event, briefest first or longest first, from the end whose
+/// See All opened it.
 ///
-/// A drawer rather than a pushed screen: the list is short and fixed, and the
-/// reader is meant to read it and put it back down where they were, not
-/// navigate away from the card that raised the question.
+/// A drawer rather than a pushed screen: the reader is meant to read it and
+/// put it back down where they were, not navigate away from the card that
+/// raised the question.
 private struct PassportExtremesSheet: View {
     let extreme: PassportExtreme
     let spans: [PassportStats.Span]
@@ -965,13 +969,6 @@ private struct PassportExtremesSheet: View {
     /// own sheet is what every list in the app opens, and the reader closes it
     /// back onto the list they tapped it from.
     @State private var openEvent: Event?
-
-    /// Tall enough for the rows it has and no taller. Five is the ceiling and
-    /// a short library gets fewer, so a fixed detent would leave a drawer
-    /// mostly empty under two rows.
-    private var height: CGFloat {
-        90 + CGFloat(spans.count) * 58 + 24
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -992,15 +989,15 @@ private struct PassportExtremesSheet: View {
             }
         }
         .washBackground()
-        // The measured height first, with .large behind it for the accessibility
-        // text sizes that wrap a row onto a second line.
-        .presentationDetents([.height(height), .large])
+        .presentationDetents([.medium, .large])
         .eventSheet($openEvent)
     }
 
+    /// How many were timed, not how many were attended: an event with no
+    /// finish published is in neither list, and the count says so.
     private var header: some View {
         PassportSheetHeader(
-            eyebrow: Text("Top ^[\(spans.count) event](inflect: true)"),
+            eyebrow: Text("^[\(spans.count) timed event](inflect: true)"),
             title: extreme.title)
     }
 }
@@ -2359,10 +2356,9 @@ private struct PassportTicketTypeRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                // One price is its own average, already printed beside it.
-                if type.highest > type.lowest {
-                    if showsPaid { paidRangeButton } else { Text(verbatim: range) }
-                }
+                // Always, so the corner is never empty: a class whose tickets
+                // all cost one price shows that price, which is its range.
+                if showsPaid { paidRangeButton } else { Text(verbatim: range) }
             }
             .font(.system(size: 11.5))
             .monospacedDigit()
@@ -2371,9 +2367,15 @@ private struct PassportTicketTypeRow: View {
         }
     }
 
-    private var range: String { "\(money(type.lowest))–\(money(type.highest))" }
+    /// The cheapest to the dearest, or the one price where they are one.
+    private var range: String {
+        type.highest > type.lowest ? "\(money(type.lowest))–\(money(type.highest))" : money(type.lowest)
+    }
 
-    private var paidRange: String { "\(type.lowestPaid.formatted)–\(type.highestPaid.formatted)" }
+    private var paidRange: String {
+        type.highest > type.lowest ? "\(type.lowestPaid.formatted)–\(type.highestPaid.formatted)"
+                                   : type.lowestPaid.formatted
+    }
 
     /// The range, with a tap that shows it as it was paid — too long a line
     /// to print beside the converted one in a row this narrow.

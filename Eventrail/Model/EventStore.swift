@@ -567,9 +567,21 @@ final class EventStore {
         !event.isUpcoming && tracking(for: event).hasTicket
     }
 
-    /// The past events here with no ticket written down that joined the
-    /// library, or whose day ended, after `reviewed` — what My Events offers
-    /// to go through once an import has brought them in (``TicketReviewView``).
+    /// Whether a past event is one ``TicketReviewView`` should offer: nothing
+    /// written on its Ticket Details at all.
+    ///
+    /// Not merely no ticket. A lottery written down, lost included, is the
+    /// reader having already said how the event went for them, and asking
+    /// them to pick it again as one they went to is asking twice — so is a
+    /// seat, a cost or a note.
+    func awaitsTicket(_ event: Event) -> Bool {
+        !event.isUpcoming && tracking(for: event).isEmpty
+    }
+
+    /// The past events here with nothing written down (``awaitsTicket(_:)``)
+    /// that joined the library, or whose day ended, after `reviewed` — what
+    /// My Events offers to go through once an import has brought them in
+    /// (``TicketReviewView``).
     ///
     /// Read cheapest first: past every review but the first, the dates leave
     /// almost nothing for the record to be read for.
@@ -577,7 +589,7 @@ final class EventStore {
         events.filter { event in
             guard !event.isUpcoming else { return false }
             let added = entries[event.id]?.changed(.inLibrary) ?? .distantPast
-            return max(added, event.dayEnds) > reviewed && !tracking(for: event).hasTicket
+            return max(added, event.dayEnds) > reviewed && awaitsTicket(event)
         }
     }
 

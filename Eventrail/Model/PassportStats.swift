@@ -285,7 +285,7 @@ nonisolated struct PassportStats {
     /// time, and publishes a finish time for fewer events still. So the total
     /// above is always a total over *part* of the library, and the screen says
     /// which part rather than implying it read every event.
-    let timedEvents: Int
+    var timedEvents: Int { spans.count }
 
     let venues: Int
     let performers: Int
@@ -345,9 +345,9 @@ nonisolated struct PassportStats {
     /// Those tickets by the class of seat they bought, most tickets first and
     /// the ones that name no class last.
     let ticketTypes: [TicketType]
-    /// The briefest events, briefest first, and the longest, longest first.
-    let shortest: [Span]
-    let longest: [Span]
+    /// Every event with both ends published, briefest first: the shortest
+    /// read from the front and the longest from the back.
+    let spans: [Span]
 
     /// The first and last event in this slice, for the line under the title.
     let firstEvent: Date?
@@ -437,20 +437,12 @@ nonisolated struct PassportStats {
         // of this and the longest are the back.
         // Equal lengths fall back on the date and then the id, so a redraw
         // never swaps two of them.
-        let spans = events.compactMap(Self.span(of:)).sorted {
+        spans = events.compactMap(Self.span(of:)).sorted {
             if $0.duration != $1.duration { return $0.duration < $1.duration }
             if $0.event.sortDate != $1.event.sortDate { return $0.event.sortDate < $1.event.sortDate }
             return $0.event.id < $1.event.id
         }
-        timedEvents = spans.count
         totalDuration = spans.reduce(0) { $0 + $1.duration }
-        // Five at most, which is what the sheet behind each See All shows, and
-        // half the run at most on top of that, so the two lists cannot name the
-        // same event twice when the library is short — an event that is both
-        // the briefest and the longest is true and reads as a mistake.
-        let half = max(1, min(5, spans.count / 2))
-        shortest = Array(spans.prefix(half))
-        longest = Array(spans.suffix(half).reversed())
 
         var performerCounts: [String: Int] = [:]
         var venueCounts: [String: Int] = [:]

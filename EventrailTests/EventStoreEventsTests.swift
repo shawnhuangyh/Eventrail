@@ -271,6 +271,25 @@ struct EventStoreEventsTests {
         #expect(store.awaitingTickets([past, ahead], since: before).isEmpty)
     }
 
+    /// A lottery written down, lost or not, already says how the event went:
+    /// only an event with nothing on its Ticket Details is offered.
+    @Test func anEventWithALostLotteryDoesNotAwaitATicket() {
+        let store = store()
+        let lost = Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))
+        let noted = Fixtures.event(id: "2", date: Fixtures.date(2025, 6, 2))
+        let blank = Fixtures.event(id: "3", date: Fixtures.date(2025, 6, 3))
+        let before = Date.now.addingTimeInterval(-60)
+        for event in [lost, noted, blank] { store.toggleLibraryMembership(event) }
+        store.setTracking(Tracking(lotteries: [LotteryEntry(round: "最速先行抽選", applications: 1, result: .lost)]),
+                          for: lost)
+        store.setTracking(Tracking(note: "Couldn't make it"), for: noted)
+
+        #expect(!store.tracking(for: lost).hasTicket)
+        #expect(store.awaitingTickets([lost, noted, blank], since: before).map(\.id) == ["3"])
+        #expect(!store.awaitsTicket(lost))
+        #expect(store.awaitsTicket(blank))
+    }
+
     @Test func askingTwiceGivesTheSame() throws {
         let store = store()
         for id in ["1", "2", "3"] { store.toggleLibraryMembership(Fixtures.event(id: id)) }

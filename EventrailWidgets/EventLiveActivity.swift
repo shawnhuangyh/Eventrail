@@ -122,20 +122,30 @@ struct EventLiveActivity: Widget {
                 // counts down only through the last hour, since the width is
                 // fixed as the island is drawn and a "1:59:59" left it that
                 // wide long after the hours had gone.
+                //
+                // The iPhone 18 Pro's island is narrower, and beside another
+                // activity it sets the poster and this side by side to the
+                // left of the camera, with room for about three characters:
+                // "47:17" was cut to "4…" there. So where the clock does not
+                // fit, the minimal island's reading stands in — "47m", "1h".
+                // Only there: wherever the clock fits, it is what is drawn.
                 let template = moment.longestGlanceCountdown
-                moment.eachStage(alignment: .trailing) { moment in
-                    moment.glanceStatus(sizedFor: template)
-                        .font(.system(size: 14, weight: .bold))
-                        .monospacedDigit()
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(moment.tint)
-                        .lineLimit(1)
+                ViewThatFits(in: .horizontal) {
+                    moment.eachStage(alignment: .trailing) { moment in
+                        moment.glanceStatus(sizedFor: template)
+                            .font(.system(size: 14, weight: .bold))
+                            .monospacedDigit()
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(moment.tint)
+                            .lineLimit(1)
+                    }
+                    moment.narrowStatus
                 }
             } minimal: {
                 // Only the largest unit left — "1h", "40m", "40s": the
                 // smallest view has room for three characters, not a clock.
                 moment.eachStage { moment in
-                    moment.minimalStatus
+                    moment.minimalStatus()
                         .font(.system(size: 13, weight: .bold))
                         .monospacedDigit()
                         .foregroundStyle(moment.tint)
@@ -452,12 +462,16 @@ struct EventMoment {
     /// those digits masked off (``digits(of:over:keeping:at:unit:)``), so
     /// "40:40" reads "40m" and still counts by itself. That is four readings
     /// a stage and a word for each hour, rather than one for every minute.
+    ///
+    /// The units are the reader's language's — "40分" in Chinese — unless
+    /// `latinUnits`, which writes "h", "m" and "s" in every language, for the
+    /// compact island where even that has no room (``narrowStatus``).
     @ViewBuilder
-    var minimalStatus: some View {
+    func minimalStatus(latinUnits: Bool = false) -> some View {
         if let target = countdownTarget(at: stage), target > .now {
             ZStack {
                 ForEach(minimalReadings(to: target)) { reading in
-                    minimalReading(reading.shape, to: target)
+                    minimalReading(reading.shape, to: target, latinUnits: latinUnits)
                         .mask { Gate(at: reading.from, opening: true) }
                         .mask { Gate(at: reading.until, opening: false) }
                 }
@@ -525,23 +539,63 @@ struct EventMoment {
     }
 
     @ViewBuilder
-    private func minimalReading(_ shape: MinimalReading.Shape, to target: Date) -> some View {
+    private func minimalReading(_ shape: MinimalReading.Shape, to target: Date,
+                                latinUnits: Bool) -> some View {
         switch shape {
         case .time:
             Text(verbatim: glanceTime(target))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
         case .hours(let count):
-            Text("\(count)h", comment: "Whole hours left, in the Dynamic Island's smallest view: 1h. Only the largest unit is shown, so an hour and twenty minutes reads 1h.")
+            (latinUnits
+                ? Text(verbatim: "\(count)h")
+                : Text("\(count)h", comment: "Whole hours left, in the Dynamic Island's smallest view: 1h. Only the largest unit is shown, so an hour and twenty minutes reads 1h."))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
         case .minutes(let digits):
             self.digits(of: target, over: digits == 2 ? 3599 : 599, keeping: digits, at: .leading,
-                        unit: Text("m", comment: "Minutes, after the count of them in the Dynamic Island's smallest view: 40m."))
+                        unit: latinUnits
+                            ? Text(verbatim: "m")
+                            : Text("m", comment: "Minutes, after the count of them in the Dynamic Island's smallest view: 40m."))
         case .seconds(let digits):
             self.digits(of: target, over: digits == 2 ? 59 : 9, keeping: digits, at: .trailing,
-                        unit: Text("s", comment: "Seconds, after the count of them in the Dynamic Island's smallest view: 40s."))
+                        unit: latinUnits
+                            ? Text(verbatim: "s")
+                            : Text("s", comment: "Seconds, after the count of them in the Dynamic Island's smallest view: 40s."))
         }
+    }
+
+    /// ``minimalStatus(latinUnits:)`` for a compact island with no room for
+    /// ``glanceStatus(sizedFor:)``: the largest unit left, "47m" or "1h",
+    /// at the largest size that fits — from the minimal island's own down.
+    /// The units are "h", "m" and "s" in every language: "分" and "小时" are
+    /// a full character wide or more, and here there is no room for one.
+    var narrowStatus: some View {
+        ViewThatFits(in: .horizontal) {
+            narrowReading(size: 13)
+            narrowReading(size: 12)
+            narrowReading(size: 11)
+            narrowReading(size: 10)
+            narrowReading(size: 9)
+        }
+    }
+
+    /// ``minimalStatus(latinUnits:)`` at `size`, laid over a hidden "00m" —
+    /// the widest count it reads — so that is all the width it asks for. The
+    /// time and the stage's word, which can run wider ("19:30", "已结束"),
+    /// shrink to it rather than widening it.
+    private func narrowReading(size: CGFloat) -> some View {
+        Text(verbatim: "00m")
+            .hidden()
+            .overlay(alignment: .trailing) {
+                eachStage(alignment: .trailing) { moment in
+                    moment.minimalStatus(latinUnits: true)
+                        .foregroundStyle(moment.tint)
+                }
+            }
+            .font(.system(size: size, weight: .bold))
+            .monospacedDigit()
+            .lineLimit(1)
     }
 
     /// The system's countdown to `target` over the last `window` before it,

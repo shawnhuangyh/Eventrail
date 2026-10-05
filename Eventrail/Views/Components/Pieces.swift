@@ -72,7 +72,10 @@ struct DaysAway: View {
     private var isSoon: Bool { days <= 7 }
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: -1) {
+        // Centred on each other rather than set against the chevron: "DAYS"
+        // is about as wide as two digits and hid the difference, but 天 and
+        // 日 are one narrow character and sat off to the side of the number.
+        VStack(alignment: .center, spacing: -1) {
             if days == 0 {
                 // The day itself has no number worth printing, and "0" would
                 // be the wrong answer to how far off it is.

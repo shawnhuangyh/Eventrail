@@ -411,13 +411,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "我的活动"
+            "value" : "行程"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "我的活動"
+            "value" : "行程"
           }
         }
       }
@@ -500,13 +500,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中"
+            "value" : "落选"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未抽中"
+            "value" : "落選"
           }
         }
       }
@@ -919,13 +919,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中"
+            "value" : "中选"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽中"
+            "value" : "中選"
           }
         }
       }
