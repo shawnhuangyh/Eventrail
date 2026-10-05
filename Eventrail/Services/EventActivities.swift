@@ -84,7 +84,7 @@ final class EventActivities {
     /// Whether the sheet offers one for `event`: kept, held a ticket for, with
     /// a start published, and not yet over.
     func canOffer(_ event: Event, tracking: Tracking, inLibrary: Bool, at now: Date = .now) -> Bool {
-        guard isEnabled, inLibrary, tracking.ticket == .purchased, event.isUpcoming,
+        guard isEnabled, inLibrary, tracking.hasTicket, event.isUpcoming,
               let state = Self.state(for: event, seat: tracking.seat, at: now) else { return false }
         return now < state.runsTo
     }

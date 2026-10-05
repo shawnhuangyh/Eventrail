@@ -47,13 +47,29 @@ enum PreviewData {
     ]
 
     static let tracking: [Event.ID: Tracking] = [
-        "492514": Tracking(ticket: .purchased, seat: "3階 H列 21番", seatClass: "S席", cost: 8800,
-                           lotteryEntries: 1,
+        "492514": Tracking(seat: "3階 H列 21番", seatClass: "S席", cost: 8800,
+                           lotteries: [lottery("最速先行抽選", applications: 3,
+                                               choices: [("S席", 2), ("A席", 2)], won: 0)],
                            note: "Doors are tight — get there by 10:45."),
-        "396310": Tracking(ticket: .purchased, seat: "A5ブロック 12番", cost: 9900,
-                           lotteryEntries: 4,
+        "396310": Tracking(seat: "A5ブロック 12番", cost: 9900,
+                           lotteries: [
+                               lottery("最速先行抽選", applications: 4, choices: [("S席", 2), ("A席", 2)], lost: true),
+                               lottery("プレイガイド先行", choices: [("A席", 2), ("一般席", 2)], lost: true),
+                               lottery("プレイガイド二次先行", choices: [("一般席", 1)], lost: true),
+                               lottery("見切れ席", choices: [("一般席", 1)]),
+                           ],
                            note: "Encore was worth the queue."),
     ]
+
+    /// One round for the fixtures above: its name, how many times it was
+    /// applied for, its choices as a seat class and a count each, and how it
+    /// went — won with the choice at `won`, lost, or neither and still to come.
+    static func lottery(_ round: String, applications: Int = 1, choices: [(String, Int)],
+                        won: Int? = nil, lost: Bool = false) -> LotteryEntry {
+        let choices = choices.map { LotteryChoice(seatClass: $0.0, quantity: $0.1) }
+        let result: LotteryResult = if let won { .won(choices[won].id) } else if lost { .lost } else { .pending }
+        return LotteryEntry(round: round, applications: applications, choices: choices, result: result)
+    }
 
     /// Two performers billed on the fixtures above, as performer search lists
     /// them — enough for a preview of Following to have somebody to follow.

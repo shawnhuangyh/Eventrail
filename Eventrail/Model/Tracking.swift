@@ -1,16 +1,9 @@
 import SwiftUI
 
-nonisolated enum TicketStatus: String, CaseIterable, Identifiable, Hashable, Codable {
+/// Whether the reader said they held a ticket, as records from before the
+/// lottery entries said it — see ``Tracking/ticket``.
+nonisolated enum TicketStatus: String, CaseIterable, Hashable, Codable {
     case none, purchased
-
-    var id: Self { self }
-
-    var label: LocalizedStringKey {
-        switch self {
-        case .none: "Not purchased"
-        case .purchased: "Purchased"
-        }
-    }
 }
 
 /// The seat classes common enough to be a chip on the ticket sheet.
@@ -38,6 +31,17 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
         }
     }
 
+    /// ``label`` as a string, to tell whether it reads any differently from
+    /// the class as the ticket prints it — S Seat beside S席, and nothing
+    /// beside it in Japanese.
+    var name: String {
+        switch self {
+        case .s: String(localized: "S Seat")
+        case .a: String(localized: "A Seat")
+        case .general: String(localized: "General Seat")
+        }
+    }
+
     /// What the chip's badge says: the letter where the class has one, and a
     /// letter for the one that has none in English.
     var badge: Text {
@@ -46,6 +50,12 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
         case .a: Text(verbatim: "A")
         case .general: Text("G", comment: "The badge on the chip for the general seat class, 一般席.")
         }
+    }
+
+    /// Where a class stands, highest first: S, A, General, then any class the
+    /// chips do not offer.
+    static func order(of seatClass: String) -> Int {
+        allCases.firstIndex { $0.rawValue == seatClass } ?? allCases.count
     }
 }
 
@@ -59,9 +69,10 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
 /// in the library because the reader means to go, so "interested" was a second
 /// word for being there at all; and an event in the library that has already
 /// happened is one they went to, so attendance was a second word for the date.
-/// What is left is the ticket: whether it is in hand, which the library cannot
-/// say by itself, and once it is, the things about it worth keeping after the
-/// event is over — and whatever the reader wants to write down.
+/// What is left is the ticket: how the reader tried for one and whether they
+/// got it, which the library cannot say by itself, and once they did, the
+/// things about it worth keeping after the event is over — and whatever the
+/// reader wants to write down.
 ///
 /// Dropping the two needed no migration: a record written before this still
 /// carries `interest` and `attendance`, and a decoder ignores keys it has no
@@ -69,8 +80,14 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
 /// below reads every key as optional — a synthesized one treats a key an older
 /// record does not carry as a corrupt file, and takes the whole library with
 /// it. So an older record simply has no seat, no seat class, no cost and no
-/// lottery count: nothing written down.
+/// lottery: nothing written down — and a cost with no currency, which is yen.
 nonisolated struct Tracking: Hashable, Codable {
+    /// Whether the reader held a ticket, as they once said it with a pair of
+    /// chips. The entries say it now (``hasTicket``: a lottery won, a
+    /// first-come round got), so this is only ever read: a record holding
+    /// `.purchased` has it folded into its entries as it is read
+    /// (``foldLegacyTicket()``) and is none from then on. Kept, and still an
+    /// answer in ``Field``, because archives carry it.
     var ticket: TicketStatus = .none
     /// Where the reader sat, as the ticket prints it.
     ///
@@ -88,35 +105,42 @@ nonisolated struct Tracking: Hashable, Codable {
     /// than as a case, so a class the chips do not offer reads back as itself.
     /// Empty is "not written down".
     var seatClass: String = ""
-    /// What the ticket cost, in whole yen.
+    /// What the ticket cost, in ``currency``, exactly as the reader typed it.
     ///
     /// Nil is "not written down", which is not the same as free — a lottery
     /// seat or an invite really does cost nothing, and it is worth being able
     /// to record that.
-    var cost: Int?
-    /// How many entries the reader put into the lottery for this event.
     ///
-    /// Nil is "not written down", and so is zero: an event the reader applied
-    /// for nothing is an event with no lottery on it rather than a lottery they
-    /// entered no times. Unlike ``cost``, where zero is a real answer — a seat
-    /// that was won or given really did cost nothing — there is nothing a 0
-    /// here says that an empty field does not.
+    /// A `Decimal`, because a ticket abroad is sold for 49.99. A record written
+    /// before then holds a whole number of yen here, which reads back as the
+    /// same number — see ``currency``.
+    var cost: Decimal?
+    /// Every round of the sale the reader tried for — the round, how many
+    /// times they applied in it, the day the results come out, the seats
+    /// asked for in order of preference and how it went — in the order they
+    /// were added.
     ///
-    /// So a count taken back down to nothing empties the field. It used to
-    /// settle on 0 and go on counting as an event the reader had answered for,
-    /// which is what the Passport's `Recorded` and its averages are counted
-    /// over: one taken down to zero read there as an event applied for and
-    /// nothing gained.
-    var lotteryEntries: Int? {
-        // The one place the rule holds, so that nothing which reads this
-        // record has to know it: a sheet writing through a binding, a merge
-        // taking the answer from another device, the Passport counting up the
-        // events it was written on. Assigning inside `didSet` does not run it
-        // again, and an observer does not run during init at all — which is
-        // what the decoder below handles for records already written.
-        didSet { if lotteryEntries == 0 { lotteryEntries = nil } }
-    }
+    /// A count once, which said how hard the reader tried and nothing about
+    /// how it went. A record written then reads back as one entry applied for
+    /// that many times (``LotteryEntry/carriedOver(count:)``), so the count is
+    /// still what the applications add up to.
+    ///
+    /// One answer, settled whole: an entry is not dated on its own, so two
+    /// devices adding different entries between syncs keep the later list,
+    /// as two devices editing the note do.
+    var lotteries: [LotteryEntry] = []
     var note: String = ""
+    /// The ISO 4217 code ``cost`` is in — JPY, TWD, USD — chosen beside it on
+    /// the ticket sheet.
+    ///
+    /// Empty on a record written before a cost had a currency, when every cost
+    /// was yen — which is what ``price`` reads it as — and wherever no cost is
+    /// written: a currency is half of the answer "what it cost", and means
+    /// nothing without the amount. So it is not an answer of its own in
+    /// ``Field`` but rides with ``cost``, settled and dated as one: ¥9,900 and
+    /// $99 are two answers, and a merge taking the amount from one device and
+    /// the currency from the other would make a third nobody gave.
+    var currency: String = ""
     /// When each answer above was last written, where that is older than the
     /// record holding it.
     ///
@@ -138,12 +162,19 @@ nonisolated struct Tracking: Hashable, Codable {
     /// The six answers a record holds, named so that a merge can take them
     /// one at a time.
     ///
+    /// Named by their raw value in an archive's ``edits``, so a raw value
+    /// never changes: ``lotteries`` keeps the name of the count it replaced,
+    /// and the date the count was written is the date of the list it reads
+    /// back as.
+    ///
     /// A field added to this struct belongs here too, and the switches in
     /// ``sameAnswer(for:as:)`` and ``take(_:from:)`` will not compile until it
     /// is — which is the point of naming them rather than reaching for a
-    /// key path.
+    /// key path. The one exception is ``currency``, which is part of the
+    /// ``cost`` answer rather than an answer of its own.
     nonisolated enum Field: String, CaseIterable, Codable, CodingKeyRepresentable, Hashable, Sendable {
-        case ticket, seat, seatClass, cost, lotteryEntries, note
+        case ticket, seat, seatClass, cost, note
+        case lotteries = "lotteryEntries"
     }
 
     /// Whether the reader has written anything down here.
@@ -153,7 +184,15 @@ nonisolated struct Tracking: Hashable, Codable {
     /// recently that happened.
     var isEmpty: Bool {
         ticket == .none && seat.isEmpty && seatClass.isEmpty && cost == nil
-            && lotteryEntries == nil && note.isEmpty
+            && lotteries.isEmpty && note.isEmpty
+    }
+
+    /// What the ticket cost and what in, or nil where nothing is written.
+    ///
+    /// The one place an empty ``currency`` is read as yen: everything that
+    /// reads a cost back reads it through here.
+    var price: Money? {
+        cost.map { Money(amount: $0, currency: currency.isEmpty ? Currencies.yen : currency) }
     }
 }
 
@@ -164,8 +203,8 @@ nonisolated extension Tracking {
         case .ticket: ticket == other.ticket
         case .seat: seat == other.seat
         case .seatClass: seatClass == other.seatClass
-        case .cost: cost == other.cost
-        case .lotteryEntries: lotteryEntries == other.lotteryEntries
+        case .cost: cost == other.cost && currency == other.currency
+        case .lotteries: lotteries == other.lotteries
         case .note: note == other.note
         }
     }
@@ -176,10 +215,25 @@ nonisolated extension Tracking {
         case .ticket: ticket = other.ticket
         case .seat: seat = other.seat
         case .seatClass: seatClass = other.seatClass
-        case .cost: cost = other.cost
-        case .lotteryEntries: lotteryEntries = other.lotteryEntries
+        case .cost:
+            cost = other.cost
+            currency = other.currency
+        case .lotteries: lotteries = other.lotteries
         case .note: note = other.note
         }
+    }
+
+    /// This record with every answer `edited` gives differently from
+    /// `original` taken from it — what a sheet holding a copy changed, laid
+    /// over the record as it stands now. An answer that arrived from another
+    /// device while the copy was open keeps what it arrived with, unless the
+    /// reader changed that one too.
+    func applying(changesFrom original: Tracking, to edited: Tracking) -> Tracking {
+        var record = self
+        for field in Field.allCases where !edited.sameAnswer(for: field, as: original) {
+            record.take(field, from: edited)
+        }
+        return record
     }
 }
 
@@ -270,93 +324,39 @@ nonisolated extension Tracking {
             ticket: try record.decodeIfPresent(TicketStatus.self, forKey: .ticket) ?? .none,
             seat: try record.decodeIfPresent(String.self, forKey: .seat) ?? "",
             seatClass: try record.decodeIfPresent(String.self, forKey: .seatClass) ?? "",
-            cost: try record.decodeIfPresent(Int.self, forKey: .cost),
-            // Zeroes written before that became "not written down" are read
-            // as nothing, because a property observer does not run here. A
-            // record is always written whole, so the key goes on the next
-            // save of its own accord.
-            lotteryEntries: try record
-                .decodeIfPresent(Int.self, forKey: .lotteryEntries)
-                .flatMap { entries -> Int? in entries == 0 ? nil : entries },
+            // Read as a `Decimal` whether it was written as one or, before
+            // costs had currencies, as a whole number of yen.
+            cost: try record.decodeIfPresent(Decimal.self, forKey: .cost),
+            // A record from before entries holds a count, which reads back
+            // as one entry applied for that many times — and a zero, written
+            // before zero became "not written down", as none.
+            lotteries: try record.decodeIfPresent([LotteryEntry].self, forKey: .lotteries)
+                ?? LotteryEntry.carriedOver(count: try decoder.container(keyedBy: LegacyKeys.self)
+                    .decodeIfPresent(Int.self, forKey: .lotteryEntries)),
             note: try record.decodeIfPresent(String.self, forKey: .note) ?? "",
+            currency: try record.decodeIfPresent(String.self, forKey: .currency) ?? "",
             edits: try record.decodeIfPresent([Field: Date].self, forKey: .edits) ?? [:])
-    }
-}
-
-/// Writes an amount of yen into a text field, and reads one back out.
-///
-/// Yen because Eventernote lists Japanese events at Japanese halls and prices
-/// every one of them in yen; a currency of its own per ticket would be a second
-/// field to fill in for the sake of the evening somebody spends abroad.
-///
-/// `TextField(value:format:)` insists the value and the style agree on a type,
-/// and no built-in style takes an optional — hence this one. Parsing reads the
-/// digits out of whatever is in the field and ignores the rest, so the ¥ and
-/// the separators the style itself wrote survive an edit, and a full-width
-/// １２３４ from a Japanese keyboard is the same number as 1234.
-nonisolated struct YenAmount: ParseableFormatStyle {
-    var parseStrategy: Strategy { Strategy() }
-
-    func format(_ value: Int?) -> String {
-        value.map { $0.formatted(.currency(code: "JPY")) } ?? ""
+        foldLegacyTicket()
     }
 
-    nonisolated struct Strategy: ParseStrategy {
-        /// Nine digits is ¥999,999,999. Past that the reader is leaning on a
-        /// key rather than recording a ticket, and the arithmetic would
-        /// eventually overflow.
-        func parse(_ value: String) -> Int? {
-            let digits = value.compactMap(\.wholeNumberValue).prefix(9)
-            guard !digits.isEmpty else { return nil }
-            return digits.reduce(0) { $0 * 10 + $1 }
-        }
+    /// Keys a record no longer writes, read so that what they held is not lost.
+    private enum LegacyKeys: String, CodingKey {
+        /// How many lotteries were entered, before each was an entry.
+        case lotteryEntries
     }
-}
-
-nonisolated extension FormatStyle where Self == YenAmount {
-    static var yen: YenAmount { YenAmount() }
-}
-
-/// Writes a count of lottery entries into a text field, and reads one back out.
-///
-/// The same shape as ``YenAmount`` and for one of the same two reasons: no
-/// built-in style takes an optional, and the field has to be able to hold
-/// nothing. Where the two part company is zero — ``YenAmount`` keeps it,
-/// because a free ticket is an answer, and this one does not.
-nonisolated struct EntryCount: ParseableFormatStyle {
-    var parseStrategy: Strategy { Strategy() }
-
-    func format(_ value: Int?) -> String {
-        value.map { $0.formatted(.number) } ?? ""
-    }
-
-    nonisolated struct Strategy: ParseStrategy {
-        /// Four digits is 9,999 applications for one event. Past that the
-        /// reader is leaning on a key rather than recording a lottery.
-        ///
-        /// A field left empty and a field holding 0 read back the same, for
-        /// the reason ``Tracking/lotteryEntries`` gives.
-        func parse(_ value: String) -> Int? {
-            let digits = value.compactMap(\.wholeNumberValue).prefix(4)
-            guard !digits.isEmpty else { return nil }
-            let count = digits.reduce(0) { $0 * 10 + $1 }
-            return count == 0 ? nil : count
-        }
-    }
-}
-
-nonisolated extension FormatStyle where Self == EntryCount {
-    static var entries: EntryCount { EntryCount() }
 }
 
 /// The single badge shown on a row.
 ///
-/// Read from where the event stands rather than from anything the reader filled
-/// in: in the library or not, past or still to come, ticket in hand or not.
+/// Read from where the event stands and from the rounds the reader wrote
+/// down: in the library or not, past or still to come, ticket in hand or not.
 /// ``EventStore/status(for:)`` is the one place it is worked out, because it is
 /// the only place that knows whether the event is in the library.
 enum TrackingStatus: Hashable {
     case untracked, planned, ticketed, attended
+    /// Kept, past, and no ticket recorded — not attended, since only a ticket
+    /// says that (``EventStore/hasAttended(_:)``).
+    case unticketed
 
     var label: LocalizedStringKey {
         switch self {
@@ -364,12 +364,13 @@ enum TrackingStatus: Hashable {
         case .planned: "Planning"
         case .ticketed: "Ticketed"
         case .attended: "Attended"
+        case .unticketed: "No Ticket"
         }
     }
 
     var tint: Color {
         switch self {
-        case .untracked: .secondary
+        case .untracked, .unticketed: .secondary
         case .planned: .trackInterest
         case .ticketed: .trackTicket
         case .attended: .trackAttended

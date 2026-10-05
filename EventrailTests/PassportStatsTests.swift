@@ -30,7 +30,15 @@ struct PassportStatsTests {
 
     let stats = PassportStats(events: Self.events) {
         var tracking = Tracking()
-        tracking.lotteryEntries = Self.lottery[$0.id]
+        // Split over two rounds where there are enough, so the figures are
+        // the applications added up rather than the rounds counted; and a
+        // first-come round beside them, which adds nothing.
+        if let count = Self.lottery[$0.id] {
+            tracking.lotteries = count > 1
+                ? [LotteryEntry(round: "最速先行抽選", applications: count - 1), LotteryEntry(round: "プレイガイド先行")]
+                : [LotteryEntry(applications: count)]
+            tracking.lotteries.append(LotteryEntry(round: "一般発売", applications: 4))
+        }
         return tracking
     }
 
@@ -84,9 +92,151 @@ struct PassportStatsTests {
     @Test func countsLotteriesOverTheEventsTheyWereWrittenOn() {
         #expect(stats.lotteryEvents == 2)
         #expect(stats.lotteryEntries == 7)
-        #expect(stats.mostLotteryEntries == 5)
-        #expect(stats.averageLotteryEntries == 3.5)
         #expect(stats.topLotteries.map(\.event.id) == ["a", "b"])
+        // Nothing was drawn, so there is no rate — rather than a 0%.
+        #expect(stats.lotteryTally == PassportStats.LotteryTally(won: 0, lost: 0, unknown: 4))
+        #expect(stats.lotteryTally.winRate == nil)
+        #expect(stats.roundsToWin == nil)
+        #expect(stats.lotteryRounds.map(\.round) == ["最速先行抽選", "プレイガイド先行"])
+    }
+
+    /// The Passport hands the attended events and the whole past apart: a
+    /// lottery lost on an event never attended still counts, and the event
+    /// itself does not.
+    @Test func countsLotteriesOverThePastItIsHanded() {
+        let lost = Fixtures.event(id: "lost", date: Fixtures.date(2025, 2, 1))
+        let won = Fixtures.event(id: "won", date: Fixtures.date(2025, 3, 1))
+        let records: [Event.ID: Tracking] = [
+            "lost": Tracking(lotteries: [LotteryEntry(applications: 3, result: .lost)]),
+            "won": Tracking(lotteries: [LotteryEntry(applications: 1, result: .won(nil))]),
+        ]
+        let stats = PassportStats(events: [won], lotteriesOf: [lost, won]) { records[$0.id] ?? Tracking() }
+        #expect(stats.totalEvents == 1)
+        #expect(stats.lotteryEntries == 4)
+        #expect(stats.lotteryTally == PassportStats.LotteryTally(won: 1, lost: 1, unknown: 0))
+        #expect(stats.topLotteries.map(\.event.id) == ["lost", "won"])
+    }
+
+    /// Three lotteries won at the second try, one won at the first beside a
+    /// seat got on general sale, a ticket from before entries, and a count
+    /// carried over with no result.
+    @Test func readsHowTheLotteriesWent() {
+        let s = LotteryChoice(seatClass: "S席"), a = LotteryChoice(seatClass: "A席")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            // Written out of order: read in the order the sale ran them.
+            "a": [
+                LotteryEntry(round: "プレイガイド二次先行", choices: [LotteryChoice(seatClass: "S席")], result: .lost),
+                LotteryEntry(round: "最速先行抽選", choices: [s, a], result: .lost),
+                LotteryEntry(round: "プレイガイド先行", choices: [s, a], result: .won(a.id)),
+            ],
+            "b": [
+                LotteryEntry(round: "最速先行抽選", choices: [s, a], result: .won(s.id)),
+                LotteryEntry(round: "一般発売", applications: 2, choices: [LotteryChoice(seatClass: "A席")]),
+            ],
+            "c": [LotteryEntry(id: LotteryEntry.carriedOverTicketID, applications: 0, result: .won(nil))],
+            "d": [LotteryEntry(applications: 3)],
+        ]
+        let stats = PassportStats(events: Self.events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+
+        // The general sale is a seat got and the old ticket a seat held:
+        // neither is a draw.
+        #expect(stats.lotteryTally == PassportStats.LotteryTally(won: 2, lost: 2, unknown: 1))
+        #expect(stats.lotteryTally.winRate == 0.5)
+        #expect(stats.lotteryEvents == 3)
+        #expect(stats.lotteryEntries == 7)
+        // Ties on applications go to the newer event.
+        #expect(stats.topLotteries.map(\.event.id) == ["d", "a", "b"])
+        #expect(stats.topLotteries[1].outcomes == [.lost, .won(a.id), .lost])
+        #expect(stats.roundsToWin == 1.5)
+
+        #expect(stats.lotteryRounds.map(\.round) == ["最速先行抽選", "プレイガイド先行", "プレイガイド二次先行", ""])
+        #expect(stats.lotteryRounds[0].tally == PassportStats.LotteryTally(won: 1, lost: 1))
+
+        // An S seat asked for in four rounds, won in one and won lower, an A
+        // seat, in another. The A seat's round won with an S seat is not one
+        // of its rounds at all, so it was won in one of two.
+        #expect(stats.lotterySeats.map(\.seatClass) == ["S席", "A席"])
+        #expect(stats.lotterySeats[0] == PassportStats.SeatTally(seatClass: "S席", won: 1, otherSeat: 1, lost: 2))
+        #expect(stats.lotterySeats[0].winRate == 0.25)
+        #expect(stats.lotterySeats[1] == PassportStats.SeatTally(seatClass: "A席", won: 1, lost: 1))
+        #expect(stats.namedWins == 2)
+        #expect(stats.firstChoiceWins == 1)
+        #expect(stats.hasRankedChoices)
+    }
+
+    /// S, A and General asked for at once: won in S, the round is not one of
+    /// A's or General's; won in General, it is an other seat for S and A;
+    /// lost, it is lost for all three. General is never an other seat.
+    @Test func aRoundWonHigherIsNoRoundOfTheLowerClasses() {
+        let s = LotteryChoice(seatClass: "S席"), a = LotteryChoice(seatClass: "A席"),
+            general = LotteryChoice(seatClass: "一般席")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            "a": [LotteryEntry(choices: [s, a, general], result: .won(s.id))],
+            "b": [LotteryEntry(choices: [s, a, general], result: .won(general.id))],
+            "c": [LotteryEntry(choices: [s, a, general], result: .lost)],
+        ]
+        let stats = PassportStats(events: Self.events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+        #expect(stats.lotterySeats == [
+            PassportStats.SeatTally(seatClass: "S席", won: 1, otherSeat: 1, lost: 1),
+            PassportStats.SeatTally(seatClass: "A席", otherSeat: 1, lost: 1),
+            PassportStats.SeatTally(seatClass: "一般席", won: 1, lost: 1),
+        ])
+        #expect(stats.lotterySeats[2].winRate == 0.5)
+
+        // Behind each row, newest first, the events it counted and how each
+        // went for it: the round won with an S seat is not among A's.
+        #expect(stats.roundEvents[""]?.map(\.event.id) == ["c", "b", "a"])
+        #expect(stats.seatEvents["A席"]?.map(\.event.id) == ["c", "b"])
+        #expect(stats.seatEvents["A席"]?.map(\.outcomes) == [[.lost], [.otherSeat]])
+        #expect(stats.seatEvents["一般席"]?.map(\.outcomes) == [[.lost], [.won]])
+        #expect(stats.seatEvents["S席"]?.map(\.outcomes) == [[.lost], [.otherSeat], [.won]])
+        // Each class's dots run to the choice that asked for it, the choices
+        // before it as they went: A, asked second, carries S before it.
+        #expect(stats.seatEvents["S席"]?.map(\.choices) == [[[.lost]], [[.otherSeat]], [[.won]]])
+        #expect(stats.seatEvents["A席"]?.map(\.choices) == [[[.lost, .lost]], [[.lost, .otherSeat]]])
+        #expect(stats.seatEvents["一般席"]?.map(\.choices) == [[[.lost, .lost, .lost]], [[.lost, .lost, .won]]])
+    }
+
+    /// A round's dots are its choices: each before the one won lost, the one
+    /// won, and nothing after it; every choice where it was lost or has no
+    /// result; and one for a round with no choice, or won with none named.
+    @Test func marksARoundChoiceByChoice() {
+        let s = LotteryChoice(seatClass: "S席"), a = LotteryChoice(seatClass: "A席"),
+            general = LotteryChoice(seatClass: "一般席")
+        func marks(_ entry: LotteryEntry) -> [PassportStats.RoundOutcome] { PassportStats.choiceMarks(of: entry) }
+        #expect(marks(LotteryEntry(choices: [s, a, general], result: .won(general.id))) == [.lost, .lost, .won])
+        #expect(marks(LotteryEntry(choices: [s, a, general], result: .won(s.id))) == [.won])
+        #expect(marks(LotteryEntry(choices: [s, a, general], result: .lost)) == [.lost, .lost, .lost])
+        #expect(marks(LotteryEntry(choices: [s, a])) == [.noResult, .noResult])
+        #expect(marks(LotteryEntry(applications: 3)) == [.noResult])
+        #expect(marks(LotteryEntry(choices: [s, a], result: .won(nil))) == [.won])
+    }
+
+    /// Classes the chips do not offer have no tier, so the order the round
+    /// ranked them in stands for one.
+    @Test func typedClassesAreRankedByTheRoundsChoices() {
+        let box = LotteryChoice(seatClass: "BOX席"), standing = LotteryChoice(seatClass: "立見")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            "a": [LotteryEntry(choices: [box, standing], result: .won(box.id))],
+            "b": [LotteryEntry(choices: [box, standing], result: .won(standing.id))],
+        ]
+        let stats = PassportStats(events: Self.events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+        #expect(Set(stats.lotterySeats) == [
+            PassportStats.SeatTally(seatClass: "BOX席", won: 1, otherSeat: 1),
+            PassportStats.SeatTally(seatClass: "立見", won: 1),
+        ])
     }
 
     /// Prices on three of four events — one of them free — across two
@@ -97,7 +247,7 @@ struct PassportStatsTests {
         ]
         let stats = PassportStats(events: Self.events) {
             var tracking = Tracking()
-            tracking.cost = costs[$0.id]?.0
+            tracking.cost = costs[$0.id]?.0.map { Decimal($0) }
             tracking.seatClass = costs[$0.id]?.1 ?? ""
             return tracking
         }
@@ -121,11 +271,78 @@ struct PassportStatsTests {
         ]
         let stats = PassportStats(events: Self.events) {
             var tracking = Tracking()
-            tracking.cost = classes[$0.id]?.0
+            tracking.cost = classes[$0.id].map { Decimal($0.0) }
             tracking.seatClass = classes[$0.id]?.1 ?? ""
             return tracking
         }
         #expect(stats.ticketTypes.map(\.seatClass) == ["S席", "A席", ""])
+    }
+
+    // MARK: - Tickets in other currencies
+
+    /// A euro buys 180 yen, 36 Taiwan dollars and 7.5 yuan.
+    static let rates = CurrencyRates(base: "EUR", rates: ["JPY": 180, "TWD": 36, "CNY": 7.5],
+                                     published: .now, readAt: .now)
+
+    func stats(paying paid: [Event.ID: Money], in currency: String,
+               at rates: CurrencyRates?) -> PassportStats {
+        PassportStats(events: Self.events, currency: currency, rates: rates) { event in
+            var tracking = Tracking()
+            tracking.cost = paid[event.id]?.amount
+            tracking.currency = paid[event.id]?.currency ?? ""
+            return tracking
+        }
+    }
+
+    /// Yen and Taiwan dollars added up in yen, through the euro: NT$1,000 is
+    /// 1000 / 36 euros, which is 5,000 yen.
+    @Test func addsUpTicketsPaidInSeveralCurrencies() {
+        let stats = stats(paying: ["a": Money(amount: 9000, currency: "JPY"),
+                                   "b": Money(amount: 1000, currency: "TWD")],
+                          in: "JPY", at: Self.rates)
+        #expect(stats.tickets.map(\.id) == ["a", "b"])
+        #expect(abs(stats.ticketSpending - 14_000) < 0.001)
+        #expect(stats.isConverted)
+        #expect(stats.unconvertedTickets == 0)
+        // Paid in two currencies, so there is no one figure as it was paid.
+        #expect(stats.paidCurrency == nil)
+        #expect(!stats.showsPaid)
+        #expect(stats.paidSpending == nil)
+    }
+
+    /// Every ticket paid in yen and read in yuan: each figure can also say
+    /// what it was in yen, exactly.
+    @Test func readsYenInAnotherCurrency() {
+        let stats = stats(paying: ["a": Money(amount: 9000, currency: "JPY"),
+                                   "b": Money(amount: 18000, currency: "JPY")],
+                          in: "CNY", at: Self.rates)
+        #expect(abs(stats.ticketSpending - 1125) < 0.001)
+        #expect(stats.paidCurrency == "JPY")
+        #expect(stats.showsPaid)
+        #expect(stats.paidSpending == Money(amount: 27000, currency: "JPY"))
+        #expect(stats.averagePaid == 13500)
+        #expect(stats.tickets.first?.paid == Money(amount: 18000, currency: "JPY"))
+        #expect(stats.ticketTypes.first?.paidAverage == Money(amount: 13500, currency: "JPY"))
+    }
+
+    /// With no rates on the device, a ticket paid in another currency is left
+    /// out and counted — never read as though it were yen.
+    @Test func leavesOutWhatTheRatesCannotConvert() {
+        let stats = stats(paying: ["a": Money(amount: 9000, currency: "JPY"),
+                                   "b": Money(amount: 1000, currency: "TWD")],
+                          in: "JPY", at: nil)
+        #expect(stats.tickets.map(\.id) == ["a"])
+        #expect(stats.ticketSpending == 9000)
+        #expect(stats.unconvertedTickets == 1)
+        #expect(!stats.isConverted)
+    }
+
+    @Test func readsRatesThroughTheirBase() {
+        #expect(Self.rates.rate(from: "JPY", to: "JPY") == 1)
+        #expect(Self.rates.rate(from: "EUR", to: "TWD") == 36)
+        #expect(Self.rates.rate(from: "TWD", to: "EUR") == 1.0 / 36)
+        #expect(Self.rates.rate(from: "TWD", to: "JPY") == 5)
+        #expect(Self.rates.rate(from: "JPY", to: "XYZ") == nil)
     }
 
     @Test func tallyByYearFillsTheGaps() {
@@ -150,7 +367,8 @@ struct PassportStatsTests {
     @Test func anEmptyLibraryAddsUpToNothing() {
         let empty = PassportStats(events: []) { _ in Tracking() }
         #expect(empty.totalEvents == 0)
-        #expect(empty.averageLotteryEntries == 0)
+        #expect(empty.topLotteries.isEmpty)
+        #expect(empty.lotteryTally.winRate == nil)
         #expect(empty.tickets.isEmpty)
         #expect(empty.averageTicketPrice == 0)
         #expect(empty.highestTicketPrice == nil)

@@ -488,6 +488,29 @@
         }
       }
     },
+    "Not won" : {
+      "comment" : "Under an event every lottery for which was lost.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "落選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未抽中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未抽中"
+          }
+        }
+      }
+    },
     "On now" : {
       "localizations" : {
         "ja" : {
@@ -880,6 +903,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "明天"
+          }
+        }
+      }
+    },
+    "Won" : {
+      "comment" : "Under an event whose lottery was won but whose ticket is not yet marked bought.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽中"
           }
         }
       }

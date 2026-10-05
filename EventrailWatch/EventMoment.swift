@@ -237,10 +237,20 @@ struct EventMoment {
 
     private var isInLottery: Bool { (event.lotteryEntries ?? 0) > 0 }
 
+    /// Where the lotteries stand, and still to be announced in a copy sent
+    /// before lotteries had results.
+    private var lotteryStanding: LotteryStanding? {
+        event.lottery.flatMap(LotteryStanding.init(rawValue:)) ?? (isInLottery ? .pending : nil)
+    }
+
     /// What it cost, or how many entries went into the lottery.
     var costLine: Text {
         if let cost = event.cost {
-            return Text(cost, format: .currency(code: "JPY").precision(.fractionLength(0)))
+            // Cents only where there are any: ¥8,800, $49.99.
+            var whole = Decimal(), value = cost
+            NSDecimalRound(&whole, &value, 0, .plain)
+            return Text(cost, format: .currency(code: event.currency ?? "JPY")
+                .precision(.fractionLength(whole == cost ? 0 : 2)))
         }
         if let entries = event.lotteryEntries, entries > 0 {
             return Text("^[\(entries) entry](inflect: true)")
@@ -250,7 +260,12 @@ struct EventMoment {
 
     var ticketLine: (text: Text, color: Color) {
         if event.hasTicket { return (Text("Purchased"), EventActivityStage.beforeDoors.tint) }
-        if isInLottery { return (Text("Results pending"), Self.ahead) }
+        switch lotteryStanding {
+        case .won: return (Text("Won"), EventActivityStage.doorsOpen.tint)
+        case .pending: return (Text("Results pending"), Self.ahead)
+        case .lost: return (Text("Not won"), .white.opacity(0.55))
+        case nil: break
+        }
         return (Text("Add one on iPhone"), .white.opacity(0.55))
     }
 

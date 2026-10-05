@@ -137,6 +137,8 @@ struct SelectionToolbar: ToolbarContent {
     /// Set where the rows have a read state — the events still ahead on My
     /// Events — and drawn opposite the trash, where Following keeps its own.
     var markRead: MarkReadButton?
+    /// Set where the rows are past events on My Events, in the same place.
+    var markAttended: MarkAttendedButton?
     let remove: () -> Void
 
     var body: some ToolbarContent {
@@ -148,6 +150,7 @@ struct SelectionToolbar: ToolbarContent {
 
         ToolbarItemGroup(placement: .bottomBar) {
             if let markRead { markRead }
+            if let markAttended { markAttended }
 
             Spacer()
 
@@ -190,6 +193,21 @@ struct MarkReadButton: View {
                action: action)
             .labelStyle(.iconOnly)
             .contentTransition(.symbolEffect(.replace))
+            .disabled(!isEnabled)
+    }
+}
+
+/// The bottom-left control while past events are being picked on My Events,
+/// where the Upcoming half keeps ``MarkReadButton``: a ticket held for every
+/// picked event that has none (``EventStore/recordTickets(for:)``), which is
+/// what makes each attended.
+struct MarkAttendedButton: View {
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button("Mark as Attended", systemImage: "ticket", action: action)
+            .labelStyle(.iconOnly)
             .disabled(!isEnabled)
     }
 }

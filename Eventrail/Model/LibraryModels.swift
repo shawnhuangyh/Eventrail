@@ -102,7 +102,7 @@ final class LibraryEvent {
 }
 
 /// Everything the reader owns about one event: whether it is in the library,
-/// whether it is hearted, and the ticket, seat, seat class, cost, lottery count
+/// whether it is hearted, and the ticket, seat, seat class, cost, lotteries
 /// and note they wrote on it.
 ///
 /// One record, written only when one of those changes — by the reader, or by
@@ -139,8 +139,28 @@ final class LibraryEntry {
     var ticket: String = TicketStatus.none.rawValue
     var seat: String = ""
     var seatClass: String = ""
+    /// What the ticket cost in whole yen, as builds before costs had a
+    /// currency kept it. Read only where ``costHundredths`` is nil, and
+    /// emptied the first time the entry is written again — see ``tracking``.
     var cost: Int?
+    /// ``Tracking/cost`` in hundredths of its currency: ¥9,900 is 990000 and
+    /// $49.99 is 4999.
+    ///
+    /// A whole number rather than a `Decimal` column, because a whole number
+    /// is a CloudKit field of a kind every build and the Console read the same,
+    /// and a hundredth is as fine as any currency a ticket is sold in divides.
+    var costHundredths: Int?
+    /// ``Tracking/currency``: empty for yen written before costs had one.
+    var costCurrency: String = ""
+    /// How many lotteries were entered, as builds before each was an entry
+    /// kept it. Read only where ``lotteries`` holds nothing, as one entry
+    /// applied for that many times, and emptied the first time the entry is
+    /// written again — see ``tracking``.
     var lotteryEntries: Int?
+    /// ``Tracking/lotteries`` as JSON, its keys sorted — see
+    /// ``LotteryEntry/columnText(of:)``. Text rather than data, so the
+    /// Console shows what a record holds. Empty for none.
+    var lotteries: String = ""
     var note: String = ""
     /// When the reader last changed any of it — which of two entries for one
     /// event is kept. Written to the millisecond, as CloudKit keeps it — see
@@ -319,8 +339,11 @@ extension LibraryEvent {
             for (field, date) in trackingEdits {
                 if let field = Tracking.Field(rawValue: field) { edits[field] = date }
             }
-            let record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
-                                  cost: cost, lotteryEntries: lotteryEntries, note: note, edits: edits)
+            var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
+                                  cost: cost.map { Decimal($0) },
+                                  lotteries: LotteryEntry.carriedOver(count: lotteryEntries),
+                                  note: note, edits: edits)
+            record.foldLegacyTicket()
             archive.tracking[eventID] = Stamped(record, at: trackingChanged)
         }
         if let readChanged {
@@ -444,17 +467,40 @@ extension LibraryEntry {
 
     var tracking: Tracking {
         get {
-            Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat, seatClass: seatClass,
-                     cost: cost, lotteryEntries: lotteryEntries, note: note)
+            let amount = costHundredths.map { Decimal($0) / 100 } ?? cost.map { Decimal($0) }
+            let entries = LotteryEntry.entries(inColumn: lotteries)
+                ?? LotteryEntry.carriedOver(count: lotteryEntries)
+            var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
+                                  seatClass: seatClass, cost: amount, lotteries: entries, note: note,
+                                  currency: costCurrency)
+            // A ticket an older build marked bought reads as a won entry, and
+            // is written so — the ticket column emptied — with the next write.
+            record.foldLegacyTicket()
+            return record
         }
         set {
             update(\.ticket, to: newValue.ticket.rawValue)
             update(\.seat, to: newValue.seat)
             update(\.seatClass, to: newValue.seatClass)
-            update(\.cost, to: newValue.cost)
-            update(\.lotteryEntries, to: newValue.lotteryEntries)
+            update(\.costHundredths, to: newValue.cost.map(Self.hundredths(of:)))
+            update(\.costCurrency, to: newValue.currency)
+            // The cost now lives in the two columns above, so the old one is
+            // emptied rather than left to be read back over an emptied cost.
+            update(\.cost, to: nil)
+            update(\.lotteries, to: LotteryEntry.columnText(of: newValue.lotteries))
+            // Emptied for the reason the old cost column is: a list taken
+            // down to nothing must not read back as the count again.
+            update(\.lotteryEntries, to: nil)
             update(\.note, to: newValue.note)
         }
+    }
+
+    /// An amount in hundredths, to the nearest one.
+    private static func hundredths(of amount: Decimal) -> Int {
+        var scaled = amount * 100
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &scaled, 0, .plain)
+        return NSDecimalNumber(decimal: rounded).intValue
     }
 
     /// The event as it stood when the reader last wrote here — what the entry

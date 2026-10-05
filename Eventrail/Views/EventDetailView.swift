@@ -42,6 +42,9 @@ struct EventDetailView: View {
     @State private var isSummaryExpanded = false
     /// Whether ``TicketDetailsView`` is up over this sheet.
     @State private var isEditingTicket = false
+    /// Whether the bar's button or the menu has asked to take the event out —
+    /// one question for both, hung off the button.
+    @State private var isConfirmingRemoval = false
     /// What has been pushed onto this sheet's stack — a performer, a hall. The
     /// refresh notices are drawn above the action bar while nothing is, and
     /// over the whole stack once something is; see ``body``.
@@ -209,7 +212,7 @@ struct EventDetailView: View {
         }
         .washBackground()
         .sheet(isPresented: $isEditingTicket) {
-            TicketDetailsView(event: event)
+            TicketDetailsView(event: event, tracking: store.tracking(for: event))
         }
         #if DEBUG
         .sheet(isPresented: $isTestingLiveActivity) {
@@ -572,21 +575,22 @@ struct EventDetailView: View {
     /// reads the event's own times through ``EventProgress``.
     private var isAhead: Bool { event.isUpcoming }
 
-    /// Whether there is a ticket to say anything about: a past event had one,
-    /// and one still to come has one once the reader says it was bought.
-    private var hasTicket: Bool { !isAhead || tracking.ticket == .purchased }
+    /// Whether there is a ticket to say anything about: a lottery won or a
+    /// first-come round got (``Tracking/hasTicket``), past or ahead alike.
+    /// With it and the day over, the reader went.
+    private var hasTicket: Bool { tracking.hasTicket }
 
     /// The colour the card is in: amber while the event is to come, green
     /// with the doors open, orange in the last minutes before the start, the
-    /// heart's red on stage — and once it is over, green if the reader kept
-    /// it, since they went.
+    /// heart's red on stage — and once it is over, green if the reader held a
+    /// ticket, since they went.
     private func tint(for progress: EventProgress, at now: Date) -> Color {
         switch progress.phase {
         case .ahead, .today, .beforeDoors, .beforeShow: .trackTicket
         case .doorsOpen(let starts):
             starts.timeIntervalSince(now) <= Self.startingSoon ? .orange : .trackAttended
         case .onNow: .favorite
-        case .wrapped, .over: store.isInLibrary(event) ? .trackAttended : .secondary
+        case .wrapped, .over: hasTicket ? .trackAttended : .secondary
         }
     }
 
@@ -595,7 +599,7 @@ struct EventDetailView: View {
 
     /// What the card opens on: how far off the event is, where it has got to
     /// on the day, or — once the day is over — whether the reader went, which
-    /// is whether it is in the library.
+    /// is whether they held a ticket.
     private func headline(for progress: EventProgress, at now: Date) -> Text {
         switch progress.phase {
         case .ahead(1): Text("Tomorrow")
@@ -609,7 +613,7 @@ struct EventDetailView: View {
                 : Text("Doors open")
         case .onNow: Text("On now")
         case .wrapped: Text("That's a wrap")
-        case .over: store.isInLibrary(event) ? Text("Attended") : Text("Ended")
+        case .over: hasTicket ? Text("Attended") : Text("Ended")
         }
     }
 
@@ -929,38 +933,81 @@ struct EventDetailView: View {
         .accessibilityValue(Text("\(value), \(detail)"))
     }
 
-    /// Where the ticket stands: in hand, still being tried for, or not yet —
-    /// and once the event is over, simply that the reader was there.
+    /// Where the ticket stands, read from the lottery entries: won (or got,
+    /// first come), waiting on a result — saying when it comes — lost, or
+    /// not tried for yet; and once the event is over with a ticket held,
+    /// simply that the reader was there. Over without one, a lottery still
+    /// waiting is one whose result was never written down, as the ticket
+    /// sheet says. A win is the ticket, so it takes the ticket's orange.
     private var ticketValue: Text {
-        if !isAhead { return Text("Attended") }
-        if tracking.ticket == .purchased { return Text("Purchased") }
-        if tracking.lotteryEntries != nil { return Text("In the lottery") }
-        return Text("No ticket yet")
+        if !isAhead, hasTicket { return Text("Attended") }
+        switch tracking.lotteryStanding {
+        case .won:
+            let won = tracking.wonLottery
+            return LotteryText.result(won?.outcome ?? .won(nil), firstCome: won?.isFirstCome ?? false)
+        case .pending:
+            guard isAhead else { return Text("No Result") }
+            if let day = tracking.nextResults()?.day {
+                return Text("Results \(Text(verbatim: LotteryText.short(day)))")
+            }
+            return Text("In the lottery")
+        case .lost: return Text("Not won")
+        case nil: return isAhead ? Text("No ticket yet") : Text("No Ticket")
+        }
     }
 
     private var ticketTint: Color {
-        if !isAhead { return .trackAttended }
-        if tracking.ticket == .purchased { return .trackTicket }
-        if tracking.lotteryEntries != nil { return .trackInterest }
-        return .secondary
+        if !isAhead, hasTicket { return .trackAttended }
+        switch tracking.lotteryStanding {
+        case .won: return .trackTicket
+        case .pending: return isAhead ? .trackInterest : .secondary
+        case .lost, nil: return .secondary
+        }
     }
 
-    /// What it cost and what it took, where either was written down.
+    /// The line under it: what the ticket cost — or, with no cost written,
+    /// what was won — and the round it came from; how far off the results
+    /// are; how many times the lotteries were applied for. Whatever was
+    /// written down.
     private var ticketDetail: Text {
         var parts: [Text] = []
-        if let cost = tracking.cost { parts.append(Text(verbatim: YenAmount().format(cost))) }
-        if let entries = tracking.lotteryEntries { parts.append(Text("^[\(entries) entry](inflect: true)")) }
+        let applications = tracking.lotteryApplications
+        let applied = Text("^[\(applications) entry](inflect: true)")
+        if !isAhead {
+            if hasTicket, let price = tracking.price { parts.append(Text(verbatim: price.formatted)) }
+            if applications > 0 { parts.append(applied) }
+        } else {
+            switch tracking.lotteryStanding {
+            case .won:
+                let entry = tracking.wonLottery
+                if let price = tracking.price {
+                    parts.append(Text(verbatim: price.formatted))
+                } else if let choice = entry?.wonChoice {
+                    parts.append(LotteryText.won(choice))
+                }
+                if let entry, !entry.round.isEmpty { parts.append(LotteryText.round(of: entry)) }
+            case .pending:
+                if let entry = tracking.nextResults(), let day = entry.day {
+                    parts.append(Text(verbatim: LotteryText.relative(day)))
+                    if !entry.round.isEmpty { parts.append(LotteryText.round(of: entry)) }
+                } else if applications > 0 {
+                    parts.append(applied)
+                }
+            case .lost:
+                if applications > 0 { parts.append(applied) }
+            case nil:
+                break
+            }
+        }
         guard let first = parts.first else { return Text("Tap to Edit") }
         return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
     }
 
-    /// The class the seat was sold as, where it was written down — in the
+    /// The class of seat the ticket is (``Tracking/ticketClass``) — in the
     /// reader's language where it is one of the chips, as written otherwise.
     private var seatDetail: Text {
-        if !tracking.seatClass.isEmpty {
-            return SeatClass(rawValue: tracking.seatClass).map { Text($0.label) }
-                ?? Text(verbatim: tracking.seatClass)
-        }
+        let seatClass = tracking.ticketClass
+        if !seatClass.isEmpty { return LotteryText.seatClass(seatClass) }
         return tracking.seat.isEmpty ? Text("Tap to Edit") : Text("Your seat")
     }
 
@@ -975,13 +1022,20 @@ struct EventDetailView: View {
     private var actionBar: some ToolbarContent {
         ToolbarItemGroup(placement: .bottomBar) {
             Button {
-                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                if store.isInLibrary(event) {
+                    isConfirmingRemoval = true
+                } else {
+                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+                }
             } label: {
                 Label(store.isInLibrary(event) ? "Remove from my events" : "Add to my events",
                       systemImage: store.isInLibrary(event) ? "checkmark" : "plus")
                     .contentTransition(.symbolEffect(.replace))
             }
             .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
+            .confirmingRemoval(isPresented: $isConfirmingRemoval) {
+                withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+            }
 
             if offersLiveActivity {
                 Button(action: toggleLiveActivity) {
@@ -1061,8 +1115,10 @@ struct EventDetailView: View {
             // The same place either way, so the menu keeps its shape as the
             // event goes in and out of the library.
             if store.isInLibrary(event) {
+                // Asked from the bar's button beside the menu, which the menu
+                // has closed over by the time the question is up.
                 Button(role: .destructive) {
-                    withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+                    isConfirmingRemoval = true
                 } label: {
                     Label { Text("Remove Event") } icon: { removalIcon }
                 }

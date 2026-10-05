@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Where the library is kept, and how to empty it.
 ///
-/// General is what a reader sets once and lives with — the language, light or
-/// dark, and the two switches that carry the library somewhere else of theirs
-/// (their other devices and their calendar). Backup is the copy they keep
-/// themselves. Advanced is what most readers never touch: how halls are
+/// General is what a reader sets once and lives with — the language and the
+/// currency, light or dark, and the two switches that carry the library
+/// somewhere else of theirs (their other devices and their calendar). Backup
+/// is the copy they keep themselves. Advanced is what most readers never touch: how halls are
 /// placed, on a screen of its own, and the pages kept from Eventernote, which
 /// are nobody's record and so stay off the cards holding the reader's own.
 /// About is the app itself. Delete All sits alone under Danger Zone at the
@@ -60,7 +60,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     section("General") {
-                        languageRow
+                        localeRow
                         SettingRowDivider()
                         appearanceRow
                         SettingRowDivider()
@@ -105,7 +105,7 @@ struct SettingsView: View {
             .presentationDragIndicator(.visible)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done", systemImage: "checkmark") { dismiss() }
                 }
             }
             .fullScreenCover(isPresented: $isReplayingWelcome) {
@@ -140,14 +140,15 @@ struct SettingsView: View {
     /// carry the library somewhere else of the reader's: their other devices,
     /// and their calendar.
 
-    /// The app's language and the one descriptions are translated into, on a
-    /// screen of their own — see ``LanguageSettingsView``. Just a chevron:
-    /// with two answers behind it, naming one here would say only half.
-    private var languageRow: some View {
+    /// The app's language, the one descriptions are translated into and the
+    /// currency money is counted in, on a screen of their own — see
+    /// ``LocaleSettingsView``. Just a chevron: with three answers behind it,
+    /// naming one here would say only a third.
+    private var localeRow: some View {
         NavigationLink {
-            LanguageSettingsView()
+            LocaleSettingsView()
         } label: {
-            SettingRowLabel("globe", "Language") {
+            SettingRowLabel("globe", "Locale") {
                 SettingRowChevron()
             }
             .settingRowPadding()

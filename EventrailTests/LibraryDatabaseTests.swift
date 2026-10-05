@@ -31,9 +31,24 @@ struct LibraryDatabaseTests {
         abroad.readAt = later
         archive.events["4"] = abroad
         archive.membership["4"] = Stamped(true, at: later)
+        archive.tracking["4"] = Stamped(Tracking(cost: Decimal(string: "1280.5"), currency: "TWD"), at: later)
         archive.membership["gone"] = Stamped(false, at: later)
-        archive.tracking["1"] = Stamped(Tracking(ticket: .purchased, seat: "A12", seatClass: "S席", cost: 9000,
-                                                 lotteryEntries: 3, note: "front row"), at: earlier)
+        // Ids written out, since this is built once to write and once to
+        // compare against.
+        func id(_ n: Int) -> UUID { UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", n))")! }
+        let won = LotteryChoice(id: id(1), seatClass: "S席", quantity: 2)
+        archive.tracking["1"] = Stamped(Tracking(seat: "A12", seatClass: "S席", cost: 9000,
+                                                 lotteries: [
+                                                     LotteryEntry(id: id(2), round: "最速先行抽選", applications: 3,
+                                                                  day: CalendarDay(year: 2025, month: 5, day: 1),
+                                                                  choices: [LotteryChoice(id: id(3), seatClass: "S席", quantity: 2)],
+                                                                  result: .lost),
+                                                     LotteryEntry(id: id(4), round: "プレイガイド先行",
+                                                                  choices: [won, LotteryChoice(id: id(5))],
+                                                                  result: .won(won.id)),
+                                                     LotteryEntry(id: id(6)),
+                                                 ],
+                                                 note: "front row"), at: earlier)
         archive.favorites["2"] = Stamped(true, at: earlier)
         let listed = Fixtures.event(id: "3", date: ahead)
         archive.followingReads = ["3": Stamped(FollowingRead(fingerprint: listed.listingFingerprint, day: listed.date), at: earlier)]
@@ -231,7 +246,9 @@ struct LibraryDatabaseTests {
     /// Everything the reader wrote on an event.
     let written = LibraryEntry.Answers(
         inLibrary: true, isFavorite: true,
-        tracking: Tracking(ticket: .purchased, seat: "A12", cost: 9000, note: "front row"))
+        tracking: Tracking(seat: "A12", cost: 9000,
+                           lotteries: [LotteryEntry(round: "最速先行抽選", applications: 2, result: .won(nil))],
+                           note: "front row"))
 
     /// A device set up afresh imports the linked account before iCloud has
     /// brought it the entry holding the reader's note: its own entry says
@@ -280,6 +297,80 @@ struct LibraryDatabaseTests {
         let kept = try #require(try entries("1", in: context).first)
         #expect(!kept.inLibrary)
         #expect(kept.tracking.note == "front row")
+        withExtendedLifetime(database) {}
+    }
+
+    /// A cost an older build wrote is whole yen in the old column. It reads
+    /// back as yen, and the next write moves it into the two new columns
+    /// rather than leaving it to be read back over an emptied cost.
+    @Test func aCostInTheOldColumnIsYenAndMovesOnTheNextWrite() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.cost = 9900
+        #expect(entry.tracking.price == Money(amount: 9900, currency: "JPY"))
+
+        entry.tracking = entry.tracking
+        #expect(entry.cost == nil)
+        #expect(entry.costHundredths == 990_000)
+        #expect(entry.tracking.price == Money(amount: 9900, currency: "JPY"))
+
+        var emptied = entry.tracking
+        emptied.cost = nil
+        entry.tracking = emptied
+        #expect(entry.tracking.price == nil)
+        withExtendedLifetime(database) {}
+    }
+
+    /// A lottery count an older build wrote reads back as one entry applied
+    /// for that many times, and the next write moves it into the list's own
+    /// column — so a list taken down to nothing does not read back as the
+    /// count again.
+    @Test func aLotteryCountInTheOldColumnMovesOnTheNextWrite() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.lotteryEntries = 2
+        #expect(entry.tracking.lotteries.map(\.applications) == [2])
+        #expect(entry.tracking == entry.tracking)
+
+        var answered = entry.tracking
+        answered.lotteries[0].result = .lost
+        answered.lotteries.append(LotteryEntry(round: "一般発売"))
+        entry.tracking = answered
+        #expect(entry.lotteryEntries == nil)
+        #expect(!entry.lotteries.isEmpty)
+        #expect(entry.tracking.lotteries.map(\.result) == [.lost, .pending])
+        #expect(entry.tracking.lotteryApplications == 2)
+
+        var emptied = entry.tracking
+        emptied.lotteries = []
+        entry.tracking = emptied
+        #expect(entry.lotteries.isEmpty)
+        #expect(entry.tracking.lotteries.isEmpty)
+        withExtendedLifetime(database) {}
+    }
+
+    /// A ticket an older build marked bought reads as a won entry, and the
+    /// next write empties the old column — so the entry, once taken out,
+    /// does not come back.
+    @Test func aTicketMarkedBoughtMovesIntoTheEntriesOnTheNextWrite() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.ticket = TicketStatus.purchased.rawValue
+        entry.lotteryEntries = 2
+        #expect(entry.tracking.hasTicket)
+        #expect(entry.tracking.lotteries.map(\.applications) == [2])
+        #expect(entry.tracking == entry.tracking)
+
+        var emptied = entry.tracking
+        emptied.lotteries = []
+        entry.tracking = emptied
+        #expect(entry.ticket == TicketStatus.none.rawValue)
+        #expect(entry.lotteryEntries == nil)
+        #expect(!entry.tracking.hasTicket)
+        #expect(entry.tracking.lotteries.isEmpty)
         withExtendedLifetime(database) {}
     }
 

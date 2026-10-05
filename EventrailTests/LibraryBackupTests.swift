@@ -17,8 +17,11 @@ struct LibraryBackupTests {
         let event = Fixtures.event(id: "300001", title: "水瀬いのり LIVE", isDetailed: true)
         archive.events[event.id] = event
         archive.membership[event.id] = Stamped(true, at: Date(timeIntervalSince1970: 1_800_000_000))
-        archive.tracking[event.id] = Stamped(Tracking(ticket: .purchased, seat: "A5ブロック 12番",
-                                                      cost: 9900, note: "最高"),
+        let won = LotteryChoice(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, seatClass: "S席")
+        let lottery = LotteryEntry(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+                                   round: "最速先行抽選", applications: 3, choices: [won], result: .won(won.id))
+        archive.tracking[event.id] = Stamped(Tracking(seat: "A5ブロック 12番", cost: 9900,
+                                                      lotteries: [lottery], note: "最高"),
                                              at: Date(timeIntervalSince1970: 1_800_000_000))
         return archive
     }

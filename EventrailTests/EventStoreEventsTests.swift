@@ -108,7 +108,8 @@ struct EventStoreEventsTests {
         #expect(store.isInLibrary(event))
         #expect(store.isFavorite(event))
         #expect(store.tracking(for: event).note == "front row")
-        #expect(store.tracking(for: event).ticket == .purchased)
+        // Marked bought by that build, the ticket reads as a won entry.
+        #expect(store.tracking(for: event).hasTicket)
     }
 
     /// Only the part given is dated: adding an event says nothing about its
@@ -176,15 +177,98 @@ struct EventStoreEventsTests {
         #expect(entry.modified > .distantPast)
     }
 
-    /// A note outlives its event, so adding it back brings the note back.
-    @Test func aRemovalKeepsTheNote() throws {
+    /// Taken out, an event takes what was written on it along — its
+    /// lotteries, its ticket and its note — so adding it back starts clean.
+    @Test func aRemovalEmptiesTheRecord() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.toggleLibraryMembership(event)
+        store.toggleFavorite(event)
+        store.setTracking(Tracking(seat: "A1", cost: 9900, lotteries: [LotteryEntry(result: .won(nil))],
+                                   note: "front row"), for: event)
+        store.remove([event])
+        #expect(!store.isInLibrary(event))
+        #expect(store.tracking(for: event).isEmpty)
+        // The heart is a separate answer.
+        #expect(store.isFavorite(event))
+    }
+
+    /// The sheet's own button is a removal like the trash.
+    @Test func theToggleEmptiesTheRecordToo() throws {
         let store = store()
         let event = Fixtures.event(id: "1")
         store.toggleLibraryMembership(event)
         store.setTracking(Tracking(note: "front row"), for: event)
-        store.remove([event])
+        store.toggleLibraryMembership(event)
         #expect(!store.isInLibrary(event))
-        #expect(store.tracking(for: event).note == "front row")
+        #expect(store.tracking(for: event).isEmpty)
+    }
+
+    /// Only a ticket says the reader went: a kept event whose day is over
+    /// is not attended until a round won or got is written on it.
+    @Test func attendedIsATicketAndTheDayOver() {
+        let store = store()
+        let past = Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))
+        let ahead = Fixtures.event(id: "2", date: Fixtures.date(2099, 6, 1))
+        store.toggleLibraryMembership(past)
+        store.toggleLibraryMembership(ahead)
+        #expect(!store.hasAttended(past))
+        #expect(store.status(for: past) == .unticketed)
+        #expect(store.status(for: ahead) == .planned)
+
+        let won = Tracking(lotteries: [LotteryEntry(applications: 2, result: .won(nil))])
+        store.setTracking(won, for: past)
+        store.setTracking(won, for: ahead)
+        #expect(store.hasAttended(past))
+        #expect(store.status(for: past) == .attended)
+        #expect(!store.hasAttended(ahead))
+        #expect(store.status(for: ahead) == .ticketed)
+
+        // A lottery lost is no ticket, past or not.
+        store.setTracking(Tracking(lotteries: [LotteryEntry(result: .lost)]), for: past)
+        #expect(!store.hasAttended(past))
+        #expect(store.status(for: past) == .unticketed)
+    }
+
+    /// Nobody kept it and nobody holds a ticket: nothing to say, however its
+    /// date reads.
+    @Test func aPastEventNobodyKeptIsUntracked() {
+        let store = store()
+        #expect(store.status(for: Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))) == .untracked)
+    }
+
+    /// A run of past events marked at once: each without a ticket gains one,
+    /// and one already won keeps its own record as it was.
+    @Test func recordingTicketsLeavesOnesAlreadyHeld() {
+        let store = store()
+        let first = Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))
+        let second = Fixtures.event(id: "2", date: Fixtures.date(2025, 7, 1))
+        store.toggleLibraryMembership(first)
+        store.toggleLibraryMembership(second)
+        let won = Tracking(lotteries: [LotteryEntry(round: "最速先行抽選", applications: 2, result: .won(nil))])
+        store.setTracking(won, for: second)
+
+        store.recordTickets(for: [first, second])
+        #expect(store.hasAttended(first))
+        #expect(store.tracking(for: first).lotteries == [LotteryEntry.ticketHeld])
+        #expect(store.tracking(for: second).lotteries == won.lotteries)
+    }
+
+    /// What My Events offers to go through: past, kept, no ticket, and
+    /// arrived since the last pass — not before it, and not once ticketed.
+    @Test func eventsAwaitTicketsOnlySinceTheLastPass() {
+        let store = store()
+        let past = Fixtures.event(id: "1", date: Fixtures.date(2025, 6, 1))
+        let ahead = Fixtures.event(id: "2", date: Fixtures.date(2099, 6, 1))
+        let before = Date.now.addingTimeInterval(-60)
+        store.toggleLibraryMembership(past)
+        store.toggleLibraryMembership(ahead)
+
+        #expect(store.awaitingTickets([past, ahead], since: before).map(\.id) == ["1"])
+        #expect(store.awaitingTickets([past, ahead], since: .now.addingTimeInterval(60)).isEmpty)
+
+        store.recordTickets(for: [past])
+        #expect(store.awaitingTickets([past, ahead], since: before).isEmpty)
     }
 
     @Test func askingTwiceGivesTheSame() throws {

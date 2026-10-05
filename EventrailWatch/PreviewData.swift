@@ -24,19 +24,19 @@ extension WatchLibrary {
                        venue: "ユナイテッド・シネマ豊洲", link: link("492514"), flyer: nil, day: day(0),
                        doors: doors, starts: doors.addingTimeInterval(15 * 60),
                        ends: doors.addingTimeInterval(119 * 60), timeZone: tokyo,
-                       hasTicket: true, seat: "3階 H列 21番", seatClass: "S席", cost: 8800, lotteryEntries: nil),
+                       hasTicket: true, seat: "3階 H列 21番", seatClass: "S席", cost: 8800, currency: "JPY", lotteryEntries: nil, lottery: nil),
             WatchEvent(id: "489120", title: "水瀬いのり LIVE TOUR 2026 \"Lantern\" 【神奈川】Day1",
                        venue: "パシフィコ横浜 国立大ホール", link: link("489120"), flyer: nil, day: day(15),
                        doors: at(day(15), 17, 0), starts: at(day(15), 18, 0), ends: nil, timeZone: tokyo,
-                       hasTicket: false, seat: "", seatClass: "", cost: nil, lotteryEntries: 2),
+                       hasTicket: false, seat: "", seatClass: "", cost: nil, currency: nil, lotteryEntries: 2, lottery: "pending"),
             WatchEvent(id: "491006", title: "伊達さゆり 1st Live「Sincerely Yours」",
                        venue: "Zepp DiverCity(TOKYO)", link: link("491006"), flyer: nil, day: day(35),
                        doors: at(day(35), 17, 15), starts: at(day(35), 18, 0), ends: nil, timeZone: tokyo,
-                       hasTicket: false, seat: "", seatClass: "", cost: nil, lotteryEntries: nil),
+                       hasTicket: false, seat: "", seatClass: "", cost: nil, currency: nil, lotteryEntries: nil, lottery: nil),
             WatchEvent(id: "492650", title: "水瀬いのり2027年ライブツアー(仮)【東京】Day2",
                        venue: "京王アリーナTOKYO", link: link("492650"), flyer: nil, day: day(204),
                        doors: nil, starts: nil, ends: nil, timeZone: tokyo,
-                       hasTicket: false, seat: "", seatClass: "", cost: nil, lotteryEntries: nil),
+                       hasTicket: false, seat: "", seatClass: "", cost: nil, currency: nil, lotteryEntries: nil, lottery: nil),
         ], showsLocalTime: false)
     }
 }

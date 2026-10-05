@@ -19,6 +19,11 @@ struct EventsView: View {
     @State private var isSelecting = false
     @State private var selection: Set<Event.ID> = []
     @State private var isConfirmingRemoval = false
+    /// The row a swipe asked to take out, while its question is open.
+    @State private var swipedAway: Event.ID?
+    /// What ``TicketReviewView`` is going through, while it is open.
+    @State private var reviewing: TicketReviewList?
+    @AppStorage(TicketReviewView.reviewedKey) private var ticketsReviewed: Double = 0
 
     private var library: [Event] { store.events(of: kept, where: \.inLibrary) }
 
@@ -38,6 +43,12 @@ struct EventsView: View {
 
     private var chosen: [Event] {
         selection.compactMap { store.event(id: $0) }
+    }
+
+    /// The past events that have arrived with no ticket since the reader last
+    /// went through them — what the row at the head of Past offers.
+    private var awaitingTickets: [Event] {
+        store.awaitingTickets(library, since: Date(timeIntervalSinceReferenceDate: ticketsReviewed))
     }
 
     var body: some View {
@@ -62,7 +73,7 @@ struct EventsView: View {
                         confirmation: RemovalConfirmation(
                             isPresented: $isConfirmingRemoval,
                             title: removalTitle,
-                            message: Text("This removes them from your other devices as well. Anything your Eventernote account still lists comes back on the next refresh; the rest you can add again from Search."),
+                            message: selection.count == 1 ? EventRemoval.message : EventRemoval.messageForSeveral,
                             confirmTitle: "Remove",
                             cancelTitle: "Keep them",
                             confirm: {
@@ -71,11 +82,13 @@ struct EventsView: View {
                             }
                         ),
                         markRead: filter == .upcoming ? markButton : nil,
+                        markAttended: filter == .past ? attendedButton : nil,
                         remove: { isConfirmingRemoval = true }
                     )
                 }
             }
             .eventSheet($openEvent)
+            .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
             // Nothing is left selected behind a filter that no longer shows it,
             // and nothing survives leaving the mode that picked it.
             .onChange(of: filter) { selection.removeAll() }
@@ -103,6 +116,20 @@ struct EventsView: View {
                     .disabled(isSelecting)
                     .padding(.horizontal, 20)
                     .headRow(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
+                // Under the picker, on Past alone and not while picking: an
+                // import's history arrives with no tickets, and only a ticket
+                // says the reader went.
+                if filter == .past, !isSelecting {
+                    let awaiting = awaitingTickets
+                    if !awaiting.isEmpty {
+                        TicketReviewPrompt(count: awaiting.count) {
+                            reviewing = TicketReviewList(events: awaiting)
+                        } dismiss: {
+                            withAnimation(.snappy) { ticketsReviewed = Date.now.timeIntervalSinceReferenceDate }
+                        }
+                        .headRow(EdgeInsets(top: 0, leading: 16, bottom: 14, trailing: 16))
+                    }
+                }
             }
             .listSectionSpacing(0)
 
@@ -146,17 +173,19 @@ struct EventsView: View {
                                 }
                             }
                             // Every row, past or ahead: the one-row form of the
-                            // selection bar's trash. Not asked about first, as no
-                            // swipe to delete on iOS is — what the account
-                            // still lists comes back on the next refresh, and the
-                            // rest is a search away.
+                            // selection bar's trash, and asked about first like
+                            // it, since what the reader wrote on the event goes
+                            // with it. No destructive role: that sends the row
+                            // off the screen before the answer is in.
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button("Remove", systemImage: "trash", role: .destructive) {
-                                    withAnimation(.snappy) { store.remove([event]) }
-                                }
-                                // Said outright: the role alone left the button
-                                // in the app's tint rather than the system red.
-                                .tint(.red)
+                                Button("Remove", systemImage: "trash") { swipedAway = event.id }
+                                    .tint(.red)
+                            }
+                            .confirmingRemoval(isPresented: Binding(
+                                get: { swipedAway == event.id },
+                                set: { if !$0 { swipedAway = nil } }
+                            )) {
+                                withAnimation(.snappy) { store.remove([event]) }
                             }
                     }
                 } header: {
@@ -180,13 +209,12 @@ struct EventsView: View {
     }
 
     /// The subtitle carries the count that matters at the moment: how many are
-    /// about to be removed, rather than how many there are. Only Upcoming can
-    /// mark as well, so only Upcoming says so.
+    /// about to be acted on, rather than how many there are. Both halves mark
+    /// as well as remove — Upcoming as read, Past as attended.
     private var subtitle: Text {
         if isSelecting {
             selection.isEmpty
-                ? (filter == .upcoming ? Text("Select events to mark or remove")
-                                       : Text("Select events to remove"))
+                ? Text("Select events to mark or remove")
                 : Text("^[\(selection.count) event](inflect: true) selected")
         } else {
             Text("^[\(eventCount) event](inflect: true)")
@@ -215,6 +243,19 @@ struct EventsView: View {
             withAnimation(.snappy) {
                 endSelecting()
                 store.markRead(picked, read: marksRead)
+            }
+        }
+    }
+
+    /// A ticket held for every picked event that has none, which makes each
+    /// attended. One way: a ticket is taken back on the event's own Ticket
+    /// Details, where what it was can be seen.
+    private var attendedButton: MarkAttendedButton {
+        let picked = chosen.filter { !store.tracking(for: $0).hasTicket }
+        return MarkAttendedButton(isEnabled: !picked.isEmpty) {
+            withAnimation(.snappy) {
+                endSelecting()
+                store.recordTickets(for: picked)
             }
         }
     }

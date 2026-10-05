@@ -544,17 +544,41 @@ final class EventStore {
 
     /// The one badge a row wears, read from where the event stands.
     ///
-    /// An event in the library that has already happened is one the reader
-    /// went to — that is what putting it there means, and it is why there is
-    /// no attendance to record. Still to come, the ticket is the only thing
-    /// left that the library does not already say. An event nobody has kept is
-    /// untracked however its date reads, so a past search result does not
-    /// announce itself as attended.
+    /// The ticket decides it (``Tracking/hasTicket``: a lottery won or a
+    /// first-come round got): held, the event is ticketed until its day is
+    /// over and attended after (``hasAttended(_:)``). Without one, a kept
+    /// event is planned while it is ahead and has no ticket once it is past;
+    /// an event nobody has kept and nobody holds a ticket for is untracked
+    /// however its date reads.
     func status(for event: Event) -> TrackingStatus {
         let isKept = isInLibrary(event)
-        if isKept, !event.isUpcoming { return .attended }
-        if tracking(for: event).ticket == .purchased { return .ticketed }
-        return isKept ? .planned : .untracked
+        if tracking(for: event).hasTicket { return event.isUpcoming ? .ticketed : .attended }
+        guard isKept else { return .untracked }
+        return event.isUpcoming ? .planned : .unticketed
+    }
+
+    /// Whether the reader went: a ticket in hand and the event's day over.
+    ///
+    /// The ticket is the one thing that says so. Keeping an event says the
+    /// reader means to go, not that they got in — the library's past is every
+    /// event they meant to go to, won or not — and an event they went to
+    /// without a round recorded is one whose win has not been written down.
+    func hasAttended(_ event: Event) -> Bool {
+        !event.isUpcoming && tracking(for: event).hasTicket
+    }
+
+    /// The past events here with no ticket written down that joined the
+    /// library, or whose day ended, after `reviewed` — what My Events offers
+    /// to go through once an import has brought them in (``TicketReviewView``).
+    ///
+    /// Read cheapest first: past every review but the first, the dates leave
+    /// almost nothing for the record to be read for.
+    func awaitingTickets(_ events: some Sequence<Event>, since reviewed: Date) -> [Event] {
+        events.filter { event in
+            guard !event.isUpcoming else { return false }
+            let added = entries[event.id]?.changed(.inLibrary) ?? .distantPast
+            return max(added, event.dayEnds) > reviewed && !tracking(for: event).hasTicket
+        }
     }
 
     func isInLibrary(_ event: Event) -> Bool { entries[event.id]?.inLibrary == true }
@@ -584,6 +608,20 @@ final class EventStore {
         save()
     }
 
+    /// Writes down a ticket held for each of these that has none, its round
+    /// left unwritten (``Tracking/recordTicket()``) — the reader saying they
+    /// went to the lot, from My Events or from ``TicketReviewView``. One save
+    /// for all of them.
+    func recordTickets(for events: some Sequence<Event>) {
+        for event in events {
+            var record = tracking(for: event)
+            guard !record.hasTicket else { continue }
+            record.recordTicket()
+            edit(event) { $0.tracking = record }
+        }
+        save()
+    }
+
     func toggleFavorite(_ event: Event) {
         edit(event) { $0.isFavorite.toggle() }
         save()
@@ -591,35 +629,39 @@ final class EventStore {
 
     /// Copying an event found in search into the library is always explicit: an
     /// import never does it silently. Taking one back out is explicit too, and
-    /// answers only for this device and the reader's other ones — an event the
-    /// linked account still lists is imported again on the next refresh.
+    /// is a removal like any other — see ``remove(_:)``.
     func toggleLibraryMembership(_ event: Event) {
-        if isInLibrary(event) {
-            edit(event, keepingFacts: false) { $0.inLibrary = false }
-        } else {
-            // Nothing to write down: being in the library is what says the
-            // reader means to go, which is what a tracking record used to be
-            // opened to say for it.
-            edit(event) { $0.inLibrary = true }
-            placeAdded(event)
+        guard !isInLibrary(event) else {
+            remove(CollectionOfOne(event))
+            return
         }
+        // Nothing to write down: being in the library is what says the reader
+        // means to go, which is what a tracking record used to be opened to
+        // say for it.
+        edit(event) { $0.inLibrary = true }
+        placeAdded(event)
         save()
     }
 
-    /// Takes events out of the library in one go.
+    /// Takes events out of the library, and everything the reader wrote on
+    /// them with them: the lotteries, the ticket, the seat, the cost and the
+    /// note. Every screen asks first and says so.
     ///
-    /// Each one's entry says so rather than going, exactly as a single removal
-    /// does: the other device has to be told a removal happened, or it would
-    /// hand all of them straight back. It answers for the reader's devices and
-    /// not for Eventernote — an event still on the linked account is imported
-    /// again by the next refresh. A note written on one outlives it, so that
-    /// adding it back brings the note back.
+    /// Each one's entry says so rather than going: the other device has to be
+    /// told a removal happened, or it would hand all of them straight back —
+    /// and its record is emptied rather than left, so it travels too. It
+    /// answers for the reader's devices and not for Eventernote — an event
+    /// still on the linked account is imported again by the next refresh,
+    /// with nothing written on it.
     ///
     /// Favorites are left alone. Hearting an event says "keep this in front of
     /// me", which is a separate answer from whether it is in the library.
     func remove(_ events: some Sequence<Event>) {
         for event in events {
-            edit(event, keepingFacts: false) { $0.inLibrary = false }
+            edit(event, keepingFacts: false) {
+                $0.inLibrary = false
+                $0.tracking = Tracking()
+            }
         }
         save()
     }
@@ -631,12 +673,9 @@ final class EventStore {
     ///
     /// Favorites go too here, unlike a removal of some events: a reader who
     /// asked for every event to go should not be left looking at a Favorites
-    /// card that still lists a few. Tracking goes for the same reason, and it is
-    /// the one place it does: a single removal keeps the note typed on an event
-    /// so re-adding it brings the note back, but there is nothing to come back
-    /// to once the reader has asked for all of it to go — and an import that
-    /// restores the events would otherwise restore them wearing ticket badges
-    /// the reader thought they had just deleted.
+    /// card that still lists a few. Tracking goes as it does with any removal —
+    /// an import that restores the events would otherwise restore them wearing
+    /// ticket badges the reader thought they had just deleted.
     ///
     /// Each record is emptied rather than dropped, for the same reason a removal
     /// is: a dropped record would let the other device's copy come straight back.
