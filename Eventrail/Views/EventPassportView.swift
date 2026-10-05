@@ -2359,10 +2359,9 @@ private struct PassportTicketTypeRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                // One price is its own average, already printed beside it.
-                if type.highest > type.lowest {
-                    if showsPaid { paidRangeButton } else { Text(verbatim: range) }
-                }
+                // Always, so the corner is never empty: a class whose tickets
+                // all cost one price shows that price, which is its range.
+                if showsPaid { paidRangeButton } else { Text(verbatim: range) }
             }
             .font(.system(size: 11.5))
             .monospacedDigit()
@@ -2371,9 +2370,15 @@ private struct PassportTicketTypeRow: View {
         }
     }
 
-    private var range: String { "\(money(type.lowest))–\(money(type.highest))" }
+    /// The cheapest to the dearest, or the one price where they are one.
+    private var range: String {
+        type.highest > type.lowest ? "\(money(type.lowest))–\(money(type.highest))" : money(type.lowest)
+    }
 
-    private var paidRange: String { "\(type.lowestPaid.formatted)–\(type.highestPaid.formatted)" }
+    private var paidRange: String {
+        type.highest > type.lowest ? "\(type.lowestPaid.formatted)–\(type.highestPaid.formatted)"
+                                   : type.lowestPaid.formatted
+    }
 
     /// The range, with a tap that shows it as it was paid — too long a line
     /// to print beside the converted one in a row this narrow.
