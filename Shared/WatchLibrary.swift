@@ -75,3 +75,60 @@ nonisolated enum LotteryStanding: String, Sendable {
     /// Every one was lost.
     case lost
 }
+
+// MARK: - Reading a copy from another build
+
+/// Read one key at a time, for the reason `Tracking` is: the phone and the
+/// watch app are updated apart — a TestFlight build can leave the watch on
+/// the last one for days — and a synthesized decoder treats a key it lacks as
+/// a corrupt copy, so a field a later phone adds, or one an earlier phone
+/// never sent, would leave the watch on whatever it last read. Any field
+/// added here is decoded with `decodeIfPresent`.
+nonisolated extension WatchLibrary {
+    init(from decoder: any Decoder) throws {
+        let copy = try decoder.container(keyedBy: CodingKeys.self)
+        // An event this build cannot read is left out rather than taking the
+        // rest of the library with it.
+        events = try copy.decodeIfPresent([Readable<WatchEvent>].self, forKey: .events)?
+            .compactMap(\.value) ?? []
+        showsLocalTime = try copy.decodeIfPresent(Bool.self, forKey: .showsLocalTime) ?? false
+    }
+}
+
+nonisolated extension WatchEvent {
+    /// Only what says which event it is and when is insisted on; everything
+    /// else falls back to "not written down".
+    init(from decoder: any Decoder) throws {
+        let event = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try event.decode(String.self, forKey: .id),
+            title: try event.decode(String.self, forKey: .title),
+            venue: try event.decodeIfPresent(String.self, forKey: .venue) ?? "",
+            link: try event.decode(URL.self, forKey: .link),
+            flyer: try event.decodeIfPresent(URL.self, forKey: .flyer),
+            day: try event.decode(Date.self, forKey: .day),
+            doors: try event.decodeIfPresent(Date.self, forKey: .doors),
+            starts: try event.decodeIfPresent(Date.self, forKey: .starts),
+            ends: try event.decodeIfPresent(Date.self, forKey: .ends),
+            // Where every import starts — see `Event.publishedZone`.
+            timeZone: try event.decodeIfPresent(TimeZone.self, forKey: .timeZone)
+                ?? TimeZone(identifier: "Asia/Tokyo")!,
+            hasTicket: try event.decodeIfPresent(Bool.self, forKey: .hasTicket) ?? false,
+            seat: try event.decodeIfPresent(String.self, forKey: .seat) ?? "",
+            seatClass: try event.decodeIfPresent(String.self, forKey: .seatClass) ?? "",
+            cost: try event.decodeIfPresent(Decimal.self, forKey: .cost),
+            currency: try event.decodeIfPresent(String.self, forKey: .currency),
+            lotteryEntries: try event.decodeIfPresent(Int.self, forKey: .lotteryEntries),
+            lottery: try event.decodeIfPresent(String.self, forKey: .lottery)
+        )
+    }
+}
+
+/// One element of a list, or nil where it could not be read.
+nonisolated private struct Readable<Value: Decodable>: Decodable {
+    let value: Value?
+
+    init(from decoder: any Decoder) throws {
+        value = try? Value(from: decoder)
+    }
+}

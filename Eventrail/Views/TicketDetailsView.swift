@@ -45,6 +45,7 @@ struct TicketDetailsView: View {
     @State private var draft: Tracking
     @State private var isConfirmingDiscard = false
     @State private var isConfirmingAnotherEntry = false
+    @State private var isConfirmingClear = false
 
     let event: Event
 
@@ -68,11 +69,33 @@ struct TicketDetailsView: View {
         return record
     }
 
-    /// Writes down what was changed here, over the record as it stands now
-    /// (``Tracking/applying(changesFrom:to:)``), and puts the sheet away.
+    /// Writes down what was changed here, and puts the sheet away — asking
+    /// first where the ticket went here and a seat or a cost is still written
+    /// (``leavesSeatOrCostBehind``).
     private func save() {
-        let record = store.tracking(for: event).applying(changesFrom: original, to: settled)
-        store.setTracking(record, for: event)
+        if leavesSeatOrCostBehind {
+            isConfirmingClear = true
+        } else {
+            write(settled)
+        }
+    }
+
+    /// Whether the ticket was taken away on this sheet — its last win taken
+    /// out, or put back to Pending or Lost — with a seat or a cost still
+    /// written for it. The two are asked only once there is a ticket, so
+    /// kept, they would be kept out of sight.
+    ///
+    /// Asked only where the ticket went here: a record that had none when
+    /// the sheet opened has been asked about already, or never had one.
+    private var leavesSeatOrCostBehind: Bool {
+        original.hasTicket && !settled.hasTicket && (!settled.seat.isEmpty || settled.cost != nil)
+    }
+
+    /// `record` written over the record as it stands now — only what was
+    /// changed here (``Tracking/applying(changesFrom:to:)``) — and the sheet
+    /// put away.
+    private func write(_ record: Tracking) {
+        store.setTracking(store.tracking(for: event).applying(changesFrom: original, to: record), for: event)
         dismiss()
     }
 
@@ -128,6 +151,20 @@ struct TicketDetailsView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(role: .confirm, action: save)
+                        .confirmationDialog("Clear the seat and cost too?", isPresented: $isConfirmingClear,
+                                            titleVisibility: .visible) {
+                            Button("Clear Seat and Cost", role: .destructive) {
+                                var cleared = settled
+                                cleared.seat = ""
+                                cleared.cost = nil
+                                cleared.currency = ""
+                                write(cleared)
+                            }
+                            Button("Keep Them") { write(settled) }
+                            Button("Keep Editing", role: .cancel) {}
+                        } message: {
+                            Text("You no longer have a ticket for this event, so its seat and cost will not be shown.")
+                        }
                 }
             }
             .navigationDestination(for: LotteryEntry.self) { entry in

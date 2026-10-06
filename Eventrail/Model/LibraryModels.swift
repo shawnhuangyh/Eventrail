@@ -479,7 +479,12 @@ extension LibraryEntry {
             return record
         }
         set {
-            update(\.ticket, to: newValue.ticket.rawValue)
+            // A list this build cannot read back whole — one a later build
+            // wrote, or one gone bad — reads as what it could make of it, and
+            // is written over only where the reader changed the list itself:
+            // a note edited beside it must not empty it on every device.
+            let writesLotteries = LotteryEntry.understands(column: lotteries)
+                || newValue.lotteries != tracking.lotteries
             update(\.seat, to: newValue.seat)
             update(\.seatClass, to: newValue.seatClass)
             update(\.costHundredths, to: newValue.cost.map(Self.hundredths(of:)))
@@ -487,10 +492,15 @@ extension LibraryEntry {
             // The cost now lives in the two columns above, so the old one is
             // emptied rather than left to be read back over an emptied cost.
             update(\.cost, to: nil)
-            update(\.lotteries, to: LotteryEntry.columnText(of: newValue.lotteries))
-            // Emptied for the reason the old cost column is: a list taken
-            // down to nothing must not read back as the count again.
-            update(\.lotteryEntries, to: nil)
+            if writesLotteries {
+                // The old ticket answer with them: it is folded into the list
+                // as it is read, so the two are emptied and written together.
+                update(\.ticket, to: newValue.ticket.rawValue)
+                update(\.lotteries, to: LotteryEntry.columnText(of: newValue.lotteries))
+                // Emptied for the reason the old cost column is: a list taken
+                // down to nothing must not read back as the count again.
+                update(\.lotteryEntries, to: nil)
+            }
             update(\.note, to: newValue.note)
         }
     }

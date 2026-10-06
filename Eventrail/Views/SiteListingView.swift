@@ -84,10 +84,12 @@ struct SiteListingView: View {
     @State private var failure: String?
     /// Why the last read did not replace what is on screen, if it did not.
     @State private var refreshFailure: String?
-    /// The read going on now and the list it is for, so a Refresh can wait for
-    /// it — see ``refresh(byHand:)``.
+    /// The read going on now and the list and day it is for, so a Refresh can
+    /// wait for it — see ``refresh(byHand:)``. The day as well as the list:
+    /// today's is one key whatever day it is, and a read of yesterday's that
+    /// lands after the site's midnight is not put on screen.
     @State private var running: Task<RefreshNotice, Never>?
-    @State private var runningKey: String?
+    @State private var runningFor: Shown?
     /// When what is on screen was read, so coming back to the app can tell
     /// whether it has gone stale meanwhile.
     @State private var readAt: Date?
@@ -204,18 +206,19 @@ struct SiteListingView: View {
     /// for that one and ends with it, and says it as a Refresh would.
     private func refresh(byHand: Bool) async {
         let key = cacheKey
+        let shown = Shown(key: key, day: day)
         let task: Task<RefreshNotice, Never>
-        if let running, runningKey == key {
+        if let running, runningFor == shown {
             task = running
         } else {
             task = Task { await read(key) }
             running = task
-            runningKey = key
+            runningFor = shown
         }
         let notice = await task.value
         if running == task {
             running = nil
-            runningKey = nil
+            runningFor = nil
         }
         notices?.report(notice, byHand: byHand)
     }

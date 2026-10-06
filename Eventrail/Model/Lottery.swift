@@ -482,9 +482,46 @@ nonisolated extension LotteryEntry {
 
     /// The list a column holds, or nil where it holds none — or none this
     /// build can read.
+    ///
+    /// Read once per text and kept (``reads``): every screen that badges a
+    /// row or adds up the Passport reads the record of each event it shows,
+    /// several times a redraw, and decoding the same JSON each time cost the
+    /// Passport some 17 ms a redraw on a library of nine hundred ticketed
+    /// events. Keyed by the text itself, so an edited list is a new key and
+    /// nothing has to be told it changed.
     static func entries(inColumn text: String) -> [LotteryEntry]? {
         guard !text.isEmpty else { return nil }
-        return try? JSONDecoder().decode([LotteryEntry].self, from: Data(text.utf8))
+        let key = text as NSString
+        if let read = reads.object(forKey: key) { return read.entries }
+        let entries = try? JSONDecoder().decode([LotteryEntry].self, from: Data(text.utf8))
+        reads.setObject(ColumnRead(entries: entries), forKey: key)
+        return entries
+    }
+
+    /// Whether this build reads back exactly what the column holds: nothing
+    /// it cannot decode, and no key or value it would drop in writing the
+    /// list out again. Empty is understood.
+    ///
+    /// What ``LibraryEntry/tracking`` asks before writing the column over —
+    /// a list a later build wrote, read here with its new parts left out,
+    /// must not be written back without them because the note beside it
+    /// was edited.
+    static func understands(column text: String) -> Bool {
+        text.isEmpty || entries(inColumn: text).map(columnText(of:)) == text
+    }
+
+    /// `NSCache` is safe to use from any thread, and lets go of what it holds
+    /// when memory runs short.
+    nonisolated(unsafe) private static let reads: NSCache<NSString, ColumnRead> = {
+        let cache = NSCache<NSString, ColumnRead>()
+        cache.countLimit = 4000
+        return cache
+    }()
+
+    /// One column's text read, readable or not.
+    private final class ColumnRead: Sendable {
+        let entries: [LotteryEntry]?
+        init(entries: [LotteryEntry]?) { self.entries = entries }
     }
 }
 

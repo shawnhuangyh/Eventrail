@@ -393,6 +393,7 @@ final class EventStore {
             .sorted(by: LibrarySettings.isPreferred).first
         // Anything may have changed underneath, so no kept copy is trusted.
         stale = nil
+        records.removeAll(keepingCapacity: true)
         revision += 1
     }
 
@@ -478,6 +479,7 @@ final class EventStore {
         entry.give(answers, dated: Dictionary(uniqueKeysWithValues: given.map { ($0, now) }))
         entry.modified = now.toTheMillisecond
         entry.kept = rows[event.id]?.facts ?? event
+        records[event.id] = nil
     }
 
     private func makeMark(for id: Event.ID) -> FollowingReadMark {
@@ -539,7 +541,11 @@ final class EventStore {
     var isLinked: Bool { eventernoteHandle != nil }
 
     func tracking(for event: Event) -> Tracking {
-        entries[event.id]?.tracking ?? Tracking()
+        guard let entry = entries[event.id] else { return Tracking() }
+        if let record = records[event.id] { return record }
+        let record = entry.tracking
+        records[event.id] = record
+        return record
     }
 
     /// The one badge a row wears, read from where the event stands.
@@ -700,6 +706,7 @@ final class EventStore {
                        dated: Dictionary(uniqueKeysWithValues: LibraryEntry.Part.allCases.map { ($0, now) }))
             entry.modified = now.toTheMillisecond
         }
+        records.removeAll(keepingCapacity: true)
         // Every Following date back to unread, on every device: written as a
         // record with no fingerprint rather than dropped, or the other
         // device's copy of each read would come straight back.
@@ -1392,9 +1399,12 @@ final class EventStore {
     ///
     /// Adding an event to the library is already the reader saying it is theirs,
     /// and that is the whole of the rule — the mirror does not go on to second-
-    /// guess it by tracking field. An earlier cut on the ticket field quietly
-    /// left every past event out, because nothing back-fills a ticket for a
-    /// event already over.
+    /// guess it by tracking field. A past event is mirrored whether or not a
+    /// ticket was recorded for it, though only a ticket says the reader went
+    /// (``hasAttended(_:)``): kept on Shawn's word once attendance became a
+    /// ticket, so the diary holds every event the reader meant to go to and
+    /// an entry never disappears the day after for want of a ticket not yet
+    /// written down.
     var calendarEvents: [Event] { library }
 
     /// Brings the calendar into line with the library, or clears it out when
@@ -1557,11 +1567,12 @@ final class EventStore {
     private func save() {
         // A note writes on every keystroke: only the rows written go stale,
         // not the nine hundred beside them.
-        if stale != nil {
-            let context = database.context
-            for model in context.changedModelsArray + context.insertedModelsArray {
-                if let row = model as? LibraryEvent { stale?.insert(row.eventID) }
-                if let entry = model as? LibraryEntry { stale?.insert(entry.eventID) }
+        let context = database.context
+        for model in context.changedModelsArray + context.insertedModelsArray {
+            if let row = model as? LibraryEvent { stale?.insert(row.eventID) }
+            if let entry = model as? LibraryEntry {
+                stale?.insert(entry.eventID)
+                records[entry.eventID] = nil
             }
         }
         revision += 1
@@ -1619,6 +1630,14 @@ final class EventStore {
     /// keeps its record, so the library can change without changing size.
     private(set) var revision = 0
     @ObservationIgnored private var converted: [Event.ID: Event?] = [:]
+    /// Each event's record as last read from its entry (``tracking(for:)``).
+    /// Every row a screen badges and every event the Passport adds up asks
+    /// for its record, several times a redraw, and reading an entry's ten
+    /// columns each time cost the Passport tens of milliseconds a redraw on a
+    /// library of nine hundred. Forgotten for an event as it is written
+    /// (``edit(_:keepingFacts:_:)``, ``save()``), and for every event when the
+    /// rows are read again (``reindex()``).
+    @ObservationIgnored private var records: [Event.ID: Tracking] = [:]
     @ObservationIgnored private var convertedAt = -1
     /// The events written since the kept copies were last checked, or nil
     /// where every one of them is to be read again.

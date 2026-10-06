@@ -147,7 +147,9 @@ struct EventPassportView: View {
         ScrollView {
             let stats = self.stats
             VStack(spacing: 14) {
-                if attended.isEmpty {
+                // Over the year chosen: a year of lotteries alone has nothing
+                // to stamp, and is said so rather than drawn as a map of none.
+                if stats.totalEvents == 0 {
                     emptyState
                 } else {
                     summaryCard(stats)
@@ -213,8 +215,13 @@ struct EventPassportView: View {
 
     // MARK: - The year the screen is read over
 
-    /// The years the reader has something in, newest first, behind All Time.
-    private var years: [Int] { PassportStats.years(of: attended) }
+    /// The years the reader has something in, newest first, behind All Time:
+    /// an event they went to, or a lottery they tried — the lottery card is
+    /// counted over every past event, so a year of lotteries lost is a year
+    /// it has something to say about.
+    private var years: [Int] {
+        PassportStats.years(of: past.filter { store.hasAttended($0) || !store.tracking(for: $0).lotteryRounds.isEmpty })
+    }
 
     /// Kept above the scroll rather than in it, because it governs every card
     /// underneath: the reader has to be able to see which year they are reading
@@ -628,10 +635,10 @@ struct EventPassportView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            // Every past event with nothing written down, not only what has
-            // come since the last pass: an empty Passport is the reader asking
-            // where it went.
-            let unticketed = past.filter(store.awaitsTicket)
+            // Every past event in the year shown with nothing written down,
+            // not only what has come since the last pass: an empty Passport
+            // is the reader asking where it went.
+            let unticketed = PassportStats.events(past, in: scope).filter(store.awaitsTicket)
             if !unticketed.isEmpty {
                 Button("Record Tickets") {
                     reviewing = TicketReviewList(events: unticketed)
@@ -1212,7 +1219,8 @@ private struct PassportLotteryRow: View {
 
 /// One event in a list of the lottery card's: how many times it was applied
 /// for and how each round went — every round, under Top Lottery Entries, or
-/// the rounds a row of By Round or By Seat counted, behind that row.
+/// the rounds a row of By Round, By Seat or Entries to Win counted, behind
+/// that row.
 private struct LotteryListRow: Identifiable {
     let event: Event
     let entries: Int
@@ -1227,8 +1235,8 @@ private struct LotteryListRow: Identifiable {
         outcomes = lottery.choices.joined().map(LotteryOutcome.init)
     }
 
-    /// One of the events behind a row of By Round or By Seat, marked choice
-    /// by choice as that row counts them.
+    /// One of the events behind a row of By Round, By Seat or Entries to
+    /// Win, marked choice by choice as that row counts them.
     init(_ counted: PassportStats.LotteryEvent) {
         event = counted.event
         entries = counted.entries
@@ -1263,8 +1271,9 @@ private struct LotteryDots: View {
 
 /// A list of the card's events: every event the reader wrote a lottery round
 /// on, behind Top Lottery Entries' See All, most applications first — or the
-/// events behind one row of By Round or By Seat, newest first, each with only
-/// the rounds that row counted.
+/// events behind one row of By Round or By Seat, newest first, or of Entries
+/// to Win, most applications first, each with only the rounds that row
+/// counted.
 ///
 /// No stack inside this one, unlike ``PassportRankingSheet``: a row here is a
 /// event rather than a name, and the card it came from does not open one
@@ -1312,7 +1321,8 @@ private struct PassportLotterySheet: View {
 /// the win rate over every round drawn and how the rounds went, how many
 /// rounds and applications that was and how many rounds a win took — then the
 /// same rounds by the round of the sale and by the class of seat asked for,
-/// and the events applied for hardest.
+/// how many applications a win took in each class it was won in, and the
+/// events applied for hardest.
 ///
 /// Counted from what the reader wrote on each event's rounds, and over the
 /// lotteries alone (``LotteryEntry/isLottery``): a first-come round is a seat
@@ -1337,6 +1347,8 @@ private struct PassportLotteryCard: View {
         case round(String)
         /// The events behind a row of By Seat, by the class as written.
         case seat(String)
+        /// The events won in a class, behind a row of Entries to Win.
+        case wins(String)
 
         var id: Self { self }
     }
@@ -1349,6 +1361,7 @@ private struct PassportLotteryCard: View {
             readings
             if !stats.lotteryRounds.isEmpty { byRound }
             if !stats.lotterySeats.isEmpty { bySeat }
+            if !stats.winTypes.isEmpty { entriesToWin }
             topEntries
         }
         .padding(16)
@@ -1365,6 +1378,11 @@ private struct PassportLotteryCard: View {
                                      eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
             case .seat(let seatClass):
                 let rows = (stats.seatEvents[seatClass] ?? []).map(LotteryListRow.init)
+                PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
+                                     eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
+            case .wins(let seatClass):
+                let rows = (stats.winTypes.first { $0.seatClass == seatClass }?.wins ?? [])
+                    .map(LotteryListRow.init)
                 PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
                                      eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
             }
@@ -1514,6 +1532,47 @@ private struct PassportLotteryCard: View {
                         ] + (seat.otherSeat > 0 ? [Text("\(seat.otherSeat) other seat")] : [])
                           + (seat.unknown > 0 ? [Text("\(seat.unknown) no result")] : []))
                     }
+                }
+            }
+        }
+    }
+
+    /// How many applications a win took, as the spending card's By Ticket
+    /// Type draws what a seat cost: one bar split by how many wins each class
+    /// took, then each class with its spread on one scale and its average
+    /// marked on it.
+    private var entriesToWin: some View {
+        let styles = SeatStyle.styles(for: stats)
+        let scale = stats.entriesToWinScale
+        return section(spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Entries to Win")
+                    .font(.system(size: 15.5, weight: .bold))
+                if let average = stats.entriesToWin {
+                    Text("Avg. \(average.formatted(.number.precision(.fractionLength(1)))) across ^[\(stats.lotteryWins) win](inflect: true)")
+                        .font(.system(size: 11.5))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            PassportShareBar(parts: stats.winTypes.map {
+                PassportShareBar.Part(count: $0.count, color: styles[$0.seatClass].color)
+            })
+
+            ForEach(stats.winTypes) { type in
+                listing(.wins(type.seatClass)) {
+                    PassportWinTypeRow(type: type, style: styles[type.seatClass],
+                                       total: stats.lotteryWins,
+                                       scale: scale.map { Double($0.lowerBound) ... Double($0.upperBound) })
+                }
+            }
+
+            if let scale {
+                PassportScaleEnds {
+                    Text("^[\(scale.lowerBound) entry](inflect: true)")
+                    Spacer(minLength: 8)
+                    Text("^[\(scale.upperBound) entry](inflect: true)")
                 }
             }
         }
@@ -1975,7 +2034,7 @@ private struct PassportSpendingCard: View {
             }
 
             if let axis {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                PassportScaleEnds {
                     Text(verbatim: money(axis.lowerBound))
                     if let cheapest = paid(stats.tickets.last?.paid) {
                         Text(verbatim: cheapest).foregroundStyle(.quaternary)
@@ -1986,17 +2045,6 @@ private struct PassportSpendingCard: View {
                     }
                     Text(verbatim: money(axis.upperBound))
                 }
-                .font(.system(size: 9.5, weight: .medium))
-                .monospacedDigit()
-                .foregroundStyle(.tertiary)
-                .padding(.top, 8)
-                .overlay(alignment: .top) {
-                    HorizontalRule()
-                        .stroke(.quaternary, style: StrokeStyle(lineWidth: 0.5, dash: [3, 2]))
-                        .frame(height: 0.5)
-                }
-                .padding(.leading, 30)
-                .padding(.top, -4)
             }
         }
         .padding(.top, 14)
@@ -2212,6 +2260,7 @@ private struct SeatStyle {
         var styles: [String: SeatStyle] = [:]
         var spare = 0
         let classes = stats.ticketTypes.map(\.seatClass) + stats.lotterySeats.map(\.seatClass)
+            + stats.winTypes.map(\.seatClass)
         for seatClass in classes where !seatClass.isEmpty && styles[seatClass] == nil {
             if let listed = SeatClass(rawValue: seatClass) {
                 styles[seatClass] = SeatStyle(label: Text(listed.label), badge: listed.badge,
@@ -2325,26 +2374,11 @@ private struct PassportTicketTypeRow: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // The name, the count and the share on one baseline, as a ranking
-            // row sets them.
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                style.label
-                    .font(Font(SeatBadge.nameFont))
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(type.count.formatted())
-                    .font(.system(size: 13, weight: .bold))
-                    .monospacedDigit()
-                Text((Double(type.count) / Double(max(1, total)))
-                        .formatted(.percent.precision(.fractionLength(0))))
-                    .font(.system(size: 11))
-                    .monospacedDigit()
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 34, alignment: .trailing)
-            }
+            PassportTypeHeading(style: style, count: type.count, total: total)
 
             if let axis {
-                PassportPriceRange(type: type, axis: axis, color: style.color)
+                PassportSpread(lowest: type.lowest, highest: type.highest, average: type.average,
+                               axis: axis, color: style.color)
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -2403,20 +2437,112 @@ private struct PassportTicketTypeRow: View {
     }
 }
 
-/// A class's cheapest ticket to its dearest, as a span on the card's scale,
-/// and a dot at what an average one cost.
-private struct PassportPriceRange: View {
-    let type: PassportStats.TicketType
+/// One class of seat a lottery was won in: how many wins, their share, and
+/// how many applications they took — the spread on the section's one scale,
+/// with the average marked on it, as ``PassportTicketTypeRow`` draws a
+/// class's prices.
+private struct PassportWinTypeRow: View {
+    let type: PassportStats.WinType
+    let style: SeatStyle
+    /// Every win in the slice, which the share is taken of.
+    let total: Int
+    /// The scale the spread is drawn on; nil where there is none.
+    let scale: ClosedRange<Double>?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            SeatBadge(style: style)
+            VStack(alignment: .leading, spacing: 8) {
+                PassportTypeHeading(style: style, count: type.count, total: total)
+
+                if let scale {
+                    PassportSpread(lowest: Double(type.fewest), highest: Double(type.most),
+                                   average: type.average, axis: scale, color: style.color)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Avg. \(Text(verbatim: type.average.formatted(.number.precision(.fractionLength(1)))).fontWeight(.semibold).foregroundStyle(.primary))")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // The fewest to the most, or the one count where they
+                    // are one, so the corner is never empty.
+                    Text(verbatim: type.most > type.fewest
+                         ? "\(type.fewest.formatted())–\(type.most.formatted())"
+                         : type.fewest.formatted())
+                }
+                .font(.system(size: 11.5))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A class's name, how many it holds and its share of the whole, on one
+/// baseline as a ranking row sets them — By Ticket Type's and Entries to
+/// Win's alike.
+private struct PassportTypeHeading: View {
+    let style: SeatStyle
+    let count: Int
+    let total: Int
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            style.label
+                .font(Font(SeatBadge.nameFont))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(count.formatted())
+                .font(.system(size: 13, weight: .bold))
+                .monospacedDigit()
+            Text((Double(count) / Double(max(1, total))).formatted(.percent.precision(.fractionLength(0))))
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+                .frame(width: 34, alignment: .trailing)
+        }
+    }
+}
+
+/// The two ends of a section's scale, small under its last row behind a
+/// dashed rule, and set in from the badges so they stand under the spreads.
+private struct PassportScaleEnds<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) { content }
+            .font(.system(size: 9.5, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(.tertiary)
+            .padding(.top, 8)
+            .overlay(alignment: .top) {
+                HorizontalRule()
+                    .stroke(.quaternary, style: StrokeStyle(lineWidth: 0.5, dash: [3, 2]))
+                    .frame(height: 0.5)
+            }
+            .padding(.leading, 30)
+            .padding(.top, -4)
+    }
+}
+
+/// A class's least to its most — the cheapest ticket to the dearest, or the
+/// fewest applications a win took to the most — as a span on the section's
+/// scale, and a dot at its average.
+private struct PassportSpread: View {
+    let lowest: Double
+    let highest: Double
+    let average: Double
     let axis: ClosedRange<Double>
     let color: Color
 
     var body: some View {
         GeometryReader { proxy in
-            // Inset by the dot's radius at both ends, so the cheapest ticket
-            // and the dearest sit inside the track rather than half off it.
+            // Inset by the dot's radius at both ends, so the least and the
+            // most sit inside the track rather than half off it.
             let inner = max(0, proxy.size.width - 10)
-            let low = fraction(type.lowest) * inner
-            let high = fraction(type.highest) * inner
+            let low = fraction(lowest) * inner
+            let high = fraction(highest) * inner
             let middle = proxy.size.height / 2
             Capsule()
                 .fill(color.opacity(0.35))
@@ -2430,15 +2556,15 @@ private struct PassportPriceRange: View {
                         .fill(Color(.systemBackground).opacity(0.95))
                         .frame(width: 14, height: 14)
                 }
-                .position(x: 5 + fraction(type.average) * inner, y: middle)
+                .position(x: 5 + fraction(average) * inner, y: middle)
         }
         .frame(height: 6)
         .background(Capsule().fill(.quaternary))
         .accessibilityHidden(true)
     }
 
-    private func fraction(_ price: Double) -> CGFloat {
-        CGFloat((price - axis.lowerBound) / (axis.upperBound - axis.lowerBound))
+    private func fraction(_ value: Double) -> CGFloat {
+        CGFloat((value - axis.lowerBound) / (axis.upperBound - axis.lowerBound))
     }
 }
 
