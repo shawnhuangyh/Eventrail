@@ -147,7 +147,9 @@ struct EventPassportView: View {
         ScrollView {
             let stats = self.stats
             VStack(spacing: 14) {
-                if attended.isEmpty {
+                // Over the year chosen: a year of lotteries alone has nothing
+                // to stamp, and is said so rather than drawn as a map of none.
+                if stats.totalEvents == 0 {
                     emptyState
                 } else {
                     summaryCard(stats)
@@ -213,8 +215,13 @@ struct EventPassportView: View {
 
     // MARK: - The year the screen is read over
 
-    /// The years the reader has something in, newest first, behind All Time.
-    private var years: [Int] { PassportStats.years(of: attended) }
+    /// The years the reader has something in, newest first, behind All Time:
+    /// an event they went to, or a lottery they tried — the lottery card is
+    /// counted over every past event, so a year of lotteries lost is a year
+    /// it has something to say about.
+    private var years: [Int] {
+        PassportStats.years(of: past.filter { store.hasAttended($0) || !store.tracking(for: $0).lotteryRounds.isEmpty })
+    }
 
     /// Kept above the scroll rather than in it, because it governs every card
     /// underneath: the reader has to be able to see which year they are reading
@@ -628,10 +635,10 @@ struct EventPassportView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            // Every past event with nothing written down, not only what has
-            // come since the last pass: an empty Passport is the reader asking
-            // where it went.
-            let unticketed = past.filter(store.awaitsTicket)
+            // Every past event in the year shown with nothing written down,
+            // not only what has come since the last pass: an empty Passport
+            // is the reader asking where it went.
+            let unticketed = PassportStats.events(past, in: scope).filter(store.awaitsTicket)
             if !unticketed.isEmpty {
                 Button("Record Tickets") {
                     reviewing = TicketReviewList(events: unticketed)

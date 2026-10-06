@@ -351,6 +351,56 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// A list this build cannot read — a day in a form it does not know, as a
+    /// later build might write one — reads as none, and a note edited beside
+    /// it leaves it as it was rather than emptying it on every device.
+    @Test func aListThisBuildCannotReadIsNotWrittenOverByANote() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        let unreadable = #"[{"applications":2,"day":"2026-10-12T09:00","id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","result":"pending"}]"#
+        entry.lotteries = unreadable
+        #expect(entry.tracking.lotteries.isEmpty)
+
+        var noted = entry.tracking
+        noted.note = "front row"
+        entry.tracking = noted
+        #expect(entry.note == "front row")
+        #expect(entry.lotteries == unreadable)
+
+        // The reader writing a list of their own is the reader's answer.
+        var answered = entry.tracking
+        answered.lotteries = [LotteryEntry(round: "一般発売")]
+        entry.tracking = answered
+        #expect(entry.tracking.lotteries.map(\.round) == ["一般発売"])
+        withExtendedLifetime(database) {}
+    }
+
+    /// A list carrying a key this build has never heard of reads back without
+    /// it, and is not written back without it because a seat was edited.
+    @Test func aListWithAKeyFromALaterBuildKeepsItThroughAnEdit() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        let later = #"[{"applications":3,"id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","paidBy":"2026-10-20","result":"lost","round":"最速先行抽選"}]"#
+        entry.lotteries = later
+        #expect(entry.tracking.lotteries.map(\.applications) == [3])
+        #expect(!LotteryEntry.understands(column: later))
+
+        var seated = entry.tracking
+        seated.seat = "A12"
+        entry.tracking = seated
+        #expect(entry.lotteries == later)
+
+        // A list this build wrote is understood, and written as it changes.
+        var answered = entry.tracking
+        answered.lotteries[0].result = .won(nil)
+        entry.tracking = answered
+        #expect(LotteryEntry.understands(column: entry.lotteries))
+        #expect(entry.tracking.lotteries.map(\.isWon) == [true])
+        withExtendedLifetime(database) {}
+    }
+
     /// A ticket an older build marked bought reads as a won entry, and the
     /// next write empties the old column — so the entry, once taken out,
     /// does not come back.

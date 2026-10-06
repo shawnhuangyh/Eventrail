@@ -832,7 +832,7 @@ struct EventDetailView: View {
         guard let instant else { return Text(verbatim: "—") }
         var style = Date.FormatStyle(date: .omitted, time: .shortened)
         style.timeZone = shown.timeZone
-        var time = instant.formatted(style.attributed)
+        var time = instant.formatted(style.attributedStyle)
         let periods = time.runs[\.dateField].compactMap { field, range in
             field == .amPM ? range : nil
         }

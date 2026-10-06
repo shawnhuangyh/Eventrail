@@ -2643,6 +2643,28 @@
         }
       }
     },
+    "Clear Seat and Cost" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座席と料金を消去"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除座位和票价"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除座位和票價"
+          }
+        }
+      }
+    },
     "Clear the cache?" : {
       "localizations" : {
         "ja" : {
@@ -2661,6 +2683,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除快取？"
+          }
+        }
+      }
+    },
+    "Clear the seat and cost too?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座席と料金も消去しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要一并清除座位和票价吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要一併清除座位和票價嗎？"
           }
         }
       }
@@ -5509,6 +5553,28 @@
       }
     },
     "Keep them" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留"
+          }
+        }
+      }
+    },
+    "Keep Them" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11974,6 +12040,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這裡的日程都已看過。新的日程，以及 Eventernote 上有變動的日程，會顯示為未讀。"
+          }
+        }
+      }
+    },
+    "You no longer have a ticket for this event, so its seat and cost will not be shown." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このイベントのチケットがなくなったため、座席と料金は表示されなくなります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这场活动已经没有门票了，座位和票价将不再显示。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這場活動已經沒有門票了，座位和票價將不再顯示。"
           }
         }
       }
