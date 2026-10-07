@@ -31,6 +31,10 @@ struct RootView: View {
     @State private var openedBackup: URL?
     /// An event opened from outside the app — its Live Activity, tapped.
     @State private var openedEvent: Event?
+    /// A lottery round opened from its results-day reminder, tapped — see
+    /// ``LotteryReminders``.
+    @State private var openedRound: LotteryRow?
+    private let reminders = LotteryReminders.shared
     /// Whether this launch still owes the reader the welcome.
     ///
     /// Seeded once from the per-device flag ``WelcomeView`` writes for itself
@@ -76,6 +80,21 @@ struct RootView: View {
             }
         }
         .eventSheet($openedEvent)
+        // The ticket sheet on the round's own page, where its result is
+        // written down — or the event, where the round has gone since.
+        .onChange(of: reminders.opened, initial: true) { _, opened in
+            guard let opened else { return }
+            reminders.opened = nil
+            guard let event = store.event(id: opened.eventID) else { return }
+            if let entry = store.tracking(for: event).lotteries.first(where: { $0.id == opened.entryID }) {
+                openedRound = LotteryRow(event: event, entry: entry)
+            } else {
+                openedEvent = event
+            }
+        }
+        .sheet(item: $openedRound) { row in
+            TicketDetailsView(event: row.event, tracking: store.tracking(for: row.event), opening: row.entry)
+        }
         // Asked about first: tapping a file is not by itself a request to fold
         // its contents into the library.
         //
@@ -104,8 +123,15 @@ struct RootView: View {
         // The watch draws the events still to come from a copy sent from here,
         // so the copy follows every write and the clock it is printed on.
         .task { WatchLink.shared.send(from: store) }
-        .onChange(of: store.revision) { WatchLink.shared.send(from: store) }
+        .onChange(of: store.revision) {
+            WatchLink.shared.send(from: store)
+            reminders.schedule(from: store)
+        }
         .onChange(of: timeDisplay) { WatchLink.shared.send(from: store) }
+        // Each results day still waiting is a reminder that evening, and the
+        // ones answered on another device meanwhile are taken back — followed
+        // from here on with every write, as the watch's copy is.
+        .task { reminders.schedule(from: store) }
         // Edits are written after a short pause; leaving the app cuts that
         // short, so the last one is flushed here rather than lost. Coming back
         // is the moment to pick up whatever another device wrote meanwhile.
@@ -116,6 +142,8 @@ struct RootView: View {
                 // An event whose day ended while the app was away leaves the
                 // watch's list too.
                 WatchLink.shared.send(from: store)
+                // Notifications may have been turned on or off in Settings.
+                reminders.schedule(from: store)
             } else {
                 store.saveNow()
             }

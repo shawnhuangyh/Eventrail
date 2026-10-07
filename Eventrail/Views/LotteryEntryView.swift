@@ -62,7 +62,8 @@ struct LotteryEntryView: View {
     /// Puts the entry into the sheet's copy — in its place where it is
     /// already in the list, at the end where it is new — and goes back to
     /// the sheet, which reads the ticket's class off the rounds won as it
-    /// saves (``Tracking/settleSeatClass(since:)``).
+    /// saves (``Tracking/settleSeatClass(since:)``). The first lottery saved
+    /// with a results day still to come asks for notifications.
     private func save() {
         var entry = draft
         // A lottery saved with its count left empty was applied for once: a
@@ -74,6 +75,9 @@ struct LotteryEntryView: View {
         } else {
             tracking.lotteries.append(entry)
         }
+        // A results day written down is the moment to ask whether the reader
+        // wants to hear about it — see ``LotteryReminders``.
+        LotteryReminders.shared.askIfNeeded(for: entry)
         dismiss()
     }
 

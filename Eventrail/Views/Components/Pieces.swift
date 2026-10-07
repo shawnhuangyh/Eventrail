@@ -188,7 +188,22 @@ struct StatTile: View {
 struct GroupHeader: View {
     /// A formatted month, an imported artist name, or the filter's own name.
     let label: Text
-    let count: Int
+    /// How many are under it, said in what they are — events, or rounds on
+    /// the Lotteries screen.
+    let count: Text
+    /// The label's own colour, where the header says how what is under it
+    /// stands — Won in green — rather than only when it falls.
+    var tint: Color?
+
+    init(label: Text, count: Int) {
+        self.init(label: label, count: Text("^[\(count) event](inflect: true)"))
+    }
+
+    init(label: Text, count: Text, tint: Color? = nil) {
+        self.label = label
+        self.count = count
+        self.tint = tint
+    }
 
     /// Where the header sits in its `List` row, and where each event row under
     /// it sits: the two tabs' months are spaced alike only if both read these.
@@ -205,11 +220,12 @@ struct GroupHeader: View {
                 label
                     .font(.system(size: 12, weight: .bold))
                     .kerning(0.24)
+                    .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.primary))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 5)
             }
             pill {
-                Text("^[\(count) event](inflect: true)")
+                count
                     .font(.system(size: 11, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)

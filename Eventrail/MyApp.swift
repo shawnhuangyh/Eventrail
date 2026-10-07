@@ -5,6 +5,12 @@ import SwiftUI
     /// made — see ``Appearance/apply()``.
     @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
 
+    init() {
+        // Made here so its delegate is in place before launch finishes: a
+        // results-day reminder tapped to open the app is otherwise never heard.
+        _ = LotteryReminders.shared
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

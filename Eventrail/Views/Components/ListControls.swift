@@ -92,14 +92,25 @@ struct EventListMenu: View {
                 }
             }
         } face: {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .foregroundStyle(.secondary)
-                Text(grouping.label)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
+            SortMenuFace(label: Text(grouping.label))
+        }
+    }
+}
+
+/// The face of a ``ListMenu`` that only puts its list in order: the sort
+/// arrows, the order it is in, and the menu's chevron — My Events' and the
+/// Lotteries screen's alike.
+struct SortMenuFace: View {
+    let label: Text
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.up.arrow.down")
+                .foregroundStyle(.secondary)
+            label
+            Image(systemName: "chevron.down")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.secondary)
         }
     }
 }
