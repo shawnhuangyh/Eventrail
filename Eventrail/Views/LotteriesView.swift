@@ -16,12 +16,21 @@ import SwiftUI
 /// one to the other, and the half awaiting is the one to work through. The
 /// order is the capsule's at the foot. A `List` rather than a scroll view of
 /// cards, for the swipes.
+///
+/// Decided can show events that are over too, from Show Past in the same
+/// capsule — off as the screen opens. Those rounds are there to be looked
+/// back on: their tile opens no menu and their card no swipe, so nothing here
+/// gives an event that is over a result (``LotteryRow/isOver``). One still
+/// pending is No Result.
 struct LotteriesView: View {
     @Environment(EventStore.self) private var store
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     @State private var half: LotteryHalf = .awaiting
     @State private var order: LotteryOrder = .resultsDay
+    /// Whether Decided shows the rounds of events that are over too — not
+    /// remembered between visits, as the Passport's year is not.
+    @State private var showsPast = false
     @State private var openEvent: Event?
     /// The round whose page the ticket sheet is open on.
     @State private var editing: LotteryRow?
@@ -32,19 +41,19 @@ struct LotteriesView: View {
     @State private var pickingWin: LotteryRow.ID?
 
     private var list: LotteryList {
-        LotteryList(events: store.events(of: kept, where: \.inLibrary)) { store.tracking(for: $0) }
+        LotteryList(events: store.events(of: kept, where: \.inLibrary), includingPast: true) { store.tracking(for: $0) }
     }
 
     var body: some View {
         let list = list
-        let groups = list.groups(in: half, by: order)
+        let groups = list.groups(in: half, by: order, showingPast: showsPast)
         List {
             // A section of its own with no gap after it, as My Events keeps
             // its halves: the gap a group opens with is for the group before.
             Section {
                 Picker("Lotteries", selection: $half.animation(.snappy)) {
                     ForEach(LotteryHalf.allCases) { option in
-                        option.label(count: list.rows(in: option).count).tag(option)
+                        option.label(count: list.rows(in: option, showingPast: showsPast).count).tag(option)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -76,7 +85,11 @@ struct LotteriesView: View {
         // refresh can still be running — stands above the capsule.
         .refreshNotices(aboveBar: true)
         .safeAreaInset(edge: .bottom) {
-            if !list.rows.isEmpty { LotteryListMenu(order: $order) }
+            // Show Past on Decided alone: Awaiting holds nothing of an event
+            // that is over.
+            if !list.rows.isEmpty {
+                LotteryListMenu(order: $order, showsPast: half == .decided ? $showsPast : nil)
+            }
         }
         .monthSections()
         .washBackground()
@@ -93,10 +106,10 @@ struct LotteriesView: View {
     /// day is still ahead (``LotteryEntry/canBeDrawn(asOf:)``). One Won for
     /// every round: where it applied with several choices, it then asks which
     /// was won — a button per choice in the swipe was too narrow to read and
-    /// too easy to miss.
+    /// too easy to miss. No swipe at all on a round of an event that is over.
     private func card(_ row: LotteryRow) -> some View {
         let entry = row.entry
-        let drawable = entry.canBeDrawn()
+        let drawable = !row.isOver && entry.canBeDrawn()
         return LotteryRoundCard(row: row) { result in
             give(result, to: row)
         } open: {
@@ -184,6 +197,7 @@ struct LotteriesView: View {
         case .noDay: Text("No Results Day")
         case .won: Text("Won")
         case .notWon: Text("Not Won")
+        case .noResult: Text("No Result")
         }
     }
 
@@ -193,7 +207,7 @@ struct LotteriesView: View {
         switch kind {
         case .resultsOut: .brandTint
         case .won: .trackAttended
-        case .month, .noDay, .notWon: nil
+        case .month, .noDay, .notWon, .noResult: nil
         }
     }
 
@@ -208,7 +222,11 @@ struct LotteriesView: View {
             } else {
                 Text("Nothing Decided Yet")
                     .font(.system(size: 17, weight: .bold))
-                Text("Rounds you record as won or lost gather here until their event is over.")
+                if showsPast {
+                    Text("Rounds you record as won or lost gather here.")
+                } else {
+                    Text("Rounds you record as won or lost gather here until their event is over.")
+                }
             }
         }
         .font(.system(size: 13))
@@ -223,7 +241,7 @@ struct LotteriesView: View {
     /// How many rounds the half on screen holds: awaiting, and how many of
     /// those have their results out; decided, and how many of those were won.
     private func subtitle(_ list: LotteryList) -> Text {
-        let shown = list.rows(in: half)
+        let shown = list.rows(in: half, showingPast: showsPast)
         let rounds = Text("^[\(shown.count) round](inflect: true)")
         switch half {
         case .awaiting:
@@ -252,12 +270,23 @@ private extension View {
     }
 }
 
-/// The capsule at the foot of the Lotteries screen: what it is in order of.
+/// The capsule at the foot of the Lotteries screen: what it is in order of,
+/// and on Decided whether events that are over are shown too — one switch,
+/// as Reminders' Show Completed is.
 private struct LotteryListMenu: View {
     @Binding var order: LotteryOrder
+    /// Nil on Awaiting, which holds nothing of an event that is over.
+    var showsPast: Binding<Bool>?
 
     var body: some View {
         ListMenu(describes: "Sort lotteries", value: Text(order.label)) {
+            if let showsPast {
+                Section {
+                    Toggle(isOn: showsPast.animation(.snappy)) {
+                        Label("Show Past", systemImage: "clock.arrow.circlepath")
+                    }
+                }
+            }
             Section("Sort") {
                 ForEach(LotteryOrder.allCases) { option in
                     Toggle(isOn: menuChoice($order.animation(.snappy), option)) {
@@ -283,7 +312,8 @@ private struct LotteryListMenu: View {
 /// The card opens the event; the tile's menu sits over it rather than inside
 /// it, a sibling of the card's button laid over the spot the tile holds, so a
 /// tap on the tile opens its menu and not the event (``FavoriteEventRow``'s
-/// heart, for the same reason).
+/// heart, for the same reason). A round of an event that is over has no
+/// menu: its tile is drawn in the card, and a tap anywhere opens the event.
 struct LotteryRoundCard: View {
     /// Which clock the event's day is printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
@@ -302,11 +332,15 @@ struct LotteryRoundCard: View {
         Button(action: open) {
             VStack(alignment: .leading, spacing: 11) {
                 HStack(spacing: 12) {
-                    // Holds the tile's room; the tile itself is the menu laid
-                    // over this spot (``TileSpot``).
-                    Color.clear
-                        .frame(width: LotteryDayTile.size.width, height: LotteryDayTile.size.height)
-                        .anchorPreference(key: TileSpot.self, value: .bounds) { $0 }
+                    if row.isOver {
+                        LotteryDayTile(row: row, showsResult: true)
+                    } else {
+                        // Holds the tile's room; the tile itself is the menu
+                        // laid over this spot (``TileSpot``).
+                        Color.clear
+                            .frame(width: LotteryDayTile.size.width, height: LotteryDayTile.size.height)
+                            .anchorPreference(key: TileSpot.self, value: .bounds) { $0 }
+                    }
                     VStack(alignment: .leading, spacing: 5) {
                         LotteryText.round(of: entry)
                             .font(.system(size: 12, weight: .semibold))
@@ -400,8 +434,10 @@ struct LotteryRoundCard: View {
 
     /// Where the results stand: how far off the day is, or how long ago it
     /// was — out and waiting to be written down while nothing is — or that no
-    /// day was announced.
+    /// day was announced. No Result for one nobody answered before its event
+    /// was over.
     private func results(isOut: Bool) -> Text {
+        if row.isOver, entry.isPending { return Text("No Result") }
         guard let day = entry.day else { return Text("Not announced") }
         if isOut { return Text("Out — record it") }
         return Text(verbatim: LotteryText.relativeStandalone(day))
@@ -425,7 +461,7 @@ struct LotteryRoundCard: View {
                 .padding(.vertical, 4)
                 .background(isWon ? Color.trackAttended.opacity(0.14) : TicketForm.controlFill.opacity(0.6),
                             in: .rect(cornerRadius: 7, style: .continuous))
-                .opacity(entry.isPending || isWon ? 1 : 0.45)
+                .opacity((entry.isPending && !row.isOver) || isWon ? 1 : 0.45)
             }
         }
         .fixedSize()
@@ -551,8 +587,11 @@ struct LotteryDayTile: View {
     /// How the round went, as the pill used to say it: a hourglass in blue
     /// while it waits, a tick in green once won, a cross in grey once lost —
     /// on a disc ringed in the page's own colour, so it stands off the tile.
+    /// A dash in grey for one still pending once its event is over, as the
+    /// ticket sheet marks No Result.
     private var resultBadge: some View {
         let (symbol, tint): (String, Color) = switch row.entry.outcome {
+        case .pending where row.isOver: ("minus", Color(.systemGray))
         case .pending: ("hourglass", .trackInterest)
         case .won: ("checkmark", .trackAttended)
         case .lost: ("xmark", Color(.systemGray))
@@ -578,7 +617,7 @@ struct LotteryDayTile: View {
         case .won:
             return (AnyShapeStyle(Color.trackAttended), AnyShapeStyle(Color.trackAttended),
                     AnyShapeStyle(Color.trackAttended.opacity(0.14)))
-        case .lost:
+        case .pending where row.isOver, .lost:
             return (AnyShapeStyle(.secondary), AnyShapeStyle(.secondary), AnyShapeStyle(Color.primary.opacity(0.06)))
         case .pending:
             return (AnyShapeStyle(.primary), AnyShapeStyle(Color.brandTint),
