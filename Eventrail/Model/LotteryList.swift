@@ -11,22 +11,26 @@ import SwiftUI
 /// Lottery rounds alone (``LotteryEntry/isLottery``): a first-come round is a
 /// seat got rather than a draw waiting on anything, and a ticket carried over
 /// from before entries has no round to wait for. An event whose day is over
-/// leaves the list — what its lotteries came to is the Passport's.
+/// leaves the list, unless it is asked for (`includingPast`): the Lotteries
+/// screen keeps its rounds under Decided, to be looked back on but not
+/// answered (``LotteryRow/isOver``).
 ///
 /// `tracking` is a closure rather than the store, as ``PassportStats`` takes
 /// it, so the whole type stays `nonisolated` and testable.
 nonisolated struct LotteryList {
     let rows: [LotteryRow]
 
-    init(events: some Sequence<Event>, tracking: (Event) -> Tracking) {
-        rows = events.filter(\.isUpcoming).flatMap { event in
+    init(events: some Sequence<Event>, includingPast: Bool = false, tracking: (Event) -> Tracking) {
+        rows = events.filter { includingPast || $0.isUpcoming }.flatMap { event in
             tracking(event).lotteries.filter(\.isLottery).map { LotteryRow(event: event, entry: $0) }
         }
     }
 
-    /// The rounds on one half of the screen.
-    func rows(in half: LotteryHalf) -> [LotteryRow] {
-        rows.filter { half.holds($0.entry) }
+    /// The rounds on one half of the screen — on Decided, those of events
+    /// that are over too where `showingPast` says so. Awaiting holds rounds of
+    /// events still ahead alone, either way.
+    func rows(in half: LotteryHalf, showingPast: Bool = false) -> [LotteryRow] {
+        rows.filter { half.holds($0) && (showingPast || !$0.isOver) }
     }
 
     /// The rounds still waiting, by the day their results come out — the
@@ -42,9 +46,16 @@ nonisolated struct LotteryList {
     /// (``LotteryRow/isResultsOut(asOf:)``) — the ones with a result to write
     /// down — then go by the month the results are out, and end on the ones
     /// with no day; by event date, they go by the month of the event. Decided
-    /// rounds are the won and then the rest, in either order.
-    func groups(in half: LotteryHalf, by order: LotteryOrder, asOf now: Date = .now) -> [LotteryGroup] {
-        let sorted = rows(in: half).sorted(by: order == .resultsDay ? LotteryRow.byResultsDay : LotteryRow.byEventDate)
+    /// rounds are the won, then the lost, then — only among events over — the
+    /// ones nobody gave a result, in either order. Earliest first, save where
+    /// Decided shows the past: there it reads back from now, latest first, as
+    /// My Events' Past does.
+    func groups(in half: LotteryHalf, by order: LotteryOrder, showingPast: Bool = false,
+                asOf now: Date = .now) -> [LotteryGroup] {
+        let shown = rows(in: half, showingPast: showingPast)
+        let sorted = half == .decided && showingPast
+            ? shown.sorted(by: LotteryRow.latestFirst(by: order))
+            : shown.sorted(by: order == .resultsDay ? LotteryRow.byResultsDay : LotteryRow.byEventDate)
         switch (half, order) {
         case (.awaiting, .resultsDay):
             return LotteryGroup.bucketed(sorted) { row in
@@ -55,7 +66,8 @@ nonisolated struct LotteryList {
             return LotteryGroup.bucketed(sorted) { .month($0.event.monthGroupLabel) }
         case (.decided, _):
             return [LotteryGroup(kind: .won, rows: sorted.filter(\.entry.isWon)),
-                    LotteryGroup(kind: .notWon, rows: sorted.filter { !$0.entry.isWon })]
+                    LotteryGroup(kind: .notWon, rows: sorted.filter { !$0.entry.isWon && !$0.entry.isPending }),
+                    LotteryGroup(kind: .noResult, rows: sorted.filter(\.entry.isPending))]
                 .filter { !$0.rows.isEmpty }
         }
     }
@@ -68,11 +80,17 @@ nonisolated struct LotteryRow: Identifiable, Hashable {
 
     var id: String { "\(event.id)/\(entry.id)" }
 
+    /// Whether the event is over. Its rounds are only looked back on: the
+    /// Lotteries screen gives them no result, and one still pending is No
+    /// Result — the ticket sheet's word for it — rather than out.
+    var isOver: Bool { !event.isUpcoming }
+
     /// Whether the round is still waiting and its results day has come —
-    /// today included, since results out today can be in already. What the
-    /// list puts first and the Me card fills its tile for.
+    /// today included, since results out today can be in already — for an
+    /// event still ahead. What the list puts first and the Me card fills its
+    /// tile for.
     func isResultsOut(asOf now: Date = .now) -> Bool {
-        guard entry.isPending, let day = entry.day else { return false }
+        guard !isOver, entry.isPending, let day = entry.day else { return false }
         return day.daysAway(from: now) <= 0
     }
 
@@ -96,6 +114,25 @@ nonisolated struct LotteryRow: Identifiable, Hashable {
         case (.some, nil): return true
         case (nil, .some): return false
         default: return byRound(lhs, rhs)
+        }
+    }
+
+    /// The other way round — the latest results day, or the latest event,
+    /// first — save that a round with no results day still comes after every
+    /// one with a day.
+    static func latestFirst(by order: LotteryOrder) -> (LotteryRow, LotteryRow) -> Bool {
+        switch order {
+        case .eventDate:
+            return { byEventDate($1, $0) }
+        case .resultsDay:
+            return { lhs, rhs in
+                switch (lhs.entry.day, rhs.entry.day) {
+                case let (left?, right?) where left != right: return left > right
+                case (.some, nil): return true
+                case (nil, .some): return false
+                default: return byEvent(rhs, lhs)
+                }
+            }
         }
     }
 
@@ -128,6 +165,8 @@ nonisolated struct LotteryGroup: Identifiable {
         case won
         /// Lost, or drawn with no win — anything decided but a win.
         case notWon
+        /// Still pending once its event is over: nobody wrote a result down.
+        case noResult
     }
 
     /// Rows already in order, cut wherever the header they fall under changes.
@@ -144,7 +183,8 @@ nonisolated struct LotteryGroup: Identifiable {
 }
 
 /// Which half of the Lotteries screen is on screen: the rounds still waiting
-/// on a result, or the ones with one.
+/// on a result, or the ones with one — and every round of an event that is
+/// over, which has nothing left to wait for.
 nonisolated enum LotteryHalf: CaseIterable, Identifiable {
     case awaiting, decided
 
@@ -158,10 +198,10 @@ nonisolated enum LotteryHalf: CaseIterable, Identifiable {
         }
     }
 
-    func holds(_ entry: LotteryEntry) -> Bool {
+    func holds(_ row: LotteryRow) -> Bool {
         switch self {
-        case .awaiting: entry.isPending
-        case .decided: !entry.isPending
+        case .awaiting: !row.isOver && row.entry.isPending
+        case .decided: row.isOver || !row.entry.isPending
         }
     }
 }

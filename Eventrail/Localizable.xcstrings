@@ -9607,6 +9607,28 @@
         }
       }
     },
+    "Rounds you record as won or lost gather here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選・落選を記録した抽選はここに集まります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记为中选或落选的抽选会集中在这里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記為中選或落選的抽選會集中在這裡。"
+          }
+        }
+      }
+    },
     "Runs %@" : {
       "localizations" : {
         "ja" : {
@@ -10265,6 +10287,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示原文"
+          }
+        }
+      }
+    },
+    "Show Past" : {
+      "comment" : "A switch in the Lotteries screen's menu: also show the lottery rounds of events that are over.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "過去の抽選を表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示已结束"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示已結束"
           }
         }
       }
