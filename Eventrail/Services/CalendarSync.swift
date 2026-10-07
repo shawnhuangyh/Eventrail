@@ -339,11 +339,11 @@ final class CalendarSync {
             entry.isAllDay = isAllDay
             changed = true
         }
-        if isAllDay ? !Calendar.current.isDate(entry.startDate, inSameDayAs: start) : entry.startDate != start {
+        if isAllDay ? !Self.isDate(entry.startDate, inSameDayAs: start) : entry.startDate != start {
             entry.startDate = start
             changed = true
         }
-        if isAllDay ? !Calendar.current.isDate(entry.endDate, inSameDayAs: end) : entry.endDate != end {
+        if isAllDay ? !Self.isDate(entry.endDate, inSameDayAs: end) : entry.endDate != end {
             entry.endDate = end
             changed = true
         }
@@ -364,6 +364,18 @@ final class CalendarSync {
             changed = true
         }
         return changed
+    }
+
+    /// Whether an entry's date falls on `day`, on this device's calendar.
+    ///
+    /// Taken as an optional on purpose. EventKit declares an entry's dates
+    /// `Date!`, and a new entry's are nil until written: handed straight to
+    /// `Calendar.isDate(_:inSameDayAs:)`, which takes a `Date`, the first
+    /// untimed event added with the mirror on unwrapped nil and crashed the
+    /// app — and every mirror after it, since the entry was never saved.
+    nonisolated static func isDate(_ date: Date?, inSameDayAs day: Date, in calendar: Calendar = .current) -> Bool {
+        guard let date else { return false }
+        return calendar.isDate(date, inSameDayAs: day)
     }
 
     /// The event's day as its hall names it, at this device's midnight.

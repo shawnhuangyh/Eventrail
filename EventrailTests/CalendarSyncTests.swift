@@ -26,4 +26,14 @@ struct CalendarSyncTests {
         #expect(angeles.dateComponents([.year, .month, .day, .hour], from: day)
             == DateComponents(year: 2027, month: 5, day: 9, hour: 0))
     }
+
+    /// A new entry's dates are nil until written; an untimed event was
+    /// compared by its day against them and crashed the mirror.
+    @Test func aDateNotYetWrittenIsNoDay() {
+        let shanghai = calendar("Asia/Shanghai")
+        let day = CalendarSync.floatingDay(of: Fixtures.event(date: Fixtures.date(2027, 5, 9)), in: shanghai)
+        #expect(!CalendarSync.isDate(nil, inSameDayAs: day, in: shanghai))
+        #expect(CalendarSync.isDate(day.addingTimeInterval(23 * 60 * 60), inSameDayAs: day, in: shanghai))
+        #expect(!CalendarSync.isDate(day.addingTimeInterval(24 * 60 * 60), inSameDayAs: day, in: shanghai))
+    }
 }
