@@ -425,6 +425,29 @@
         }
       }
     },
+    "%@ · Tap to record whether you won." : {
+      "comment" : "A results-day notification's text. The argument is the round, such as Earliest Presale Lottery.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · タップして当落を記録しましょう。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 点按记录是否中选。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 點按記錄是否中選。"
+          }
+        }
+      }
+    },
     "%@ · Venue" : {
       "localizations" : {
         "ja" : {
@@ -6220,6 +6243,51 @@
         }
       }
     },
+    "Lottery Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選結果の通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选结果提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選結果提醒"
+          }
+        }
+      }
+    },
+    "Lottery results are out" : {
+      "comment" : "A notification's title, at 8 PM on the day a lottery round's results come out.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選結果が発表されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选结果已公布"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選結果已公布"
+          }
+        }
+      }
+    },
     "lottery.tile.noDay" : {
       "comment" : "Over a question mark, on a lottery round's tile where no results day was announced.",
       "localizations" : {
@@ -7636,6 +7704,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你收藏的活動中沒有尚未舉行的。"
+          }
+        }
+      }
+    },
+    "Notifications are off in Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「設定」で通知がオフになっています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在“设置”中关闭通知"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在「設定」中關閉通知"
           }
         }
       }
@@ -10770,6 +10860,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "點一下以編輯"
+          }
+        }
+      }
+    },
+    "Tap to record whether you won." : {
+      "comment" : "A results-day notification's text, for a lottery round with no round name.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップして当落を記録しましょう。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按记录是否中选。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點按記錄是否中選。"
           }
         }
       }

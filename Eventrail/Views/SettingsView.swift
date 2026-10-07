@@ -3,8 +3,9 @@ import SwiftUI
 /// Where the library is kept, and how to empty it.
 ///
 /// General is what a reader sets once and lives with — the language and the
-/// currency, light or dark, and the two switches that carry the library
-/// somewhere else of theirs (their other devices and their calendar). Backup
+/// currency, light or dark, the two switches that carry the library
+/// somewhere else of theirs (their other devices and their calendar), and
+/// the results-day reminders. Backup
 /// is the copy they keep themselves. Advanced is what most readers never touch: how halls are
 /// placed, on a screen of its own, and the pages kept from Eventernote, which
 /// are nobody's record and so stay off the cards holding the reader's own.
@@ -25,6 +26,7 @@ struct SettingsView: View {
     @Environment(FollowedDates.self) private var followed
     @Environment(VenueRegions.self) private var venues
     @Environment(\.dismiss) private var dismiss
+    private let reminders = LotteryReminders.shared
 
     @State private var isConfirmingDeleteAll = false
     @State private var isConfirmingClearCache = false
@@ -69,6 +71,8 @@ struct SettingsView: View {
                         iCloudRow(store: $store)
                         SettingRowDivider()
                         calendarRow(store: $store)
+                        SettingRowDivider()
+                        remindersRow
                     }
                     section("Backup") {
                         exportRow
@@ -284,6 +288,35 @@ struct SettingsView: View {
     private var calendarDenied: Bool {
         guard case .denied = store.calendarStatus else { return false }
         return true
+    }
+
+    /// On until the reader turns it off — see ``LotteryReminders``. The
+    /// system's prompt comes as a results day is written down; turned back on
+    /// here with nothing asked yet, the switch asks.
+    private var remindersRow: some View {
+        @Bindable var reminders = reminders
+        return Toggle(isOn: $reminders.isEnabled) {
+            SettingRowLabel("bell", "Lottery Reminders",
+                            status: remindersStatus, needsAttention: true) {
+                if remindersStatus != nil {
+                    Link("Open Settings", destination: Self.notificationSettings)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Color.brandTint)
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        .settingRowPadding()
+        .task { await reminders.refreshAuthorization() }
+    }
+
+    private static let notificationSettings = URL(string: UIApplication.openNotificationSettingsURLString)!
+
+    /// Only a refusal the reader can mend: the switch on and the system
+    /// saying no.
+    private var remindersStatus: Text? {
+        guard reminders.isEnabled, reminders.authorization == .denied else { return nil }
+        return Text("Notifications are off in Settings")
     }
 
     // MARK: - Backup
