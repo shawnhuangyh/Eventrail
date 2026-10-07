@@ -49,10 +49,13 @@ struct TicketDetailsView: View {
 
     let event: Event
 
-    init(event: Event, tracking: Tracking) {
+    /// The sheet for `event`'s record — opened on one of its lottery
+    /// entries where `entry` names one, as the Lotteries list opens it.
+    init(event: Event, tracking: Tracking, opening entry: LotteryEntry? = nil) {
         self.event = event
         _original = State(initialValue: tracking)
         _draft = State(initialValue: tracking)
+        _path = State(initialValue: entry.map { [$0] } ?? [])
     }
 
     private var tracking: Binding<Tracking> { $draft }
@@ -88,7 +91,7 @@ struct TicketDetailsView: View {
     /// Asked only where the ticket went here: a record that had none when
     /// the sheet opened has been asked about already, or never had one.
     private var leavesSeatOrCostBehind: Bool {
-        original.hasTicket && !settled.hasTicket && (!settled.seat.isEmpty || settled.cost != nil)
+        settled.leavesSeatOrCostBehind(since: original)
     }
 
     /// `record` written over the record as it stands now — only what was
@@ -154,11 +157,7 @@ struct TicketDetailsView: View {
                         .confirmationDialog("Clear the seat and cost too?", isPresented: $isConfirmingClear,
                                             titleVisibility: .visible) {
                             Button("Clear Seat and Cost", role: .destructive) {
-                                var cleared = settled
-                                cleared.seat = ""
-                                cleared.cost = nil
-                                cleared.currency = ""
-                                write(cleared)
+                                write(settled.clearingSeatAndCost)
                             }
                             Button("Keep Them") { write(settled) }
                             Button("Keep Editing", role: .cancel) {}
@@ -610,7 +609,9 @@ enum LotteryText {
         return Text("\(Text("^[\(entry.applications) entry](inflect: true)")) · \(line)")
     }
 
-    private static func day(of entry: LotteryEntry, isEventAhead: Bool) -> Text {
+    /// The results day — "Results Oct 12", and how far off that is while
+    /// the result is still to come — or that none was written down.
+    static func day(of entry: LotteryEntry, isEventAhead: Bool) -> Text {
         guard let day = entry.day else { return Text("No results day") }
         let date = Text(verbatim: short(day))
         guard entry.isPending, isEventAhead else { return Text("Results \(date)") }
@@ -633,9 +634,20 @@ enum LotteryText {
 
     /// "today", "tomorrow", "in 8 days", "3 days ago".
     static func relative(_ day: CalendarDay) -> String {
+        relative(day, context: .unknown)
+    }
+
+    /// The same, standing on its own rather than in a sentence — "Today",
+    /// "In 8 days".
+    static func relativeStandalone(_ day: CalendarDay) -> String {
+        relative(day, context: .beginningOfSentence)
+    }
+
+    private static func relative(_ day: CalendarDay, context: Formatter.Context) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.dateTimeStyle = .named
         formatter.unitsStyle = .full
+        formatter.formattingContext = context
         return formatter.localizedString(from: DateComponents(day: day.daysAway()))
     }
 

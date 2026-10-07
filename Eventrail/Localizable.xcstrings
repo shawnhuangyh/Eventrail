@@ -1,6 +1,29 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ awaiting results" : {
+      "comment" : "The Lotteries screen's subtitle on its first half: how many rounds await a result.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果待ちの抽選 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@等待结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@等待結果"
+          }
+        }
+      }
+    },
     "%@ Choice" : {
       "localizations" : {
         "ja" : {
@@ -19,6 +42,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@志願"
+          }
+        }
+      }
+    },
+    "%@ decided · %lld won" : {
+      "comment" : "The Lotteries screen's subtitle on its second half: how many rounds have a result, and how many were won.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果確定の抽選 %1$@ · 当選%2$lld回"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@已出结果 · 中选 %2$lld 轮"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@已出結果 · 中選 %2$lld 輪"
           }
         }
       }
@@ -307,6 +353,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 將新增到你的資料庫。此裝置上的現有內容不會被清除。"
+          }
+        }
+      }
+    },
+    "%@ · %@ × %lld" : {
+      "comment" : "A button asking which lottery choice was won: the choice's rank, its seat class and how many tickets — “1st Choice · S Seat × 2”.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ × %3$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ × %3$lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ × %3$lld"
+          }
+        }
+      }
+    },
+    "%@ · %lld out now" : {
+      "comment" : "Added to the Lotteries subtitle: how many of the rounds awaiting have their results out already.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$lld件が発表済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$lld 轮已公布"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$lld 輪已公布"
           }
         }
       }
@@ -2247,6 +2339,29 @@
         }
       }
     },
+    "Awaiting · %lld" : {
+      "comment" : "The Lotteries screen's first half, with how many rounds await a result.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果待ち · %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待结果 · %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待結果 · %lld"
+          }
+        }
+      }
+    },
     "Back" : {
       "localizations" : {
         "ja" : {
@@ -3083,6 +3198,29 @@
         }
       }
     },
+    "Decided · %lld" : {
+      "comment" : "The Lotteries screen's second half, with how many rounds have a result.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果確定 · %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已出结果 · %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已出結果 · %lld"
+          }
+        }
+      }
+    },
     "Default Currency" : {
       "localizations" : {
         "ja" : {
@@ -3502,6 +3640,29 @@
         }
       }
     },
+    "Edit Entry" : {
+      "comment" : "A menu item on a lottery round: open the round's own page on the ticket sheet.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応募を編集"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑抽选记录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯抽選紀錄"
+          }
+        }
+      }
+    },
     "Edits and cancellations follow your library, and the events you have been to are filled in too." : {
       "localizations" : {
         "ja" : {
@@ -3634,6 +3795,28 @@
         }
       }
     },
+    "Enter a lottery from an event’s Ticket Details and it waits here for its results." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントのチケット詳細で抽選を記録すると、結果が出るまでここに表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在活动的门票详情里记下抽选，它就会在这里等待结果。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在活動的門票詳情裡記下抽選，它就會在這裡等待結果。"
+          }
+        }
+      }
+    },
     "Entries" : {
       "localizations" : {
         "ja" : {
@@ -3696,6 +3879,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "活動資料匯入自公開的 Eventernote 頁面。"
+          }
+        }
+      }
+    },
+    "Event Date" : {
+      "comment" : "The Lotteries screen's sort: by the date of the event the lottery was for.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開催日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活动日期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活動日期"
           }
         }
       }
@@ -6014,6 +6220,35 @@
         }
       }
     },
+    "lottery.tile.noDay" : {
+      "comment" : "Over a question mark, on a lottery round's tile where no results day was announced.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Day"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発表日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公布日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公布日"
+          }
+        }
+      }
+    },
     "Lowest" : {
       "localizations" : {
         "ja" : {
@@ -6806,6 +7041,29 @@
         }
       }
     },
+    "No Results Day" : {
+      "comment" : "A header on the Lotteries screen over the rounds with no results day written down.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発表日未設定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未设公布日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未設公布日"
+          }
+        }
+      }
+    },
     "No Ticket" : {
       "localizations" : {
         "ja" : {
@@ -6960,6 +7218,29 @@
         }
       }
     },
+    "Not announced" : {
+      "comment" : "In a lottery round's card, under Results: no results day was written down.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未発表"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未公布"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未公布"
+          }
+        }
+      }
+    },
     "Not Now" : {
       "localizations" : {
         "ja" : {
@@ -7092,6 +7373,29 @@
         }
       }
     },
+    "Not Won" : {
+      "comment" : "A header on the Lotteries screen over the decided rounds that were not won.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選せず"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未中选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未中選"
+          }
+        }
+      }
+    },
     "Notes" : {
       "localizations" : {
         "ja" : {
@@ -7110,6 +7414,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "備註"
+          }
+        }
+      }
+    },
+    "Nothing Awaiting" : {
+      "comment" : "The Lotteries screen's first half when no round awaits a result.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果待ちはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有等待结果的抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有等待結果的抽選"
+          }
+        }
+      }
+    },
+    "Nothing Decided Yet" : {
+      "comment" : "The Lotteries screen's second half when no round has a result.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ結果の出た抽選はありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有已出结果的抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還沒有已出結果的抽選"
           }
         }
       }
@@ -7814,6 +8164,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他票種"
+          }
+        }
+      }
+    },
+    "Out — record it" : {
+      "comment" : "In a lottery round's card, under Results: the results day has come and no result is written down.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発表済み — 記録を"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已公布 — 记下吧"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已公布 — 記下吧"
           }
         }
       }
@@ -8853,6 +9226,29 @@
         }
       }
     },
+    "Results" : {
+      "comment" : "Small capitals in a lottery round's card, over where its results stand.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果"
+          }
+        }
+      }
+    },
     "Results %@" : {
       "localizations" : {
         "ja" : {
@@ -8941,6 +9337,75 @@
         }
       }
     },
+    "Results Day" : {
+      "comment" : "The Lotteries screen's sort: by the day a lottery's results are announced.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発表日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公布日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公布日"
+          }
+        }
+      }
+    },
+    "Results Out" : {
+      "comment" : "A header on the Lotteries screen over the rounds whose results day has come and no result is written down.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果発表済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已公布结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已公布結果"
+          }
+        }
+      }
+    },
+    "Results out" : {
+      "comment" : "On the Lotteries card on the Me tab: a round's results day has come and nothing is written down.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結果発表済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已公布结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已公布結果"
+          }
+        }
+      }
+    },
     "Round" : {
       "localizations" : {
         "ja" : {
@@ -9003,6 +9468,51 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中選所需輪數"
+          }
+        }
+      }
+    },
+    "Rounds you enter for an upcoming event wait here for their results." : {
+      "comment" : "The Lotteries card on the Me tab, and the Lotteries screen, when nothing is waiting.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今後のイベントに応募した抽選は、結果が出るまでここに表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为即将举行的活动参加的抽选会在这里等待结果。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "為即將舉行的活動參加的抽選會在這裡等待結果。"
+          }
+        }
+      }
+    },
+    "Rounds you record as won or lost gather here until their event is over." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選・落選を記録した抽選は、イベントが終わるまでここに集まります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记为中选或落选的抽选会集中在这里，直到活动结束。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記為中選或落選的抽選會集中在這裡，直到活動結束。"
           }
         }
       }
@@ -9267,6 +9777,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "座位圖"
+          }
+        }
+      }
+    },
+    "Seats" : {
+      "comment" : "Small capitals in a lottery round's card, over the seats applied for.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "席種"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座位"
           }
         }
       }
@@ -9928,6 +10461,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "排序活動"
+          }
+        }
+      }
+    },
+    "Sort lotteries" : {
+      "comment" : "VoiceOver label for the sort menu at the foot of the Lotteries screen.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選を並べ替え"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "排序抽选"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "排序抽選"
           }
         }
       }
@@ -11776,6 +12332,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間"
+          }
+        }
+      }
+    },
+    "Which choice did you win?" : {
+      "comment" : "Asked after swiping Won on a lottery round that applied with several choices; each button is one choice.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どの希望で当選しましたか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中选的是哪个志愿？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中選的是哪個志願？"
           }
         }
       }

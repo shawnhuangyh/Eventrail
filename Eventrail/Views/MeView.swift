@@ -1,9 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// Which of the Me tab's two lists has been opened in full.
+/// Which of the Me tab's lists has been opened in full.
 enum MeList: Hashable {
-    case favorites, following
+    case lotteries, favorites, following
 }
 
 /// The reader's own library at a glance: what it holds, when it was last
@@ -33,6 +33,10 @@ struct MeView: View {
     /// that the two cards below the account cannot push each other off the
     /// bottom as the library grows.
     private static let cardLimit = 5
+    /// The Lotteries card shows fewer, as the design draws it: the rounds
+    /// next to be decided, which is what the card is for, rather than a
+    /// sample of a list.
+    private static let lotteryLimit = 3
 
     private var library: [Event] { store.events(of: kept, where: \.inLibrary) }
     private var favorites: [Event] { store.events(of: hearted, where: \.isFavorite).upcomingFirst() }
@@ -49,6 +53,7 @@ struct MeView: View {
                 VStack(spacing: 14) {
                     accountCard
                     passportCard
+                    lotteriesCard
                     favoritesCard
                     followingCard
                 }
@@ -61,6 +66,7 @@ struct MeView: View {
             .navigationDestination(for: PassportLink.self) { _ in EventPassportView() }
             .navigationDestination(for: MeList.self) { list in
                 switch list {
+                case .lotteries: LotteriesView()
                 case .favorites: FavoriteEventsView()
                 case .following: FollowedPerformersView()
                 }
@@ -391,6 +397,48 @@ struct MeView: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Lotteries
+
+    /// The rounds awaiting a result, for the events still ahead — the next
+    /// three by the day their results are out, so the one to write down next
+    /// is on top — and the way into the whole list (``LotteriesView``), which
+    /// holds the decided ones too.
+    private var lotteriesCard: some View {
+        let list = LotteryList(events: library) { store.tracking(for: $0) }
+        let waiting = list.next
+        return VStack(alignment: .leading, spacing: 0) {
+            CardHeader(title: "Lotteries", count: waiting.isEmpty ? nil : waiting.count) {
+                if !list.rows.isEmpty {
+                    seeAll(.lotteries)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, waiting.isEmpty ? 6 : 12)
+
+            if waiting.isEmpty {
+                Text(LotteryCardRow.emptyNote)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            } else {
+                VStack(spacing: 0) {
+                    let shown = Array(waiting.prefix(Self.lotteryLimit))
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, row in
+                        LotteryCardRow(row: row, showsDivider: index > 0) {
+                            openEvent = row.event
+                        }
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+        }
+        .glassPanel()
     }
 
     // MARK: - Favorites
