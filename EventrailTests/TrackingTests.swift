@@ -148,6 +148,27 @@ struct TrackingTests {
         #expect(Tracking(lotteries: [LotteryEntry(round: "見切れ席")]).lotteryApplications == 0)
     }
 
+    /// Entries are listed in the order the sale runs its rounds, whatever
+    /// order they were added in; two of one round keep their own order, and
+    /// one with no round comes last.
+    @Test func entriesAreListedInTheOrderTheSaleRuns() {
+        let secondSeat = LotteryEntry(round: "プレイガイド先行", applications: 2)
+        let tracking = Tracking(lotteries: [
+            LotteryEntry(round: "見切れ席"),
+            .ticketHeld,
+            LotteryEntry(round: "プレイガイド先行"),
+            LotteryEntry(round: "一般発売"),
+            LotteryEntry(round: "最速先行抽選"),
+            secondSeat,
+            LotteryEntry(round: "プレイガイド二次先行"),
+        ])
+        #expect(tracking.lotteriesInOrder.map(\.round)
+            == ["最速先行抽選", "プレイガイド先行", "プレイガイド先行", "プレイガイド二次先行", "一般発売", "見切れ席", ""])
+        #expect(tracking.lotteriesInOrder[2].id == secondSeat.id)
+        // Read in order, never rewritten.
+        #expect(tracking.lotteries.first?.round == "見切れ席")
+    }
+
     /// A count a later build or a hand-edited file holds out of bounds is
     /// brought back inside them rather than dropping the entry.
     @Test func applicationsOutOfBoundsAreBroughtBackIn() throws {

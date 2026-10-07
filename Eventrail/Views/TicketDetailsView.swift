@@ -183,13 +183,14 @@ struct TicketDetailsView: View {
     /// What sets a section off the one before it, over the row gap: 24 in all.
     private static let sectionGap: CGFloat = 24 - rowGap
 
-    /// Every round of the sale tried for, a card each, and a way to add one —
-    /// rows of their own rather than one section, since each card swipes on
-    /// its own. A card opens the entry on a page of its own, and a swipe from
-    /// the trailing edge takes it out.
+    /// Every round of the sale tried for, a card each, in the order the sale
+    /// runs them whatever order they were added in (``Tracking/lotteriesInOrder``),
+    /// and a way to add one — rows of their own rather than one section, since
+    /// each card swipes on its own. A card opens the entry on a page of its
+    /// own, and a swipe from the trailing edge takes it out.
     @ViewBuilder
     private var lotteryRows: some View {
-        let entries = tracking.wrappedValue.lotteries
+        let entries = tracking.wrappedValue.lotteriesInOrder
         TicketForm.header("Lotteries") {
             if let summary = lotterySummary(entries) {
                 summary
