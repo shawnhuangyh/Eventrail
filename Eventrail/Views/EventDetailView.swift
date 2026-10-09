@@ -1,5 +1,4 @@
 import SwiftUI
-import Photos
 import QuickLook
 import SwiftData
 import Translation
@@ -93,14 +92,9 @@ struct EventDetailView: View {
     @State private var previewedFlyer: URL?
     /// Counted up as each save lands, for the tap that says so.
     @State private var flyerSaves = 0
-    @State private var flyerSaveFailure: FlyerSaveFailure?
-
-    /// Why the flyer did not reach the reader's photos.
-    private enum FlyerSaveFailure {
-        /// The reader has said no, here or in Settings.
-        case notAllowed
-        case failed(String)
-    }
+    @State private var flyerSaveFailure: PhotoSaveFailure?
+    /// Whether ``TicketStubView`` is up over this sheet.
+    @State private var isMakingStub = false
 
     /// What ``flyerFile`` is written from: the flyer, the title it is named
     /// for, and the last refresh by hand it has to be as fresh as.
@@ -218,6 +212,9 @@ struct EventDetailView: View {
         .sheet(isPresented: $isEditingTicket) {
             TicketDetailsView(event: event, tracking: store.tracking(for: event))
         }
+        .sheet(isPresented: $isMakingStub) {
+            TicketStubView(event: event)
+        }
         #if DEBUG
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)
@@ -258,21 +255,7 @@ struct EventDetailView: View {
             flyerFile = await ImageCache.shared.file(for: url, named: event.title, checkedSince: imagesCheckedSince)
         }
         .sensoryFeedback(.success, trigger: flyerSaves)
-        .alert("Couldn't Save the Flyer",
-               isPresented: Binding { flyerSaveFailure != nil } set: { if !$0 { flyerSaveFailure = nil } },
-               presenting: flyerSaveFailure) { failure in
-            if case .notAllowed = failure {
-                Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
-                Button("Cancel", role: .cancel) {}
-            } else {
-                Button("OK") {}
-            }
-        } message: { failure in
-            switch failure {
-            case .notAllowed: Text("Eventrail isn't allowed to add to your photos. You can allow it in Settings.")
-            case .failed(let reason): Text(verbatim: reason)
-            }
-        }
+        .photoSaveFailureAlert("Couldn't Save the Flyer", failure: $flyerSaveFailure)
         // The first time an event at a hall nothing has looked up yet is
         // opened, this is what goes and finds it — whether or not the reader
         // mirrors anything to their calendar.
@@ -400,21 +383,14 @@ struct EventDetailView: View {
         .accessibilityHint(flyerFile == nil ? Text(verbatim: "") : Text("Opens the flyer"))
     }
 
-    /// Adds the flyer to the reader's photos as the host sent it, asking for
-    /// leave to add — and only to add — the first time.
+    /// Adds the flyer to the reader's photos as the host sent it — see
+    /// ``PhotoSaving``.
     private func saveFlyer(_ file: URL) async {
-        switch await PHPhotoLibrary.requestAuthorization(for: .addOnly) {
-        case .authorized, .limited:
-            do {
-                try await PHPhotoLibrary.shared().performChanges { @Sendable in
-                    PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: file, options: nil)
-                }
-                flyerSaves += 1
-            } catch {
-                flyerSaveFailure = .failed(error.localizedDescription)
-            }
-        default:
-            flyerSaveFailure = .notAllowed
+        do {
+            try await PhotoSaving.add(file)
+            flyerSaves += 1
+        } catch {
+            flyerSaveFailure = error
         }
     }
 
@@ -865,6 +841,7 @@ struct EventDetailView: View {
 
     /// The ticket and the seat as two tiles, and the note under them where
     /// there is one. Each opens ``TicketDetailsView``, where they are answered.
+    /// Between them, where there is a ticket, the way to its ticket stub.
     private var ticketTiles: some View {
         VStack(spacing: 10) {
             HStack(spacing: 11) {
@@ -877,6 +854,8 @@ struct EventDetailView: View {
                            value: tracking.seat.isEmpty ? Text("Seat") : Text(verbatim: tracking.seat),
                            valueTint: hasTicket ? .primary : .secondary, detail: seatDetail)
             }
+
+            if TicketStubFace.offered(for: tracking) { ticketStubRow }
 
             if !tracking.note.isEmpty {
                 Button {
@@ -902,10 +881,50 @@ struct EventDetailView: View {
                 .glassPanel(cornerRadius: 18, interactive: true)
                 .accessibilityLabel(Text("Notes"))
                 .accessibilityValue(Text(tracking.note))
+                .accessibilityHint("Opens the ticket details")
             }
         }
         .padding(.horizontal, 18)
-        .accessibilityHint("Opens the ticket details")
+    }
+
+    /// Opens ``TicketStubView``: the ticket as a keepsake image, with or
+    /// without a seat written down — saying to mask the seat only where
+    /// there is one. Offered only with a ticket — see
+    /// ``TicketStubFace/offered(for:)``.
+    private var ticketStubRow: some View {
+        Button {
+            isMakingStub = true
+        } label: {
+            HStack(spacing: 13) {
+                // The label's own colours rather than `.primary`, which glass
+                // draws vibrant — a grey square rather than an ink-dark one.
+                Image(systemName: "ticket")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Color(.systemBackground))
+                    .frame(width: 38, height: 38)
+                    .background(Color(.label), in: .rect(cornerRadius: 11, style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Ticket Stub")
+                        .font(.system(size: 15, weight: .bold))
+                    Text(tracking.seat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                         ? "A keepsake image to save or share"
+                         : "A keepsake image to share — mask the seat first")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 15)
+            .padding(.vertical, 13)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .glassPanel(cornerRadius: 22, interactive: true)
+        .accessibilityElement(children: .combine)
     }
 
     private func ticketTile(_ title: LocalizedStringKey, symbol: String, tint: Color,
@@ -935,6 +954,7 @@ struct EventDetailView: View {
         .glassPanel(cornerRadius: 22, interactive: true)
         .accessibilityLabel(Text(title))
         .accessibilityValue(Text("\(value), \(detail)"))
+        .accessibilityHint("Opens the ticket details")
     }
 
     /// Where the ticket stands, read from the lottery entries: won (or got,

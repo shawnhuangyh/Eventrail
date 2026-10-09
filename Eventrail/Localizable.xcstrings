@@ -1570,6 +1570,51 @@
         }
       }
     },
+    "A keepsake image to save or share" : {
+      "comment" : "Under Ticket Stub on an event's sheet, where no seat is written down to mask.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存・シェアできる記念画像"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可存储或分享的纪念图片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可儲存或分享的紀念圖片"
+          }
+        }
+      }
+    },
+    "A keepsake image to share — mask the seat first" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアできる記念画像 — 先に座席を隠しましょう"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可分享的纪念图片——先遮住座位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可分享的紀念圖片——先遮住座位"
+          }
+        }
+      }
+    },
     "A restore only ever adds. Everything already on this device stays as it is." : {
       "localizations" : {
         "ja" : {
@@ -3019,6 +3064,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法儲存海報"
+          }
+        }
+      }
+    },
+    "Couldn't Save the Image" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法存储图像"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存影像"
           }
         }
       }
@@ -4854,6 +4921,29 @@
         }
       }
     },
+    "Flyer" : {
+      "comment" : "A tile on the ticket stub composer: print the event's flyer across the top of the ticket.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フライヤー"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海报"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海報"
+          }
+        }
+      }
+    },
     "Follow" : {
       "localizations" : {
         "ja" : {
@@ -6449,6 +6539,52 @@
         }
       }
     },
+    "Mask Seat" : {
+      "comment" : "A tile on the ticket stub composer: hide the seat under a mosaic before the image is saved or shared.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座席を隠す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遮住座位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遮住座位"
+          }
+        }
+      }
+    },
+    "Masked" : {
+      "comment" : "VoiceOver: the seat on a ticket stub is hidden under a mosaic.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已遮住"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已遮住"
+          }
+        }
+      }
+    },
     "Match" : {
       "localizations" : {
         "ja" : {
@@ -6841,6 +6977,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "7 天內"
+          }
+        }
+      }
+    },
+    "Night" : {
+      "comment" : "A look for the ticket stub: a dark ticket on a night sky. Beside Light.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ナイト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夜间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夜間"
           }
         }
       }
@@ -9695,6 +9854,28 @@
         }
       }
     },
+    "Save Image" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储图像"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存影像"
+          }
+        }
+      }
+    },
     "Save to Photos" : {
       "localizations" : {
         "ja" : {
@@ -9713,6 +9894,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "儲存到「照片」"
+          }
+        }
+      }
+    },
+    "Saved to Photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真に保存しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储到“照片”"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已儲存到「照片」"
           }
         }
       }
@@ -10843,6 +11046,29 @@
         }
       }
     },
+    "Style" : {
+      "comment" : "VoiceOver: the ticket stub's look, Light or Night.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スタイル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "样式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "樣式"
+          }
+        }
+      }
+    },
     "System" : {
       "localizations" : {
         "ja" : {
@@ -11350,6 +11576,29 @@
         }
       }
     },
+    "Ticket Stub" : {
+      "comment" : "A keepsake image of the reader's ticket for an event, and the screen that makes it.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケット半券"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "票根"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "票根"
+          }
+        }
+      }
+    },
     "Ticketed" : {
       "localizations" : {
         "ja" : {
@@ -11478,6 +11727,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時區"
+          }
+        }
+      }
+    },
+    "Times" : {
+      "comment" : "A tile on the ticket stub composer: print the doors and start times.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時刻"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間"
           }
         }
       }

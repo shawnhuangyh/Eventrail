@@ -272,18 +272,27 @@ nonisolated extension Tracking {
         lotteries.filter(\.isLottery).reduce(0) { $0 + $1.applications }
     }
 
-    /// The rounds that were lotteries (``LotteryEntry/isLottery``), in the
-    /// order the sale ran them — rounds the list holds out of order, or two
-    /// of one round, keep the order they were written in among themselves.
-    /// What the Passport reads how the reader's lotteries went from.
-    var lotteryRounds: [LotteryEntry] {
+    /// Every entry in the order the sale runs its rounds — 最速先行抽選,
+    /// プレイガイド先行, プレイガイド二次先行, 一般発売, 見切れ席
+    /// (``LotteryRound/order(of:)``) — whatever order they were added in. An
+    /// entry with no round, or one a later build names, comes after them, and
+    /// two of one round keep the order they were written in. How the ticket
+    /// sheet lists them; the list itself is kept as written, so reading it in
+    /// order writes nothing.
+    var lotteriesInOrder: [LotteryEntry] {
         lotteries.enumerated()
-            .filter { $0.element.isLottery }
             .sorted {
                 (LotteryRound.order(of: $0.element.round), $0.offset)
                     < (LotteryRound.order(of: $1.element.round), $1.offset)
             }
             .map(\.element)
+    }
+
+    /// The rounds that were lotteries (``LotteryEntry/isLottery``), in the
+    /// order the sale ran them (``lotteriesInOrder``). What the Passport reads
+    /// how the reader's lotteries went from.
+    var lotteryRounds: [LotteryEntry] {
+        lotteriesInOrder.filter(\.isLottery)
     }
 
     /// Where the reader's lotteries stand taken together: won where any was,
@@ -296,8 +305,9 @@ nonisolated extension Tracking {
         return .lost
     }
 
-    /// The first entry won, for the event sheet's ticket tile.
-    var wonLottery: LotteryEntry? { lotteries.first(where: \.isWon) }
+    /// The first entry won in the order the sale ran, for the event sheet's
+    /// ticket tile.
+    var wonLottery: LotteryEntry? { lotteriesInOrder.first(where: \.isWon) }
 
     /// The lottery still to be announced whose results come soonest: the
     /// next day from today on, or, where every day written has gone by, the

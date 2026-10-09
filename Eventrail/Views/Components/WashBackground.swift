@@ -10,15 +10,18 @@ struct WashBackground: View {
             let size = proxy.size
             ZStack {
                 Color.washBase
-                blob(.washOne, at: UnitPoint(x: 0.12, y: 0), radii: (0.58, 0.38), fade: 0.70, in: size)
-                blob(.washTwo, at: UnitPoint(x: 0.92, y: 0.06), radii: (0.52, 0.34), fade: 0.70, in: size)
-                blob(.washThree, at: UnitPoint(x: 0.48, y: 1.02), radii: (0.64, 0.40), fade: 0.72, in: size)
+                Self.blob(.washOne, at: UnitPoint(x: 0.12, y: 0), radii: (0.58, 0.38), fade: 0.70, in: size)
+                Self.blob(.washTwo, at: UnitPoint(x: 0.92, y: 0.06), radii: (0.52, 0.34), fade: 0.70, in: size)
+                Self.blob(.washThree, at: UnitPoint(x: 0.48, y: 1.02), radii: (0.64, 0.40), fade: 0.72, in: size)
             }
         }
         .ignoresSafeArea()
     }
 
-    private func blob(
+    /// One radial gradient of the design's, in a frame of `size`: centred at
+    /// `center`, its radii fractions of the frame, transparent at `fade`. The
+    /// ticket stub's canvas is drawn from the same — see ``TicketCanvas``.
+    static func blob(
         _ color: Color, at center: UnitPoint,
         radii: (x: CGFloat, y: CGFloat), fade: CGFloat, in size: CGSize
     ) -> some View {
