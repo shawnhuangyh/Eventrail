@@ -152,8 +152,9 @@ actor ImageCache {
     }
 
     /// `name` as a file name: no slash or colon, and short enough in bytes
-    /// for the extension to fit after it.
-    private static func fileName(_ name: String) -> String {
+    /// for the extension to fit after it. Also what a ticket stub's image is
+    /// named by — see ``TicketStubImage``.
+    static func fileName(_ name: String) -> String {
         var kept = ""
         for character in name.replacing(/[\/:]/, with: "-").trimmingCharacters(in: .whitespacesAndNewlines) {
             guard kept.utf8.count + character.utf8.count <= 200 else { break }
