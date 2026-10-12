@@ -403,7 +403,7 @@ struct EventDetailView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
         } else {
-            NavigationLink(value: venueLink) {
+            NavigationLink(value: event.venueLink) {
                 HStack(spacing: 4) {
                     Text(event.venue)
                         .lineLimit(1)
@@ -1678,7 +1678,7 @@ struct EventDetailView: View {
         if event.venue.isEmpty {
             venueLines
         } else {
-            NavigationLink(value: venueLink) {
+            NavigationLink(value: event.venueLink) {
                 HStack(spacing: 7) {
                     venueLines
                     Image(systemName: "chevron.right")
@@ -1688,17 +1688,6 @@ struct EventDetailView: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-        }
-    }
-
-    /// The place id where the event's own page has been imported, and the name
-    /// alone otherwise — which the hall's page is found by, the way a billed
-    /// performer's is.
-    private var venueLink: VenueLink {
-        if let placeID = event.placeID {
-            .place(PlaceListing(id: placeID, name: event.venue))
-        } else {
-            .named(event.venue)
         }
     }
 

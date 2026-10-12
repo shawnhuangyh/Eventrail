@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Which of the Me tab's lists has been opened in full.
 enum MeList: Hashable {
-    case lotteries, favorites, following
+    case onThisDay, lotteries, favorites, following
 }
 
 /// The reader's own library at a glance: what it holds, when it was last
@@ -52,6 +52,7 @@ struct MeView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     accountCard
+                    onThisDayCard
                     passportCard
                     lotteriesCard
                     favoritesCard
@@ -66,6 +67,7 @@ struct MeView: View {
             .navigationDestination(for: PassportLink.self) { _ in EventPassportView() }
             .navigationDestination(for: MeList.self) { list in
                 switch list {
+                case .onThisDay: OnThisDayView()
                 case .lotteries: LotteriesView()
                 case .favorites: FavoriteEventsView()
                 case .following: FollowedPerformersView()
@@ -314,6 +316,23 @@ struct MeView: View {
         .disabled(store.isRefreshing)
         .overlay(alignment: .top) {
             Divider().padding(.leading, 16)
+        }
+    }
+
+    // MARK: - On this day
+
+    /// What the reader went to on today's date in earlier years (``OnThisDay``)
+    /// — the most recent drawn large, the rest a line each — and the way into
+    /// all of them (``OnThisDayView``).
+    ///
+    /// Left out on a day with nothing to show, which is most days, rather than
+    /// standing there empty: the other cards' empty notes say how to fill them,
+    /// and there is nothing the reader could do to fill this one today.
+    @ViewBuilder
+    private var onThisDayCard: some View {
+        let today = OnThisDay(events: library) { store.tracking(for: $0) }
+        if !today.memories.isEmpty {
+            OnThisDayCard(onThisDay: today, limit: Self.cardLimit)
         }
     }
 
