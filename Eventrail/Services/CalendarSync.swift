@@ -1,7 +1,6 @@
 import EventKit
 import MapKit
 import os
-import SwiftUI
 
 /// Mirrors the reader's library into their calendar.
 ///
@@ -20,17 +19,44 @@ import SwiftUI
 /// the door time is the event's own fact rather than a preference, and a
 /// reader who has asked for their events in their calendar has asked to be
 /// somewhere on time. Calendar's own per-entry alert remains theirs to change.
-final class CalendarSync {
+///
+/// An actor, so the mirror runs off the main actor: a pass reads the whole
+/// calendar back — ten searches of four years each — and compares every event
+/// in the library against it. It is handed plain values (``Place``, not the
+/// map item) and builds what EventKit wants of them here.
+actor CalendarSync {
     static let shared = CalendarSync()
 
     /// What the last mirror did, or why it could not.
     ///
     /// `denied` is kept apart from `failed` because it is the one case the
     /// reader can do something about, and the Settings screen says so.
-    enum Outcome: Hashable {
+    nonisolated enum Outcome: Hashable, Sendable {
         case mirrored(Int)
         case denied
         case failed(String)
+    }
+
+    /// Where a hall has been placed, as plain values the mirror can be handed
+    /// across actors — what ``VenuePlaces/Placing`` holds, less the map item,
+    /// which is built again here from the same coordinate, name and address.
+    nonisolated struct Place: Hashable, Sendable {
+        let name: String?
+        let address: String?
+        let latitude: CLLocationDegrees
+        let longitude: CLLocationDegrees
+        /// How far the coordinate might be from the hall's door — see
+        /// ``VenuePlaces/Placing``.
+        let uncertainty: CLLocationDistance
+
+        var location: CLLocation { CLLocation(latitude: latitude, longitude: longitude) }
+
+        var item: MKMapItem {
+            let item = MKMapItem(location: location,
+                                 address: address.flatMap { MKAddress(fullAddress: $0, shortAddress: nil) })
+            item.name = name
+            return item
+        }
     }
 
     private let store = EKEventStore()
@@ -72,26 +98,40 @@ final class CalendarSync {
     private static let sweepBack: TimeInterval = 30 * 365 * 24 * 60 * 60
     private static let sweepAhead: TimeInterval = 10 * 365 * 24 * 60 * 60
 
+    /// Whether this device has taken out the entries the builds before every
+    /// day was counted on the Gregorian calendar left outside the sweep —
+    /// see ``strays(in:)``. Per device, like ``calendarKey``.
+    private static let straysSweptKey = "calendarStraysSwept"
+
     // MARK: - Mirroring
 
     /// Brings the calendar into line with `events`, adding what is missing,
     /// correcting what moved, and deleting what has left the library.
     ///
+    /// `places` is whatever has been looked up already. The mirror never
+    /// searches for a hall itself — see ``VenuePlaces`` — so an event at a
+    /// hall the reader has not opened yet gets its name and waits for a later
+    /// mirror. `color` is what a calendar made here is drawn in.
+    ///
     /// Matching is by the Eventernote page URL rather than by title: a title
     /// can be re-published, and an entry the reader dragged elsewhere is still
     /// the same event.
-    func mirror(_ events: [Event]) async -> Outcome {
+    func mirror(_ events: [Event], places: [Event.ID: Place], color: CGColor?) async -> Outcome {
         guard await requestAccess() else { return .denied }
-        // Whatever has been looked up already. The mirror never searches for a
-        // hall itself — see ``VenuePlaces`` — so an event at a hall the reader
-        // has not opened yet gets its name and waits for a later mirror.
-        let places = VenuePlaces.shared.mapItems(for: events)
         do {
-            let calendar = try calendar()
+            let calendar = try calendar(color: color)
             var wanted = Dictionary(
                 events.map { ($0.sourceURL, $0) },
                 uniquingKeysWith: { first, _ in first }
             )
+
+            // Never an event's: no day of the library falls there.
+            let sweepsStrays = !UserDefaults.standard.bool(forKey: Self.straysSweptKey)
+            if sweepsStrays {
+                for stray in strays(in: calendar) where Self.isOurs(stray) {
+                    try store.remove(stray, span: .thisEvent, commit: false)
+                }
+            }
 
             for entry in entries(in: calendar, covering: events) {
                 // Anything in this calendar that no longer answers to an event
@@ -113,6 +153,7 @@ final class CalendarSync {
             }
 
             try store.commit()
+            if sweepsStrays { UserDefaults.standard.set(true, forKey: Self.straysSweptKey) }
             let located = events.filter { places[$0.id] != nil }.count
             Self.log.info("mirrored \(events.count, privacy: .public) events, \(located, privacy: .public) with a place on the map")
             return .mirrored(events.count)
@@ -174,7 +215,7 @@ final class CalendarSync {
 
     // MARK: - The app's own calendar
 
-    private func calendar() throws -> EKCalendar {
+    private func calendar(color: CGColor?) throws -> EKCalendar {
         let kept: EKCalendar
         if let id = savedCalendarID, let existing = store.calendar(withIdentifier: id) {
             kept = existing
@@ -184,7 +225,7 @@ final class CalendarSync {
         } else {
             let calendar = EKCalendar(for: .event, eventStore: store)
             calendar.title = String(localized: "Eventrail")
-            calendar.cgColor = UIColor(Color.brandTint).cgColor
+            if let color { calendar.cgColor = color }
             guard let source = preferredSource() else {
                 throw CalendarSyncError.noCalendarSource
             }
@@ -291,9 +332,33 @@ final class CalendarSync {
     private func entries(in calendar: EKCalendar, covering events: [Event]) -> [EKEvent] {
         let now = Date.now
         let dates = events.map(\.sortDate)
-        var start = min(dates.min() ?? now, now.addingTimeInterval(-Self.sweepBack))
+        let start = min(dates.min() ?? now, now.addingTimeInterval(-Self.sweepBack))
         let end = max(dates.max() ?? now, now.addingTimeInterval(Self.sweepAhead))
+        return entries(in: calendar, from: start, to: end)
+    }
 
+    /// The entries the builds before every day was counted on the Gregorian
+    /// calendar wrote for an untimed event on a phone set to the Japanese or
+    /// the Buddhist calendar: its year read as Reiwa's, 2018 years on, or as
+    /// the Buddhist Era's, 543 years back — 4044 or 1483 for 2026. Outside
+    /// the sweep, so never found again, and written afresh by every mirror
+    /// after. The fixed sweep, moved by each of those, finds them; taken out
+    /// once per device, since nothing writes there any more.
+    private func strays(in calendar: EKCalendar) -> [EKEvent] {
+        let now = Date.now
+        let counted = Calendar.gregorian()
+        return [2018, -543].flatMap { years -> [EKEvent] in
+            guard let start = counted.date(byAdding: .year, value: years, to: now.addingTimeInterval(-Self.sweepBack)),
+                  let end = counted.date(byAdding: .year, value: years, to: now.addingTimeInterval(Self.sweepAhead))
+            else { return [] }
+            return entries(in: calendar, from: start, to: end)
+        }
+    }
+
+    /// Everything in the app's calendar between two moments, read in chunks of
+    /// ``window``.
+    private func entries(in calendar: EKCalendar, from start: Date, to end: Date) -> [EKEvent] {
+        var start = start
         var found: [EKEvent] = []
         while start < end {
             let chunk = min(start.addingTimeInterval(Self.window), end)
@@ -309,7 +374,7 @@ final class CalendarSync {
     /// Writes the event onto the calendar entry, and says whether anything
     /// actually changed — an unchanged entry is not saved, so a mirror that
     /// finds nothing to do touches the reader's calendar not at all.
-    private func apply(_ event: Event, to entry: EKEvent, places: [Event.ID: VenuePlaces.Placing]) -> Bool {
+    private func apply(_ event: Event, to entry: EKEvent, places: [Event.ID: Place]) -> Bool {
         // Eventernote announces plenty of events months before it publishes a
         // time. Those land as all-day entries rather than at an invented hour.
         let isAllDay = event.startsAt == nil
@@ -366,7 +431,7 @@ final class CalendarSync {
         return changed
     }
 
-    /// Whether an entry's date falls on `day`, on this device's calendar.
+    /// Whether an entry's date falls on `day`, on this device's clock.
     ///
     /// Taken as an optional on purpose. EventKit declares an entry's dates
     /// `Date!`, and a new entry's are nil until written: handed straight to
@@ -375,7 +440,7 @@ final class CalendarSync {
     /// app — and every mirror after it, since the entry was never saved.
     nonisolated static func isDate(_ date: Date?, inSameDayAs day: Date, in calendar: Calendar = .current) -> Bool {
         guard let date else { return false }
-        return calendar.isDate(date, inSameDayAs: day)
+        return calendar.asGregorian.isDate(date, inSameDayAs: day)
     }
 
     /// The event's day as its hall names it, at this device's midnight.
@@ -384,11 +449,15 @@ final class CalendarSync {
     /// and handed to an all-day entry as it stands it lands wherever that
     /// instant falls here: the evening before, on a phone in Shanghai. The
     /// day is the hall's answer, so it is carried across as a day.
+    ///
+    /// Gregorian on both sides, whatever `calendar` counts in — only its
+    /// clock is read. Handed to the reader's own calendar on a phone set to
+    /// the Japanese one, the year 2026 was Reiwa's and the entry landed in
+    /// 4044, outside the sweep: never found again, and written afresh by every
+    /// mirror after (``strays(in:)``).
     nonisolated static func floatingDay(of event: Event, in calendar: Calendar = .current) -> Date {
-        var hall = Calendar(identifier: .gregorian)
-        hall.timeZone = event.timeZone
-        let day = hall.dateComponents([.year, .month, .day], from: event.date)
-        return calendar.date(from: day) ?? event.date
+        let day = Calendar.gregorian(in: event.timeZone).dateComponents([.year, .month, .day], from: event.date)
+        return calendar.asGregorian.date(from: day) ?? event.date
     }
 
     // MARK: - When to set off
@@ -456,7 +525,7 @@ final class CalendarSync {
     /// hall the site calls Kアリーナ横浜 is that in the reader's calendar even
     /// where Maps files it under something shorter or in another language: the
     /// map item is being asked where the place is, not what to call it.
-    private static func place(for event: Event, found: VenuePlaces.Placing?) -> EKStructuredLocation? {
+    private static func place(for event: Event, found: Place?) -> EKStructuredLocation? {
         guard let title = event.venue.isEmpty ? event.locationTitle : event.venue else { return nil }
         guard let found else { return EKStructuredLocation(title: title) }
         let place = EKStructuredLocation(mapItem: found.item)
@@ -472,7 +541,7 @@ final class CalendarSync {
         // answer has no placemark for `init(mapItem:)` to read it out of. So it
         // is set here rather than assumed.
         if place.geoLocation == nil {
-            place.geoLocation = found.item.location
+            place.geoLocation = found.location
         }
         return place
     }
@@ -490,7 +559,18 @@ final class CalendarSync {
     }
 }
 
-enum CalendarSyncError: LocalizedError {
+extension CalendarSync.Place {
+    /// What a placing says, as plain values — read on the main actor, where
+    /// the placing's map item is.
+    @MainActor init(_ placing: VenuePlaces.Placing) {
+        let coordinate = placing.item.location.coordinate
+        self.init(name: placing.item.name, address: placing.item.address?.fullAddress,
+                  latitude: coordinate.latitude, longitude: coordinate.longitude,
+                  uncertainty: placing.uncertainty)
+    }
+}
+
+nonisolated enum CalendarSyncError: LocalizedError {
     case noCalendarSource
 
     var errorDescription: String? {

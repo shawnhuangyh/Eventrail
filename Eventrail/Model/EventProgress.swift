@@ -66,7 +66,7 @@ nonisolated struct EventProgress: Equatable {
             fraction = 1
             return
         }
-        let reader = Calendar.current
+        let reader = Calendar.gregorian()
         let days = reader.dateComponents([.day], from: reader.startOfDay(for: now),
                                          to: reader.startOfDay(for: event.localDay)).day ?? 0
         if days > 0 {

@@ -128,8 +128,8 @@ nonisolated struct JapanAddresses: Sendable {
     /// One question put to the register, exactly as asked.
     private func asking(_ address: String) async throws -> Place? {
         var components = URLComponents(url: Self.endpoint, resolvingAgainstBaseURL: false)
-        components?.queryItems = (Self.parameters.map { URLQueryItem(name: $0.key, value: $0.value) })
-            + [URLQueryItem(name: "q", value: address)]
+        components?.setQuery(Self.parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
+            + [URLQueryItem(name: "q", value: address)])
         guard let url = components?.url else { throw Failure.unreadable }
 
         var request = URLRequest(url: url)

@@ -33,6 +33,20 @@ struct EventStoreEventsTests {
         #expect(Set(store.events(of: rows, where: \.inLibrary).map(\.title)) == ["After", "Beside"])
     }
 
+    /// The library the calendar, the watch and the reminders read is the same
+    /// kept copies a screen's list is, and follows a write at once.
+    @Test func theUpcomingFollowAWriteAtOnce() {
+        let store = store()
+        let event = Fixtures.event(id: "1", title: "Before", date: Fixtures.day(fromToday: 10), isDetailed: true)
+        store.toggleLibraryMembership(event)
+        #expect(store.upcoming.map(\.title) == ["Before"])
+        store.setTracking(Tracking(note: "front row"),
+                          for: Fixtures.event(id: "1", title: "After", date: Fixtures.day(fromToday: 10), isDetailed: true))
+        #expect(store.upcoming.map(\.title) == ["After"])
+        store.remove([event])
+        #expect(store.upcoming.isEmpty)
+    }
+
     @Test func anEventTakenOutIsNotListed() throws {
         let store = store()
         let event = Fixtures.event(id: "1")

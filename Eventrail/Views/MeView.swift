@@ -424,8 +424,12 @@ struct MeView: View {
     /// three by the day their results are out, so the one to write down next
     /// is on top — and the way into the whole list (``LotteriesView``), which
     /// holds the decided ones too.
+    ///
+    /// See All stands wherever there is a round at all, the rounds of events
+    /// that are over included: those are the screen's to look back on (Show
+    /// Past), and a library whose lotteries are all behind it had no way in.
     private var lotteriesCard: some View {
-        let list = LotteryList(events: library) { store.tracking(for: $0) }
+        let list = LotteryList(events: library, includingPast: true) { store.tracking(for: $0) }
         let waiting = list.next
         return VStack(alignment: .leading, spacing: 0) {
             CardHeader(title: "Lotteries", count: waiting.isEmpty ? nil : waiting.count) {

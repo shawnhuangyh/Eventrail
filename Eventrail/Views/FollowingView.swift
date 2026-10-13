@@ -652,7 +652,7 @@ struct FollowingFilter: Equatable {
         /// the next seven, whatever the hour — and the months as the calendar
         /// has them, so three months from 30 November is the end of February.
         func contains(_ event: Event, asOf now: Date = .now) -> Bool {
-            let reader = Calendar.current
+            let reader = Calendar.gregorian()
             let today = reader.startOfDay(for: now)
             let end: Date? = switch self {
             case .any: nil

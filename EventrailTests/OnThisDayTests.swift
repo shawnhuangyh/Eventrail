@@ -3,9 +3,10 @@ import Testing
 @testable import Eventrail
 
 struct OnThisDayTests {
-    /// Noon on a day of the reader's own calendar.
+    /// Noon on a day, on the reader's clock — a Gregorian day, whatever
+    /// calendar the phone running the tests is set to.
     static func today(_ year: Int, _ month: Int, _ day: Int) -> Date {
-        Calendar.current.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+        Calendar.gregorian().date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
     }
 
     static let ticket = Tracking(lotteries: [LotteryEntry(round: "最速先行抽選", result: .won(nil))])

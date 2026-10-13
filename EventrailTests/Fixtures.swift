@@ -61,7 +61,7 @@ enum Fixtures {
     /// Midnight in Tokyo on the day `offset` days from the reader's today, as
     /// an import would date it.
     static func day(fromToday offset: Int) -> Date {
-        let reader = Calendar.current
+        let reader = Calendar.gregorian()
         let target = reader.date(byAdding: .day, value: offset, to: reader.startOfDay(for: .now))!
         let fields = reader.dateComponents([.year, .month, .day], from: target)
         return date(fields.year!, fields.month!, fields.day!)

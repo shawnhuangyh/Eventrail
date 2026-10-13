@@ -319,7 +319,7 @@ struct TrackingTests {
     }
 
     @Test func theNextResultsAreTheSoonestStillToCome() {
-        let now = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 4, hour: 12))!
+        let now = Calendar.gregorian().date(from: DateComponents(year: 2026, month: 10, day: 4, hour: 12))!
         func day(_ d: Int) -> CalendarDay { CalendarDay(year: 2026, month: 10, day: d) }
         let past = LotteryEntry(day: day(1)), soon = LotteryEntry(day: day(9))
         let later = LotteryEntry(day: day(20)), decided = LotteryEntry(day: day(5), result: .lost)

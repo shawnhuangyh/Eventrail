@@ -58,13 +58,39 @@ final class WatchLink: NSObject {
     private func flush() {
         guard let session, session.activationState == .activated,
               session.isPaired, session.isWatchAppInstalled,
-              let latest, let data = try? JSONEncoder().encode(latest), data != sent
+              let latest, let data = Self.payload(for: latest), data != sent
         else { return }
         do {
             try session.updateApplicationContext([WatchLibrary.contextKey: data])
             sent = data
         } catch {
             Self.log.error("The library could not be sent to the watch: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// How large a copy is sent. WatchConnectivity refuses an application
+    /// context much past 64 KB, and a refused copy left the watch on the last
+    /// one it had, with nothing but a line in the log to say so; sixty events
+    /// with long titles come to some 51 KB, so the room is not as wide as it
+    /// looks.
+    nonisolated static let budget = 60_000
+
+    /// `library` as it is sent: within ``budget``, the events furthest off
+    /// left out where it would not fit — the watch shows what is soonest —
+    /// and the slashes of its links unescaped, which JSON allows and a
+    /// decoder of any build reads the same.
+    nonisolated static func payload(for library: WatchLibrary, within budget: Int = budget) -> Data? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        var library = library
+        while true {
+            guard let data = try? encoder.encode(library) else { return nil }
+            guard data.count > budget, !library.events.isEmpty else { return data }
+            // The share of the events that the copy runs over by, and one at
+            // the least, so a copy is encoded a few times rather than sixty.
+            let over = Double(data.count - budget) / Double(data.count)
+            let drop = max(1, Int((Double(library.events.count) * over).rounded(.up)))
+            library.events.removeLast(min(drop, library.events.count))
         }
     }
 

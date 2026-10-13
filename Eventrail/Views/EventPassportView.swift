@@ -998,6 +998,7 @@ private struct PassportExtremesSheet: View {
         .washBackground()
         .presentationDetents([.medium, .large])
         .eventSheet($openEvent)
+        .opensFromOutside()
     }
 
     /// How many were timed, not how many were attended: an event with no
@@ -1072,6 +1073,7 @@ private struct PassportRankingSheet: View {
         // Opens half-height like the extremes and pulls up to full: these two
         // lists run to as many names as the reader has been to.
         .presentationDetents([.medium, .large])
+        .opensFromOutside()
     }
 
     private func eyebrow(_ count: Int) -> Text {
@@ -1312,6 +1314,7 @@ private struct PassportLotterySheet: View {
         .washBackground()
         .presentationDetents([.medium, .large])
         .eventSheet($openEvent)
+        .opensFromOutside()
     }
 }
 
@@ -2671,6 +2674,7 @@ private struct PassportTicketSheet: View {
         .washBackground()
         .presentationDetents([.medium, .large])
         .eventSheet($openEvent)
+        .opensFromOutside()
     }
 
     private var eyebrow: Text {

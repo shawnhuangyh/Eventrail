@@ -807,10 +807,12 @@ nonisolated struct PassportStats {
     /// instead, a Tokyo Sunday becomes Saturday for anybody west of Japan —
     /// the chart would then say nobody goes out on Sundays while every row
     /// under it says "Sun". The year is read the same way, in ``year(of:)``.
+    ///
+    /// Counted on the Gregorian calendar (``Foundation/Calendar/gregorian(in:)``):
+    /// on a phone set to the Japanese one the year was the era's, so 2018 was
+    /// 30, 2025 was 7, and the chart ran from 1 to 31 with 2019 split in two.
     private static func component(_ component: Calendar.Component, of event: Event) -> Int {
-        var calendar = Calendar.current
-        calendar.timeZone = event.timeZone
-        return calendar.component(component, from: event.date)
+        Calendar.gregorian(in: event.timeZone).component(component, from: event.date)
     }
 
     /// How long an event ran, for the events that can say.

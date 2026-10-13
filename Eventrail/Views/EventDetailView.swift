@@ -162,6 +162,7 @@ struct EventDetailView: View {
         .refreshNotices(showing: !path.isEmpty)
         .refreshNoticesInSheet()
         .presentationDragIndicator(.visible)
+        .opensFromOutside()
     }
 
     private var detail: some View {

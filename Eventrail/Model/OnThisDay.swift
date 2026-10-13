@@ -34,12 +34,12 @@ nonisolated struct OnThisDay {
         // on the Japanese one a year is an era's, and Heisei 31 is not before
         // Reiwa 8. The reader's zone says which day it is here; each hall's
         // says which day its event fell on.
-        let today = CalendarDay(now, in: Self.calendar(in: .current))
+        let today = CalendarDay(now)
         day = today
         var halls: [TimeZone: Calendar] = [:]
         memories = events
             .compactMap { event -> Memory? in
-                let hall = halls[event.timeZone] ?? Self.calendar(in: event.timeZone)
+                let hall = halls[event.timeZone] ?? .gregorian(in: event.timeZone)
                 halls[event.timeZone] = hall
                 let written = CalendarDay(event.date, in: hall)
                 // The day first: it rules out nearly the whole library without
@@ -56,13 +56,7 @@ nonisolated struct OnThisDay {
     var years: Int { Set(memories.map(\.yearsAgo)).count }
 
     /// The start of today, to be printed.
-    var date: Date { day.date(in: Self.calendar(in: .current)) }
-
-    private static func calendar(in zone: TimeZone) -> Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = zone
-        return calendar
-    }
+    var date: Date { day.date() }
 
     /// Whether a day in an earlier year is this one's: the same month and the
     /// same day — and the 29th of February on the 28th in a year without one,

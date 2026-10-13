@@ -201,70 +201,24 @@
         }
       }
     },
-    "%@ and %lld favorites" : {
-      "extractionState" : "stale",
+    "%@ came back. Anything newer on this device was kept." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@とお気に入り%lld件"
+            "value" : "%@を復元しました。このデバイスにあったより新しい内容はそのまま残しています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 和 %lld 个收藏"
+            "value" : "已恢复 %@。此设备上较新的内容均已保留。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 和 %lld 個收藏"
-          }
-        }
-      }
-    },
-    "%@ and 1 favorite" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@とお気に入り1件"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 和 1 个收藏"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 和 1 個收藏"
-          }
-        }
-      }
-    },
-    "%@ came back. Nothing already on this device was changed." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@を復元しました。このデバイスにある内容は変更されていません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已恢复 %@。此设备上的现有内容均未更改。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已恢復 %@。此裝置上的現有內容均未更改。"
+            "value" : "已恢復 %@。此裝置上較新的內容均已保留。"
           }
         }
       }
@@ -1684,24 +1638,24 @@
         }
       }
     },
-    "A restore only ever adds. Everything already on this device stays as it is." : {
+    "A restore only ever adds. Wherever this device holds something newer, that stays." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "復元は追加するだけです。このデバイスにある内容はそのまま残ります。"
+            "value" : "復元は追加するだけです。このデバイスにより新しい内容があれば、そちらが残ります。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "恢复只会添加内容，此设备上已有的一切都会保持不变。"
+            "value" : "恢复只会添加内容，此设备上较新的内容会保留下来。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "恢復只會新增內容，此裝置上已有的一切都會保持不變。"
+            "value" : "恢復只會新增內容，此裝置上較新的內容會保留下來。"
           }
         }
       }
@@ -7874,24 +7828,24 @@
         }
       }
     },
-    "Nothing is overwritten" : {
+    "Nothing is erased" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上書きされません"
+            "value" : "消去されません"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不会覆盖任何内容"
+            "value" : "不会清除任何内容"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不會覆蓋任何內容"
+            "value" : "不會清除任何內容"
           }
         }
       }

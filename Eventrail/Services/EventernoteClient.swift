@@ -290,8 +290,8 @@ nonisolated struct EventernoteClient: Sendable {
             components.path = path
         }
         if !query.isEmpty {
-            components.queryItems = query.sorted { $0.key < $1.key }
-                .map { URLQueryItem(name: $0.key, value: $0.value) }
+            components.setQuery(query.sorted { $0.key < $1.key }
+                .map { URLQueryItem(name: $0.key, value: $0.value) })
         }
         return components.url
     }
@@ -310,5 +310,18 @@ nonisolated struct EventernoteClient: Sendable {
             throw Failure.http(status)
         }
         return String(decoding: data, as: UTF8.self)
+    }
+}
+
+nonisolated extension URLComponents {
+    /// Sets the query to `items`, a `+` in any of them written as `%2B`.
+    ///
+    /// `queryItems` leaves a `+` as it is — it is allowed in a query — and a
+    /// server reads one there as a space: a search for +α/あるふぁきゅん。
+    /// arrived as " α/あるふぁきゅん。", and the exact match a billed name is
+    /// looked up by came back with nobody.
+    mutating func setQuery(_ items: [URLQueryItem]) {
+        queryItems = items
+        percentEncodedQuery = percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
     }
 }

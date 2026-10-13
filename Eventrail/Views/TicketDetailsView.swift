@@ -99,6 +99,12 @@ struct TicketDetailsView: View {
     /// put away.
     private func write(_ record: Tracking) {
         store.setTracking(store.tracking(for: event).applying(changesFrom: original, to: record), for: event)
+        // A results day written down here is the moment to ask whether the
+        // reader wants to hear about it — see ``LotteryReminders``. On the
+        // checkmark rather than on an entry's own page, which a sheet put
+        // away with its X undoes: asked there, a day thrown away still asked.
+        let days = Dictionary(original.lotteries.map { ($0.id, $0.day) }) { first, _ in first }
+        LotteryReminders.shared.askIfNeeded(for: record.lotteries.filter { days[$0.id] != .some($0.day) })
         dismiss()
     }
 
@@ -173,6 +179,7 @@ struct TicketDetailsView: View {
         // An entry's page asks its own question on the way back, which a
         // swipe down past it would not.
         .interactiveDismissDisabled(hasChanges || !path.isEmpty)
+        .opensFromOutside()
     }
 
     // MARK: - Sections
@@ -622,7 +629,8 @@ enum LotteryText {
     /// "Oct 12", with the year only where it is not this one.
     static func short(_ day: CalendarDay) -> String {
         let date = day.date()
-        let thisYear = Calendar.current.component(.year, from: .now) == day.year
+        // Gregorian, as the day is kept — see ``CalendarDay``.
+        let thisYear = Calendar.gregorian().component(.year, from: .now) == day.year
         return thisYear
             ? date.formatted(.dateTime.month(.abbreviated).day())
             : date.formatted(.dateTime.month(.abbreviated).day().year())

@@ -83,7 +83,9 @@ struct BackupRestore: ViewModifier {
         case 2: Text("\(parts[0]) and \(parts[1])")
         default: Text("\(parts[0]), \(parts[1]) and \(parts[2])")
         }
-        return Text("\(list) came back. Nothing already on this device was changed.")
+        // Not "nothing changed": an answer the file holds a newer copy of
+        // is taken over this device's older one — see ``LibraryArchive/restoring(_:)``.
+        return Text("\(list) came back. Anything newer on this device was kept.")
     }
 
     private var isAsking: Binding<Bool> {

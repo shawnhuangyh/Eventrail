@@ -44,9 +44,14 @@ nonisolated struct VenueBuildings: Sendable {
     private static let endpoint =
         URL(string: "https://nominatim.openstreetmap.org/search")!
 
-    /// The policy asks that requests be attributable to the app making them.
-    private static let userAgent =
-        "Eventrail/1.0 (iOS; https://www.eventernote.com companion)"
+    /// The policy asks that requests be attributable to the app making them,
+    /// with a way to reach whoever made it: the app's own repository, whose
+    /// issues are where to say so — not Eventernote, whose address this once
+    /// carried and which has nothing to do with these requests.
+    private static let userAgent: String = {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        return "Eventrail/\(version) (iOS; +https://github.com/shawnhuangyh/Eventrail)"
+    }()
 
     /// How far from the register's block a building may stand and still be the
     /// hall.
@@ -143,7 +148,7 @@ nonisolated struct VenueBuildings: Sendable {
             URLQueryItem(name: "accept-language", value: "ja")
         ]
         if let country { items += VenueCountries.searchScope(for: country) }
-        components?.queryItems = items
+        components?.setQuery(items)
         guard let url = components?.url else { throw Failure.unreadable }
 
         var request = URLRequest(url: url)

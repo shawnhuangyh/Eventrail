@@ -46,6 +46,7 @@ struct EventernoteAccountSheet: View {
                 }
             }
         }
+        .opensFromOutside()
     }
 
     /// What naming an account is about to do, which is not the same thing for

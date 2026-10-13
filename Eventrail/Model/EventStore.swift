@@ -282,6 +282,12 @@ final class EventStore {
     private var pendingSave: Task<Void, Never>?
     private var venuePlacings: Task<Void, Never>?
     private var pendingMirror: Task<Void, Never>?
+    /// Whether a write since the last save moved something a calendar entry
+    /// is made of — an event in or out of the library, or an event's facts —
+    /// so the save owes the calendar a mirror (``save()``). A note, a ticket,
+    /// a heart, a Following date read or a search does not: a pass reads the
+    /// whole calendar back, and opening a row of Following set one off.
+    @ObservationIgnored private var owesMirror = false
     /// The halls an import brought in, being placed behind it.
     private var venuePlacement: Task<Void, Never>?
     /// Events the reader has just added by hand, waiting for their hall to be
@@ -467,6 +473,7 @@ final class EventStore {
         answers.tracking.edits = [:]
         let given = answers.parts(differingFrom: held?.answers ?? LibraryEntry.Answers())
         guard !given.isEmpty else { return }
+        if given.contains(.inLibrary) { owesMirror = true }
         if keepingFacts { keep(event, in: makeRow(for: event.id)) }
         let entry = held ?? LibraryEntry(eventID: event.id)
         if held == nil {
@@ -480,6 +487,7 @@ final class EventStore {
         entry.modified = now.toTheMillisecond
         entry.kept = rows[event.id]?.facts ?? event
         records[event.id] = nil
+        converted[event.id] = nil
     }
 
     private func makeMark(for id: Event.ID) -> FollowingReadMark {
@@ -514,9 +522,14 @@ final class EventStore {
     // is drawn again when that row changes and not when another does.
 
     /// The library, for the work done here rather than on a screen: the
-    /// calendar, the halls, a refresh.
+    /// calendar, the halls, a refresh, the watch and the reminders.
+    ///
+    /// Through the same kept copies a screen's list is (``events(of:where:)``):
+    /// read after every write by the calendar, the watch and the reminders
+    /// each, building nine hundred events out of their columns every time
+    /// was the most of what a write cost.
     private var library: [Event] {
-        entries.values.compactMap { $0.inLibrary ? event(id: $0.eventID) : nil }
+        events(of: entries.values, where: \.inLibrary)
     }
 
     /// The library's events still to come, soonest first — what the watch is
@@ -700,6 +713,7 @@ final class EventStore {
     func removeAllEvents() {
         let now = Date.now
         for entry in entries.values where !entry.answers.isEmpty {
+            if entry.inLibrary { owesMirror = true }
             // Every part, given or not: an answer another device gave before
             // this is one the reader asked to be rid of too.
             entry.give(LibraryEntry.Answers(),
@@ -804,6 +818,9 @@ final class EventStore {
     private func keep(_ event: Event, in row: LibraryEvent) {
         let known = row.facts
         row.write(known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event)
+        // Before the save that would say so: an import reads the library
+        // back (``needsReading``) between taking the events in and saving.
+        converted[row.eventID] = nil
     }
 
     /// Folds a freshly imported copy of an event back in, wherever it is held.
@@ -820,6 +837,7 @@ final class EventStore {
         if let row = rows[imported.id], let held = row.facts {
             guard !imported.isSameRead(as: held) else { return }
             row.write(imported)
+            converted[imported.id] = nil
         } else {
             seen[imported.id] = imported
         }
@@ -1419,7 +1437,11 @@ final class EventStore {
             calendarStatus = await calendar.stop()
             return
         }
-        calendarStatus = await calendar.mirror(calendarEvents)
+        let events = calendarEvents
+        // Whatever the sheets have placed, as plain values the mirror can be
+        // handed off the main actor — see ``CalendarSync/Place``.
+        let places = VenuePlaces.shared.mapItems(for: events).mapValues { CalendarSync.Place($0) }
+        calendarStatus = await calendar.mirror(events, places: places, color: UIColor(Color.brandTint).cgColor)
     }
 
     /// Every event whose hall is worth asking about: the library and the
@@ -1505,6 +1527,7 @@ final class EventStore {
         for (id, zone) in zones {
             if let row = rows[id], let event = row.facts, event.timeZone != zone {
                 row.write(event.published(in: zone))
+                converted[id] = nil
                 moved = true
             }
             // An event met in Search and not kept is held here and nowhere
@@ -1569,7 +1592,11 @@ final class EventStore {
         // not the nine hundred beside them.
         let context = database.context
         for model in context.changedModelsArray + context.insertedModelsArray {
-            if let row = model as? LibraryEvent { stale?.insert(row.eventID) }
+            if let row = model as? LibraryEvent {
+                stale?.insert(row.eventID)
+                // An event's facts are what its entry is written from.
+                owesMirror = true
+            }
             if let entry = model as? LibraryEntry {
                 stale?.insert(entry.eventID)
                 records[entry.eventID] = nil
@@ -1582,7 +1609,10 @@ final class EventStore {
             guard !Task.isCancelled, let self else { return }
             commit()
             // The calendar follows the same pause as the save: a ticket
-            // toggled twice while deciding should reach EventKit once.
+            // toggled twice while deciding should reach EventKit once — and
+            // only where the save moved something an entry is made of.
+            guard owesMirror else { return }
+            owesMirror = false
             await mirrorCalendar()
         }
     }
@@ -1698,7 +1728,7 @@ final class EventStore {
 
     /// Everything the reader has hearted, for the halls worth placing.
     private var favoriteEvents: [Event] {
-        entries.values.compactMap { $0.isFavorite ? event(id: $0.eventID) : nil }
+        events(of: entries.values, where: \.isFavorite)
     }
 
     // MARK: - Followed performers

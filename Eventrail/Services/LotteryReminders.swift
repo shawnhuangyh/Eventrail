@@ -121,18 +121,24 @@ final class LotteryReminders: NSObject {
     }
 
     /// Asks the system for the right to notify, where nobody has answered yet
-    /// and `entry` is a lottery saved with a results day whose evening is
-    /// still to come — the moment the reader shows they want to hear about
-    /// it. Asks nothing with the switch off, or where the system has already
-    /// been answered either way.
-    func askIfNeeded(for entry: LotteryEntry) {
-        guard isEnabled, entry.isLottery, entry.isPending,
-              let day = entry.day, let evening = LotteryReminder.evening(of: day), evening > .now
-        else { return }
+    /// and one of `entries` is a lottery saved with a results day whose
+    /// evening is still to come — the moment the reader shows they want to
+    /// hear about it. Asks nothing with the switch off, or where the system
+    /// has already been answered either way.
+    func askIfNeeded(for entries: some Sequence<LotteryEntry>) {
+        guard isEnabled, entries.contains(where: Self.wantsReminding) else { return }
         Task {
             guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
             await requestAuthorization()
         }
+    }
+
+    /// A lottery still waiting, with a results day whose evening is to come.
+    private static func wantsReminding(_ entry: LotteryEntry) -> Bool {
+        guard entry.isLottery, entry.isPending, let day = entry.day,
+              let evening = LotteryReminder.evening(of: day)
+        else { return false }
+        return evening > .now
     }
 
     private func requestAuthorization() async {
@@ -239,15 +245,25 @@ nonisolated struct LotteryReminder: Hashable {
 
     var identifier: String { "\(Self.prefix)\(eventID)/\(entryID.uuidString)" }
 
-    /// Eight in the evening of `day`, on `calendar`'s clock.
+    /// Eight in the evening of `day`, on `calendar`'s clock. The day is a
+    /// Gregorian one whatever `calendar` counts in — see ``CalendarDay``.
     static func evening(of day: CalendarDay, in calendar: Calendar = .current) -> Date? {
-        calendar.date(from: components(of: day))
+        calendar.asGregorian
+            .date(from: DateComponents(year: day.year, month: day.month, day: day.day, hour: hour, minute: 0))
     }
 
     /// The trigger's date, with no zone: it comes at eight wherever the
     /// phone is that evening.
-    private static func components(of day: CalendarDay) -> DateComponents {
-        DateComponents(year: day.year, month: day.month, day: day.day, hour: hour, minute: 0)
+    ///
+    /// Written in `calendar`'s own terms — the phone's, which is what the
+    /// system matches a trigger with no calendar against — era and all. The
+    /// Gregorian year handed over as it stands was the year 2026 of Reiwa on
+    /// a phone set to the Japanese calendar, which no evening ever reaches.
+    static func components(of day: CalendarDay, in calendar: Calendar = .current) -> DateComponents {
+        guard let evening = evening(of: day, in: calendar) else {
+            return DateComponents(year: day.year, month: day.month, day: day.day, hour: hour, minute: 0)
+        }
+        return calendar.dateComponents([.era, .year, .month, .day, .hour, .minute], from: evening)
     }
 
     /// The reminders owed: every round in `list` still waiting on a result
@@ -306,9 +322,9 @@ nonisolated struct LotteryReminder: Hashable {
         guard let request,
               let trigger = request.trigger as? UNCalendarNotificationTrigger
         else { return false }
-        let when = trigger.dateComponents
-        return when.year == day.year && when.month == day.month && when.day == day.day
-            && when.hour == Self.hour
+        let when = trigger.dateComponents, wanted = Self.components(of: day)
+        return when.era == wanted.era && when.year == wanted.year && when.month == wanted.month
+            && when.day == wanted.day && when.hour == wanted.hour
             && request.content.title == title
             && request.content.subtitle == eventTitle
             && request.content.body == body
