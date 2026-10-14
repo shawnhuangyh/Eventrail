@@ -163,6 +163,9 @@ struct EventDetailView: View {
         .refreshNoticesInSheet()
         .presentationDragIndicator(.visible)
         .opensFromOutside()
+        // Outside the line above, so it stands at the depth this sheet was
+        // presented at rather than at the depth of what it presents.
+        .advertisesHandoff(of: event)
     }
 
     private var detail: some View {

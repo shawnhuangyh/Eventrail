@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// What the app has been asked to open from outside it — an event, from its
-/// Live Activity tapped; a lottery round, from its results-day reminder — and
-/// where it is opened: over whatever the reader has up.
+/// Live Activity tapped or handed off from another device (``EventHandoff``);
+/// a lottery round, from its results-day reminder — and where it is opened:
+/// over whatever the reader has up.
 ///
 /// A sheet presented from the root while another sheet is up is one SwiftUI
 /// does not present at all: a reminder tapped with an event's sheet open, as

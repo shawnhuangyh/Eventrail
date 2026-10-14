@@ -29,10 +29,15 @@ struct RootView: View {
     /// rather than in Settings: the app can be opened from a file while any tab
     /// is showing, and from a cold launch with no Settings sheet at all.
     @State private var openedBackup: URL?
-    /// An event opened from outside the app — its Live Activity, tapped — or
-    /// a lottery round, from its results-day reminder (``LotteryReminders``):
-    /// opened over whatever sheet is up — see ``OutsideOpens``.
+    /// An event opened from outside the app — its Live Activity, tapped, or
+    /// another device's sheet, handed off — or a lottery round, from its
+    /// results-day reminder (``LotteryReminders``): opened over whatever sheet
+    /// is up — see ``OutsideOpens``.
     @State private var opens = OutsideOpens()
+    /// The event in the frontmost sheet, offered to the reader's other
+    /// devices — see ``EventHandoff``.
+    @State private var handoff = EventHandoff()
+    @Environment(\.openURL) private var openURL
     private let reminders = LotteryReminders.shared
     /// Whether this launch still owes the reader the welcome.
     ///
@@ -78,6 +83,13 @@ struct RootView: View {
                 openedBackup = url
             }
         }
+        // Offered while an event's sheet is up, and taken back as it closes.
+        .userActivity(EventHandoff.activityType, element: handoff.shown) { event, activity in
+            EventHandoff.fill(activity, with: event)
+        }
+        .onContinueUserActivity(EventHandoff.activityType) { activity in
+            continueHandoff(activity)
+        }
         // The ticket sheet on the round's own page, where its result is
         // written down — or the event, where the round has gone since.
         .onChange(of: reminders.opened, initial: true) { openReminder() }
@@ -101,6 +113,7 @@ struct RootView: View {
         .environment(venues)
         .environment(notices)
         .environment(opens)
+        .environment(handoff)
         .tint(.brandTint)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only
@@ -163,8 +176,23 @@ struct RootView: View {
         }
     }
 
+    /// Opens the event another device offered through Handoff: the copy it
+    /// sent, which the sheet answers with this device's own where it holds
+    /// one. A copy this build cannot read falls back to whatever this device
+    /// holds under the page's address, and with nothing held, the page itself
+    /// opens in the browser — where Handoff would have taken a device without
+    /// the app.
+    private func continueHandoff(_ activity: NSUserActivity) {
+        if let event = EventHandoff.event(in: activity)
+            ?? activity.webpageURL.flatMap(Self.eventID(in:)).flatMap(store.event(id:)) {
+            opens.open(.event(event))
+        } else if let page = activity.webpageURL {
+            openURL(page)
+        }
+    }
+
     /// The event a link to its Eventernote page names — what a Live Activity
-    /// opens the app with.
+    /// opens the app with, and the page a handed-off event points at.
     private static func eventID(in url: URL) -> Event.ID? {
         guard url.host() == "www.eventernote.com" else { return nil }
         let path = url.pathComponents

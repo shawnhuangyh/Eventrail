@@ -33,6 +33,7 @@ Eventrail 正通过 TestFlight 进行 **Beta 测试**，支持 iPhone、iPad 和
 - **📅 日历同步** — 把行程写入应用自己的日历，并在入场时间提醒
 - **📥 导入个人主页** — 导入 Eventernote 公开个人主页的参加记录和收藏（只读，无需密码），再勾选你有票的活动
 - **☁️ iCloud 同步** — 通过你的 iCloud 私有存储在 iPhone 和 iPad 之间同步记录，应用没有自己的服务器
+- **📲 接力** — 在 iPhone 上打开的活动，可以在 iPad 上接着看，直接打开同一场活动；在 Mac 或没有安装 Eventrail 的设备上，则会在浏览器中打开该活动的 Eventernote 页面
 - **💾 备份与恢复** — 把行程导出为 `.eventrail` 文件，随时恢复
 - **🌍 多语言** — 英语、日语、简体中文和繁体中文；活动概要可在设备上翻译，时间可按场馆当地或你所在的时区显示
 
@@ -65,7 +66,7 @@ Eventrail 正通过 TestFlight 进行 **Beta 测试**，支持 iPhone、iPad 和
 
    模拟器构建无需额外配置。真机构建需要在开发者账户中为 App ID 开启 iCloud（含 `iCloud.moe.shawn.Eventrail` CloudKit 容器）和推送通知，因为同步基于 CloudKit；还需要为 App 和小组件扩展都加上 App Group `group.moe.shawn.Eventrail`，实时活动的海报经由它传递。首次从 Xcode 进行真机构建时，自动签名会注册这个 App Group 以及扩展和手表 App 的 App ID；无法自动注册的签名方式（例如 Xcode Cloud）需要它们事先存在。TestFlight 构建要能同步，需先在 CloudKit 控制台把 CloudKit schema 部署到生产环境；之后每当模型新增类型或字段，都要再部署一次——先用开启了 iCloud 同步的开发构建运行一遍，让开发环境的 schema 里有这些内容可供部署。
 
-   实时活动需要用真机 iPhone 检查：模拟器的截图不包含灵动岛，手表模拟器也收不到实时活动。
+   实时活动需要用真机 iPhone 检查：模拟器的截图不包含灵动岛，手表模拟器也收不到实时活动。接力需要两台登录同一 Apple 账户的真机才能检查：模拟器无法接力。
 
 ### 常用命令
 
