@@ -760,8 +760,9 @@ nonisolated struct PassportStats {
     /// a run that stepped from 2019 straight to 2023 would say they were out
     /// in between.
     ///
-    /// Months and days are named and ordered by the reader's own calendar —
-    /// a week that starts on Monday starts on Monday here — but which month
+    /// Days are named and ordered by the reader's own calendar — a week that
+    /// starts on Monday starts on Monday here — and months by the Gregorian
+    /// one they are counted on (``monthSymbols(in:)``); but which month
     /// and which day an event *falls* on is read in the hall's zone, for the
     /// reason ``component(_:of:)`` gives.
     func tally(by cadence: PassportCadence) -> [Tally] {
@@ -783,8 +784,9 @@ nonisolated struct PassportStats {
             for event in events {
                 counts[Self.component(.month, of: event) - 1] += 1
             }
+            let months = Self.monthSymbols(in: calendar)
             return (0 ..< 12).map {
-                Tally(value: $0 + 1, label: calendar.shortMonthSymbols[$0], count: counts[$0])
+                Tally(value: $0 + 1, label: months[$0], count: counts[$0])
             }
         case .weekday:
             var counts = Array(repeating: 0, count: 7)
@@ -800,6 +802,19 @@ nonisolated struct PassportStats {
         }
     }
 
+    /// The Gregorian months' short names, January first, in the language
+    /// `calendar` is in.
+    ///
+    /// The months the tally counts, whatever `calendar` is: its own names are
+    /// its own months, and on a phone set to the Chinese or the Hebrew
+    /// calendar January's column read 正月 or Tishri. The Japanese and
+    /// Buddhist calendars share the Gregorian months, which hid it.
+    static func monthSymbols(in calendar: Calendar) -> [String] {
+        var gregorian = Calendar.gregorian(in: calendar.timeZone)
+        gregorian.locale = calendar.locale
+        return gregorian.shortMonthSymbols
+    }
+
     /// Which month or day of the week an event fell on, read where it was held.
     ///
     /// ``Event/date`` is midnight in the *venue's* zone, and every line in the
@@ -807,10 +822,12 @@ nonisolated struct PassportStats {
     /// instead, a Tokyo Sunday becomes Saturday for anybody west of Japan —
     /// the chart would then say nobody goes out on Sundays while every row
     /// under it says "Sun". The year is read the same way, in ``year(of:)``.
+    ///
+    /// Counted on the Gregorian calendar (``Foundation/Calendar/gregorian(in:)``):
+    /// on a phone set to the Japanese one the year was the era's, so 2018 was
+    /// 30, 2025 was 7, and the chart ran from 1 to 31 with 2019 split in two.
     private static func component(_ component: Calendar.Component, of event: Event) -> Int {
-        var calendar = Calendar.current
-        calendar.timeZone = event.timeZone
-        return calendar.component(component, from: event.date)
+        Calendar.gregorian(in: event.timeZone).component(component, from: event.date)
     }
 
     /// How long an event ran, for the events that can say.

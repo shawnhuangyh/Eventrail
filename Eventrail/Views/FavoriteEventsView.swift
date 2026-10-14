@@ -89,7 +89,7 @@ struct FavoriteEventsView: View {
                     confirmation: RemovalConfirmation(
                         isPresented: $isConfirmingRemoval,
                         title: removalTitle,
-                        message: Text("Only the heart comes off — they stay in your library, and you can heart them again any time."),
+                        message: removalMessage,
                         confirmTitle: "Remove",
                         cancelTitle: "Keep them",
                         confirm: removeChosen
@@ -164,7 +164,24 @@ struct FavoriteEventsView: View {
             : Text("Remove \(selection.count) events from your favorites?")
     }
 
-    /// Un-hearting rather than deleting: the events stay in the library.
+    /// What un-hearting leaves of the picked events. One in the library stays
+    /// there; one met in Search or on Following and only hearted was kept in
+    /// the app by its heart alone, and is found again only through Search.
+    private var removalMessage: Text {
+        let events = chosen
+        let kept = events.filter { store.isInLibrary($0) }.count
+        if kept == events.count {
+            return Text("Only the heart comes off — they stay in your library, and you can heart them again any time.")
+        } else if kept > 0 {
+            return Text("Only the hearts come off. Those in your library stay there; to heart the rest again, find them in Search.")
+        } else if events.count == 1 {
+            return Text("Only the heart comes off. The event is not in your library, so to heart it again, find it in Search.")
+        } else {
+            return Text("Only the hearts come off. They are not in your library, so to heart them again, find them in Search.")
+        }
+    }
+
+    /// Un-hearting rather than removing: an event in the library stays there.
     private func removeChosen() {
         let events = chosen
         withAnimation(.snappy) {

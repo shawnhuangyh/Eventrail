@@ -110,6 +110,12 @@ final class VenuePlaces {
         /// When Maps was asked. Kept so that "no such place" can be tried
         /// again one day — see ``VenuePlaces/patience``.
         var asked: Date
+        /// When anything last wanted this answer: a sheet drawing it, the
+        /// library's clocks read at launch, the calendar mirror, the Passport.
+        /// Nil on an answer just asked, and on every answer written before
+        /// there was one; both count from ``asked``. See
+        /// ``VenuePlaces/hasLapsed(asked:used:now:)``.
+        var used: Date?
         /// Which reading of Maps' answers produced this one. Optional because
         /// an answer written before there were any carries none.
         var ruleset: Int?
@@ -179,14 +185,21 @@ final class VenuePlaces {
             // Kept in WGS-84 and shifted only as drawn, on the one provider
             // that needs it — see ``MainlandOffset``. Maps' own answers there
             // are shifted already.
-            var coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            let kept = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            var coordinate = kept
+            var otherDrawing: CLLocationCoordinate2D?
             // By the country the answer came back in wherever it carries one,
             // so a hall on the mainland that the address reading missed is
             // shifted as well; by where it stands on answers older than that.
             if source == .openStreetMap || source == .openStreetMapAddress,
-               VenuePlaces.mapsIsMainland,
-               country.map(MainlandOffset.applies(toCountry:)) ?? MainlandOffset.applies(at: coordinate) {
-                coordinate = MainlandOffset.shifted(coordinate)
+               country.map(MainlandOffset.applies(toCountry:)) ?? MainlandOffset.applies(at: kept) {
+                let shifted = MainlandOffset.shifted(kept)
+                if VenuePlaces.mapsIsMainland {
+                    coordinate = shifted
+                    otherDrawing = kept
+                } else {
+                    otherDrawing = shifted
+                }
             }
             let item = MKMapItem(
                 location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude),
@@ -196,7 +209,8 @@ final class VenuePlaces {
             // An answer written before there were sources reads as the blunt
             // one, which is the safe way round: it widens a frame that did not
             // need widening, rather than claiming a precision it may not have.
-            return Placing(item: item, uncertainty: (source ?? .register).uncertainty, timeZone: zone)
+            return Placing(item: item, uncertainty: (source ?? .register).uncertainty, timeZone: zone,
+                           otherDrawing: otherDrawing, isFromMaps: source == .maps)
         }
 
         @MainActor init(_ found: Found?) {
@@ -263,6 +277,16 @@ final class VenuePlaces {
         /// the hall's times has to be able to tell a clock it knows from the
         /// one an import assumed.
         let timeZone: TimeZone?
+        /// Where the other kind of phone draws the same answer — kept, where
+        /// this one shifts it, and shifted, where this one does not — or nil
+        /// where nobody shifts it (see ``MainlandOffset``). For the calendar
+        /// mirror: an iCloud calendar is one entry for every device, and two
+        /// devices on different providers each found the other's pin moved and
+        /// wrote their own back, every mirror.
+        let otherDrawing: CLLocationCoordinate2D?
+        /// Whether Apple Maps placed it — the one answer the calendar mirror
+        /// never writes another over (see ``CalendarSync/keepsLocation(_:over:found:)``).
+        let isFromMaps: Bool
     }
 
     /// Whether this device may ask OpenStreetMap anything — which building at
@@ -347,12 +371,30 @@ final class VenuePlaces {
     /// and carrying on would only be asking to be refused for longer.
     private static let givesUpAfter = 3
 
-    /// How long an answer is kept once nothing has asked about it.
+    /// How long an answer is kept once nothing has wanted it.
     ///
-    /// A hall the reader still goes to is asked about again a year later and
-    /// found again in one search; a hall they met once in Search and never
-    /// kept stops taking up room. The alternative is a cache that only grows.
+    /// Counted from the last time anything read it, not from when it was
+    /// asked: every hall the library holds is read as the app launches (see
+    /// ``timeZones(for:)``), so none of them ever lapses, and a hall the reader
+    /// met once in Search and never kept stops taking up room. Counted from
+    /// the asking, as it once was, every hall a first import placed would have
+    /// gone on one day a year later — the Passport's pins, the calendar's
+    /// places, the halls' clocks and OpenStreetMap's "asked once" with them —
+    /// and the next refresh would have asked Maps about all of them at once.
     private static let keep: TimeInterval = 365 * 24 * 60 * 60
+
+    /// Whether nothing has wanted an answer for ``keep``.
+    static func hasLapsed(asked: Date, used: Date?, now: Date = .now) -> Bool {
+        now.timeIntervalSince(max(asked, used ?? asked)) > keep
+    }
+
+    /// Whether reading an answer now is worth writing down. At most once a
+    /// ``patience``: a read is every launch and every mirror, and writing the
+    /// file for each would be writing the whole cache over and over to move a
+    /// date a year away by a day.
+    static func isWorthNoting(asked: Date, used: Date?, now: Date = .now) -> Bool {
+        now.timeIntervalSince(max(asked, used ?? asked)) > patience
+    }
 
     /// Where a search looks first. Eventernote is a Japanese site publishing
     /// Japanese venues — the same assumption ``Event/publishedZone`` makes.
@@ -425,7 +467,8 @@ final class VenuePlaces {
     /// later mirror, after the reader has opened it.
     func mapItems(for events: [Event]) -> [Event.ID: Placing] {
         let cache = cache
-        return events.reduce(into: [:]) { placed, event in
+        var read: [String] = []
+        let placed: [Event.ID: Placing] = events.reduce(into: [:]) { placed, event in
             // Read under the same rule a sheet reads it under, so an answer
             // settled by a reading since found wrong is not still being
             // written into the reader's calendar.
@@ -434,7 +477,10 @@ final class VenuePlaces {
                   let placing = answer.placing
             else { return }
             placed[event.id] = placing
+            read.append(venue.key)
         }
+        note(read)
+        return placed
     }
 
     /// Which clock each of `events` is kept on, as far as anything has already
@@ -446,15 +492,21 @@ final class VenuePlaces {
     /// up yet is simply absent, and goes on being read on Tokyo time — which
     /// is right for every hall in Japan and is where an import starts every
     /// hall off. See ``Event/published(in:)``.
+    ///
+    /// Every hall it is handed is noted as wanted, placed or not — this is
+    /// what reads the whole library as the app launches, and what keeps
+    /// every hall in it from lapsing (see ``keep``).
     func timeZones(for events: [Event]) -> [Event.ID: TimeZone] {
         let cache = cache
-        return events.reduce(into: [:]) { zones, event in
-            guard let venue = Venue(event),
-                  let answer = cache[venue.key], !Self.isWorthAskingAgain(answer),
-                  let zone = answer.zone
-            else { return }
+        var read: [String] = []
+        let zones: [Event.ID: TimeZone] = events.reduce(into: [:]) { zones, event in
+            guard let venue = Venue(event), let answer = cache[venue.key] else { return }
+            read.append(venue.key)
+            guard !Self.isWorthAskingAgain(answer), let zone = answer.zone else { return }
             zones[event.id] = zone
         }
+        note(read)
+        return zones
     }
 
     /// Which clock a hall keeps, asked by its name alone — for a Following
@@ -471,14 +523,28 @@ final class VenuePlaces {
     func timeZone(ofHallNamed name: String) -> TimeZone? {
         if zonesByName == nil {
             zonesByName = Self.zonesByName(cache.compactMap { key, answer in
-                guard !Self.isWorthAskingAgain(answer), let zone = answer.zone,
-                      let hall = key.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first
-                else { return nil }
-                return (String(hall), zone)
+                guard !Self.isWorthAskingAgain(answer), let zone = answer.zone else { return nil }
+                return (Self.hall(inKey: key), zone)
             })
         }
-        return zonesByName?[Self.hallName(name)]
+        let name = Self.hallName(name)
+        guard let zone = zonesByName?[name] else { return nil }
+        // A Following row is read by its hall's name alone, and that clock is
+        // worth keeping for as long as the row is there to read. Once a
+        // launch per name, since this is asked per row as a list draws.
+        if namesNoted.insert(name).inserted {
+            note(cache.keys.filter { Self.hallName(Self.hall(inKey: $0)) == name })
+        }
+        return zone
     }
+
+    /// The hall's name, as the key of its answer holds it — see ``Venue/key``.
+    private static func hall(inKey key: String) -> String {
+        String(key.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
+    }
+
+    /// Names ``timeZone(ofHallNamed:)`` has already noted as wanted this launch.
+    private var namesNoted: Set<String> = []
 
     /// Which clock each hall name keeps, from every placing of it: dropped
     /// where two placings of one name keep different clocks.
@@ -595,6 +661,7 @@ final class VenuePlaces {
             if answer.triedBuilding != known.triedBuilding {
                 settle(answer, for: venue.key)
             }
+            note([venue.key])
             if answer.latitude != known.latitude || answer.longitude != known.longitude {
                 placed.continuation.yield()
             }
@@ -1101,10 +1168,27 @@ final class VenuePlaces {
     /// Writes one answer down, and drops whatever nothing has wanted for a
     /// year.
     private func remember(_ answer: Answer, for key: String) {
-        cache = cache.filter { $0.value.asked.timeIntervalSinceNow > -Self.keep }
+        cache = cache.filter { !Self.hasLapsed(asked: $0.value.asked, used: $0.value.used) }
         cache[key] = answer
         file.write(&cache)
         zonesByName = nil
+    }
+
+    /// Notes that the answers under `keys` were wanted just now, so ``keep``
+    /// counts from today — written down only where ``isWorthNoting(asked:used:now:)``.
+    /// Moves nothing a placing is read from, so ``zonesByName`` stands.
+    private func note(_ keys: some Sequence<String>) {
+        let now = Date.now
+        var noted = false
+        for key in keys {
+            guard var answer = cache[key],
+                  Self.isWorthNoting(asked: answer.asked, used: answer.used, now: now)
+            else { continue }
+            answer.used = now
+            cache[key] = answer
+            noted = true
+        }
+        if noted { file.write(&cache) }
     }
 
     /// A place found stays found. A place Maps did not have is asked about

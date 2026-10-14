@@ -120,6 +120,7 @@ struct SettingsView: View {
         // the screen pushed from Advanced would otherwise report behind it.
         .refreshNotices()
         .refreshNoticesInSheet()
+        .opensFromOutside()
     }
 
     // MARK: - The shape of the screen

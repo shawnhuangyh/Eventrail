@@ -427,6 +427,8 @@ struct FollowedPerformerRow: View {
     /// What a tap does while picking. Unused otherwise.
     var choose: () -> Void = {}
 
+    @State private var isConfirmingUnfollow = false
+
     var body: some View {
         HStack(spacing: 12) {
             if isSelecting {
@@ -444,8 +446,12 @@ struct FollowedPerformerRow: View {
                 }
                 .buttonStyle(.plain)
 
+                // Asked first, as the list's own Unfollow asks: the row goes
+                // with the follow, on every device, and a performer followed
+                // in Eventrail alone does not come back with a refresh. The
+                // page's Follow button asks nothing, being its own undo.
                 Button {
-                    withAnimation(.snappy) { store.unfollow(performer) }
+                    isConfirmingUnfollow = true
                 } label: {
                     Image(systemName: "checkmark")
                         .font(.system(size: 17, weight: .semibold))
@@ -455,6 +461,15 @@ struct FollowedPerformerRow: View {
                 .buttonStyle(.plain)
                 .glassCircle(interactive: true)
                 .accessibilityLabel("Stop following")
+                .confirmationDialog("Stop following them?", isPresented: $isConfirmingUnfollow,
+                                    titleVisibility: .visible) {
+                    Button("Unfollow", role: .destructive) {
+                        withAnimation(.snappy) { store.unfollow(performer) }
+                    }
+                    Button("Keep following", role: .cancel) {}
+                } message: {
+                    Text("Their dates stop appearing in Following, on this device and on your other devices. Anyone your Eventernote account still favorites comes back on the next refresh.")
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -520,12 +535,14 @@ enum VenueDirections {
         }
     }
 
-    /// The hall by name, for Maps to find for itself.
-    private static func searchURL(_ venue: String, directions: Bool) -> URL? {
-        guard !venue.isEmpty,
-              let query = venue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+    /// The hall by name, for Maps to find for itself — as a query value, so
+    /// an `&` or a `+` in it is part of the name rather than the end of the
+    /// query or a space: HMV&BOOKS SHIBUYA was searched for as "HMV".
+    static func searchURL(_ venue: String, directions: Bool) -> URL? {
+        guard !venue.isEmpty, var components = URLComponents(string: "https://maps.apple.com/")
         else { return nil }
-        return URL(string: "https://maps.apple.com/?\(directions ? "daddr" : "q")=\(query)")
+        components.setQuery([URLQueryItem(name: directions ? "daddr" : "q", value: venue)])
+        return components.url
     }
 }
 

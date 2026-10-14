@@ -119,15 +119,21 @@ nonisolated enum LotteryResult: Hashable, Sendable {
 /// says results are out, which is the same day wherever the reader is.
 ///
 /// Kept as `2026-10-12`, so a record reads the same in every zone and in the
-/// CloudKit Console.
+/// CloudKit Console — a Gregorian year, month and day, whatever calendar the
+/// phone that wrote it is set to. Every `calendar` handed in below is read
+/// for its clock alone; the day is counted on the Gregorian calendar
+/// (``Foundation/Calendar/gregorian(in:)``). Taken from the reader's own on a
+/// phone set to the Japanese calendar, the day was kept as `0008-10-12` — the
+/// year of Reiwa — and read back on every other device as the year 8.
 nonisolated struct CalendarDay: Hashable, Comparable, Sendable {
     var year: Int
     var month: Int
     var day: Int
 
-    /// The day a moment falls on in a calendar — the reader's, by default.
+    /// The day a moment falls on, on `calendar`'s clock — the reader's, by
+    /// default.
     init(_ date: Date, in calendar: Calendar = .current) {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        let parts = calendar.asGregorian.dateComponents([.year, .month, .day], from: date)
         year = parts.year ?? 1970
         month = parts.month ?? 1
         day = parts.day ?? 1
@@ -139,14 +145,15 @@ nonisolated struct CalendarDay: Hashable, Comparable, Sendable {
         self.day = day
     }
 
-    /// Midnight starting the day, in a calendar.
+    /// Midnight starting the day, on `calendar`'s clock.
     func date(in calendar: Calendar = .current) -> Date {
-        calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
+        calendar.asGregorian.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
     }
 
     /// Whole days from today to this one: 0 today, negative once it is past.
     func daysAway(from now: Date = .now, in calendar: Calendar = .current) -> Int {
-        calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: date(in: calendar)).day ?? 0
+        let counted = calendar.asGregorian
+        return counted.dateComponents([.day], from: counted.startOfDay(for: now), to: date(in: counted)).day ?? 0
     }
 
     static func < (lhs: CalendarDay, rhs: CalendarDay) -> Bool {
@@ -158,7 +165,26 @@ nonisolated struct CalendarDay: Hashable, Comparable, Sendable {
     init?(text: String) {
         let parts = text.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3, (1...12).contains(parts[1]), (1...31).contains(parts[2]) else { return nil }
-        self.init(year: parts[0], month: parts[1], day: parts[2])
+        self.init(year: Self.gregorianYear(parts[0]), month: parts[1], day: parts[2])
+    }
+
+    /// The Gregorian year a kept year stands for. The builds before every day
+    /// was counted on the Gregorian calendar kept the year of the reader's own:
+    /// on a phone set to the Japanese calendar the year of Reiwa (8 for 2026),
+    /// on one set to the Buddhist calendar the Buddhist Era (2569). Neither is
+    /// a year a results day falls in, so each is read back as the year it
+    /// was — save a day picked in Heisei, early in 2019, which reads as Reiwa
+    /// and cannot be told apart.
+    ///
+    /// Read so and not written back: a column holding one is not understood
+    /// (``LotteryEntry/understands(column:)``), so it is rewritten only with
+    /// a change to the list itself.
+    private static func gregorianYear(_ year: Int) -> Int {
+        switch year {
+        case 1 ..< 100: year + 2018
+        case 2400...: year - 543
+        default: year
+        }
     }
 }
 

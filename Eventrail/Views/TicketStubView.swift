@@ -643,6 +643,7 @@ struct TicketStubView: View {
         .onDisappear {
             if let drawn { TicketStubImage.discard(drawn.file) }
         }
+        .opensFromOutside()
     }
 
     /// The flyer as the cache holds it — at once where this device has it,

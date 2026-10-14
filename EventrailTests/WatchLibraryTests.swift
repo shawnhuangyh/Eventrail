@@ -54,4 +54,29 @@ struct WatchLibraryTests {
                                             from: JSONSerialization.data(withJSONObject: copy))
         #expect(read.events.map(\.id) == ["2"])
     }
+
+    /// A copy past what WatchConnectivity takes was refused and left the
+    /// watch on its last one; the events furthest off are left out instead.
+    @Test func aCopyTooLargeLeavesOutTheEventsFurthestOff() throws {
+        let long = String(repeating: "あ", count: 120)
+        let events = (1...WatchLibrary.limit).map { index in
+            let one = event(id: "\(index)")
+            return WatchEvent(id: one.id, title: long, venue: one.venue, link: one.link, flyer: one.flyer,
+                              day: one.day, doors: nil, starts: nil, ends: nil, timeZone: one.timeZone,
+                              hasTicket: true, seat: one.seat, seatClass: one.seatClass, cost: one.cost,
+                              currency: one.currency, lotteryEntries: nil, lottery: nil)
+        }
+        let library = WatchLibrary(events: events, showsLocalTime: false)
+
+        let whole = try #require(WatchLink.payload(for: library, within: .max))
+        #expect(try JSONDecoder().decode(WatchLibrary.self, from: whole) == library)
+        #expect(!String(decoding: whole, as: UTF8.self).contains(#"\/"#))
+
+        let budget = whole.count / 2
+        let fitted = try #require(WatchLink.payload(for: library, within: budget))
+        #expect(fitted.count <= budget)
+        let sent = try JSONDecoder().decode(WatchLibrary.self, from: fitted)
+        #expect(!sent.events.isEmpty && sent.events.count < events.count)
+        #expect(sent.events.map(\.id) == events.prefix(sent.events.count).map(\.id))
+    }
 }

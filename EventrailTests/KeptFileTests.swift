@@ -81,6 +81,32 @@ struct KeptFileTests {
         #expect(try stored(at: url) == ["a": 1, "b": 20, "c": 3])
     }
 
+    /// A file that opens and will not decode — a later build's shape, or one
+    /// got wrong — is set aside rather than written over, and folded back in
+    /// beneath the file once a build can read it.
+    @Test func aFileThatWillNotDecodeIsSetAsideAndFoldedBackIn() async throws {
+        let (file, url, _) = try file()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let aside = url.appendingPathExtension("unreadable")
+        try Data(#"{"a": "one"}"#.utf8).write(to: url)
+
+        var contents = file.read()
+        #expect(contents.isEmpty)
+        #expect(try Data(contentsOf: aside) == Data(#"{"a": "one"}"#.utf8))
+        contents["b"] = 2
+        file.write(&contents)
+        await file.settled()
+        #expect(try stored(at: url) == ["b": 2])
+        #expect(FileManager.default.fileExists(atPath: aside.path(percentEncoded: false)))
+
+        // A build that can read the copy set aside takes it back, beneath
+        // what the file holds since.
+        try JSONEncoder().encode(["a": 1, "b": 20]).write(to: aside)
+        #expect(file.read() == ["a": 1, "b": 2])
+        #expect(try stored(at: url) == ["a": 1, "b": 2])
+        #expect(!FileManager.default.fileExists(atPath: aside.path(percentEncoded: false)))
+    }
+
     @Test func aRemovalDropsAWriteStillWaiting() async throws {
         let (file, url, _) = try file()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }

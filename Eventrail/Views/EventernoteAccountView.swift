@@ -46,6 +46,7 @@ struct EventernoteAccountSheet: View {
                 }
             }
         }
+        .opensFromOutside()
     }
 
     /// What naming an account is about to do, which is not the same thing for
@@ -66,7 +67,7 @@ struct EventernoteAccountSheet: View {
     }
 
     private var explanation: some View {
-        Text("Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it.")
+        Text("Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. An event you remove here comes back on the next refresh if your account still lists it. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it.")
             .font(.system(size: 11))
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)

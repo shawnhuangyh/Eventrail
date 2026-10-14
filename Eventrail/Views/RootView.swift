@@ -29,11 +29,10 @@ struct RootView: View {
     /// rather than in Settings: the app can be opened from a file while any tab
     /// is showing, and from a cold launch with no Settings sheet at all.
     @State private var openedBackup: URL?
-    /// An event opened from outside the app — its Live Activity, tapped.
-    @State private var openedEvent: Event?
-    /// A lottery round opened from its results-day reminder, tapped — see
-    /// ``LotteryReminders``.
-    @State private var openedRound: LotteryRow?
+    /// An event opened from outside the app — its Live Activity, tapped — or
+    /// a lottery round, from its results-day reminder (``LotteryReminders``):
+    /// opened over whatever sheet is up — see ``OutsideOpens``.
+    @State private var opens = OutsideOpens()
     private let reminders = LotteryReminders.shared
     /// Whether this launch still owes the reader the welcome.
     ///
@@ -46,7 +45,7 @@ struct RootView: View {
     /// the only one they get.
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
     /// Read only to send the watch its copy again when it changes — see
-    /// ``WatchLink``.
+    /// ``WatchLink`` — and to print a Live Activity on the new clock.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     var body: some View {
@@ -74,12 +73,11 @@ struct RootView: View {
         #endif
         .onOpenURL { url in
             if let id = Self.eventID(in: url) {
-                openedEvent = store.event(id: id)
+                if let event = store.event(id: id) { opens.open(.event(event)) }
             } else {
                 openedBackup = url
             }
         }
-        .eventSheet($openedEvent)
         // The ticket sheet on the round's own page, where its result is
         // written down — or the event, where the round has gone since.
         .onChange(of: reminders.opened, initial: true) { _, opened in
@@ -87,14 +85,14 @@ struct RootView: View {
             reminders.opened = nil
             guard let event = store.event(id: opened.eventID) else { return }
             if let entry = store.tracking(for: event).lotteries.first(where: { $0.id == opened.entryID }) {
-                openedRound = LotteryRow(event: event, entry: entry)
+                opens.open(.round(LotteryRow(event: event, entry: entry)))
             } else {
-                openedEvent = event
+                opens.open(.event(event))
             }
         }
-        .sheet(item: $openedRound) { row in
-            TicketDetailsView(event: row.event, tracking: store.tracking(for: row.event), opening: row.entry)
-        }
+        // Inside the environment lines below, for the store; over the tabs,
+        // which stand a sheet deeper for it.
+        .opensFromOutside()
         // Asked about first: tapping a file is not by itself a request to fold
         // its contents into the library.
         //
@@ -111,6 +109,7 @@ struct RootView: View {
         .environment(followed)
         .environment(venues)
         .environment(notices)
+        .environment(opens)
         .tint(.brandTint)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only
@@ -126,8 +125,12 @@ struct RootView: View {
         .onChange(of: store.revision) {
             WatchLink.shared.send(from: store)
             reminders.schedule(from: store)
+            EventActivities.shared.refreshSoon(from: store)
         }
-        .onChange(of: timeDisplay) { WatchLink.shared.send(from: store) }
+        .onChange(of: timeDisplay) {
+            WatchLink.shared.send(from: store)
+            EventActivities.shared.refreshSoon(from: store)
+        }
         // Each results day still waiting is a reminder that evening, and the
         // ones answered on another device meanwhile are taken back — followed
         // from here on with every write, as the watch's copy is.

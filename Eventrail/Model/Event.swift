@@ -184,9 +184,13 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
 
     /// When ``isUpcomingAnywhere`` turns false: the end of its day twelve
     /// hours behind Greenwich.
+    ///
+    /// The day is carried across as a Gregorian year, month and day on both
+    /// sides (``Foundation/Calendar/gregorian(in:)``): read off the reader's
+    /// calendar on a phone set to the Japanese one, it was the year 8, and
+    /// every date of the Following tab whose clock was not known went at once.
     var dayEndsEverywhere: Date? {
-        var westernmost = Calendar(identifier: .gregorian)
-        westernmost.timeZone = TimeZone(secondsFromGMT: -12 * 60 * 60) ?? .gmt
+        let westernmost = Calendar.gregorian(in: TimeZone(secondsFromGMT: -12 * 60 * 60) ?? .gmt)
         let day = calendar.dateComponents([.year, .month, .day], from: date)
         guard let start = westernmost.date(from: day) else { return nil }
         return westernmost.date(byAdding: .day, value: 1, to: start)
@@ -243,7 +247,7 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
     /// evening. A hall abroad is counted on the day its own clock calls it,
     /// which is the day printed on the row beside this.
     var daysAway: Int? {
-        let reader = Calendar.current
+        let reader = Calendar.gregorian()
         let days = reader.dateComponents(
             [.day],
             from: reader.startOfDay(for: .now),
@@ -255,12 +259,11 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
 }
 
 nonisolated extension Event {
-    /// Dates and times render in the venue's zone, but in the reader's locale.
-    private var calendar: Calendar {
-        var calendar = Calendar.current
-        calendar.timeZone = timeZone
-        return calendar
-    }
+    /// The venue's clock, for counting its days. Gregorian whatever calendar
+    /// the reader's phone is set to — see ``Foundation/Calendar/gregorian(in:)``;
+    /// dates and times are still printed on the reader's own, by the format
+    /// styles below.
+    private var calendar: Calendar { .gregorian(in: timeZone) }
 
     private func formatted(_ style: Date.FormatStyle) -> String {
         var style = style
@@ -339,9 +342,14 @@ nonisolated extension Event {
     /// venue's, so the two are compared as *written dates* rather than as
     /// instants: midnight in Kobe is the evening before in London, and handing
     /// either one the other's midnight puts a show on the wrong day.
+    ///
+    /// Both sides Gregorian: a year handed from one calendar to another is
+    /// not the same year, and on a phone set to the Japanese calendar an
+    /// event of Heisei 30 came back as Reiwa 30 — 2048, and a countdown of
+    /// some eight thousand days on a row of My Events' past.
     var localDay: Date {
         let fields = calendar.dateComponents([.year, .month, .day], from: date)
-        return Calendar.current.date(from: fields) ?? date
+        return Calendar.gregorian().date(from: fields) ?? date
     }
 
 }

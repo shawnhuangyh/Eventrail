@@ -44,9 +44,10 @@ struct EventMoment {
             zone = event.timeZone
             day = event.day
         }
-        var printed = Calendar.current
-        printed.timeZone = zone
-        let reader = Calendar.current
+        // Gregorian on both sides: a year handed from the reader's calendar
+        // to itself loses its era — see `Calendar.gregorian(in:)`.
+        let printed = Calendar.gregorian(in: zone)
+        let reader = Calendar.gregorian()
         let written = reader.date(from: printed.dateComponents([.year, .month, .day], from: day)) ?? day
         daysAway = max(0, reader.dateComponents([.day], from: reader.startOfDay(for: now),
                                                 to: reader.startOfDay(for: written)).day ?? 0)
@@ -75,8 +76,7 @@ struct EventMoment {
     /// Whether My Events still lists it: until its day is over on the clock it
     /// is printed on, and for as long as the show runs past that.
     var isListed: Bool {
-        var printed = Calendar.current
-        printed.timeZone = zone
+        let printed = Calendar.gregorian(in: zone)
         let dayEnds = printed.date(byAdding: .day, value: 1, to: printed.startOfDay(for: day)) ?? day
         return max(dayEnds, runsTo ?? dayEnds) > now
     }

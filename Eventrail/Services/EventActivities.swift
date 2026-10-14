@@ -67,6 +67,8 @@ final class EventActivities {
     /// A refresh is running, and another was asked for meanwhile.
     private var isRefreshing = false
     private var refreshesAgain = false
+    /// The refresh a write is owed — see ``refreshSoon(from:)``.
+    private var pendingRefresh: Task<Void, Never>?
 
     private init() {
         let authorization = ActivityAuthorizationInfo()
@@ -152,6 +154,26 @@ final class EventActivities {
         dropPosters()
         read()
         scheduleWake()
+    }
+
+    /// Brings what is up into line with the library a second from now, where
+    /// anything is up at all — after every write, and as Settings › Time Zone
+    /// changes the clock it is printed on.
+    ///
+    /// The sheet brings its own event's activity up to date while it is open;
+    /// a seat written anywhere else — the ticket sheet opened from the
+    /// Lotteries list or a reminder — or a clock changed in Settings reached
+    /// the activity only when the app next came back or the stage next moved.
+    /// A second after the last of a burst, as the watch's copy is sent, since a
+    /// note is a write a keystroke.
+    func refreshSoon(from store: EventStore) {
+        guard !statuses.isEmpty else { return }
+        pendingRefresh?.cancel()
+        pendingRefresh = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await self?.refresh(from: store)
+        }
     }
 
     /// Brings every activity up to where its event now stands, and — where the

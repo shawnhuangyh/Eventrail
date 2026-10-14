@@ -186,8 +186,8 @@ struct WelcomeView: View {
                         "Turn on iCloud Sync and your events, notes and tracking arrive privately through your own iCloud.")
                 feature("doc", "From a backup file",
                         "Restore an .eventrail file you exported before.")
-                feature("plus.circle", "Nothing is overwritten",
-                        "A restore only ever adds. Everything already on this device stays as it is.")
+                feature("plus.circle", "Nothing is erased",
+                        "A restore only ever adds. Wherever this device holds something newer, that stays.")
             }
 
             // One card, drawn as Settings draws its Sync & Backup card, since

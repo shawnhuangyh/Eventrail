@@ -201,70 +201,24 @@
         }
       }
     },
-    "%@ and %lld favorites" : {
-      "extractionState" : "stale",
+    "%@ came back. Anything newer on this device was kept." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@とお気に入り%lld件"
+            "value" : "%@を復元しました。このデバイスにあったより新しい内容はそのまま残しています。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 和 %lld 个收藏"
+            "value" : "已恢复 %@。此设备上较新的内容均已保留。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 和 %lld 個收藏"
-          }
-        }
-      }
-    },
-    "%@ and 1 favorite" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@とお気に入り1件"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 和 1 个收藏"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 和 1 個收藏"
-          }
-        }
-      }
-    },
-    "%@ came back. Nothing already on this device was changed." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@を復元しました。このデバイスにある内容は変更されていません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已恢复 %@。此设备上的现有内容均未更改。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已恢復 %@。此裝置上的現有內容均未更改。"
+            "value" : "已恢復 %@。此裝置上較新的內容均已保留。"
           }
         }
       }
@@ -399,6 +353,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ · %2$lld 輪已公布"
+          }
+        }
+      }
+    },
+    "%@ · ^[%lld event](inflect: true) across ^[%lld year](inflect: true)" : {
+      "comment" : "The On This Day screen's subtitle: today's date, how many events the reader went to on it in earlier years, and over how many different years — “Saturday, October 10 · 2 events across 2 years”.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@・%lld件のイベント（%lld年分）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · %lld 场活动，来自 %lld 个年份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · %lld 場活動，來自 %lld 個年份"
+          }
+        }
+      }
+    },
+    "%@ · ^[%lld event](inflect: true) you went to" : {
+      "comment" : "The On This Day card's caption: today's month and day, and how many events the reader went to on it in earlier years — “October 10 · 2 events you went to”.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@・参加したイベント%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 参加过 %lld 场活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · 參加過 %lld 場活動"
           }
         }
       }
@@ -1394,6 +1394,29 @@
         }
       }
     },
+    "^[%lld year](inflect: true) ago" : {
+      "comment" : "On This Day: how long ago an event the reader went to was, such as 1 year ago.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld年前"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 年前"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 年前"
+          }
+        }
+      }
+    },
     "^[Across the %lld appearance](inflect: true) read so far." : {
       "localizations" : {
         "ja" : {
@@ -1615,24 +1638,24 @@
         }
       }
     },
-    "A restore only ever adds. Everything already on this device stays as it is." : {
+    "A restore only ever adds. Wherever this device holds something newer, that stays." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "復元は追加するだけです。このデバイスにある内容はそのまま残ります。"
+            "value" : "復元は追加するだけです。このデバイスにより新しい内容があれば、そちらが残ります。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "恢复只会添加内容，此设备上已有的一切都会保持不变。"
+            "value" : "恢复只会添加内容，此设备上较新的内容会保留下来。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "恢復只會新增內容，此裝置上已有的一切都會保持不變。"
+            "value" : "恢復只會新增內容，此裝置上較新的內容會保留下來。"
           }
         }
       }
@@ -3597,6 +3620,29 @@
         }
       }
     },
+    "Doors %@" : {
+      "comment" : "On This Day: when an event's doors opened, such as Doors 17:30.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開場 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入场 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入場 %@"
+          }
+        }
+      }
+    },
     "Doors and start time" : {
       "localizations" : {
         "ja" : {
@@ -4414,24 +4460,24 @@
         }
       }
     },
-    "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
+    "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. An event you remove here comes back on the next refresh if your account still lists it. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eventrailは、誰でも閲覧できるプロフィールの公開ページだけを読み取ります。ログインせず、Eventernoteに書き込むこともありません。ここで削除したイベントは削除されたままです。読み込みではイベントをライブラリに追加するだけで、自分で入力した内容が上書きされることはありません。"
+            "value" : "Eventrailは、誰でも閲覧できるプロフィールの公開ページだけを読み取ります。ログインせず、Eventernoteに書き込むこともありません。ここで削除したイベントも、アカウントにまだ残っていれば次回の更新で戻ります。読み込みではイベントをライブラリに追加するだけで、自分で入力した内容が上書きされることはありません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eventrail 读取任何人访问你的个人资料时都能看到的同一公开页面。它不会登录，也绝不会向 Eventernote 写入任何内容。你已在此移除的活动仍会保持移除。导入只会将活动放入资料库——你为活动填写的内容归你所有，这里不会覆盖它们。"
+            "value" : "Eventrail 读取任何人访问你的个人资料时都能看到的同一公开页面。它不会登录，也绝不会向 Eventernote 写入任何内容。在此移除的活动，如果账号中仍列出，会在下次刷新时恢复。导入只会将活动放入资料库——你为活动填写的内容归你所有，这里不会覆盖它们。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eventrail 讀取任何人存取你的個人資料時都能看到的同一公開頁面。它不會登入，也絕不會向 Eventernote 寫入任何內容。你已在此移除的活動仍會保持移除。匯入只會將活動放入資料庫——你為活動填寫的內容歸你所有，這裡不會覆蓋它們。"
+            "value" : "Eventrail 讀取任何人存取你的個人資料時都能看到的同一公開頁面。它不會登入，也絕不會向 Eventernote 寫入任何內容。在此移除的活動，如果帳號中仍列出，會在下次重新整理時恢復。匯入只會將活動放入資料庫——你為活動填寫的內容歸你所有，這裡不會覆蓋它們。"
           }
         }
       }
@@ -4564,6 +4610,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你跟蹤的活動會顯示在這裡。可在“搜尋”中尋找。"
+          }
+        }
+      }
+    },
+    "Events you went to on %@ in earlier years, from your own library. Nothing here is read from Eventernote." : {
+      "comment" : "The On This Day screen's footnote. The argument is today's month and day, such as October 10.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前の年の%@に参加したイベントを、ライブラリから表示しています。ここではEventernoteから何も読み込みません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "往年%@你参加过的活动，来自你的资料库。这里的内容不从 Eventernote 读取。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "往年%@你參加過的活動，來自你的資料庫。這裡的內容不從 Eventernote 讀取。"
           }
         }
       }
@@ -7202,6 +7271,29 @@
         }
       }
     },
+    "No price written down" : {
+      "comment" : "On This Day: the reader recorded nothing about how a ticket was had or what it cost.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "価格の記録なし"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未记录价格"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未記錄價格"
+          }
+        }
+      }
+    },
     "No published date matches the filter. Nothing has been removed — widen it to see the rest." : {
       "localizations" : {
         "ja" : {
@@ -7287,6 +7379,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未設公布日"
+          }
+        }
+      }
+    },
+    "No seat written down" : {
+      "comment" : "On This Day: the reader recorded no seat for an event they went to.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座席の記録なし"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未记录座位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未記錄座位"
           }
         }
       }
@@ -7713,24 +7828,24 @@
         }
       }
     },
-    "Nothing is overwritten" : {
+    "Nothing is erased" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "上書きされません"
+            "value" : "消去されません"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不会覆盖任何内容"
+            "value" : "不会清除任何内容"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不會覆蓋任何內容"
+            "value" : "不會清除任何內容"
           }
         }
       }
@@ -7863,6 +7978,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你收藏的活動中沒有尚未舉行的。"
+          }
+        }
+      }
+    },
+    "Nothing you went to fell on this day in an earlier year." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前の年のこの日に参加したイベントはありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "往年的今天没有你参加过的活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "往年的今天沒有你參加過的活動。"
           }
         }
       }
@@ -8065,6 +8202,29 @@
         }
       }
     },
+    "On This Day" : {
+      "comment" : "The Me tab's card, and the screen behind it, of the events the reader went to on today's date in earlier years.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "那年今日"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "那年今日"
+          }
+        }
+      }
+    },
     "One entry for each lottery applied to — the choices ranked and how it went." : {
       "localizations" : {
         "ja" : {
@@ -8109,6 +8269,72 @@
         }
       }
     },
+    "Only the hearts come off. Those in your library stay there; to heart the rest again, find them in Search." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りだけを解除します。ライブラリにあるイベントはそのまま残ります。それ以外を再びお気に入りにするには「検索」から探してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只会取消收藏。资料库中的活动仍会保留；其余活动如需再次收藏，请从“搜索”中找到它们。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只會取消收藏。資料庫中的活動仍會保留；其餘活動如需再次收藏，請從“搜尋”中找到它們。"
+          }
+        }
+      }
+    },
+    "Only the heart comes off. The event is not in your library, so to heart it again, find it in Search." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りだけを解除します。このイベントはライブラリにないため、再びお気に入りにするには「検索」から探してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只会取消收藏。此活动不在资料库中，如需再次收藏，请从“搜索”中找到它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只會取消收藏。此活動不在資料庫中，如需再次收藏，請從“搜尋”中找到它。"
+          }
+        }
+      }
+    },
+    "Only the hearts come off. They are not in your library, so to heart them again, find them in Search." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りだけを解除します。これらのイベントはライブラリにないため、再びお気に入りにするには「検索」から探してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只会取消收藏。这些活动不在资料库中，如需再次收藏，请从“搜索”中找到它们。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只會取消收藏。這些活動不在資料庫中，如需再次收藏，請從“搜尋”中找到它們。"
+          }
+        }
+      }
+    },
     "Only while Refine with OpenStreetMap is on. Narrows a block to its building, and in mainland China places halls outside Japan and the mainland." : {
       "localizations" : {
         "ja" : {
@@ -8127,6 +8353,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "僅在開啟「用 OpenStreetMap 細化位置」時使用。從街區細化到建築；在中國大陸時，也用它定位日本和中國大陸以外的場館。"
+          }
+        }
+      }
+    },
+    "Open Event" : {
+      "comment" : "A button on the On This Day screen that opens an event's sheet.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントを開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開活動"
           }
         }
       }
@@ -8788,6 +9037,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "由場館發布"
+          }
+        }
+      }
+    },
+    "Ran %@" : {
+      "comment" : "On This Day: how long an event ran, such as Ran 2h 40m.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上演時間 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时长 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時長 %@"
           }
         }
       }
@@ -10866,6 +11138,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開演"
+          }
+        }
+      }
+    },
+    "Start %@" : {
+      "comment" : "On This Day: when an event started, such as Start 18:30.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开演 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演 %@"
           }
         }
       }

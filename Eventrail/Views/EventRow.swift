@@ -18,6 +18,11 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
     /// everywhere the list is already about one thing.
     @ViewBuilder var billing: Billing
     @ViewBuilder var trailing: Trailing
+    /// What a tap on a row that is no button opens — Following's and Search's,
+    /// which hold buttons of their own and open the event by a tap gesture.
+    /// A gesture is nothing to VoiceOver or Voice Control, so the row's words
+    /// are then one button for them, under the buttons beside it.
+    var opens: (() -> Void)?
 
     var body: some View {
         // Centred, not top-aligned: the flyer is a fixed 5:7 block and the text
@@ -28,27 +33,30 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 billing
-                Text(event.title)
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                caption
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                HStack(spacing: 7) {
-                    Text(event.shown(on: timeDisplay).dayLine)
-                        .font(.system(size: 12, weight: .semibold))
-                        .monospacedDigit()
-                    Circle()
-                        .fill(.tertiary)
-                        .frame(width: 3, height: 3)
-                    detail
-                        .font(.system(size: 12, weight: .medium))
-                        .monospacedDigit()
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(event.title)
+                        .font(.system(size: 14.5, weight: .semibold))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    caption
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    HStack(spacing: 7) {
+                        Text(event.shown(on: timeDisplay).dayLine)
+                            .font(.system(size: 12, weight: .semibold))
+                            .monospacedDigit()
+                        Circle()
+                            .fill(.tertiary)
+                            .frame(width: 3, height: 3)
+                        detail
+                            .font(.system(size: 12, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 1)
                 }
-                .padding(.top, 1)
+                .modifier(OpensEvent(open: opens))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -62,20 +70,39 @@ extension EventRowContent {
     /// The venue under the title, which is what places a row in every list that
     /// is not already about one place.
     init(
-        event: Event, detail: Text,
+        event: Event, detail: Text, opens: (() -> Void)? = nil,
         @ViewBuilder billing: () -> Billing, @ViewBuilder trailing: () -> Trailing
     ) {
         self.init(event: event, detail: detail, caption: Text(event.venue),
-                  billing: billing, trailing: trailing)
+                  billing: billing, trailing: trailing, opens: opens)
     }
 }
 
 extension EventRowContent where Billing == EmptyView {
     /// A row about the event alone, which is every list but Following.
-    init(event: Event, detail: Text, caption: Text? = nil,
+    init(event: Event, detail: Text, caption: Text? = nil, opens: (() -> Void)? = nil,
          @ViewBuilder trailing: () -> Trailing) {
         self.init(event: event, detail: detail, caption: caption ?? Text(event.venue),
-                  billing: { EmptyView() }, trailing: trailing)
+                  billing: { EmptyView() }, trailing: trailing, opens: opens)
+    }
+}
+
+/// A row's words as one button that opens its event, for VoiceOver and Voice
+/// Control — see ``EventRowContent/opens``. Left alone where the row is a
+/// button already.
+private struct OpensEvent: ViewModifier {
+    let open: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let open {
+            content
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Opens the event")
+                .accessibilityAction(.default, open)
+        } else {
+            content
+        }
     }
 }
 

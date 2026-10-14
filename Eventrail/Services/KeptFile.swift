@@ -18,9 +18,15 @@ import os
 /// answers such a launch finds over it would throw away everything it held.
 /// So until a read gets through, nothing is written; each write tries the file
 /// again, and once it opens, what it held is folded in beneath what the launch
-/// found since — the rule ``LibraryFile`` keeps for the library. A file that
-/// opens and will not decode is a cache in an older shape, and is read as
-/// empty and written over, as it always was.
+/// found since — the rule ``LibraryFile`` keeps for the library.
+///
+/// **Nor is a file that opens and will not decode.** It is read as empty, as
+/// a cache in an older shape always was, but moved aside first, as
+/// `<name>.unreadable` — one copy, the latest — and folded back in beneath the
+/// file by a build that can read it. Written over, a change of shape one build
+/// got wrong would have cost every hall ``VenuePlaces`` had placed: hundreds
+/// of searches, and the one file of the three in Application Support for that
+/// reason.
 final class KeptFile<Key: Codable & Hashable & Sendable, Value: Codable & Sendable> {
     /// Where the file lives, which is how much losing it would cost.
     enum Place {
@@ -66,19 +72,32 @@ final class KeptFile<Key: Codable & Hashable & Sendable, Value: Codable & Sendab
     func read() -> [Key: Value] {
         var contents: [Key: Value] = [:]
         do {
-            contents = Self.decode(try Data(contentsOf: url))
+            let data = try Data(contentsOf: url)
             isBlocked = false
+            if let decoded = Self.decode(data) {
+                contents = decoded
+            } else {
+                setAside()
+            }
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             isBlocked = false
         } catch {
             log.error("\(self.url.lastPathComponent, privacy: .public) would not open: \(error.localizedDescription, privacy: .public)")
             isBlocked = true
         }
+        // A copy an earlier read could not decode, beneath the file once this
+        // build can — and dropped only once the file holds it.
+        if !isBlocked, let aside = try? Data(contentsOf: asideURL), let held = Self.decode(aside) {
+            contents = held.merging(contents) { _, kept in kept }
+            if (try? JSONEncoder().encode(contents).write(to: url, options: .atomic)) != nil {
+                try? FileManager.default.removeItem(at: asideURL)
+            }
+        }
         // Folded in beneath the file rather than only read where there is no
         // file: a launch that could not read `UserDefaults` either may have
         // written a file of its own since.
         if let former = defaults.data(forKey: formerKey) {
-            contents = Self.decode(former).merging(contents) { _, kept in kept }
+            contents = (Self.decode(former) ?? [:]).merging(contents) { _, kept in kept }
             if !isBlocked, (try? JSONEncoder().encode(contents).write(to: url, options: .atomic)) != nil {
                 defaults.removeObject(forKey: formerKey)
             }
@@ -108,14 +127,36 @@ final class KeptFile<Key: Codable & Hashable & Sendable, Value: Codable & Sendab
         }
     }
 
-    /// Throws the file away, and any write still waiting to be made.
+    /// Throws the file away, a copy set aside with it, and any write still
+    /// waiting to be made.
     func remove() {
         pendingWrite?.cancel()
         pendingWrite = nil
         isBlocked = false
+        let asideURL = asideURL
         enqueue { url in
-            guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return }
-            try FileManager.default.removeItem(at: url)
+            for file in [url, asideURL] where FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) {
+                try FileManager.default.removeItem(at: file)
+            }
+        }
+    }
+
+    /// Where a file that opened and would not decode is moved.
+    private var asideURL: URL { url.appendingPathExtension("unreadable") }
+
+    /// Moves the file out of the way of the next write, over any copy set
+    /// aside before it. Where it cannot be moved, nothing is written over it
+    /// either: the file is held as one that will not open.
+    private func setAside() {
+        log.error("\(self.url.lastPathComponent, privacy: .public) would not decode; set aside")
+        do {
+            if FileManager.default.fileExists(atPath: asideURL.path(percentEncoded: false)) {
+                try FileManager.default.removeItem(at: asideURL)
+            }
+            try FileManager.default.moveItem(at: url, to: asideURL)
+        } catch {
+            log.error("\(self.url.lastPathComponent, privacy: .public) could not be set aside: \(error.localizedDescription, privacy: .public)")
+            isBlocked = true
         }
     }
 
@@ -139,7 +180,8 @@ final class KeptFile<Key: Codable & Hashable & Sendable, Value: Codable & Sendab
         }
     }
 
-    private nonisolated static func decode(_ data: Data) -> [Key: Value] {
-        (try? JSONDecoder().decode([Key: Value].self, from: data)) ?? [:]
+    /// What `data` holds, or nil where it holds nothing this build can read.
+    private nonisolated static func decode(_ data: Data) -> [Key: Value]? {
+        try? JSONDecoder().decode([Key: Value].self, from: data)
     }
 }

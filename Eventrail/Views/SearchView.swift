@@ -498,7 +498,7 @@ struct SearchResultRow: View {
     }
 
     var body: some View {
-        EventRowContent(event: event, detail: detail) {
+        EventRowContent(event: event, detail: detail, opens: open) {
             LibraryToggle(event: event)
         }
         .contentShape(.rect)

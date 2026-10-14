@@ -25,9 +25,9 @@ struct LotteryReminderTests {
 
         let trigger = try #require(reminder.request.trigger as? UNCalendarNotificationTrigger)
         let day = LotteryListTests.day(3)
-        #expect(trigger.dateComponents.year == day.year)
-        #expect(trigger.dateComponents.month == day.month)
-        #expect(trigger.dateComponents.day == day.day)
+        // In the phone's own calendar's terms, which a trigger with none is
+        // matched against — see ``LotteryReminder/components(of:in:)``.
+        #expect(Calendar.current.date(from: trigger.dateComponents) == LotteryReminder.evening(of: day))
         #expect(trigger.dateComponents.hour == 20)
         // Floating, so it comes at eight wherever the phone is.
         #expect(trigger.dateComponents.timeZone == nil)

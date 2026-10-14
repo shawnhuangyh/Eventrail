@@ -101,6 +101,7 @@ struct TicketReviewView: View {
             }
         }
         .interactiveDismissDisabled(!selection.isEmpty)
+        .opensFromOutside()
     }
 
     private var heading: some View {

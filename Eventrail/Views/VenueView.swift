@@ -23,6 +23,19 @@ nonisolated enum VenueLink: Hashable {
     }
 }
 
+nonisolated extension Event {
+    /// The way to this event's hall: by the place id where the event's own
+    /// page has been imported, and by the name alone otherwise — which the
+    /// hall's page is found by, the way a billed performer's is.
+    var venueLink: VenueLink {
+        if let placeID {
+            .place(PlaceListing(id: placeID, name: venue))
+        } else {
+            .named(venue)
+        }
+    }
+}
+
 /// One hall: what Eventernote publishes about the place, everything held there,
 /// and how much of it the reader has been to.
 ///
