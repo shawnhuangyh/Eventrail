@@ -80,16 +80,7 @@ struct RootView: View {
         }
         // The ticket sheet on the round's own page, where its result is
         // written down — or the event, where the round has gone since.
-        .onChange(of: reminders.opened, initial: true) { _, opened in
-            guard let opened else { return }
-            reminders.opened = nil
-            guard let event = store.event(id: opened.eventID) else { return }
-            if let entry = store.tracking(for: event).lotteries.first(where: { $0.id == opened.entryID }) {
-                opens.open(.round(LotteryRow(event: event, entry: entry)))
-            } else {
-                opens.open(.event(event))
-            }
-        }
+        .onChange(of: reminders.opened, initial: true) { openReminder() }
         // Inside the environment lines below, for the store; over the tabs,
         // which stand a sheet deeper for it.
         .opensFromOutside()
@@ -140,6 +131,8 @@ struct RootView: View {
         // is the moment to pick up whatever another device wrote meanwhile.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                // A reminder tapped while this window was on its way in.
+                openReminder()
                 Task { await store.syncNow() }
                 Task { await EventActivities.shared.refresh(from: store) }
                 // An event whose day ended while the app was away leaves the
@@ -150,6 +143,23 @@ struct RootView: View {
             } else {
                 store.saveNow()
             }
+        }
+    }
+
+    /// Opens the round a results-day reminder was tapped for, in this window
+    /// — only while it is the one in front. On an iPad each window has a root
+    /// of its own and the reminder is one for the app, so whichever window's
+    /// root heard it first used to take it, the one in the other half of the
+    /// screen or behind as often as not. A tap brings forward the window it
+    /// was meant for, and that window opens it as it comes in.
+    private func openReminder() {
+        guard scenePhase == .active, let opened = reminders.opened else { return }
+        reminders.opened = nil
+        guard let event = store.event(id: opened.eventID) else { return }
+        if let entry = store.tracking(for: event).lotteries.first(where: { $0.id == opened.entryID }) {
+            opens.open(.round(LotteryRow(event: event, entry: entry)))
+        } else {
+            opens.open(.event(event))
         }
     }
 

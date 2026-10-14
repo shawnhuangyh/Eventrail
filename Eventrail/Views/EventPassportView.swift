@@ -338,8 +338,9 @@ struct EventPassportView: View {
     /// on this map because ``VenuePlaces`` has already been asked about it —
     /// by an event's sheet, by the hall's own page, or by the placement run
     /// behind an import. A hall nothing has asked about yet is not drawn in
-    /// the middle of the sea; it is simply missing from the map, and a pull on
-    /// the page asks Maps about the ones nothing has an answer for.
+    /// the middle of the sea; it is simply missing from the map until one of
+    /// those asks, or Settings' Refresh Venue Locations does — the Passport
+    /// itself asks nothing (see ``readPlacings()``).
     ///
     /// Fixed rather than scrollable, for the reason ``VenueMap`` gives: this
     /// sits inside a page that scrolls, and a map that swallowed the drag would

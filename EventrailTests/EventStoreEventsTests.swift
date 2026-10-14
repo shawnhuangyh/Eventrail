@@ -47,6 +47,26 @@ struct EventStoreEventsTests {
         #expect(store.upcoming.isEmpty)
     }
 
+    /// The calendar mirror takes out the entries of what the reader took out
+    /// of the library, here or on another device, and nothing else: not an
+    /// event only hearted, not one still kept, and not one this device never
+    /// held — see ``CalendarSync/goes(_:library:departed:)``.
+    @Test func onlyAnEventTakenOutHasDeparted() {
+        let store = store()
+        let removed = Fixtures.event(id: "1")
+        let kept = Fixtures.event(id: "2")
+        let hearted = Fixtures.event(id: "3")
+        store.toggleLibraryMembership(removed)
+        store.toggleLibraryMembership(kept)
+        store.remove([removed])
+        store.toggleFavorite(hearted)
+        #expect(store.departedEvents == ["1"])
+
+        // Delete All answers every part of every entry, the heart's too.
+        store.removeAllEvents()
+        #expect(store.departedEvents == ["1", "2", "3"])
+    }
+
     @Test func anEventTakenOutIsNotListed() throws {
         let store = store()
         let event = Fixtures.event(id: "1")

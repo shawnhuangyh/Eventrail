@@ -260,7 +260,13 @@ struct EventDetailView: View {
         // The first time an event at a hall nothing has looked up yet is
         // opened, this is what goes and finds it — whether or not the reader
         // mirrors anything to their calendar.
-        .task(id: venueKey) { place = await VenuePlaces.shared.mapItem(for: event) }
+        .task(id: venueKey) {
+            let found = await VenuePlaces.shared.mapItem(for: event)
+            // Asked again once the page brings the address: the answer for the
+            // name alone, landing after it, would draw over the better one.
+            guard !Task.isCancelled else { return }
+            place = found
+        }
     }
 
     /// Imports the event's own page for the times, billing, description and

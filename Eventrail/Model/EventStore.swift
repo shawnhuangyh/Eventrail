@@ -1441,7 +1441,20 @@ final class EventStore {
         // Whatever the sheets have placed, as plain values the mirror can be
         // handed off the main actor — see ``CalendarSync/Place``.
         let places = VenuePlaces.shared.mapItems(for: events).mapValues { CalendarSync.Place($0) }
-        calendarStatus = await calendar.mirror(events, places: places, color: UIColor(Color.brandTint).cgColor)
+        calendarStatus = await calendar.mirror(events, departed: departedEvents, places: places,
+                                               color: UIColor(Color.brandTint).cgColor)
+    }
+
+    /// The events this device knows have left the library — taken out here,
+    /// by Delete All, or on another device and synced in — whose calendar
+    /// entries the mirror takes out. Only a removal written down as one: an
+    /// entry the reader only hearted, or one an older build left undated,
+    /// says nothing about whether the event was ever in the library. See
+    /// ``CalendarSync/goes(_:library:departed:)``.
+    var departedEvents: Set<Event.ID> {
+        Set(entries.compactMap { id, entry in
+            !entry.inLibrary && entry.inLibraryChanged != nil ? id : nil
+        })
     }
 
     /// Every event whose hall is worth asking about: the library and the
