@@ -49,8 +49,9 @@ struct RootView: View {
     /// Closing it early costs them this launch's showing; it does not spend
     /// the only one they get.
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
-    /// Read only to send the watch its copy again when it changes — see
-    /// ``WatchLink`` — and to print a Live Activity on the new clock.
+    /// Read only to send the watch and the widgets their copies again when it
+    /// changes — see ``WatchLink`` and ``WidgetLink`` — and to print a Live
+    /// Activity on the new clock.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     var body: some View {
@@ -78,7 +79,16 @@ struct RootView: View {
         #endif
         .onOpenURL { url in
             if let id = Self.eventID(in: url) {
-                if let event = store.event(id: id) { opens.open(.event(event)) }
+                guard let event = store.event(id: id) else { return }
+                // A widget's link to one round of the event's — see
+                // ``RoundLink`` — opens the round's own page, where its
+                // result is written down; one gone since opens the event.
+                if let round = RoundLink.entry(in: url),
+                   let entry = store.tracking(for: event).lotteries.first(where: { $0.id == round }) {
+                    opens.open(.round(LotteryRow(event: event, entry: entry)))
+                } else {
+                    opens.open(.event(event))
+                }
             } else {
                 openedBackup = url
             }
@@ -126,13 +136,21 @@ struct RootView: View {
         // The watch draws the events still to come from a copy sent from here,
         // so the copy follows every write and the clock it is printed on.
         .task { WatchLink.shared.send(from: store) }
+        // The widgets draw from a copy left beside them, which follows every
+        // write the same way; a result given from one is written down first.
+        .task {
+            WidgetLink.shared.takeAnswers(into: store)
+            WidgetLink.shared.send(from: store)
+        }
         .onChange(of: store.revision) {
             WatchLink.shared.send(from: store)
+            WidgetLink.shared.send(from: store)
             reminders.schedule(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
         .onChange(of: timeDisplay) {
             WatchLink.shared.send(from: store)
+            WidgetLink.shared.send(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
         // Each results day still waiting is a reminder that evening, and the
@@ -151,6 +169,9 @@ struct RootView: View {
                 // An event whose day ended while the app was away leaves the
                 // watch's list too.
                 WatchLink.shared.send(from: store)
+                // A Won or Lost tapped on the Lotteries widget while away.
+                WidgetLink.shared.takeAnswers(into: store)
+                WidgetLink.shared.send(from: store)
                 // Notifications may have been turned on or off in Settings.
                 reminders.schedule(from: store)
             } else {
@@ -192,7 +213,8 @@ struct RootView: View {
     }
 
     /// The event a link to its Eventernote page names — what a Live Activity
-    /// opens the app with, and the page a handed-off event points at.
+    /// and a widget open the app with, and the page a handed-off event points
+    /// at.
     private static func eventID(in url: URL) -> Event.ID? {
         guard url.host() == "www.eventernote.com" else { return nil }
         let path = url.pathComponents

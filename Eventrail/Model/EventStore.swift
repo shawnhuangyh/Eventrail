@@ -538,6 +538,12 @@ final class EventStore {
         library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
     }
 
+    /// Every event in the library the reader went to (``hasAttended(_:)``),
+    /// in no order — what the On This Day widget picks each day's from.
+    var attended: [Event] {
+        library.filter { hasAttended($0) }
+    }
+
     var lastRefreshed: Date? { settingsRow?.lastRefreshed }
 
     /// The Eventernote account the reader imports from, if they have named one.

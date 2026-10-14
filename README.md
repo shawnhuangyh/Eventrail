@@ -29,6 +29,7 @@ Eventrail is in **beta testing** through TestFlight, for iPhone, iPad and Apple 
 - **🗺️ Event Passport** — A map of the halls you have been to, with the numbers behind your events: time spent, ticket spending by seat class, and how your lotteries went
 - **🎟️ Ticket stub** — Turn a ticket into a keepsake image to save or share, with the seat masked if you like
 - **⏱️ Live Activity** — On the day of an event you hold a ticket for, follow it from the doors to the end on the Lock Screen, in the Dynamic Island and in your Apple Watch's Smart Stack
+- **🧩 Widgets** — On the Home Screen and the Lock Screen: the next event counting down to its doors, the lottery rounds waiting on their results (with Won and Lost right on the widget once they are out), and what you went to on this day in earlier years
 - **⌚ Apple Watch app** — Your upcoming events on your wrist: the countdown, your seat and the times
 - **📅 Calendar mirror** — Write your library into a calendar of the app's own, with an alert when the doors open
 - **📥 Profile import** — Import a public Eventernote profile's attendance history and favorites (read-only, no password), then tick off the events you held a ticket for
