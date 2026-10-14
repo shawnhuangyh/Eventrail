@@ -210,7 +210,7 @@ final class VenuePlaces {
             // one, which is the safe way round: it widens a frame that did not
             // need widening, rather than claiming a precision it may not have.
             return Placing(item: item, uncertainty: (source ?? .register).uncertainty, timeZone: zone,
-                           otherDrawing: otherDrawing)
+                           otherDrawing: otherDrawing, isFromMaps: source == .maps)
         }
 
         @MainActor init(_ found: Found?) {
@@ -284,6 +284,9 @@ final class VenuePlaces {
         /// devices on different providers each found the other's pin moved and
         /// wrote their own back, every mirror.
         let otherDrawing: CLLocationCoordinate2D?
+        /// Whether Apple Maps placed it — the one answer the calendar mirror
+        /// never writes another over (see ``CalendarSync/keepsLocation(_:over:found:)``).
+        let isFromMaps: Bool
     }
 
     /// Whether this device may ask OpenStreetMap anything — which building at

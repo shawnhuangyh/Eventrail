@@ -53,6 +53,21 @@ actor CalendarSync {
         /// either spot is left where it is.
         var otherLatitude: CLLocationDegrees?
         var otherLongitude: CLLocationDegrees?
+        /// Whether Apple Maps placed the hall, whose placing no other answer
+        /// writes over — see ``CalendarSync/keepsLocation(_:over:found:)``.
+        var isFromMaps = false
+
+        /// What the entry carries as its radius: how sure the coordinate is,
+        /// and at least ``notMapsRadius`` for an answer that is not Apple
+        /// Maps', so every device reading the entry can tell Maps' placing
+        /// from the rest. Nothing else in a structured location can say so.
+        var radius: CLLocationDistance {
+            isFromMaps ? uncertainty : max(uncertainty, Self.notMapsRadius)
+        }
+
+        /// A metre — OpenStreetMap's building is otherwise as sure as Maps'
+        /// own, at zero — which nothing reads as anything but the building.
+        static let notMapsRadius: CLLocationDistance = 1
 
         var location: CLLocation { CLLocation(latitude: latitude, longitude: longitude) }
 
@@ -402,7 +417,7 @@ actor CalendarSync {
         // draws the venue on a map and can work out when to leave for it.
         let found = places[event.id]
         let place = Self.place(for: event, found: found)
-        if !isSamePlace(entry.structuredLocation, place, orDrawnAs: found) {
+        if !Self.keepsLocation(entry.structuredLocation, over: place, found: found) {
             entry.structuredLocation = place
             changed = true
         }
@@ -539,8 +554,9 @@ actor CalendarSync {
         // How sure the coordinate is, which EKStructuredLocation keeps a field
         // for. A hall placed by its address rather than by its own listing
         // sits at the middle of its block, and saying so is the difference
-        // between a location and a claim — see ``VenuePlaces/Placing``.
-        place.radius = found.uncertainty
+        // between a location and a claim — see ``VenuePlaces/Placing``. It
+        // also says whether Apple Maps placed it (``Place/radius``).
+        place.radius = found.radius
         // Built from the map item, so the entry carries whatever else Calendar
         // wants of a place — but the coordinate is what makes it a point on the
         // map rather than a line of text, and an item rebuilt from the kept
@@ -552,25 +568,63 @@ actor CalendarSync {
         return place
     }
 
-    /// Two places are the same when they read the same and sit in the same
-    /// spot. Worth checking, because an entry written before Maps had been
+    /// Whether the entry's location stays as it is rather than becoming
+    /// `wanted`, this device's placing of the hall (`found`, nil where it has
+    /// none). Worth asking, because an entry written before Maps had been
     /// asked should be corrected once, and then left alone.
     ///
-    /// The same spot includes where a device on the other map provider draws
-    /// that answer (`found`'s other drawing): the entry is shared with it
-    /// through iCloud, and each would otherwise put its own back for good.
-    private func isSamePlace(_ lhs: EKStructuredLocation?, _ rhs: EKStructuredLocation?,
-                             orDrawnAs found: Place? = nil) -> Bool {
-        guard lhs?.title == rhs?.title else { return false }
+    /// It stays where it already says what this device would write: the same
+    /// hall, at the same spot — or where a device on the other map provider
+    /// draws the same answer (`found`'s other drawing) — with the same radius.
+    ///
+    /// **And it stays where it is Apple Maps' placing of the hall and this
+    /// device's is not: Maps' placing always wins**, on Shawn's word (October
+    /// 2026). A phone on the mainland provider cannot ask Maps about a hall
+    /// in Japan or one abroad, and places it by the register or OpenStreetMap,
+    /// while the reader's other device placed the same hall by Maps; an iCloud
+    /// calendar is one entry for both, and each put its own back on every
+    /// mirror. So a device holding Maps' answer writes it over anything else,
+    /// and a device without one — placed otherwise, or not placed at all —
+    /// leaves Maps' alone. Told apart by the radius (``Place/radius``): Maps'
+    /// is zero, and every other answer's at least a metre. An entry an older
+    /// build wrote for an OpenStreetMap building carries zero too, and is
+    /// taken for Maps' — a building either way.
+    nonisolated static func keepsLocation(
+        _ existing: EKStructuredLocation?, over wanted: EKStructuredLocation?, found: Place?
+    ) -> Bool {
+        guard existing?.title == wanted?.title else { return false }
+        if isSameSpot(existing, wanted, orDrawnAs: found) { return true }
+        guard found?.isFromMaps != true, let existing else { return false }
+        return isMapsPlacing(existing)
+    }
+
+    /// Whether the entry's location is Apple Maps' placing of its hall —
+    /// a coordinate, with Maps' radius of zero.
+    private nonisolated static func isMapsPlacing(_ location: EKStructuredLocation) -> Bool {
+        location.geoLocation != nil && location.radius < Place.notMapsRadius / 2
+    }
+
+    /// Two locations in the same spot: both with no coordinate, or both at
+    /// one — this device's drawing or the other provider's — with the same
+    /// radius. Within about a metre, which no placing moves a hall by, so a
+    /// coordinate that comes back from the calendar's server short of its
+    /// last binary digit is not taken for a move.
+    private nonisolated static func isSameSpot(
+        _ lhs: EKStructuredLocation?, _ rhs: EKStructuredLocation?, orDrawnAs found: Place?
+    ) -> Bool {
         switch (lhs?.geoLocation?.coordinate, rhs?.geoLocation?.coordinate) {
         case (nil, nil): return true
         case let (left?, right?):
-            if left.latitude == right.latitude && left.longitude == right.longitude { return true }
-            guard let found, let latitude = found.otherLatitude, let longitude = found.otherLongitude
-            else { return false }
-            return left.latitude == latitude && left.longitude == longitude
+            guard abs((lhs?.radius ?? 0) - (rhs?.radius ?? 0)) < Place.notMapsRadius / 2 else { return false }
+            if isNear(left, right) { return true }
+            guard let latitude = found?.otherLatitude, let longitude = found?.otherLongitude else { return false }
+            return isNear(left, CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
         default: return false
         }
+    }
+
+    private nonisolated static func isNear(_ one: CLLocationCoordinate2D, _ other: CLLocationCoordinate2D) -> Bool {
+        abs(one.latitude - other.latitude) < 0.00001 && abs(one.longitude - other.longitude) < 0.00001
     }
 }
 
@@ -583,7 +637,8 @@ extension CalendarSync.Place {
                   latitude: coordinate.latitude, longitude: coordinate.longitude,
                   uncertainty: placing.uncertainty,
                   otherLatitude: placing.otherDrawing?.latitude,
-                  otherLongitude: placing.otherDrawing?.longitude)
+                  otherLongitude: placing.otherDrawing?.longitude,
+                  isFromMaps: placing.isFromMaps)
     }
 }
 
