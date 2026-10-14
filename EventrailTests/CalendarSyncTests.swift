@@ -38,6 +38,30 @@ struct CalendarSyncTests {
         #expect(!CalendarSync.isDate(day.addingTimeInterval(24 * 60 * 60), inSameDayAs: day, in: shanghai))
     }
 
+    // MARK: - Which entries go
+
+    private func page(_ id: String) -> URL {
+        URL(string: "https://www.eventernote.com/events/\(id)")!
+    }
+
+    /// The calendar is shared with the reader's other devices: an entry this
+    /// device's library lacks goes only where this device knows its event
+    /// left. A device set up afresh, its library not yet arrived, took every
+    /// other device's entries out of the calendar.
+    @Test func anEntryGoesOnlyWhereItsEventIsKnownToHaveLeft() {
+        let library: Set<URL> = [page("1")]
+        // Another device's, never held here.
+        #expect(!CalendarSync.goes(page("2"), library: library, departed: []))
+        // Taken out of the library, here or synced in.
+        #expect(CalendarSync.goes(page("2"), library: library, departed: ["2"]))
+        // A second entry for an event already written.
+        #expect(CalendarSync.goes(page("1"), library: library, departed: []))
+        // Nothing this mirror writes.
+        #expect(CalendarSync.goes(nil, library: library, departed: []))
+        #expect(CalendarSync.goes(URL(string: "https://www.eventernote.com/actors/1"), library: library, departed: []))
+        #expect(CalendarSync.goes(URL(string: "https://example.com/events/2"), library: library, departed: []))
+    }
+
     // MARK: - Whose placing an entry keeps
 
     /// Where Apple Maps puts Zepp Haneda, and the block the register puts it on.

@@ -58,17 +58,9 @@ nonisolated struct OnThisDay {
     /// The start of today, to be printed.
     var date: Date { day.date() }
 
-    /// Whether a day in an earlier year is this one's: the same month and the
-    /// same day — and the 29th of February on the 28th in a year without one,
-    /// so an event on a leap day comes round every year rather than every
-    /// fourth.
+    /// Whether a day in an earlier year is this one's — see
+    /// ``CalendarDay/comesRound(on:)``.
     static func falls(_ written: CalendarDay, on today: CalendarDay) -> Bool {
-        if written.month == today.month, written.day == today.day { return true }
-        return written.month == 2 && written.day == 29
-            && today.month == 2 && today.day == 28 && !isLeapYear(today.year)
-    }
-
-    private static func isLeapYear(_ year: Int) -> Bool {
-        year.isMultiple(of: 4) && (!year.isMultiple(of: 100) || year.isMultiple(of: 400))
+        written.comesRound(on: today)
     }
 }

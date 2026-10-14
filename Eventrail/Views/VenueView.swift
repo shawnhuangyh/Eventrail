@@ -273,7 +273,11 @@ struct VenueView: View {
 
     private func placeOnMap() async {
         guard let profile else { return }
-        place = await VenuePlaces.shared.mapItem(forVenue: profile.name, address: profile.address)
+        let found = await VenuePlaces.shared.mapItem(forVenue: profile.name, address: profile.address)
+        // A refresh that changed the address asks again, and the answer for
+        // the old one, landing after it, would draw over it.
+        guard !Task.isCancelled else { return }
+        place = found
     }
 
     // MARK: - Where it is
@@ -400,7 +404,7 @@ struct VenueView: View {
                         // Dialled rather than read: a hall's number is only
                         // ever wanted on the day, in a hurry.
                         fact(icon: "phone.fill", label: "Phone", value: phone,
-                             destination: URL(string: "tel:\(phone.filter { $0.isNumber || $0 == "+" })"))
+                             destination: Self.dialURL(for: phone))
                     }
                     if let website = profile.website {
                         fact(icon: "safari", label: "Official site", value: website.host() ?? website.absoluteString,
@@ -417,6 +421,17 @@ struct VenueView: View {
             .glassPanel(cornerRadius: 28)
             .padding(.horizontal, 18)
         }
+    }
+
+    /// The number to dial for what the hall's page publishes as its phone,
+    /// or nil where it holds none. Members type it, often in full-width
+    /// figures — ０３－３２１６－０５５５, which a `tel:` link carried as
+    /// percent-escapes no phone dials — and now and then as 非公開.
+    nonisolated static func dialURL(for phone: String) -> URL? {
+        let halfwidth = phone.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? phone
+        let number = String(halfwidth.filter { $0.isASCII && ($0.isNumber || $0 == "+") })
+        guard number.filter(\.isNumber).count >= 6 else { return nil }
+        return URL(string: "tel:\(number)")
     }
 
     /// One published fact about the hall, and where tapping it goes when the

@@ -29,10 +29,15 @@ struct RootView: View {
     /// rather than in Settings: the app can be opened from a file while any tab
     /// is showing, and from a cold launch with no Settings sheet at all.
     @State private var openedBackup: URL?
-    /// An event opened from outside the app — its Live Activity, tapped — or
-    /// a lottery round, from its results-day reminder (``LotteryReminders``):
-    /// opened over whatever sheet is up — see ``OutsideOpens``.
+    /// An event opened from outside the app — its Live Activity, tapped, or
+    /// another device's sheet, handed off — or a lottery round, from its
+    /// results-day reminder (``LotteryReminders``): opened over whatever sheet
+    /// is up — see ``OutsideOpens``.
     @State private var opens = OutsideOpens()
+    /// The event in the frontmost sheet, offered to the reader's other
+    /// devices — see ``EventHandoff``.
+    @State private var handoff = EventHandoff()
+    @Environment(\.openURL) private var openURL
     private let reminders = LotteryReminders.shared
     /// Whether this launch still owes the reader the welcome.
     ///
@@ -44,8 +49,9 @@ struct RootView: View {
     /// Closing it early costs them this launch's showing; it does not spend
     /// the only one they get.
     @State private var isWelcoming = !UserDefaults.standard.bool(forKey: WelcomeView.seenKey)
-    /// Read only to send the watch its copy again when it changes — see
-    /// ``WatchLink`` — and to print a Live Activity on the new clock.
+    /// Read only to send the watch and the widgets their copies again when it
+    /// changes — see ``WatchLink`` and ``WidgetLink`` — and to print a Live
+    /// Activity on the new clock.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     var body: some View {
@@ -73,23 +79,30 @@ struct RootView: View {
         #endif
         .onOpenURL { url in
             if let id = Self.eventID(in: url) {
-                if let event = store.event(id: id) { opens.open(.event(event)) }
+                guard let event = store.event(id: id) else { return }
+                // A widget's link to one round of the event's — see
+                // ``RoundLink`` — opens the round's own page, where its
+                // result is written down; one gone since opens the event.
+                if let round = RoundLink.entry(in: url),
+                   let entry = store.tracking(for: event).lotteries.first(where: { $0.id == round }) {
+                    opens.open(.round(LotteryRow(event: event, entry: entry)))
+                } else {
+                    opens.open(.event(event))
+                }
             } else {
                 openedBackup = url
             }
         }
+        // Offered while an event's sheet is up, and taken back as it closes.
+        .userActivity(EventHandoff.activityType, element: handoff.shown) { event, activity in
+            EventHandoff.fill(activity, with: event)
+        }
+        .onContinueUserActivity(EventHandoff.activityType) { activity in
+            continueHandoff(activity)
+        }
         // The ticket sheet on the round's own page, where its result is
         // written down — or the event, where the round has gone since.
-        .onChange(of: reminders.opened, initial: true) { _, opened in
-            guard let opened else { return }
-            reminders.opened = nil
-            guard let event = store.event(id: opened.eventID) else { return }
-            if let entry = store.tracking(for: event).lotteries.first(where: { $0.id == opened.entryID }) {
-                opens.open(.round(LotteryRow(event: event, entry: entry)))
-            } else {
-                opens.open(.event(event))
-            }
-        }
+        .onChange(of: reminders.opened, initial: true) { openReminder() }
         // Inside the environment lines below, for the store; over the tabs,
         // which stand a sheet deeper for it.
         .opensFromOutside()
@@ -110,6 +123,7 @@ struct RootView: View {
         .environment(venues)
         .environment(notices)
         .environment(opens)
+        .environment(handoff)
         .tint(.brandTint)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only
@@ -122,13 +136,21 @@ struct RootView: View {
         // The watch draws the events still to come from a copy sent from here,
         // so the copy follows every write and the clock it is printed on.
         .task { WatchLink.shared.send(from: store) }
+        // The widgets draw from a copy left beside them, which follows every
+        // write the same way; a result given from one is written down first.
+        .task {
+            WidgetLink.shared.takeAnswers(into: store)
+            WidgetLink.shared.send(from: store)
+        }
         .onChange(of: store.revision) {
             WatchLink.shared.send(from: store)
+            WidgetLink.shared.send(from: store)
             reminders.schedule(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
         .onChange(of: timeDisplay) {
             WatchLink.shared.send(from: store)
+            WidgetLink.shared.send(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
         // Each results day still waiting is a reminder that evening, and the
@@ -140,11 +162,16 @@ struct RootView: View {
         // is the moment to pick up whatever another device wrote meanwhile.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                // A reminder tapped while this window was on its way in.
+                openReminder()
                 Task { await store.syncNow() }
                 Task { await EventActivities.shared.refresh(from: store) }
                 // An event whose day ended while the app was away leaves the
                 // watch's list too.
                 WatchLink.shared.send(from: store)
+                // A Won or Lost tapped on the Lotteries widget while away.
+                WidgetLink.shared.takeAnswers(into: store)
+                WidgetLink.shared.send(from: store)
                 // Notifications may have been turned on or off in Settings.
                 reminders.schedule(from: store)
             } else {
@@ -153,8 +180,41 @@ struct RootView: View {
         }
     }
 
+    /// Opens the round a results-day reminder was tapped for, in this window
+    /// — only while it is the one in front. On an iPad each window has a root
+    /// of its own and the reminder is one for the app, so whichever window's
+    /// root heard it first used to take it, the one in the other half of the
+    /// screen or behind as often as not. A tap brings forward the window it
+    /// was meant for, and that window opens it as it comes in.
+    private func openReminder() {
+        guard scenePhase == .active, let opened = reminders.opened else { return }
+        reminders.opened = nil
+        guard let event = store.event(id: opened.eventID) else { return }
+        if let entry = store.tracking(for: event).lotteries.first(where: { $0.id == opened.entryID }) {
+            opens.open(.round(LotteryRow(event: event, entry: entry)))
+        } else {
+            opens.open(.event(event))
+        }
+    }
+
+    /// Opens the event another device offered through Handoff: the copy it
+    /// sent, which the sheet answers with this device's own where it holds
+    /// one. A copy this build cannot read falls back to whatever this device
+    /// holds under the page's address, and with nothing held, the page itself
+    /// opens in the browser — where Handoff would have taken a device without
+    /// the app.
+    private func continueHandoff(_ activity: NSUserActivity) {
+        if let event = EventHandoff.event(in: activity)
+            ?? activity.webpageURL.flatMap(Self.eventID(in:)).flatMap(store.event(id:)) {
+            opens.open(.event(event))
+        } else if let page = activity.webpageURL {
+            openURL(page)
+        }
+    }
+
     /// The event a link to its Eventernote page names — what a Live Activity
-    /// opens the app with.
+    /// and a widget open the app with, and the page a handed-off event points
+    /// at.
     private static func eventID(in url: URL) -> Event.ID? {
         guard url.host() == "www.eventernote.com" else { return nil }
         let path = url.pathComponents

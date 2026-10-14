@@ -229,7 +229,9 @@ nonisolated struct LotteryReminder: Hashable {
     /// scheduled as the earlier ones are delivered and the app next opens.
     static let limit = 60
 
-    static let prefix = "lottery-results/"
+    /// Shared with the Lotteries widget, which takes back the reminder for a
+    /// round it was given a result from — see ``ResultsReminderID``.
+    static let prefix = ResultsReminderID.prefix
     static let eventKey = "event"
     static let entryKey = "entry"
 
@@ -243,7 +245,7 @@ nonisolated struct LotteryReminder: Hashable {
         self.day = day
     }
 
-    var identifier: String { "\(Self.prefix)\(eventID)/\(entryID.uuidString)" }
+    var identifier: String { ResultsReminderID.of(event: eventID, entry: entryID) }
 
     /// Eight in the evening of `day`, on `calendar`'s clock. The day is a
     /// Gregorian one whatever `calendar` counts in — see ``CalendarDay``.

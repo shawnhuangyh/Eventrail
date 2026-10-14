@@ -124,8 +124,10 @@ nonisolated extension WatchEvent {
     }
 }
 
-/// One element of a list, or nil where it could not be read.
-nonisolated private struct Readable<Value: Decodable>: Decodable {
+/// One element of a list, or nil where it could not be read — so one element
+/// a build cannot read is left out rather than the list. The widgets' copy
+/// (``WidgetLibrary``) is read the same way.
+nonisolated struct Readable<Value: Decodable>: Decodable {
     let value: Value?
 
     init(from decoder: any Decoder) throws {

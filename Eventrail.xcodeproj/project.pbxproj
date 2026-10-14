@@ -68,6 +68,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				EventActivity.swift,
+				WidgetLibrary.swift,
 			);
 			target = 000000000000000500000000 /* EventrailWatch */;
 		};

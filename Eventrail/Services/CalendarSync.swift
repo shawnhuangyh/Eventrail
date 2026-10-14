@@ -126,7 +126,8 @@ actor CalendarSync {
     // MARK: - Mirroring
 
     /// Brings the calendar into line with `events`, adding what is missing,
-    /// correcting what moved, and deleting what has left the library.
+    /// correcting what moved, and deleting what `departed` says has left the
+    /// library — see ``goes(_:library:departed:)`` for what is left alone.
     ///
     /// `places` is whatever has been looked up already. The mirror never
     /// searches for a hall itself — see ``VenuePlaces`` — so an event at a
@@ -136,7 +137,8 @@ actor CalendarSync {
     /// Matching is by the Eventernote page URL rather than by title: a title
     /// can be re-published, and an entry the reader dragged elsewhere is still
     /// the same event.
-    func mirror(_ events: [Event], places: [Event.ID: Place], color: CGColor?) async -> Outcome {
+    func mirror(_ events: [Event], departed: Set<Event.ID>, places: [Event.ID: Place],
+                color: CGColor?) async -> Outcome {
         guard await requestAccess() else { return .denied }
         do {
             let calendar = try calendar(color: color)
@@ -153,15 +155,14 @@ actor CalendarSync {
                 }
             }
 
+            let library = Set(wanted.keys)
             for entry in entries(in: calendar, covering: events) {
-                // Anything in this calendar that no longer answers to an event
-                // in the library goes: the reader took the event back out.
-                guard let url = entry.url, let event = wanted.removeValue(forKey: url) else {
+                if let url = entry.url, let event = wanted.removeValue(forKey: url) {
+                    if apply(event, to: entry, places: places) {
+                        try store.save(entry, span: .thisEvent, commit: false)
+                    }
+                } else if Self.goes(entry.url, library: library, departed: departed) {
                     try store.remove(entry, span: .thisEvent, commit: false)
-                    continue
-                }
-                if apply(event, to: entry, places: places) {
-                    try store.save(entry, span: .thisEvent, commit: false)
                 }
             }
 
@@ -180,6 +181,35 @@ actor CalendarSync {
         } catch {
             return .failed(error.localizedDescription)
         }
+    }
+
+    /// Whether an entry that is not the library's copy of an event is taken
+    /// out: a second entry for an event already written, the entry of an
+    /// event this device knows has left the library (`departed`), or one that
+    /// points at no event page. **The entry of an event this device has never
+    /// held stays**: another of the reader's devices put it there.
+    ///
+    /// The calendar is usually the reader's iCloud account's, so every device
+    /// that mirrors writes to the same one, each from the library as it holds
+    /// it. Taking out whatever this device's library lacked, as the mirror
+    /// once did, emptied the calendar on every device the moment a device set
+    /// up afresh turned Calendar Sync on, its library not yet arrived from
+    /// iCloud — and two devices mirroring without iCloud Sync took each
+    /// other's entries out on every pass. A removal is written down as one
+    /// (``LibraryEntry/inLibrary`` false, dated) and synced like any other
+    /// answer, so the devices that hear of it take its entry out.
+    nonisolated static func goes(_ url: URL?, library: Set<URL>, departed: Set<Event.ID>) -> Bool {
+        guard let url, let id = eventID(onPage: url) else { return true }
+        return library.contains(url) || departed.contains(id)
+    }
+
+    /// The event an Eventernote event page is about — what every entry this
+    /// mirror writes points at.
+    nonisolated static func eventID(onPage url: URL) -> Event.ID? {
+        guard url.host() == EventernoteClient.site.host() else { return nil }
+        let path = url.pathComponents
+        guard path.count == 3, path[1] == "events", !path[2].isEmpty else { return nil }
+        return path[2]
     }
 
     /// Takes the whole calendar back out again.

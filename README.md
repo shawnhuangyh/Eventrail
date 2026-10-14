@@ -29,10 +29,12 @@ Eventrail is in **beta testing** through TestFlight, for iPhone, iPad and Apple 
 - **🗺️ Event Passport** — A map of the halls you have been to, with the numbers behind your events: time spent, ticket spending by seat class, and how your lotteries went
 - **🎟️ Ticket stub** — Turn a ticket into a keepsake image to save or share, with the seat masked if you like
 - **⏱️ Live Activity** — On the day of an event you hold a ticket for, follow it from the doors to the end on the Lock Screen, in the Dynamic Island and in your Apple Watch's Smart Stack
+- **🧩 Widgets** — On the Home Screen and the Lock Screen: the next event counting down to its doors, the lottery rounds waiting on their results (with Won and Lost right on the widget once they are out), and what you went to on this day in earlier years
 - **⌚ Apple Watch app** — Your upcoming events on your wrist: the countdown, your seat and the times
 - **📅 Calendar mirror** — Write your library into a calendar of the app's own, with an alert when the doors open
 - **📥 Profile import** — Import a public Eventernote profile's attendance history and favorites (read-only, no password), then tick off the events you held a ticket for
 - **☁️ iCloud sync** — Keep your records in step across iPhone and iPad through your private iCloud storage, with no server of the app's own
+- **📲 Handoff** — Pick up the event you have open on your iPhone on your iPad, straight to the same event; on a Mac, or a device without Eventrail, it opens the event's Eventernote page in the browser
 - **💾 Backup & restore** — Export your library to a `.eventrail` file and restore it any time
 - **🌍 Multi-language** — English, Japanese, Simplified Chinese and Traditional Chinese, with on-device translation of event overviews and times on the hall's clock or your own
 
@@ -65,7 +67,7 @@ See the [feature overview](docs/overview.md) for how each of these works and how
 
    Simulator builds work as-is. A device build needs iCloud (with the `iCloud.moe.shawn.Eventrail` CloudKit container) and Push Notifications enabled on the App ID in your developer portal, since sync runs on CloudKit, and the App Group `group.moe.shawn.Eventrail` on both the app and the widget extension, since the Live Activity's flyer is handed over through it. Automatic signing registers the group and the extension's and watch app's App IDs on the first device build from Xcode; a signing that cannot, such as Xcode Cloud's, needs them to exist first. Before a TestFlight build can sync, deploy the CloudKit schema to Production in the CloudKit Console, and again whenever a model gains a type or a field: run a development build with iCloud Sync on first, so the Development schema has it to deploy.
 
-   The Live Activity needs a real iPhone to check: the Simulator's screenshots leave the Dynamic Island out, and the watch Simulator is sent no Live Activity.
+   The Live Activity needs a real iPhone to check: the Simulator's screenshots leave the Dynamic Island out, and the watch Simulator is sent no Live Activity. Handoff needs two real devices signed in to the same Apple Account: the Simulator cannot hand anything off.
 
 ### Common Commands
 

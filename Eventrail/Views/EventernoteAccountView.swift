@@ -204,25 +204,39 @@ struct AccountFinder: View {
         chosen = nil
         missed = false
         failure = nil
+        isLooking = false
         guard !query.isEmpty else { return }
 
         try? await Task.sleep(for: .milliseconds(450))
         guard !Task.isCancelled else { return }
 
         isLooking = true
-        defer { isLooking = false }
+        let result: Result<EventernoteProfile, any Error>
         do {
-            let profile = try await store.lookUpAccount(query)
+            result = .success(try await store.lookUpAccount(query))
+        } catch {
+            result = .failure(error)
+        }
+        // A look the reader has typed past says nothing at all: its answer is
+        // for a name no longer in the field, and its failure is only the
+        // keystroke cancelling it. Written over the next look's, it put "Could
+        // not reach Eventernote" up mid-word — and an answer that landed just
+        // as it was cancelled left the last name's account ticked, with Link
+        // ready, under the name that replaced it.
+        guard !Task.isCancelled else { return }
+        isLooking = false
+        switch result {
+        case .success(let profile):
             found = profile
             // One exact match and nothing to choose between: it is taken as the
             // answer, and the row is still there to take it back.
             chosen = profile
-        } catch let error as EventernoteClient.Failure {
+        case .failure(let error as EventernoteClient.Failure):
             switch error {
             case .http(404), .unreadable: missed = true
             case .http: failure = error.errorDescription
             }
-        } catch {
+        case .failure:
             failure = String(localized: "Could not reach Eventernote. Try again in a moment.")
         }
     }
