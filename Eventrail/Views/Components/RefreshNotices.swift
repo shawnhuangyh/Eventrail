@@ -28,7 +28,7 @@ struct RefreshNotice: Identifiable, Equatable {
         case failed(String)
         /// Not a refresh at all: what the reader tapped for, and why it was
         /// not done, in a line.
-        case refused(LocalizedStringKey)
+        case refused(LocalizedStringResource)
     }
 
     let id = UUID()
@@ -44,7 +44,17 @@ struct RefreshNotice: Identifiable, Equatable {
 
     static func failed(_ reason: String) -> RefreshNotice { RefreshNotice(outcome: .failed(reason)) }
 
-    static func refused(_ words: LocalizedStringKey) -> RefreshNotice { RefreshNotice(outcome: .refused(words)) }
+    static func refused(_ words: LocalizedStringResource) -> RefreshNotice { RefreshNotice(outcome: .refused(words)) }
+
+    /// The notice in words, for VoiceOver: the banner's headline, and the
+    /// reason under it where there is one.
+    var spoken: String {
+        switch outcome {
+        case .updated: String(localized: "Updated")
+        case .failed(let reason): [String(localized: "Update failed"), reason].joined(separator: "\n")
+        case .refused(let words): String(localized: words)
+        }
+    }
 }
 
 /// The one notice on screen, shared by every screen that refreshes.
@@ -75,6 +85,12 @@ final class RefreshNotices {
         // again.
         if current?.outcome != notice.outcome { current = notice }
         if case .refused = notice.outcome { current = notice }
+        // Said as well as shown: VoiceOver reads nothing that slides in by
+        // itself, and a reader who cannot see the pill would never hear how
+        // the refresh they asked for went. Once, as the notice goes up.
+        if current?.id == notice.id {
+            AccessibilityNotification.Announcement(notice.spoken).post()
+        }
         let notice = current ?? notice
         dismissal?.cancel()
         // A failure stays up longer: it is the one with a reason worth reading

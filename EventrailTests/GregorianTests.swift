@@ -3,10 +3,11 @@ import Testing
 @testable import Eventrail
 
 /// A reader can set their phone to the Japanese calendar, where 2026 is the
-/// year 8 of Reiwa, or to the Buddhist one, where it is 2569. Every day the
-/// app counts or keeps is a Gregorian one whatever the phone is set to: read
-/// off the reader's calendar and handed to another, a day landed in 4044 or
-/// in the year 8.
+/// year 8 of Reiwa, or to the Buddhist one, where it is 2569 — or to the
+/// Chinese, Hebrew, Islamic or Persian one, whose months are not the
+/// Gregorian ones either. Every day the app counts or keeps is a Gregorian
+/// one whatever the phone is set to: read off the reader's calendar and
+/// handed to another, a day landed in 4044 or in the year 8.
 struct GregorianTests {
     /// A phone set to `identifier`, in Tokyo.
     static func reader(_ identifier: Calendar.Identifier, in zone: TimeZone = Fixtures.tokyo) -> Calendar {
@@ -15,7 +16,9 @@ struct GregorianTests {
         return calendar
     }
 
-    nonisolated static let calendars: [Calendar.Identifier] = [.gregorian, .japanese, .buddhist]
+    nonisolated static let calendars: [Calendar.Identifier] = [
+        .gregorian, .japanese, .buddhist, .chinese, .hebrew, .islamicUmmAlQura, .persian,
+    ]
 
     @Test(arguments: calendars)
     func aDayIsCountedOnTheGregorianCalendar(_ identifier: Calendar.Identifier) {
@@ -70,6 +73,19 @@ struct GregorianTests {
         let soon = LotteryEntry(round: "最速先行抽選", day: LotteryListTests.day(3))
         let list = LotteryList(events: [event]) { _ in Tracking(lotteries: [soon]) }
         #expect(LotteryReminder.due(in: list, calendar: reader).map(\.entryID) == [soon.id])
+    }
+
+    /// The Passport counts by the Gregorian month, so it names its months
+    /// so: on the Chinese calendar January's column read 正月, and on the
+    /// Hebrew one Tishri.
+    @Test(arguments: calendars)
+    func thePassportNamesTheMonthsItCounts(_ identifier: Calendar.Identifier) {
+        var reader = Self.reader(identifier)
+        reader.locale = Locale(identifier: "en_US")
+        let months = PassportStats.monthSymbols(in: reader)
+        #expect(months.count == 12)
+        #expect(months.first == "Jan")
+        #expect(months.last == "Dec")
     }
 
     /// The year an event fell in, which the Passport counts its years by.

@@ -23,9 +23,10 @@ struct FollowingFilterTests {
     }
 
     /// Months as the calendar has them, so the window ends on the same date
-    /// three months on, whatever the months' lengths.
+    /// three months on, whatever the months' lengths — Gregorian months, on
+    /// a phone set to the Chinese calendar too, whose months are others.
     @Test func monthsEndOnTheSameDateMonthsOn() {
-        let reader = Calendar.current
+        let reader = Calendar.gregorian()
         let today = reader.startOfDay(for: .now)
         let end = reader.date(byAdding: .month, value: 3, to: today)!
         let lastDay = reader.dateComponents([.day], from: today, to: end).day! - 1

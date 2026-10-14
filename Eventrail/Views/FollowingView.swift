@@ -709,7 +709,7 @@ private struct FollowedDateRow: View {
     let open: () -> Void
 
     var body: some View {
-        EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail) {
+        EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail, opens: open) {
             HStack(spacing: 6) {
                 if let first = billing.first {
                     // The whole caption leads to the first name on it. Two

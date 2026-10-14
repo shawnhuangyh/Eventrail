@@ -4460,24 +4460,24 @@
         }
       }
     },
-    "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. Events you have already removed here stay removed. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
+    "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. An event you remove here comes back on the next refresh if your account still lists it. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eventrailは、誰でも閲覧できるプロフィールの公開ページだけを読み取ります。ログインせず、Eventernoteに書き込むこともありません。ここで削除したイベントは削除されたままです。読み込みではイベントをライブラリに追加するだけで、自分で入力した内容が上書きされることはありません。"
+            "value" : "Eventrailは、誰でも閲覧できるプロフィールの公開ページだけを読み取ります。ログインせず、Eventernoteに書き込むこともありません。ここで削除したイベントも、アカウントにまだ残っていれば次回の更新で戻ります。読み込みではイベントをライブラリに追加するだけで、自分で入力した内容が上書きされることはありません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eventrail 读取任何人访问你的个人资料时都能看到的同一公开页面。它不会登录，也绝不会向 Eventernote 写入任何内容。你已在此移除的活动仍会保持移除。导入只会将活动放入资料库——你为活动填写的内容归你所有，这里不会覆盖它们。"
+            "value" : "Eventrail 读取任何人访问你的个人资料时都能看到的同一公开页面。它不会登录，也绝不会向 Eventernote 写入任何内容。在此移除的活动，如果账号中仍列出，会在下次刷新时恢复。导入只会将活动放入资料库——你为活动填写的内容归你所有，这里不会覆盖它们。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eventrail 讀取任何人存取你的個人資料時都能看到的同一公開頁面。它不會登入，也絕不會向 Eventernote 寫入任何內容。你已在此移除的活動仍會保持移除。匯入只會將活動放入資料庫——你為活動填寫的內容歸你所有，這裡不會覆蓋它們。"
+            "value" : "Eventrail 讀取任何人存取你的個人資料時都能看到的同一公開頁面。它不會登入，也絕不會向 Eventernote 寫入任何內容。在此移除的活動，如果帳號中仍列出，會在下次重新整理時恢復。匯入只會將活動放入資料庫——你為活動填寫的內容歸你所有，這裡不會覆蓋它們。"
           }
         }
       }
@@ -8265,6 +8265,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只會取消收藏——活動仍保留在資料庫中，你可以隨時再次收藏。"
+          }
+        }
+      }
+    },
+    "Only the hearts come off. Those in your library stay there; to heart the rest again, find them in Search." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りだけを解除します。ライブラリにあるイベントはそのまま残ります。それ以外を再びお気に入りにするには「検索」から探してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只会取消收藏。资料库中的活动仍会保留；其余活动如需再次收藏，请从“搜索”中找到它们。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只會取消收藏。資料庫中的活動仍會保留；其餘活動如需再次收藏，請從“搜尋”中找到它們。"
+          }
+        }
+      }
+    },
+    "Only the heart comes off. The event is not in your library, so to heart it again, find it in Search." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りだけを解除します。このイベントはライブラリにないため、再びお気に入りにするには「検索」から探してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只会取消收藏。此活动不在资料库中，如需再次收藏，请从“搜索”中找到它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只會取消收藏。此活動不在資料庫中，如需再次收藏，請從“搜尋”中找到它。"
+          }
+        }
+      }
+    },
+    "Only the hearts come off. They are not in your library, so to heart them again, find them in Search." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りだけを解除します。これらのイベントはライブラリにないため、再びお気に入りにするには「検索」から探してください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只会取消收藏。这些活动不在资料库中，如需再次收藏，请从“搜索”中找到它们。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只會取消收藏。這些活動不在資料庫中，如需再次收藏，請從“搜尋”中找到它們。"
           }
         }
       }

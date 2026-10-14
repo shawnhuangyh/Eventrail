@@ -11,6 +11,14 @@ import SwiftUI
 /// (``View/opensFromOutside()``), each at the depth it was presented at, and
 /// the frontmost takes the request — ranked as ``RefreshNotices`` ranks its
 /// overlays. What the reader had up stays under it, where they left it.
+///
+/// A request stands until its sheet is on screen, not only until a presenter
+/// has asked for it: a presenter knows the sheets in front of it and nothing
+/// else, and a sheet asked for while an alert, a popover, Quick Look, a share
+/// sheet or the Welcome screen replayed from Settings is up is one SwiftUI
+/// does not present either. Let go of as it was asked for, that request
+/// opened nothing once whatever stood in front was put away. So the frontmost
+/// presenter asks again each second until the sheet appears.
 @Observable
 final class OutsideOpens {
     /// What is waiting to be opened, until the frontmost presenter takes it.
@@ -18,8 +26,15 @@ final class OutsideOpens {
 
     /// Every presenter on screen, by how many sheets deep it stands.
     @ObservationIgnored fileprivate var standing: [UUID: Int] = [:]
+    /// The presenter that has asked for ``waiting`` and not yet seen it on
+    /// screen. One at a time: the sheet it asked for holds a presenter of its
+    /// own, which stands in front as it appears and would otherwise open the
+    /// same request again over it.
+    @ObservationIgnored fileprivate var claimant: UUID?
 
     func open(_ request: OutsideOpen) {
+        // The same request tapped twice is still the one being presented.
+        if waiting?.id != request.id { claimant = nil }
         waiting = request
     }
 
@@ -29,9 +44,11 @@ final class OutsideOpens {
         standing.max { ($0.value, $0.key.uuidString) < ($1.value, $1.key.uuidString) }?.key
     }
 
-    fileprivate func take() -> OutsideOpen? {
-        defer { waiting = nil }
-        return waiting
+    /// `open`, on screen: the request is answered.
+    fileprivate func delivered(_ open: OutsideOpen) {
+        guard waiting?.id == open.id else { return }
+        claimant = nil
+        waiting = nil
     }
 }
 
@@ -79,22 +96,31 @@ private struct OutsideOpenPresenter: ViewModifier {
     /// and a sheet bound to whoever is frontmost would close as it opened.
     @State private var shown: OutsideOpen?
 
+    /// How long a sheet asked for has to appear before it is asked for again.
+    private static let retry: Duration = .seconds(1)
+
     func body(content: Content) -> some View {
         content
             .onAppear {
                 opens?.standing[id] = depth
                 take()
             }
-            .onDisappear { opens?.standing[id] = nil }
-            .onChange(of: opens?.waiting?.id) { take() }
+            .onDisappear {
+                opens?.standing[id] = nil
+                if opens?.claimant == id { opens?.claimant = nil }
+            }
+            .task(id: opens?.waiting?.id) { await keepTaking() }
             .sheet(item: $shown) { open in
-                switch open {
-                case .event(let event):
-                    EventDetailView(event: event)
-                case .round(let row):
-                    TicketDetailsView(event: row.event, tracking: store?.tracking(for: row.event) ?? Tracking(),
-                                      opening: row.entry)
+                Group {
+                    switch open {
+                    case .event(let event):
+                        EventDetailView(event: event)
+                    case .round(let row):
+                        TicketDetailsView(event: row.event, tracking: store?.tracking(for: row.event) ?? Tracking(),
+                                          opening: row.entry)
+                    }
                 }
+                .onAppear { opens?.delivered(open) }
             }
             // Outermost, so what this holds and what it presents both stand
             // a sheet deeper than it does.
@@ -102,7 +128,29 @@ private struct OutsideOpenPresenter: ViewModifier {
     }
 
     private func take() {
-        guard let opens, opens.waiting != nil, opens.front == id else { return }
-        shown = opens.take()
+        guard let opens, let waiting = opens.waiting, opens.claimant == nil, opens.front == id else { return }
+        opens.claimant = id
+        shown = waiting
+    }
+
+    /// Asks for the waiting request, and again each ``retry`` until it is on
+    /// screen. Asked for and not there a second later, something this cannot
+    /// see stood in front — an alert, a popover, a share sheet — and the
+    /// request is let go of here and asked for afresh, by whichever presenter
+    /// is frontmost by then.
+    private func keepTaking() async {
+        while let opens, opens.waiting != nil, !Task.isCancelled {
+            take()
+            try? await Task.sleep(for: Self.retry)
+            guard !Task.isCancelled else { return }
+            if opens.waiting != nil, opens.claimant == id {
+                opens.claimant = nil
+                shown = nil
+                // A moment with nothing asked for, so SwiftUI sees the
+                // request go and come back: put back in the same turn, it
+                // would see no change and ask for nothing.
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
     }
 }

@@ -48,6 +48,11 @@ actor CalendarSync {
         /// How far the coordinate might be from the hall's door — see
         /// ``VenuePlaces/Placing``.
         let uncertainty: CLLocationDistance
+        /// Where a device on the other map provider draws the same answer —
+        /// see ``VenuePlaces/Placing/otherDrawing``. An entry already at
+        /// either spot is left where it is.
+        var otherLatitude: CLLocationDegrees?
+        var otherLongitude: CLLocationDegrees?
 
         var location: CLLocation { CLLocation(latitude: latitude, longitude: longitude) }
 
@@ -395,8 +400,9 @@ actor CalendarSync {
         }
         // A place rather than a line of text: given the map item, Calendar
         // draws the venue on a map and can work out when to leave for it.
-        let place = Self.place(for: event, found: places[event.id])
-        if !isSamePlace(entry.structuredLocation, place) {
+        let found = places[event.id]
+        let place = Self.place(for: event, found: found)
+        if !isSamePlace(entry.structuredLocation, place, orDrawnAs: found) {
             entry.structuredLocation = place
             changed = true
         }
@@ -549,11 +555,20 @@ actor CalendarSync {
     /// Two places are the same when they read the same and sit in the same
     /// spot. Worth checking, because an entry written before Maps had been
     /// asked should be corrected once, and then left alone.
-    private func isSamePlace(_ lhs: EKStructuredLocation?, _ rhs: EKStructuredLocation?) -> Bool {
+    ///
+    /// The same spot includes where a device on the other map provider draws
+    /// that answer (`found`'s other drawing): the entry is shared with it
+    /// through iCloud, and each would otherwise put its own back for good.
+    private func isSamePlace(_ lhs: EKStructuredLocation?, _ rhs: EKStructuredLocation?,
+                             orDrawnAs found: Place? = nil) -> Bool {
         guard lhs?.title == rhs?.title else { return false }
         switch (lhs?.geoLocation?.coordinate, rhs?.geoLocation?.coordinate) {
         case (nil, nil): return true
-        case let (left?, right?): return left.latitude == right.latitude && left.longitude == right.longitude
+        case let (left?, right?):
+            if left.latitude == right.latitude && left.longitude == right.longitude { return true }
+            guard let found, let latitude = found.otherLatitude, let longitude = found.otherLongitude
+            else { return false }
+            return left.latitude == latitude && left.longitude == longitude
         default: return false
         }
     }
@@ -566,7 +581,9 @@ extension CalendarSync.Place {
         let coordinate = placing.item.location.coordinate
         self.init(name: placing.item.name, address: placing.item.address?.fullAddress,
                   latitude: coordinate.latitude, longitude: coordinate.longitude,
-                  uncertainty: placing.uncertainty)
+                  uncertainty: placing.uncertainty,
+                  otherLatitude: placing.otherDrawing?.latitude,
+                  otherLongitude: placing.otherDrawing?.longitude)
     }
 }
 

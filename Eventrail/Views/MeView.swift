@@ -359,7 +359,9 @@ struct MeView: View {
                     let attended = library.filter(store.hasAttended)
                     passportTile(attended.count, tint: .trackInterest,
                                  label: "Events attended", isFirst: true)
-                    passportTile(Set(attended.map(\.venue)).count, tint: .trackTicket,
+                    // Halls only, as the Passport counts them: a stream or an
+                    // undisclosed room adds none — see ``Event/isAtHall``.
+                    passportTile(Set(attended.filter(\.isAtHall).map(\.venue)).count, tint: .trackTicket,
                                  label: "Venues visited", isFirst: false)
                     passportTile(Set(attended.flatMap { $0.performers.map(\.name) }).count,
                                  tint: .trackAttended, label: "Performers seen", isFirst: false)

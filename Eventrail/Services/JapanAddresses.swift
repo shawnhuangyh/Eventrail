@@ -72,24 +72,53 @@ nonisolated struct JapanAddresses: Sendable {
     /// precise answer first.
     private static let parameters = ["ilvl": "T", "sort_il": "1"]
 
-    /// Japan, generously — from 沖ノ鳥島 to 南鳥島. A last guard on the answer
-    /// rather than on the question: the grade says how sure the register is,
-    /// and this says it is at least talking about the right country.
-    private static let latitudes = 20.0...46.0
-    private static let longitudes = 122.0...154.0
+    /// Japan, generously — from 与那国島 to 南鳥島 and from 沖ノ鳥島 to 宗谷岬
+    /// — as longitude and latitude, drawn round the sea and through the
+    /// straits between it and its neighbours: west of 与那国島 and short of
+    /// Taiwan, east of Jeju and 巨済島 and west of 対馬, then out through the
+    /// Sea of Japan clear of Busan, Ulsan and 鬱陵島, east of the Russian
+    /// coast, and south of Sakhalin. A last guard on the answer rather than on
+    /// the question: the grade says how sure the register is, and this says it
+    /// is at least talking about the right country.
+    ///
+    /// Not the box from 20° to 46° north and 122° to 154° east it once was,
+    /// which held the whole Korean peninsula, the mainland's northeast and
+    /// Vladivostok: a hall in Shenyang was read as on Tokyo's clock, an hour
+    /// out, and a Korean answer as already in Japan, which nothing re-asked.
+    private static let outline: [(longitude: Double, latitude: Double)] = [
+        (122.5, 23.5), (122.5, 26.0),       // west of 与那国島, east of Taiwan
+        (128.0, 31.5), (128.2, 33.3),       // west of 男女群島 and 五島, east of Jeju
+        (128.9, 34.2), (129.3, 34.8),       // between 巨済島 and 対馬
+        (131.0, 35.5), (133.5, 37.5),       // off Busan and Ulsan, south of 鬱陵島
+        (137.5, 39.0), (139.0, 41.0),       // the Sea of Japan, west of 佐渡 and 奥尻島
+        (139.0, 45.3), (142.0, 45.7),       // east of the Russian coast, south of Sakhalin
+        (154.5, 45.7), (154.5, 23.5),       // the Pacific, past 南鳥島
+        (136.5, 20.0),                      // south of 沖ノ鳥島
+    ]
 
     /// Whether a coordinate is in Japan at all.
     ///
-    /// The box above, offered because ``VenuePlaces`` holds Maps' answers to
-    /// the same last guard this holds the register's: a hall the site places
-    /// in Japan and a map places across the sea is the map answering about
-    /// somewhere else. A box rather than a border — it is a sanity check on
-    /// an answer that has already been matched against the published address,
-    /// not a claim about where the coastline runs.
+    /// The outline above, offered because ``VenuePlaces`` holds Maps' answers
+    /// to the same last guard this holds the register's: a hall the site
+    /// places in Japan and a map places across the sea is the map answering
+    /// about somewhere else. It also settles which halls answer to Tokyo's
+    /// clock without asking (``VenuePlaces``' `Answer.zone`), so it keeps out
+    /// every neighbour on another clock — but it is drawn through the sea, not
+    /// along the coastline, and claims nothing about a border.
     static func isInJapan(_ coordinate: CLLocationCoordinate2D) -> Bool {
-        CLLocationCoordinate2DIsValid(coordinate)
-            && latitudes.contains(coordinate.latitude)
-            && longitudes.contains(coordinate.longitude)
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return false }
+        let (x, y) = (coordinate.longitude, coordinate.latitude)
+        var inside = false
+        var previous = outline[outline.count - 1]
+        for point in outline {
+            if (point.latitude > y) != (previous.latitude > y),
+               x < (previous.longitude - point.longitude) * (y - point.latitude)
+                   / (previous.latitude - point.latitude) + point.longitude {
+                inside.toggle()
+            }
+            previous = point
+        }
+        return inside
     }
 
     var session: URLSession = .shared
