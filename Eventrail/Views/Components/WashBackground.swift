@@ -5,17 +5,48 @@ import SwiftUI
 /// Each blob mirrors one radial gradient from the design: the frame is twice the
 /// gradient's radii scaled by the stop where it reaches transparent.
 struct WashBackground: View {
+    /// The screen this wash is a piece of, where a screen parted at the fold
+    /// draws one in each half — see ``EnvironmentValues/washCanvas``.
+    @Environment(\.washCanvas) private var canvas
+
     var body: some View {
         GeometryReader { proxy in
-            let size = proxy.size
-            ZStack {
-                Color.washBase
-                Self.blob(.washOne, at: UnitPoint(x: 0.12, y: 0), radii: (0.58, 0.38), fade: 0.70, in: size)
-                Self.blob(.washTwo, at: UnitPoint(x: 0.92, y: 0.06), radii: (0.52, 0.34), fade: 0.70, in: size)
-                Self.blob(.washThree, at: UnitPoint(x: 0.48, y: 1.02), radii: (0.64, 0.40), fade: 0.72, in: size)
+            if let canvas {
+                // One piece of a wider picture: the blobs stand where they
+                // stand on that picture, and each piece shows its own part of
+                // it and no more — the blobs that reach past it are drawn by
+                // the piece beside it, and drawn twice over they darken.
+                let own = proxy.frame(in: .global)
+                let picture = canvas.offsetBy(dx: -own.minX, dy: -own.minY)
+                ZStack(alignment: .topLeading) {
+                    Color.washBase
+                    Self.blobs(in: picture.size)
+                        .frame(width: picture.width, height: picture.height)
+                        .offset(x: picture.minX, y: picture.minY)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+                .clipped()
+            } else {
+                ZStack {
+                    Color.washBase
+                    Self.blobs(in: proxy.size)
+                }
             }
         }
         .ignoresSafeArea()
+        // Something to look at, never to touch. A piece of a wider picture
+        // keeps its blobs' whole frames for hit-testing however it is
+        // clipped, so the list beside an open iPhone Duo's fold — laid out
+        // over the event beside it — took every touch meant for the event.
+        .allowsHitTesting(false)
+    }
+
+    private static func blobs(in size: CGSize) -> some View {
+        ZStack {
+            blob(.washOne, at: UnitPoint(x: 0.12, y: 0), radii: (0.58, 0.38), fade: 0.70, in: size)
+            blob(.washTwo, at: UnitPoint(x: 0.92, y: 0.06), radii: (0.52, 0.34), fade: 0.70, in: size)
+            blob(.washThree, at: UnitPoint(x: 0.48, y: 1.02), radii: (0.64, 0.40), fade: 0.72, in: size)
+        }
     }
 
     /// One radial gradient of the design's, in a frame of `size`: centred at
@@ -33,6 +64,14 @@ struct WashBackground: View {
                height: size.height * radii.y * 2 * fade)
         .position(x: size.width * center.x, y: size.height * center.y)
     }
+}
+
+extension EnvironmentValues {
+    /// The whole screen, in global coordinates, where a screen is drawn as
+    /// halves either side of the iPhone Duo's fold and each half draws its own
+    /// wash — set by ``View/eventPane(_:)``. Nil everywhere else,
+    /// where a wash is drawn to its own frame.
+    @Entry var washCanvas: CGRect?
 }
 
 extension View {

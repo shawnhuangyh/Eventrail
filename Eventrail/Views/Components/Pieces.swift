@@ -397,6 +397,8 @@ struct FavoriteEventRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        // A row inside its card rather than a card of its own.
+        .marksEventBeside(event.id, cornerRadius: 20)
         .overlay(alignment: .top) {
             if showsDivider { Divider().padding(.leading, 66) }
         }

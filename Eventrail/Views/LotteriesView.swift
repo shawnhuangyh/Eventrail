@@ -95,7 +95,7 @@ struct LotteriesView: View {
         .washBackground()
         .navigationTitle("Lotteries")
         .navigationSubtitle(subtitle(list))
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .sheet(item: $editing) { row in
             TicketDetailsView(event: row.event, tracking: store.tracking(for: row.event), opening: row.entry)
         }
@@ -401,6 +401,7 @@ struct LotteryRoundCard: View {
             .contentShape(.rect(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
+        .marksEventBeside(row.event.id, cornerRadius: 24)
         .overlayPreferenceValue(TileSpot.self) { spot in
             GeometryReader { proxy in
                 if let spot {

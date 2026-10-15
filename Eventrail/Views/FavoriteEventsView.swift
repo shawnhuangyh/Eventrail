@@ -98,7 +98,7 @@ struct FavoriteEventsView: View {
                 )
             }
         }
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .onChange(of: filter) { selection.removeAll() }
         .onChange(of: isSelecting) { selection.removeAll() }
     }

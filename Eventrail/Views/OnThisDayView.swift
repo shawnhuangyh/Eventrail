@@ -59,8 +59,7 @@ struct OnThisDayView: View {
         .washBackground()
         .navigationTitle("On This Day")
         .navigationSubtitle(subtitle(of: today))
-        .navigationDestination(for: VenueLink.self) { VenueView(link: $0) }
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .sheet(item: $stubEvent) { TicketStubView(event: $0) }
     }
 
@@ -159,6 +158,7 @@ struct OnThisDayView: View {
             }
         }
         .padding(16)
+        .marksEventBeside(event.id, cornerRadius: 28)
         .glassPanel(cornerRadius: 28)
     }
 
@@ -267,6 +267,9 @@ struct OnThisDayView: View {
 struct OnThisDayCard: View {
     let onThisDay: OnThisDay
     let limit: Int
+    /// How tall the panel is drawn — as tall as its row, where the Me tab
+    /// lays its cards out in a grid. Nil, as tall as it needs.
+    var height: CGFloat? = nil
 
     var body: some View {
         NavigationLink(value: MeList.onThisDay) {
@@ -282,6 +285,7 @@ struct OnThisDayCard: View {
                 }
             }
             .padding(.bottom, 6)
+            .frame(maxHeight: height, alignment: .top)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

@@ -13,6 +13,9 @@ import Translation
 ///
 /// A sheet opened from a search row starts with only what the row printed, and
 /// imports the event's own page for the rest.
+///
+/// Beside a list on an open iPhone Duo it is no sheet but a page of the
+/// list's own — see ``Presentation/pane``.
 struct EventDetailView: View {
     @Environment(EventStore.self) private var store
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
@@ -105,9 +108,29 @@ struct EventDetailView: View {
     }
 
     @Environment(\.openURL) private var openURL
+    /// Where the system keeps its vertical bar, on an iPhone Duo — where the
+    /// sheet's close button joins its actions. See ``closeItem``.
+    @Environment(\.verticalBarEdge) private var verticalBarEdge
+    /// Empties the half the page stands in beside a list.
+    @Environment(\.closeEventBeside) private var closeBeside
 
-    init(event: Event) {
+    /// How the event is put in front of the reader.
+    enum Presentation {
+        /// A sheet over the screen it was opened from, with a stack of its own
+        /// for the performers and the hall it pushes.
+        case sheet
+        /// The half of an open iPhone Duo beside the list it was opened from —
+        /// see ``SwiftUI/View/eventPane(_:)``. No stack of its own:
+        /// what it pushes goes on the list's, and its actions join the list's
+        /// bar, under a close button that empties the half.
+        case pane
+    }
+
+    private let presentation: Presentation
+
+    init(event: Event, presentation: Presentation = .sheet) {
         source = event
+        self.presentation = presentation
     }
 
     /// The fullest copy the app holds. An import lands in the store, so reading
@@ -140,6 +163,33 @@ struct EventDetailView: View {
     }
 
     var body: some View {
+        switch presentation {
+        case .sheet: sheet
+        case .pane: pane
+        }
+    }
+
+    /// Beside the list, in the list's own stack: the page, and its actions in
+    /// the list's bar — on the Duo, the top of the system's rail, where the
+    /// design draws them — under a close button in a capsule of its own, as
+    /// the sheet's heads the rail (``closeItem``). Closed, the half is empty
+    /// until another row is chosen.
+    private var pane: some View {
+        detail
+            .toolbar {
+                if let closeBeside {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Close", systemImage: "xmark", action: closeBeside)
+                            .tint(.primary)
+                    }
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
+                }
+                ToolbarItemGroup(placement: .primaryAction) { actions }
+            }
+            .advertisesHandoff(of: event)
+    }
+
+    private var sheet: some View {
         // A stack of its own, so a performer billed here — or the hall it is
         // held at — opens inside this sheet rather than dismissing it. The
         // sheet's own chrome is the close button and the action bar, so the
@@ -198,19 +248,20 @@ struct EventDetailView: View {
                 // event's times and not another's — and a stack any wider than
                 // its scroll view let that sheet be dragged sideways as well as
                 // up and down.
-                .containerRelativeFrame(.horizontal)
-                // Clear of the close button, which floats over the top of it.
-                .padding(.top, 64)
+                .modifier(PageWidth())
+                .padding(.top, topInset)
                 .padding(.bottom, 32)
             }
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(edges: presentation == .sheet ? .top : [])
             // No pull: a pull down from the top of a sheet is how it is put
             // away. The page is read again from Refresh in the menu instead —
             // see ``RefreshMenuItem``.
 
-            closeButton
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+            if floatsCloseButton {
+                closeButton
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+            }
         }
         .washBackground()
         .sheet(isPresented: $isEditingTicket) {
@@ -427,6 +478,20 @@ struct EventDetailView: View {
             .buttonStyle(.plain)
             .accessibilityHint("Opens the venue")
         }
+    }
+
+    /// Whether the close button floats over the top of the page, as it does
+    /// on a sheet — rather than heading the system's rail, on an iPhone Duo
+    /// (``closeItem``), and rather than not being there at all beside a list.
+    private var floatsCloseButton: Bool {
+        presentation == .sheet && verticalBarEdge == nil
+    }
+
+    /// Where the page starts: clear of the floating close button, or of the
+    /// sheet's grabber where the button has gone to the rail — and under the
+    /// list's bar beside a list, whose safe area already stops below it.
+    private var topInset: CGFloat {
+        if floatsCloseButton { 64 } else if presentation == .sheet { 28 } else { 8 }
     }
 
     /// The way out of the sheet.
@@ -1052,41 +1117,77 @@ struct EventDetailView: View {
     ///
     /// One capsule at the leading edge, as the design draws it, with the space
     /// beside it left empty for the page to show through.
+    ///
+    /// On an iPhone Duo the system draws the bar as part of its rail, down
+    /// the side of the screen, and the close button joins it in a capsule of
+    /// its own above the actions, as `DuoClosedEvent.dc.html` draws it —
+    /// floating over the page, it sat beside the rail rather than in it. The
+    /// rail keeps a bar's items at its foot, where the design has them at its
+    /// head; that is the system's to place.
     @ToolbarContentBuilder
     private var actionBar: some ToolbarContent {
-        ToolbarItemGroup(placement: .bottomBar) {
-            Button {
-                if store.isInLibrary(event) {
-                    isConfirmingRemoval = true
-                } else {
-                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-                }
-            } label: {
-                Label(store.isInLibrary(event) ? "Remove from my events" : "Add to my events",
-                      systemImage: store.isInLibrary(event) ? "checkmark" : "plus")
+        if verticalBarEdge != nil {
+            closeItem
+            // Apart from the actions, so it is a capsule of its own.
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+        }
+        ToolbarItemGroup(placement: .bottomBar) { actions }
+        ToolbarSpacer(.flexible, placement: .bottomBar)
+    }
+
+    /// The close button, as a bar item of its own for the rail to carry.
+    private var closeItem: some ToolbarContent {
+        ToolbarItem(placement: .bottomBar) {
+            Button("Close", systemImage: "xmark") { dismiss() }
+                .tint(.primary)
+        }
+    }
+
+    /// Keep it, a Live Activity for it, share it, and the rest behind the
+    /// ellipsis — in the sheet's bar, or in the list's beside a list.
+    @ViewBuilder
+    private var actions: some View {
+        Button {
+            if store.isInLibrary(event) {
+                isConfirmingRemoval = true
+            } else {
+                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+            }
+        } label: {
+            Label(store.isInLibrary(event) ? "Remove from my events" : "Add to my events",
+                  systemImage: store.isInLibrary(event) ? "checkmark" : "plus")
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
+        .confirmingRemoval(isPresented: $isConfirmingRemoval) {
+            withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+        }
+
+        if offersLiveActivity, !keepsBarShort {
+            Button(action: toggleLiveActivity) {
+                Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                      systemImage: liveActivitySymbol)
                     .contentTransition(.symbolEffect(.replace))
             }
-            .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
-            .confirmingRemoval(isPresented: $isConfirmingRemoval) {
-                withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
-            }
+            .tint(liveActivity == .running ? .trackAttended : .brandTint)
+        }
 
-            if offersLiveActivity {
-                Button(action: toggleLiveActivity) {
-                    Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
-                          systemImage: liveActivitySymbol)
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .tint(liveActivity == .running ? .trackAttended : .brandTint)
-            }
-
+        if !keepsBarShort {
             ShareLink(item: event.sourceURL)
                 .tint(.brandTint)
-
-            moreMenu
-                .tint(.brandTint)
         }
-        ToolbarSpacer(.flexible, placement: .bottomBar)
+
+        moreMenu
+            .tint(.brandTint)
+    }
+
+    /// Whether the bar keeps to the heart of it — keeping the event, and the
+    /// menu — leaving the clock and Share to the menu, which carries both
+    /// again. Beside a list, where the close button heads the list's bar and
+    /// the list's own buttons follow: on the Duo's rail Following's filter
+    /// and pencil were folded into a second ⋯ to make room for them.
+    private var keepsBarShort: Bool {
+        closeBeside != nil
     }
 
     /// Everything the bar has no room for, and the bar's own actions again,
@@ -1742,6 +1843,23 @@ struct EventDetailView: View {
             return Text("\(source) The page was last edited \(when).")
         }
         return Text("\(source) The page was last edited by \(Text(verbatim: handle)) \(when).")
+    }
+}
+
+/// Holds the page to exactly the width its scroll view offers it, whatever
+/// width the cards inside come out at.
+///
+/// Taken from the offer and from nothing measured: a vertical scroll view is
+/// as wide as what it holds, so a page given a width measured off it kept it
+/// at whatever width it was caught at, and every measurement after read the
+/// same back — beside a list the page ran under the rail for good after the
+/// Duo was turned, and a sheet first laid out at no width at all stayed
+/// blank. Held to its container instead (`containerRelativeFrame`), a sheet
+/// opened with the Duo upright and then folded stayed as wide as the opened
+/// screen and ran off both sides of the outer one.
+private struct PageWidth: ViewModifier {
+    func body(content: Content) -> some View {
+        content.frame(minWidth: 0, maxWidth: .infinity)
     }
 }
 

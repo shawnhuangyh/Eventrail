@@ -170,8 +170,8 @@ struct FollowingView: View {
             // Events: the tab bar stands down for the actions on what is picked.
             .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
             .toolbar { toolbar }
-            .performerDestination()
-            .eventSheet($openEvent)
+            .venueDestination()
+            .eventPane($openEvent)
             // The tab's own load places a ration of halls, which a list held
             // to areas can outrun: what nothing has placed is under Not Placed
             // until it is. So while the list is held to any, halls go on
@@ -743,6 +743,7 @@ private struct FollowedDateRow: View {
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)
+        .marksEventBeside(event.id)
         .glassPanel()
         .accessibilityElement(children: .contain)
     }

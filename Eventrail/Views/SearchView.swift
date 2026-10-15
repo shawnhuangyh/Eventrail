@@ -69,14 +69,15 @@ struct SearchView: View {
                     controls
                 }
             }
+            // Beside an open iPhone Duo's fold, events or performers is
+            // chosen here rather than in the system's bar — see
+            // ``SearchScopes``. Inside the search field's reach, so it hears
+            // whether the search is up.
+            .safeAreaBar(edge: .top) { BesideFoldScopes(scope: $scope) }
             .washBackground()
             .navigationTitle("Search")
             .searchable(text: $query, prompt: Text("Search Eventernote events"))
-            .searchScopes($scope) {
-                ForEach(SearchScope.allCases) { option in
-                    Text(option.label).tag(option)
-                }
-            }
+            .modifier(SearchScopes(scope: $scope))
             .onSubmit(of: .search) { store.remember(search: term) }
             .navigationDestination(for: SiteListing.self) { listing in
                 switch listing {
@@ -84,8 +85,9 @@ struct SearchView: View {
                 case .justAdded: SiteListingView(listing: listing, filter: $justAddedFilter)
                 }
             }
-            .performerDestination()
-            .eventSheet($openEvent)
+            .venueDestination()
+            // Beside the results on an open iPhone Duo.
+            .eventPane($openEvent)
             .task(id: Request(term: term, scope: scope, filter: filter, order: order)) { await search() }
         }
     }
@@ -503,6 +505,7 @@ struct SearchResultRow: View {
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)
+        .marksEventBeside(event.id)
         .glassPanel()
     }
 }
@@ -662,4 +665,53 @@ struct SearchFailure: View {
 #Preview {
     SearchView()
         .library(EventStore.preview)
+}
+
+/// Events or performers: the system's scope bar under the search field — or,
+/// beside an open iPhone Duo's fold, the same choice over the results
+/// (``BesideFoldScopes``).
+///
+/// The system centres its scope bar across the whole screen, where it ran
+/// over the event open beside the results, and nothing moves it. So there
+/// the system is handed no scopes and the results carry their own, in the
+/// half they choose between. The system's scopes are emptied rather than
+/// taken off, so nothing under them is rebuilt as the Duo opens and folds.
+private struct SearchScopes: ViewModifier {
+    @Environment(\.opensEventsBeside) private var besideFold
+    @Binding var scope: SearchScope
+
+    func body(content: Content) -> some View {
+        content
+            .searchScopes($scope) {
+                if !besideFold {
+                    ForEach(SearchScope.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+            }
+    }
+}
+
+/// Events or performers over the results beside an open iPhone Duo's fold,
+/// shown while the search is up, as the system's scope bar would be. A view
+/// of its own so it can ask whether it is: only what the search field is
+/// attached to is told.
+private struct BesideFoldScopes: View {
+    @Environment(\.opensEventsBeside) private var besideFold
+    @Environment(\.isSearching) private var isSearching
+    @Binding var scope: SearchScope
+
+    var body: some View {
+        if besideFold, isSearching {
+            Picker("Search", selection: $scope) {
+                ForEach(SearchScope.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
 }

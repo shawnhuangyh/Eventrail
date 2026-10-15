@@ -135,7 +135,7 @@ struct ListingHalfView: View {
         // away for its own bar; it stays away until the reader is back past
         // that page, rather than coming back for one screen.
         .toolbar(.hidden, for: .tabBar)
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
     }
 
     /// Pages on while this half is still empty.

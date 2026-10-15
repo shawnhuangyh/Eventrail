@@ -157,7 +157,7 @@ struct SiteListingView: View {
         .navigationSubtitle(listing.detail(on: day))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { menu }
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .task(id: Shown(key: cacheKey, day: day)) { await open() }
         // A list left open while the reader was away is owed the check it
         // made as it opened — and today's is owed the day it now is.

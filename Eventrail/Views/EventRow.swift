@@ -168,6 +168,7 @@ struct LibraryRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .marksEventBeside(event.id)
         .glassPanel(interactive: true)
         .accessibilityHint("Opens the event")
     }
@@ -210,6 +211,9 @@ struct AppearanceRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        // A row inside its page's card rather than a card of its own, so
+        // marked a little in from the card's edge.
+        .marksEventBeside(event.id, cornerRadius: 20)
         .accessibilityHint("Opens the event")
     }
 }

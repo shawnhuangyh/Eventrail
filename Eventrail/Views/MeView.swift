@@ -47,23 +47,16 @@ struct MeView: View {
     private var handle: String? { settingsRows.first?.account }
     private var profile: LinkedProfile? { handle == nil ? nil : settingsRows.first?.eventernoteProfile }
 
+    /// Where the iPhone Duo's fold crosses the screen — see ``cards``.
+    @State private var fold: Fold?
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    accountCard
-                    onThisDayCard
-                    passportCard
-                    lotteriesCard
-                    favoritesCard
-                    followingCard
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
+            cards
+            .readingFold(into: $fold)
             .washBackground()
             .navigationTitle("Me")
-            .performerDestination()
+            .venueDestination()
             .navigationDestination(for: PassportLink.self) { _ in EventPassportView() }
             .navigationDestination(for: MeList.self) { list in
                 switch list {
@@ -94,6 +87,103 @@ struct MeView: View {
             }
         }
     }
+
+    // MARK: - The cards, around the fold
+
+    private static let verticalPadding: CGFloat = 10
+    private static let spacing: CGFloat = 14
+
+    /// The six cards in one scrolling column — or, on an open iPhone Duo,
+    /// laid out around the fold.
+    ///
+    /// With the fold running down the screen, the Duo open on its side, each
+    /// half is a column scrolling on its own, as the Passport's pages do: the
+    /// account, today's memories and the Passport in the one before it, under
+    /// the title, the three lists in the one after, from the top of the
+    /// screen — and so laid out last and first (``FoldSplitLayout``). One
+    /// scroll view under both, as they were, carried the short column along
+    /// with the long one. With the Duo turned and the fold running across:
+    /// the account and the Passport full width and at their own heights, as
+    /// on an iPhone, then the rest two by two, each list sampling fewer rows,
+    /// one run of cards with nothing held back for the fold. Not
+    /// `DuoTurnedMe.dc.html`'s two cards side by side stretched to the fold,
+    /// which left both mostly empty glass, nor a gap kept over the fold,
+    /// which read as a hole.
+    @ViewBuilder
+    private var cards: some View {
+        switch fold {
+        case let fold? where fold.axis == .vertical:
+            FoldSplitLayout(fold: fold) {
+                column {
+                    lotteriesCard
+                    favoritesCard
+                    followingCard
+                }
+                .castingShadowsToTheFold()
+                .standingAfterTheFold()
+                column {
+                    accountCard
+                    onThisDayCard
+                    passportCard
+                }
+                .castingShadowsToTheFold()
+            }
+        case .some:
+            let hasMemories = !onThisDay.memories.isEmpty
+            ScrollView {
+                VStack(spacing: 12) {
+                    accountCard
+                    passportCard
+                    // On a day with no memories the followed performers take
+                    // a row of their own rather than leave a hole beside them.
+                    Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                        GridRow {
+                            if hasMemories { onThisDayCard } else { lotteriesCard }
+                            if hasMemories { lotteriesCard } else { favoritesCard }
+                        }
+                        GridRow {
+                            if hasMemories {
+                                favoritesCard
+                                followingCard
+                            } else {
+                                followingCard.gridCellColumns(2)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, Self.verticalPadding)
+            }
+        case nil:
+            column {
+                accountCard
+                onThisDayCard
+                passportCard
+                lotteriesCard
+                favoritesCard
+                followingCard
+            }
+        }
+    }
+
+    /// A scrolling column of cards.
+    private func column(@ViewBuilder _ cards: () -> some View) -> some View {
+        ScrollView {
+            VStack(spacing: Self.spacing) { cards() }
+                .padding(.horizontal, 16)
+                .padding(.vertical, Self.verticalPadding)
+        }
+    }
+
+    /// Whether the cards stand in a grid either side of a fold that runs
+    /// across the screen, each as tall as the tallest beside it and sampling
+    /// fewer rows.
+    private var isGrid: Bool { fold?.axis == .horizontal }
+
+    /// How tall a card's panel is drawn: as tall as its row in the grid, as
+    /// tall as it needs everywhere else. Before the glass, so the panel grows
+    /// with it.
+    private var cardHeight: CGFloat? { isGrid ? .infinity : nil }
 
     // MARK: - The account, and the one thing it is for
 
@@ -175,6 +265,10 @@ struct MeView: View {
                     }
             }
         }
+        // At its own height inside a taller panel: the Refresh button reaches
+        // for the height it is offered, and spread the rows apart.
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxHeight: cardHeight, alignment: .top)
         .glassPanel(cornerRadius: 28)
     }
 
@@ -330,10 +424,14 @@ struct MeView: View {
     /// and there is nothing the reader could do to fill this one today.
     @ViewBuilder
     private var onThisDayCard: some View {
-        let today = OnThisDay(events: library) { store.tracking(for: $0) }
+        let today = onThisDay
         if !today.memories.isEmpty {
-            OnThisDayCard(onThisDay: today, limit: Self.cardLimit)
+            OnThisDayCard(onThisDay: today, limit: isGrid ? 2 : Self.cardLimit, height: cardHeight)
         }
+    }
+
+    private var onThisDay: OnThisDay {
+        OnThisDay(events: library) { store.tracking(for: $0) }
     }
 
     // MARK: - The Passport
@@ -368,6 +466,7 @@ struct MeView: View {
                 }
             }
             .padding(16)
+            .frame(maxHeight: cardHeight, alignment: .top)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -453,7 +552,7 @@ struct MeView: View {
                     .padding(.bottom, 16)
             } else {
                 VStack(spacing: 0) {
-                    let shown = Array(waiting.prefix(Self.lotteryLimit))
+                    let shown = Array(waiting.prefix(isGrid ? 2 : Self.lotteryLimit))
                     ForEach(Array(shown.enumerated()), id: \.element.id) { index, row in
                         LotteryCardRow(row: row, showsDivider: index > 0) {
                             openEvent = row.event
@@ -463,6 +562,7 @@ struct MeView: View {
                 .padding(.bottom, 6)
             }
         }
+        .frame(maxHeight: cardHeight, alignment: .top)
         .glassPanel()
     }
 
@@ -493,7 +593,7 @@ struct MeView: View {
                     .padding(.bottom, 16)
             } else {
                 VStack(spacing: 0) {
-                    let shown = Array(favorites.prefix(Self.cardLimit))
+                    let shown = Array(favorites.prefix(isGrid ? 2 : Self.cardLimit))
                     ForEach(Array(shown.enumerated()), id: \.element.id) { index, event in
                         FavoriteEventRow(event: event, showsDivider: index > 0) {
                             openEvent = event
@@ -503,6 +603,7 @@ struct MeView: View {
                 .padding(.bottom, 6)
             }
         }
+        .frame(maxHeight: cardHeight, alignment: .top)
         .glassPanel()
     }
 
@@ -537,7 +638,7 @@ struct MeView: View {
                     .padding(.bottom, 16)
             } else {
                 VStack(spacing: 0) {
-                    let shown = Array(performers.prefix(Self.cardLimit))
+                    let shown = Array(performers.prefix(isGrid ? 3 : Self.cardLimit))
                     ForEach(Array(shown.enumerated()), id: \.element.id) { index, performer in
                         FollowedPerformerRow(performer: performer, showsDivider: index > 0)
                     }
@@ -545,6 +646,7 @@ struct MeView: View {
                 .padding(.bottom, 6)
             }
         }
+        .frame(maxHeight: cardHeight, alignment: .top)
         .glassPanel()
     }
 

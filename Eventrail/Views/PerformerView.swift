@@ -118,7 +118,7 @@ struct PerformerView: View {
         // The bar takes the foot of the screen over, as an event's sheet
         // has it: the tab bar stands down while the page is up.
         .toolbar(.hidden, for: .tabBar)
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .task { await open() }
         // A page left open while the reader was away is owed the check it
         // made as it opened: past the window, it reads again.
