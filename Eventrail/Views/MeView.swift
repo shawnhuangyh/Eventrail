@@ -112,6 +112,8 @@ struct MeView: View {
     /// which read as a hole.
     @ViewBuilder
     private var cards: some View {
+        // Once a drawing, over the whole library: read twice in the grid.
+        let today = onThisDay
         switch fold {
         case let fold? where fold.axis == .vertical:
             FoldSplitLayout(fold: fold) {
@@ -124,13 +126,13 @@ struct MeView: View {
                 .standingAfterTheFold()
                 column {
                     accountCard
-                    onThisDayCard
+                    onThisDayCard(today)
                     passportCard
                 }
                 .castingShadowsToTheFold()
             }
         case .some:
-            let hasMemories = !onThisDay.memories.isEmpty
+            let hasMemories = !today.memories.isEmpty
             ScrollView {
                 VStack(spacing: 12) {
                     accountCard
@@ -139,7 +141,7 @@ struct MeView: View {
                     // a row of their own rather than leave a hole beside them.
                     Grid(horizontalSpacing: 12, verticalSpacing: 12) {
                         GridRow {
-                            if hasMemories { onThisDayCard } else { lotteriesCard }
+                            if hasMemories { onThisDayCard(today) } else { lotteriesCard }
                             if hasMemories { lotteriesCard } else { favoritesCard }
                         }
                         GridRow {
@@ -158,7 +160,7 @@ struct MeView: View {
         case nil:
             column {
                 accountCard
-                onThisDayCard
+                onThisDayCard(today)
                 passportCard
                 lotteriesCard
                 favoritesCard
@@ -424,8 +426,7 @@ struct MeView: View {
     /// standing there empty: the other cards' empty notes say how to fill them,
     /// and there is nothing the reader could do to fill this one today.
     @ViewBuilder
-    private var onThisDayCard: some View {
-        let today = onThisDay
+    private func onThisDayCard(_ today: OnThisDay) -> some View {
         if !today.memories.isEmpty {
             OnThisDayCard(onThisDay: today, limit: isGrid ? 2 : Self.cardLimit, height: cardHeight)
         }

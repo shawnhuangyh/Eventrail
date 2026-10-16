@@ -113,6 +113,10 @@ struct EventDetailView: View {
     @Environment(\.verticalBarEdge) private var verticalBarEdge
     /// Empties the half the page stands in beside a list.
     @Environment(\.closeEventBeside) private var closeBeside
+    /// Where this page says it has a sheet of its own up, for the screen it
+    /// stands in to hold its layout still meanwhile — see ``holdsSheet``.
+    @Environment(\.eventSheetsHold) private var sheetsHold
+    @State private var holdID = UUID()
 
     /// How the event is put in front of the reader.
     enum Presentation {
@@ -175,19 +179,25 @@ struct EventDetailView: View {
     /// design draws them — under a close button in a capsule of its own, as
     /// the sheet's heads the rail (``closeItem``). Closed, the half is empty
     /// until another row is chosen.
+    ///
+    /// Tucked away out of sight — the screen gone whole while this holds a
+    /// sheet up, see ``View/eventPane(_:)`` — it is handed no close button,
+    /// and puts nothing in the bar.
     private var pane: some View {
         detail
             .toolbar {
                 if let closeBeside {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Close", systemImage: "xmark", action: closeBeside)
+                        Button("Close", systemImage: "xmark") { closeBeside() }
                             .tint(.primary)
                     }
                     ToolbarSpacer(.fixed, placement: .primaryAction)
+                    ToolbarItemGroup(placement: .primaryAction) { actions }
                 }
-                ToolbarItemGroup(placement: .primaryAction) { actions }
             }
-            .advertisesHandoff(of: event)
+            // Beneath any sheet over the list: an event opened over it from
+            // outside the app is the one in front.
+            .advertisesHandoff(of: event, beneathSheets: true)
     }
 
     private var sheet: some View {
@@ -265,12 +275,16 @@ struct EventDetailView: View {
             }
         }
         .washBackground()
-        .sheet(isPresented: $isEditingTicket) {
+        .sheet(isPresented: $isEditingTicket, onDismiss: releaseHold) {
             TicketDetailsView(event: event, tracking: store.tracking(for: event))
         }
-        .sheet(isPresented: $isMakingStub) {
+        .sheet(isPresented: $isMakingStub, onDismiss: releaseHold) {
             TicketStubView(event: event)
         }
+        .onChange(of: holdsSheet) { _, holds in
+            if holds { sheetsHold?.set(holdID, holding: true) }
+        }
+        .onDisappear { sheetsHold?.set(holdID, holding: false) }
         #if DEBUG
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)
@@ -479,6 +493,21 @@ struct EventDetailView: View {
             .buttonStyle(.plain)
             .accessibilityHint("Opens the venue")
         }
+    }
+
+    /// Whether this page has a sheet of its own up that a change of the
+    /// screen's layout would take away with it — Ticket Details, which writes
+    /// nothing until its checkmark, and the ticket stub. Said to the screen
+    /// (``EventSheetsHold``), which holds the page where it is meanwhile.
+    private var holdsSheet: Bool { isEditingTicket || isMakingStub }
+
+    /// Lets the screen move this page again, once the last of its sheets has
+    /// gone — gone, not going: let go of as it began to go, the screen put
+    /// this page's own sheet away in the same moment, which SwiftUI does not
+    /// do while another dismissal is under way, and the sheet stayed up with
+    /// nothing presenting it.
+    private func releaseHold() {
+        if !holdsSheet { sheetsHold?.set(holdID, holding: false) }
     }
 
     /// Whether the close button floats over the top of the page, as it does

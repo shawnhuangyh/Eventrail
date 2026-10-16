@@ -71,6 +71,12 @@ extension EnvironmentValues {
     /// halves either side of the iPhone Duo's fold and each half draws its own
     /// wash — set by ``View/eventPane(_:)``. Nil everywhere else,
     /// where a wash is drawn to its own frame.
+    ///
+    /// A sheet presented from inside a parted screen inherits it, and a wash
+    /// drawn in that sheet would be the middle of the screen's picture rather
+    /// than its own. None does today — every list's sheets hang outside its
+    /// ``View/eventPane(_:)``, and the page's own draw no wash — but one that
+    /// does should set it back to nil.
     @Entry var washCanvas: CGRect?
 }
 

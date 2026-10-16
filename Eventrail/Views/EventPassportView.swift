@@ -138,6 +138,21 @@ struct EventPassportView: View {
     @State private var pagesUnderBar: Set<PassportPage> = []
     /// The drawer open beside the fold, over the Duo's two pages.
     @State private var drawers = PassportDrawers()
+    /// The sheets an event opened from here has up over itself — Ticket
+    /// Details, the stub — and whether the drawers stood beside the fold as
+    /// the first went up: held there until the last is put away. A drawer
+    /// going as the Duo folds or opens took the event's sheet opened from it
+    /// along, and Ticket Details with it — see ``EventSheetsHold``.
+    @State private var sheetsHold = EventSheetsHold()
+    @State private var heldBeside: Bool?
+    /// Whether a drawer opens beside the fold, as a panel over the second
+    /// page: where the screen is two pages, or was as an event opened from
+    /// a drawer put a sheet up.
+    private var drawersBeside: Bool { heldBeside ?? isBook }
+    /// Whether the screen is laid out as two pages: two pages to lay out, and
+    /// the drawers beside the fold. A screen parted while an event opened from
+    /// a drawer's sheet holds a sheet up stays one page until it is put away.
+    private var showsBook: Bool { isBook && drawersBeside }
 
     /// How much of each ranked list a card shows before sending the rest to a
     /// screen of its own — the same five the Me tab's cards show, for the same
@@ -176,7 +191,7 @@ struct EventPassportView: View {
     var body: some View {
         let stats = self.stats
         Group {
-            if let fold, isBook {
+            if let fold, showsBook {
                 // Two pages, as `DuoBookPassport.dc.html` draws the Duo held
                 // like a book: where the reader went and who and where most
                 // on the one before the fold, under the title, and how the
@@ -221,7 +236,7 @@ struct EventPassportView: View {
         // the scrolling content, where the year bar inset lands on top of it.
         // Large over the Duo's two, where the bar holds the title alone and
         // the board heads the first page with it.
-        .navigationBarTitleDisplayMode(isBook ? .large : .inline)
+        .navigationBarTitleDisplayMode(showsBook ? .large : .inline)
         .task(id: store.revision) { readPlacings() }
         .task(id: needsRates) {
             if needsRates { await ExchangeRates.shared.refreshIfStale() }
@@ -261,19 +276,29 @@ struct EventPassportView: View {
         // the fold, rather than as a sheet across it — see
         // ``View/passportDrawer(item:content:)``. Outside every drawer above,
         // so each can hand its drawer up through the environment.
-        .environment(\.passportDrawers, isBook ? drawers : nil)
-        .environment(\.holdsPassportSheets, isOpening || !isShown)
+        .environment(\.passportDrawers, drawersBeside ? drawers : nil)
+        // Nothing held back while an event opened from a drawer holds a sheet
+        // up: put away, the drawer's sheet would take it along.
+        .environment(\.holdsPassportSheets, heldBeside == nil && (isOpening || !isShown))
         .overlay {
             ZStack {
-                if let drawer = drawers.open, let fold, isBook {
-                    PassportDrawerPanel(drawer: drawer, fold: fold)
+                // Out of sight, rather than gone, while the screen is one page
+                // and an event opened from the panel holds a sheet up.
+                if let drawer = drawers.open, drawersBeside {
+                    PassportDrawerPanel(drawer: drawer, fold: fold, isTucked: !showsBook)
                 }
             }
             .animation(.snappy, value: drawers.open?.id)
         }
+        // Outside the drawers, their sheets and the panel, so an event's
+        // page opened from any of them says here.
+        .environment(\.eventSheetsHold, sheetsHold)
+        .onChange(of: sheetsHold.isHeld) { _, isHeld in
+            heldBeside = isHeld ? drawersBeside : nil
+        }
         // Folded, an open drawer is its presenter's sheet again; whatever is
         // open as the Duo opens is handed back here.
-        .onChange(of: isBook) { if !isBook { drawers.open = nil } }
+        .onChange(of: drawersBeside) { if !drawersBeside { drawers.open = nil } }
     }
 
     // MARK: - The pages
@@ -316,14 +341,14 @@ struct EventPassportView: View {
             places(stats)
             rankings(stats)
         }
-        .modifier(PageUnderBar(page: PassportPage.first, pages: $pagesUnderBar))
+        .modifier(PageUnderBar(page: PassportPage.first, pages: $pagesUnderBar, isTracking: barEdge == nil))
         .castingShadowsToTheFold()
     }
 
     /// The page after the fold: how the tickets were had.
     private func secondPage(_ stats: PassportStats) -> some View {
         page { tickets(stats) }
-            .modifier(PageUnderBar(page: PassportPage.second, pages: $pagesUnderBar))
+            .modifier(PageUnderBar(page: PassportPage.second, pages: $pagesUnderBar, isTracking: barEdge == nil))
             .castingShadowsToTheFold()
             .standingAfterTheFold(underTheBar: true)
     }
@@ -469,7 +494,7 @@ struct EventPassportView: View {
                 // Wider over the Duo's first page, in the board's proportion:
                 // square there, the map alone filled the screen's height.
                 // The whole country still fits — with more sea either side.
-                .aspectRatio(isBook ? 439 / 290 : 1 / 0.98, contentMode: .fit)
+                .aspectRatio(showsBook ? 439 / 290 : 1 / 0.98, contentMode: .fit)
                 .overlay(alignment: .bottomTrailing) {
                     // Both in the one corner, on the map rather than under it:
                     // they are readings of the map, and the figures below are
@@ -1291,12 +1316,18 @@ private struct PassportRankingSheet: View {
 private struct PageUnderBar<Page: Hashable>: ViewModifier {
     let page: Page
     @Binding var pages: Set<Page>
+    /// Whether there is a band to show: on an iPad, not on the Duo.
+    let isTracking: Bool
 
     func body(content: Content) -> some View {
-        content.onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top > 0.5
-        } action: { _, isUnder in
-            if isUnder { pages.insert(page) } else { pages.remove(page) }
+        if isTracking {
+            content.onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top > 0.5
+            } action: { _, isUnder in
+                if isUnder { pages.insert(page) } else { pages.remove(page) }
+            }
+        } else {
+            content
         }
     }
 }
@@ -1310,7 +1341,7 @@ extension EnvironmentValues {
     @Entry var passportDrawers: PassportDrawers?
     /// How a drawer drawn beside the fold is put away — set on the drawer
     /// there, and nil in a sheet, which is dismissed.
-    @Entry var closesPassportDrawer: (() -> Void)?
+    @Entry var closesPassportDrawer: EnvironmentAction?
     /// Whether a drawer's sheet is held back: while the Duo opens, until the
     /// fold says whether the drawer is a panel there, and while the Passport
     /// is out of sight — set by the Passport.
@@ -1354,7 +1385,7 @@ struct PassportDrawer {
     /// Which presenter opened it, so only that one puts it away.
     let owner: UUID
     let content: AnyView
-    let close: () -> Void
+    let close: EnvironmentAction
 }
 
 private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewModifier {
@@ -1371,6 +1402,8 @@ private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewMo
     /// and a sheet put away as the Duo opened would have emptied the panel
     /// that took its drawer over.
     @State private var sheetItem: Item?
+    /// Whether a sheet this put away has yet to say so — see ``sheetBinding``.
+    @State private var awaitsReceipt = false
 
     /// What decides whether there is a drawer to hand over.
     private struct Handing: Equatable {
@@ -1395,15 +1428,33 @@ private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewMo
             .onDisappear {
                 if drawers?.open?.owner == owner { drawers?.open = nil }
             }
+            // A receipt that never comes is not waited for long.
+            .task(id: awaitsReceipt) {
+                guard awaitsReceipt else { return }
+                try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled else { return }
+                awaitsReceipt = false
+                withTransaction(\.disablesAnimations, true) { hand() }
+            }
     }
 
     /// The sheet's item, which SwiftUI empties as a sheet goes: only where a
-    /// sheet is up does that put the drawer away.
+    /// sheet is up does that put the drawer away. Where this put it away
+    /// itself, the nil is SwiftUI saying so, up to a second later — and a
+    /// sheet brought back meanwhile would take it for the reader putting that
+    /// one away. So a sheet put away here is brought back only once its nil
+    /// has come, as an event's sheet beside a list is (``View/eventPane(_:)``).
     private var sheetBinding: Binding<Item?> {
         Binding {
             sheetItem
         } set: { new in
-            guard new == nil, sheetItem != nil else { return }
+            guard new == nil else { return }
+            if awaitsReceipt {
+                awaitsReceipt = false
+                withTransaction(\.disablesAnimations, true) { hand() }
+                return
+            }
+            guard sheetItem != nil else { return }
             sheetItem = nil
             item = nil
         }
@@ -1411,18 +1462,28 @@ private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewMo
 
     private func hand() {
         guard let drawers else {
-            sheetItem = holdsSheet ? nil : item
+            showSheet(holdsSheet ? nil : item)
             return
         }
-        sheetItem = nil
+        showSheet(nil)
         if let item {
             let binding = $item
             drawers.open = PassportDrawer(id: AnyHashable(item.id), owner: owner,
-                                          content: AnyView(drawer(item))) {
-                binding.wrappedValue = nil
-            }
+                                          content: AnyView(drawer(item)),
+                                          close: EnvironmentAction(id: UUID()) { binding.wrappedValue = nil })
         } else if drawers.open?.owner == owner {
             drawers.open = nil
+        }
+    }
+
+    /// Puts `item` up as the sheet, or the sheet away — and nothing up again
+    /// until the one put away has said so (``sheetBinding``).
+    private func showSheet(_ item: Item?) {
+        if item == nil {
+            if sheetItem != nil { awaitsReceipt = true }
+            sheetItem = nil
+        } else if !awaitsReceipt {
+            sheetItem = item
         }
     }
 }
@@ -1439,7 +1500,11 @@ private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewMo
 private struct PassportDrawerPanel: View {
     @Environment(\.verticalBarEdge) private var barEdge
     let drawer: PassportDrawer
-    let fold: Fold
+    /// The fold it opens beside — nil while it is tucked away.
+    let fold: Fold?
+    /// Whether it is out of sight: the screen gone back to one page while an
+    /// event opened from it holds a sheet up, which would go with it.
+    let isTucked: Bool
 
     /// How far the panel has been pulled down by its top.
     @State private var pull: CGFloat = 0
@@ -1453,7 +1518,7 @@ private struct PassportDrawerPanel: View {
             Self.dim.opacity(0.18)
                 .ignoresSafeArea()
                 .contentShape(.rect)
-                .onTapGesture(perform: drawer.close)
+                .onTapGesture { drawer.close() }
                 .accessibilityHidden(true)
                 .transition(.opacity)
 
@@ -1468,7 +1533,7 @@ private struct PassportDrawerPanel: View {
                         .shadow(color: Self.dim.opacity(0.2), radius: 20, y: -10)
                 }
                 .offset(y: pull)
-                .padding(.leading, fold.frame.maxX)
+                .padding(.leading, fold?.frame.maxX ?? 0)
                 .padding(.trailing, 8)
                 // From the top of the screen, as the board draws it — or from
                 // under the bar, without the rail — and down past the home
@@ -1476,9 +1541,13 @@ private struct PassportDrawerPanel: View {
                 .padding(.top, barEdge != nil ? 40 : 8)
                 .ignoresSafeArea(.container, edges: barEdge != nil ? [.top, .bottom] : .bottom)
                 .accessibilityAddTraits(.isModal)
-                .accessibilityAction(.escape, drawer.close)
+                .accessibilityAction(.escape) { drawer.close() }
                 .transition(.move(edge: .bottom))
         }
+        // There still, so whatever was opened from it stays up.
+        .opacity(isTucked ? 0 : 1)
+        .allowsHitTesting(!isTucked)
+        .accessibilityHidden(isTucked)
     }
 
     /// The handle a sheet carries, and the strip under it a pull starts on.

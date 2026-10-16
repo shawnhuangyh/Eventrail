@@ -109,12 +109,23 @@ extension View {
     /// half, or brought up as the half goes — happens at once rather than as
     /// a second animation after the system's. Seen sliding away on the opened
     /// screen, the sheet read as the event being closed and opened again.
+    ///
+    /// Measured as if the keyboard were not up. A view makes room for the
+    /// keyboard by growing shorter, and an iPad held upright with the
+    /// keyboard taking a third of its height is left with a view wider than
+    /// it is tall — parted as if on its side the moment a search field or a
+    /// ticket's note was tapped, which put the event's sheet away with the
+    /// ticket being written in it.
     func readingFold(into fold: Binding<Fold?>) -> some View {
         let partsWideViews = UIDevice.current.userInterfaceIdiom == .pad
-        return onGeometryChange(for: Fold?.self) {
-            Fold.crossing($0, partsWideViews: partsWideViews)
-        } action: { new in
-            withTransaction(\.disablesAnimations, true) { fold.wrappedValue = new }
+        return background {
+            Color.clear
+                .ignoresSafeArea(.keyboard)
+                .onGeometryChange(for: Fold?.self) {
+                    Fold.crossing($0, partsWideViews: partsWideViews)
+                } action: { new in
+                    withTransaction(\.disablesAnimations, true) { fold.wrappedValue = new }
+                }
         }
     }
 }

@@ -94,7 +94,13 @@ struct EventsView: View {
             // Nothing is left selected behind a filter that no longer shows it,
             // and nothing survives leaving the mode that picked it.
             .onChange(of: filter) { selection.removeAll() }
-            .onChange(of: isSelecting) { selection.removeAll() }
+            .onChange(of: isSelecting) {
+                selection.removeAll()
+                // Picking takes the screen over, beside the fold too: the event
+                // open beside the list goes, rather than keep its own buttons in
+                // the bar beside the picking's, or stay up once picked and removed.
+                if isSelecting { openEvent = nil }
+            }
             // Read again as the sheet closes, against the copy the sheet has
             // just read: the row was marked as it stood when tapped, and a
             // page that had changed since would otherwise come back Updated

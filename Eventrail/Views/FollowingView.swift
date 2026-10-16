@@ -200,7 +200,13 @@ struct FollowingView: View {
             // Turning the filter off lets go of what it was keeping, and
             // turning it back on starts from what is unread now.
             .onChange(of: unreadOnly) { readWhileFiltering.removeAll() }
-            .onChange(of: isSelecting) { selection.removeAll() }
+            .onChange(of: isSelecting) {
+                selection.removeAll()
+                // Picking takes the screen over, beside the fold too: the event
+                // open beside the list goes, rather than keep its own buttons in
+                // the bar beside the picking's, or stay up once picked and removed.
+                if isSelecting { openEvent = nil }
+            }
             // Nothing stays picked behind a filter that no longer shows it.
             .onChange(of: shownIDs) { _, shown in selection.formIntersection(shown) }
             .environment(\.imagesCheckedSince, imagesCheckedSince)
