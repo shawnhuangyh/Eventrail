@@ -450,6 +450,26 @@ struct TrackingTests {
         #expect(saved.price == Money(amount: 9900, currency: "TWD"))
     }
 
+    /// The sheet's copy of the list is laid over the list as it stands
+    /// round by round: a round another device added while it was open stays,
+    /// and the sheet's own additions, changes and removals all land.
+    @Test func aSavedCopyKeepsARoundAddedElsewhereMeanwhile() {
+        let kept = LotteryEntry(round: "最速先行抽選", applications: 2)
+        let dropped = LotteryEntry(round: "プレイガイド先行")
+        let opened = Tracking(lotteries: [kept, dropped])
+        var copy = opened
+        copy.lotteries[0].result = .lost
+        copy.lotteries.remove(at: 1)
+        let added = LotteryEntry(round: "プレイガイド二次先行")
+        copy.lotteries.append(added)
+        let elsewhere = LotteryEntry(round: "一般発売")
+        let now = Tracking(lotteries: [kept, dropped, elsewhere])
+
+        let saved = now.applying(changesFrom: opened, to: copy)
+        #expect(saved.lotteries.map(\.id) == [kept.id, elsewhere.id, added.id])
+        #expect(saved.lotteries.first?.result == .lost)
+    }
+
     @Test func anUnchangedCopyChangesNothing() {
         let opened = Tracking(seat: "A1")
         let now = Tracking(seat: "C3", note: "b")

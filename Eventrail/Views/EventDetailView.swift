@@ -13,6 +13,9 @@ import Translation
 ///
 /// A sheet opened from a search row starts with only what the row printed, and
 /// imports the event's own page for the rest.
+///
+/// Beside a list on an open iPhone Duo it is no sheet but a page of the
+/// list's own — see ``Presentation/pane``.
 struct EventDetailView: View {
     @Environment(EventStore.self) private var store
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
@@ -105,9 +108,34 @@ struct EventDetailView: View {
     }
 
     @Environment(\.openURL) private var openURL
+    /// Where the system keeps its vertical bar, on an iPhone Duo — where the
+    /// sheet's close button joins its actions. See ``closeItem``.
+    @Environment(\.verticalBarEdge) private var verticalBarEdge
+    /// Empties the half the page stands in beside a list.
+    @Environment(\.closeEventBeside) private var closeBeside
+    /// Where this page says it has a sheet of its own up, for the screen it
+    /// stands in to hold its layout still meanwhile — see ``holdsSheet``.
+    @Environment(\.eventSheetsHold) private var sheetsHold
+    @State private var holdID = UUID()
 
-    init(event: Event) {
+    /// How the event is put in front of the reader.
+    enum Presentation {
+        /// A sheet over the screen it was opened from, with a stack of its own
+        /// for the performers and the hall it pushes.
+        case sheet
+        /// The half of an open iPhone Duo, or of an iPad on its side, beside
+        /// the list it was opened from — see ``SwiftUI/View/eventPane(_:)``.
+        /// No stack of its own: what it pushes goes on the list's, and its
+        /// actions join the list's bar, under a close button that empties
+        /// the half.
+        case pane
+    }
+
+    private let presentation: Presentation
+
+    init(event: Event, presentation: Presentation = .sheet) {
         source = event
+        self.presentation = presentation
     }
 
     /// The fullest copy the app holds. An import lands in the store, so reading
@@ -140,6 +168,39 @@ struct EventDetailView: View {
     }
 
     var body: some View {
+        switch presentation {
+        case .sheet: sheet
+        case .pane: pane
+        }
+    }
+
+    /// Beside the list, in the list's own stack: the page, and its actions in
+    /// the list's bar — on the Duo, the top of the system's rail, where the
+    /// design draws them — under a close button in a capsule of its own, as
+    /// the sheet's heads the rail (``closeItem``). Closed, the half is empty
+    /// until another row is chosen.
+    ///
+    /// Tucked away out of sight — the screen gone whole while this holds a
+    /// sheet up, see ``View/eventPane(_:)`` — it is handed no close button,
+    /// and puts nothing in the bar.
+    private var pane: some View {
+        detail
+            .toolbar {
+                if let closeBeside {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Close", systemImage: "xmark") { closeBeside() }
+                            .tint(.primary)
+                    }
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
+                    ToolbarItemGroup(placement: .primaryAction) { actions }
+                }
+            }
+            // Beneath any sheet over the list: an event opened over it from
+            // outside the app is the one in front.
+            .advertisesHandoff(of: event, beneathSheets: true)
+    }
+
+    private var sheet: some View {
         // A stack of its own, so a performer billed here — or the hall it is
         // held at — opens inside this sheet rather than dismissing it. The
         // sheet's own chrome is the close button and the action bar, so the
@@ -198,27 +259,32 @@ struct EventDetailView: View {
                 // event's times and not another's — and a stack any wider than
                 // its scroll view let that sheet be dragged sideways as well as
                 // up and down.
-                .containerRelativeFrame(.horizontal)
-                // Clear of the close button, which floats over the top of it.
-                .padding(.top, 64)
+                .modifier(PageWidth())
+                .padding(.top, topInset)
                 .padding(.bottom, 32)
             }
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea(edges: presentation == .sheet ? .top : [])
             // No pull: a pull down from the top of a sheet is how it is put
             // away. The page is read again from Refresh in the menu instead —
             // see ``RefreshMenuItem``.
 
-            closeButton
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+            if floatsCloseButton {
+                closeButton
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+            }
         }
         .washBackground()
-        .sheet(isPresented: $isEditingTicket) {
+        .sheet(isPresented: $isEditingTicket, onDismiss: releaseHold) {
             TicketDetailsView(event: event, tracking: store.tracking(for: event))
         }
-        .sheet(isPresented: $isMakingStub) {
+        .sheet(isPresented: $isMakingStub, onDismiss: releaseHold) {
             TicketStubView(event: event)
         }
+        .onChange(of: holdsSheet) { _, holds in
+            if holds { sheetsHold?.set(holdID, holding: true) }
+        }
+        .onDisappear { sheetsHold?.set(holdID, holding: false) }
         #if DEBUG
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)
@@ -333,14 +399,14 @@ struct EventDetailView: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(event.title)
-                    .font(.system(size: 20, weight: .bold))
+                    .scalingFont(size: 20, weight: .bold)
                     .kerning(-0.2)
                     .fixedSize(horizontal: false, vertical: true)
                 // An already-formatted date, so it is shown as given rather
                 // than as a localizable key. The day alone: the times are the
                 // timeline's, a card below.
                 Text(verbatim: shown.longDateLine)
-                    .font(.system(size: 13, weight: .medium))
+                    .scalingFont(size: 13, weight: .medium)
                     .foregroundStyle(.secondary)
                 venueLine
             }
@@ -410,7 +476,7 @@ struct EventDetailView: View {
     private var venueLine: some View {
         if event.venue.isEmpty {
             Text("Venue to be announced")
-                .font(.system(size: 13, weight: .medium))
+                .scalingFont(size: 13, weight: .medium)
                 .foregroundStyle(.secondary)
         } else {
             NavigationLink(value: event.venueLink) {
@@ -418,15 +484,44 @@ struct EventDetailView: View {
                     Text(event.venue)
                         .lineLimit(1)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .scalingFont(size: 9, weight: .bold)
                 }
-                .font(.system(size: 13, weight: .medium))
+                .scalingFont(size: 13, weight: .medium)
                 .foregroundStyle(Color.brandTint)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityHint("Opens the venue")
         }
+    }
+
+    /// Whether this page has a sheet of its own up that a change of the
+    /// screen's layout would take away with it — Ticket Details, which writes
+    /// nothing until its checkmark, and the ticket stub. Said to the screen
+    /// (``EventSheetsHold``), which holds the page where it is meanwhile.
+    private var holdsSheet: Bool { isEditingTicket || isMakingStub }
+
+    /// Lets the screen move this page again, once the last of its sheets has
+    /// gone — gone, not going: let go of as it began to go, the screen put
+    /// this page's own sheet away in the same moment, which SwiftUI does not
+    /// do while another dismissal is under way, and the sheet stayed up with
+    /// nothing presenting it.
+    private func releaseHold() {
+        if !holdsSheet { sheetsHold?.set(holdID, holding: false) }
+    }
+
+    /// Whether the close button floats over the top of the page, as it does
+    /// on a sheet — rather than heading the system's rail, on an iPhone Duo
+    /// (``closeItem``), and rather than not being there at all beside a list.
+    private var floatsCloseButton: Bool {
+        presentation == .sheet && verticalBarEdge == nil
+    }
+
+    /// Where the page starts: clear of the floating close button, or of the
+    /// sheet's grabber where the button has gone to the rail — and under the
+    /// list's bar beside a list, whose safe area already stops below it.
+    private var topInset: CGFloat {
+        if floatsCloseButton { 64 } else if presentation == .sheet { 28 } else { 8 }
     }
 
     /// The way out of the sheet.
@@ -493,7 +588,7 @@ struct EventDetailView: View {
                     // Wraps rather than cutting off where the switch leaves it
                     // too little room: a countdown is no use with its end gone.
                     headline(for: progress, at: now)
-                        .font(.system(size: 20, weight: .bold))
+                        .scalingFont(size: 20, weight: .bold)
                         .kerning(-0.4)
                         .monospacedDigit()
                         .foregroundStyle(tint)
@@ -511,7 +606,7 @@ struct EventDetailView: View {
                 }
                 if let detail = detail(for: progress, at: now) {
                     detail
-                        .font(.system(size: 13, weight: .medium))
+                        .scalingFont(size: 13, weight: .medium)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
@@ -523,26 +618,23 @@ struct EventDetailView: View {
 
             stopsRow(progress, tint: tint)
 
-            HStack(spacing: 10) {
-                Label { runLine } icon: { Image(systemName: "timer") }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineLimit(1)
-                // The head count reads as a number needing a noun, so it says
-                // where it was counted.
-                if let listed = event.listedAttendees {
-                    Label {
-                        Text("\(listed.formatted()) going on Eventernote")
-                            .monospacedDigit()
-                    } icon: {
-                        Image(systemName: "person.2.fill")
-                    }
-                    .foregroundStyle(.tertiary)
-                    // Whole on one line; the run time beside it gives way.
-                    .fixedSize()
+            // Side by side, or one over the other where the reader's text
+            // size leaves no room for both whole: beside the head count, the
+            // run time was cut to "Runs 1…".
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    runLabel.fixedSize()
+                    Spacer(minLength: 0)
+                    attendeesLabel.fixedSize()
                 }
+                VStack(alignment: .leading, spacing: 6) {
+                    runLabel
+                    attendeesLabel
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .labelStyle(FooterLabelStyle())
-            .font(.system(size: 12.5, weight: .medium))
+            .scalingFont(size: 12.5, weight: .medium)
             .foregroundStyle(.secondary)
             .padding(.top, 13)
             .overlay(alignment: .top) {
@@ -634,6 +726,26 @@ struct EventDetailView: View {
         let minutes = max(1, Int((moment.timeIntervalSince(now) / 60).rounded(.up)))
         return Duration.seconds(minutes * 60)
             .formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+    }
+
+    /// How long the event runs, in the timeline card's footer.
+    private var runLabel: some View {
+        Label { runLine } icon: { Image(systemName: "timer") }
+    }
+
+    /// The head count, in the timeline card's footer — a number needing a
+    /// noun, so it says where it was counted.
+    @ViewBuilder
+    private var attendeesLabel: some View {
+        if let listed = event.listedAttendees {
+            Label {
+                Text("\(listed.formatted()) going on Eventernote")
+                    .monospacedDigit()
+            } icon: {
+                Image(systemName: "person.2.fill")
+            }
+            .foregroundStyle(.tertiary)
+        }
     }
 
     /// The dot before the headline, pulsing while the event is under way.
@@ -873,11 +985,11 @@ struct EventDetailView: View {
                 } label: {
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: "text.alignleft")
-                            .font(.system(size: 12, weight: .semibold))
+                            .scalingFont(size: 12, weight: .semibold)
                             .foregroundStyle(.tertiary)
                             .padding(.top, 2)
                         Text(tracking.note)
-                            .font(.system(size: 13))
+                            .scalingFont(size: 13)
                             .foregroundStyle(.secondary)
                             .lineSpacing(2)
                             .multilineTextAlignment(.leading)
@@ -915,17 +1027,17 @@ struct EventDetailView: View {
                     .background(Color(.label), in: .rect(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Ticket Stub")
-                        .font(.system(size: 15, weight: .bold))
+                        .scalingFont(size: 15, weight: .bold)
                     Text(tracking.seat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                          ? "A keepsake image to save or share"
                          : "A keepsake image to share — mask the seat first")
-                        .font(.system(size: 12, weight: .medium))
+                        .scalingFont(size: 12, weight: .medium)
                         .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 15)
@@ -1052,41 +1164,77 @@ struct EventDetailView: View {
     ///
     /// One capsule at the leading edge, as the design draws it, with the space
     /// beside it left empty for the page to show through.
+    ///
+    /// On an iPhone Duo the system draws the bar as part of its rail, down
+    /// the side of the screen, and the close button joins it in a capsule of
+    /// its own above the actions, as `DuoClosedEvent.dc.html` draws it —
+    /// floating over the page, it sat beside the rail rather than in it. The
+    /// rail keeps a bar's items at its foot, where the design has them at its
+    /// head; that is the system's to place.
     @ToolbarContentBuilder
     private var actionBar: some ToolbarContent {
-        ToolbarItemGroup(placement: .bottomBar) {
-            Button {
-                if store.isInLibrary(event) {
-                    isConfirmingRemoval = true
-                } else {
-                    withAnimation(.snappy) { store.toggleLibraryMembership(event) }
-                }
-            } label: {
-                Label(store.isInLibrary(event) ? "Remove from my events" : "Add to my events",
-                      systemImage: store.isInLibrary(event) ? "checkmark" : "plus")
+        if verticalBarEdge != nil {
+            closeItem
+            // Apart from the actions, so it is a capsule of its own.
+            ToolbarSpacer(.flexible, placement: .bottomBar)
+        }
+        ToolbarItemGroup(placement: .bottomBar) { actions }
+        ToolbarSpacer(.flexible, placement: .bottomBar)
+    }
+
+    /// The close button, as a bar item of its own for the rail to carry.
+    private var closeItem: some ToolbarContent {
+        ToolbarItem(placement: .bottomBar) {
+            Button("Close", systemImage: "xmark") { dismiss() }
+                .tint(.primary)
+        }
+    }
+
+    /// Keep it, a Live Activity for it, share it, and the rest behind the
+    /// ellipsis — in the sheet's bar, or in the list's beside a list.
+    @ViewBuilder
+    private var actions: some View {
+        Button {
+            if store.isInLibrary(event) {
+                isConfirmingRemoval = true
+            } else {
+                withAnimation(.snappy) { store.toggleLibraryMembership(event) }
+            }
+        } label: {
+            Label(store.isInLibrary(event) ? "Remove from my events" : "Add to my events",
+                  systemImage: store.isInLibrary(event) ? "checkmark" : "plus")
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
+        .confirmingRemoval(isPresented: $isConfirmingRemoval) {
+            withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
+        }
+
+        if offersLiveActivity, !keepsBarShort {
+            Button(action: toggleLiveActivity) {
+                Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
+                      systemImage: liveActivitySymbol)
                     .contentTransition(.symbolEffect(.replace))
             }
-            .tint(store.isInLibrary(event) ? .trackAttended : .brandTint)
-            .confirmingRemoval(isPresented: $isConfirmingRemoval) {
-                withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }
-            }
+            .tint(liveActivity == .running ? .trackAttended : .brandTint)
+        }
 
-            if offersLiveActivity {
-                Button(action: toggleLiveActivity) {
-                    Label(liveActivity == nil ? "Enable Live Activity" : "Disable Live Activity",
-                          systemImage: liveActivitySymbol)
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .tint(liveActivity == .running ? .trackAttended : .brandTint)
-            }
-
+        if !keepsBarShort {
             ShareLink(item: event.sourceURL)
                 .tint(.brandTint)
-
-            moreMenu
-                .tint(.brandTint)
         }
-        ToolbarSpacer(.flexible, placement: .bottomBar)
+
+        moreMenu
+            .tint(.brandTint)
+    }
+
+    /// Whether the bar keeps to the heart of it — keeping the event, and the
+    /// menu — leaving the clock and Share to the menu, which carries both
+    /// again. Beside a list, where the close button heads the list's bar and
+    /// the list's own buttons follow: on the Duo's rail Following's filter
+    /// and pencil were folded into a second ⋯ to make room for them.
+    private var keepsBarShort: Bool {
+        closeBeside != nil
     }
 
     /// Everything the bar has no room for, and the bar's own actions again,
@@ -1264,7 +1412,7 @@ struct EventDetailView: View {
                 // thing this app adds to it. A translation is linked the same
                 // way, since the addresses are carried through it untouched.
                 Text(shown.linkingURLs)
-                    .font(.system(size: 13))
+                    .scalingFont(size: 13)
                     .tint(Color.brandTint)
                     .foregroundStyle(.secondary)
                     .lineSpacing(2)
@@ -1277,7 +1425,7 @@ struct EventDetailView: View {
                         withAnimation(.snappy) { isSummaryExpanded.toggle() }
                     } label: {
                         Text(isSummaryExpanded ? "Show less" : "Show more")
-                            .font(.system(size: 12.5, weight: .semibold))
+                            .scalingFont(size: 12.5, weight: .semibold)
                             .foregroundStyle(Color.brandTint)
                             .contentShape(.rect)
                     }
@@ -1539,17 +1687,17 @@ struct EventDetailView: View {
         Link(destination: link) {
             HStack(spacing: 12) {
                 Image(systemName: "link")
-                    .font(.system(size: 13, weight: .semibold))
+                    .scalingFont(size: 13, weight: .semibold)
                     .foregroundStyle(Color.brandTint)
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: host(of: link))
-                        .font(.system(size: 13.5, weight: .semibold))
+                        .scalingFont(size: 13.5, weight: .semibold)
                         .lineLimit(1)
                     if let path = trail(of: link) {
                         Text(verbatim: path)
-                            .font(.system(size: 11))
+                            .scalingFont(size: 11)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -1558,7 +1706,7 @@ struct EventDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(.vertical, 9)
@@ -1599,11 +1747,11 @@ struct EventDetailView: View {
                         HStack(spacing: 12) {
                             HStack(alignment: .firstTextBaseline, spacing: 6) {
                                 Text(performer.name)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .scalingFont(size: 14, weight: .semibold)
 
                                 if isFollowed(performer) {
                                     Image(systemName: "person.fill.checkmark")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .scalingFont(size: 12, weight: .semibold)
                                         .foregroundStyle(Color.trackAttended)
                                         .accessibilityLabel("Followed")
                                 }
@@ -1611,7 +1759,7 @@ struct EventDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
+                                .scalingFont(size: 11, weight: .semibold)
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(.horizontal, 6)
@@ -1692,7 +1840,7 @@ struct EventDetailView: View {
                 HStack(spacing: 7) {
                     venueLines
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .scalingFont(size: 11, weight: .semibold)
                         .foregroundStyle(.tertiary)
                 }
                 .contentShape(.rect)
@@ -1704,11 +1852,11 @@ struct EventDetailView: View {
     private var venueLines: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(event.venue.isEmpty ? String(localized: "Venue to be announced") : event.venue)
-                .font(.system(size: 14.5, weight: .semibold))
+                .scalingFont(size: 14.5, weight: .semibold)
                 .fixedSize(horizontal: false, vertical: true)
             if let venueDetail = event.venueDetail {
                 Text(venueDetail)
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1745,13 +1893,30 @@ struct EventDetailView: View {
     }
 }
 
+/// Holds the page to exactly the width its scroll view offers it, whatever
+/// width the cards inside come out at.
+///
+/// Taken from the offer and from nothing measured: a vertical scroll view is
+/// as wide as what it holds, so a page given a width measured off it kept it
+/// at whatever width it was caught at, and every measurement after read the
+/// same back — beside a list the page ran under the rail for good after the
+/// Duo was turned, and a sheet first laid out at no width at all stayed
+/// blank. Held to its container instead (`containerRelativeFrame`), a sheet
+/// opened with the Duo upright and then folded stayed as wide as the opened
+/// screen and ran off both sides of the outer one.
+private struct PageWidth: ViewModifier {
+    func body(content: Content) -> some View {
+        content.frame(minWidth: 0, maxWidth: .infinity)
+    }
+}
+
 /// A small symbol before a line of the timeline card's footer, drawn a step
 /// lighter than the words.
 private struct FooterLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 5) {
             configuration.icon
-                .font(.system(size: 11, weight: .semibold))
+                .scalingFont(size: 11, weight: .semibold)
                 .opacity(0.8)
             configuration.title
         }

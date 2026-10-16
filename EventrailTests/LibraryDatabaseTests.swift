@@ -244,11 +244,11 @@ struct LibraryDatabaseTests {
     }
 
     /// Everything the reader wrote on an event.
+    /// Not the lotteries: those are rows of their own (``LibraryLottery``),
+    /// and an entry neither writes nor folds them.
     let written = LibraryEntry.Answers(
         inLibrary: true, isFavorite: true,
-        tracking: Tracking(seat: "A12", cost: 9000,
-                           lotteries: [LotteryEntry(round: "最速先行抽選", applications: 2, result: .won(nil))],
-                           note: "front row"))
+        tracking: Tracking(seat: "A12", cost: 9000, note: "front row", currency: "JPY"))
 
     /// A device set up afresh imports the linked account before iCloud has
     /// brought it the entry holding the reader's note: its own entry says
@@ -301,59 +301,166 @@ struct LibraryDatabaseTests {
     }
 
     /// A cost an older build wrote is whole yen in the old column. It reads
-    /// back as yen, and the next write moves it into the two new columns
-    /// rather than leaving it to be read back over an emptied cost.
-    @Test func aCostInTheOldColumnIsYenAndMovesOnTheNextWrite() throws {
+    /// back as yen; a note edited beside it leaves it where it is, and a
+    /// change to the cost moves it into ``LibraryEntry/price``, emptying the
+    /// old columns so they are not read back over an emptied cost.
+    @Test func aCostInTheOldColumnIsYenAndMovesWhenItChanges() throws {
         let (database, context) = try database()
         let entry = LibraryEntry(eventID: "1")
         context.insert(entry)
         entry.cost = 9900
         #expect(entry.tracking.price == Money(amount: 9900, currency: "JPY"))
 
-        entry.tracking = entry.tracking
+        var noted = entry.tracking
+        noted.note = "front row"
+        entry.tracking = noted
+        #expect(entry.cost == 9900)
+        #expect(entry.price.isEmpty)
+
+        var priced = entry.tracking
+        priced.cost = Decimal(string: "1280.5")
+        priced.currency = "TWD"
+        entry.tracking = priced
         #expect(entry.cost == nil)
-        #expect(entry.costHundredths == 990_000)
-        #expect(entry.tracking.price == Money(amount: 9900, currency: "JPY"))
+        #expect(entry.price == "1280.5 TWD")
+        #expect(entry.tracking.price == Money(amount: Decimal(string: "1280.5")!, currency: "TWD"))
 
         var emptied = entry.tracking
         emptied.cost = nil
         entry.tracking = emptied
+        #expect(entry.price.isEmpty)
         #expect(entry.tracking.price == nil)
         withExtendedLifetime(database) {}
     }
 
+    /// A cost in the two columns the builds before ``LibraryEntry/price``
+    /// wrote reads back, and moves into the one column as it changes — the
+    /// amount and the currency together, as one answer.
+    @Test func aCostInTwoColumnsMovesIntoOneAsItChanges() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.costHundredths = 4999
+        entry.costCurrency = "USD"
+        #expect(entry.tracking.price == Money(amount: Decimal(string: "49.99")!, currency: "USD"))
+
+        var priced = entry.tracking
+        priced.currency = "TWD"
+        entry.tracking = priced
+        #expect(entry.price == "49.99 TWD")
+        #expect(entry.costHundredths == nil)
+        #expect(entry.costCurrency.isEmpty)
+        #expect(entry.tracking.price == Money(amount: Decimal(string: "49.99")!, currency: "TWD"))
+        withExtendedLifetime(database) {}
+    }
+
+    // MARK: Lotteries as rows
+
+    func lotteryRows(_ id: Event.ID, in context: ModelContext) throws -> [String: LibraryLottery]? {
+        LibraryDatabase.lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))[id]
+    }
+
+    func writeLotteries(_ list: [LotteryEntry], for id: Event.ID, entry: LibraryEntry?, dated when: Date,
+                        in context: ModelContext) throws {
+        var rows = LibraryDatabase.lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))
+        LibraryDatabase.writeLotteries(list, for: id, rows: &rows, entry: entry, dated: when, in: context)
+    }
+
+    func tracking(_ id: Event.ID, entry: LibraryEntry?, in context: ModelContext) throws -> Tracking {
+        LibraryDatabase.tracking(of: entry, rows: try lotteryRows(id, in: context))
+    }
+
     /// A lottery count an older build wrote reads back as one entry applied
-    /// for that many times, and the next write moves it into the list's own
-    /// column — so a list taken down to nothing does not read back as the
-    /// count again.
-    @Test func aLotteryCountInTheOldColumnMovesOnTheNextWrite() throws {
+    /// for that many times, and the first change to the list moves it into
+    /// rows — so a list taken down to nothing does not read back as the count
+    /// again.
+    @Test func aLotteryCountInTheOldColumnMovesIntoRowsOnTheFirstChange() throws {
         let (database, context) = try database()
         let entry = LibraryEntry(eventID: "1")
         context.insert(entry)
         entry.lotteryEntries = 2
-        #expect(entry.tracking.lotteries.map(\.applications) == [2])
-        #expect(entry.tracking == entry.tracking)
+        #expect(try tracking("1", entry: entry, in: context).lotteries.map(\.applications) == [2])
 
-        var answered = entry.tracking
-        answered.lotteries[0].result = .lost
-        answered.lotteries.append(LotteryEntry(round: "一般発売"))
-        entry.tracking = answered
-        #expect(entry.lotteryEntries == nil)
-        #expect(!entry.lotteries.isEmpty)
-        #expect(entry.tracking.lotteries.map(\.result) == [.lost, .pending])
-        #expect(entry.tracking.lotteryApplications == 2)
+        var answered = try tracking("1", entry: entry, in: context).lotteries
+        answered[0].result = .lost
+        answered.append(LotteryEntry(round: "一般発売"))
+        try writeLotteries(answered, for: "1", entry: entry, dated: later, in: context)
+        let record = try tracking("1", entry: entry, in: context)
+        #expect(record.lotteries.map(\.result) == [.lost, .pending])
+        #expect(record.lotteryApplications == 2)
 
-        var emptied = entry.tracking
-        emptied.lotteries = []
-        entry.tracking = emptied
-        #expect(entry.lotteries.isEmpty)
-        #expect(entry.tracking.lotteries.isEmpty)
+        try writeLotteries([], for: "1", entry: entry, dated: later, in: context)
+        #expect(try tracking("1", entry: entry, in: context).lotteries.isEmpty)
+        // Taken out as rows that say so, not as rows gone.
+        let removed = try lotteryRows("1", in: context)?.values.allSatisfy { $0.isRemoved }
+        #expect(removed == true)
         withExtendedLifetime(database) {}
     }
 
-    /// A list this build cannot read — a day in a form it does not know, as a
-    /// later build might write one — reads as none, and a note edited beside
-    /// it leaves it as it was rather than emptying it on every device.
+    /// Rounds left as they were in the move across keep the date the entry
+    /// had: a device moving its copy late cannot outrank a round another
+    /// device has taken out since.
+    @Test func aRoundTakenOutOutranksACopyMovedAcrossLater() throws {
+        let (database, context) = try database()
+        let round = LotteryEntry(round: "最速先行抽選", applications: 2)
+        // This device took the round out, after the list was moved across.
+        let removed = LibraryLottery(eventID: "1", entryID: round.id.uuidString)
+        context.insert(removed)
+        removed.write(round, at: 0, dated: earlier)
+        removed.write(nil, at: 0, dated: later)
+        // Another device, still on the old list, adds a round of its own.
+        let elsewhere = LibraryEntry(eventID: "1")
+        context.insert(elsewhere)
+        elsewhere.give(LibraryEntry.Answers(inLibrary: true), dated: [.inLibrary: earlier, .tracking: earlier])
+        elsewhere.lotteries = LotteryEntry.columnText(of: [round])
+        var otherRows: [String: [String: LibraryLottery]] = [:]
+        LibraryDatabase.writeLotteries([round, LotteryEntry(round: "一般発売")], for: "1", rows: &otherRows,
+                                       entry: elsewhere, dated: .now, in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        #expect(try tracking("1", entry: elsewhere, in: context).lotteries.map(\.round) == ["一般発売"])
+        withExtendedLifetime(database) {}
+    }
+
+    /// Two devices each adding a round while apart: each round is a record
+    /// of its own, and both stand.
+    @Test func twoDevicesAddingRoundsApartKeepBoth() throws {
+        let (database, context) = try database()
+        let first = LotteryEntry(round: "最速先行抽選", applications: 2)
+        let second = LotteryEntry(round: "プレイガイド先行", applications: 1)
+        var oneDevice: [String: [String: LibraryLottery]] = [:]
+        LibraryDatabase.writeLotteries([first], for: "1", rows: &oneDevice, entry: nil, dated: earlier, in: context)
+        var otherDevice: [String: [String: LibraryLottery]] = [:]
+        LibraryDatabase.writeLotteries([second], for: "1", rows: &otherDevice, entry: nil, dated: later, in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        #expect(Set(try tracking("1", entry: nil, in: context).lotteries.map(\.id)) == [first.id, second.id])
+        withExtendedLifetime(database) {}
+    }
+
+    /// The same round changed on two devices is settled as a record is: the
+    /// one written last stands, and only one row is left.
+    @Test func oneRoundChangedOnTwoDevicesKeepsTheLaterOne() throws {
+        let (database, context) = try database()
+        var round = LotteryEntry(round: "最速先行抽選", applications: 2)
+        var oneDevice: [String: [String: LibraryLottery]] = [:]
+        LibraryDatabase.writeLotteries([round], for: "1", rows: &oneDevice, entry: nil, dated: earlier, in: context)
+        round.result = .lost
+        var otherDevice: [String: [String: LibraryLottery]] = [:]
+        LibraryDatabase.writeLotteries([round], for: "1", rows: &otherDevice, entry: nil, dated: later, in: context)
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        #expect(try context.fetch(FetchDescriptor<LibraryLottery>()).count == 1)
+        #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.result) == [.lost])
+        withExtendedLifetime(database) {}
+    }
+
+    /// A list the entry kept that this build cannot read — a day in a form it
+    /// does not know, as a later build might write one — reads as none, and
+    /// a note edited beside it leaves it as it was.
     @Test func aListThisBuildCannotReadIsNotWrittenOverByANote() throws {
         let (database, context) = try database()
         let entry = LibraryEntry(eventID: "1")
@@ -367,60 +474,67 @@ struct LibraryDatabaseTests {
         entry.tracking = noted
         #expect(entry.note == "front row")
         #expect(entry.lotteries == unreadable)
-
-        // The reader writing a list of their own is the reader's answer.
-        var answered = entry.tracking
-        answered.lotteries = [LotteryEntry(round: "一般発売")]
-        entry.tracking = answered
-        #expect(entry.tracking.lotteries.map(\.round) == ["一般発売"])
         withExtendedLifetime(database) {}
     }
 
-    /// A list carrying a key this build has never heard of reads back without
-    /// it, and is not written back without it because a seat was edited.
-    @Test func aListWithAKeyFromALaterBuildKeepsItThroughAnEdit() throws {
+    /// A round carrying a key this build has never heard of reads back
+    /// without it, and keeps it while another round beside it changes; the
+    /// reader changing that round is their answer.
+    @Test func aRoundWithAKeyFromALaterBuildKeepsItThroughAnEdit() throws {
         let (database, context) = try database()
-        let entry = LibraryEntry(eventID: "1")
-        context.insert(entry)
-        let later = #"[{"applications":3,"id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","paidBy":"2026-10-20","result":"lost","round":"最速先行抽選"}]"#
-        entry.lotteries = later
-        #expect(entry.tracking.lotteries.map(\.applications) == [3])
-        #expect(!LotteryEntry.understands(column: later))
+        let later = #"{"applications":3,"id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","paidBy":"2026-10-20","result":"lost","round":"最速先行抽選"}"#
+        let row = LibraryLottery(eventID: "1", entryID: "5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22")
+        context.insert(row)
+        row.entry = later
+        row.modified = earlier
+        #expect(!LotteryEntry.understands(row: later))
 
-        var seated = entry.tracking
-        seated.seat = "A12"
-        entry.tracking = seated
-        #expect(entry.lotteries == later)
+        var list = try tracking("1", entry: nil, in: context).lotteries
+        #expect(list.map(\.applications) == [3])
+        list.append(LotteryEntry(round: "プレイガイド先行"))
+        try writeLotteries(list, for: "1", entry: nil, dated: .now, in: context)
+        #expect(row.entry == later)
 
-        // A list this build wrote is understood, and written as it changes.
-        var answered = entry.tracking
-        answered.lotteries[0].result = .won(nil)
-        entry.tracking = answered
-        #expect(LotteryEntry.understands(column: entry.lotteries))
-        #expect(entry.tracking.lotteries.map(\.isWon) == [true])
+        list = try tracking("1", entry: nil, in: context).lotteries
+        list[0].result = .won(nil)
+        try writeLotteries(list, for: "1", entry: nil, dated: .now, in: context)
+        #expect(LotteryEntry.understands(row: row.entry))
+        #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.isWon) == [true, false])
         withExtendedLifetime(database) {}
     }
 
-    /// A ticket an older build marked bought reads as a won entry, and the
-    /// next write empties the old column — so the entry, once taken out,
-    /// does not come back.
-    @Test func aTicketMarkedBoughtMovesIntoTheEntriesOnTheNextWrite() throws {
+    /// A ticket an older build marked bought reads as a won entry, and moves
+    /// into rows with the list — so the entry, once taken out, does not come
+    /// back.
+    @Test func aTicketMarkedBoughtMovesIntoRowsWithTheList() throws {
         let (database, context) = try database()
         let entry = LibraryEntry(eventID: "1")
         context.insert(entry)
         entry.ticket = TicketStatus.purchased.rawValue
         entry.lotteryEntries = 2
-        #expect(entry.tracking.hasTicket)
-        #expect(entry.tracking.lotteries.map(\.applications) == [2])
-        #expect(entry.tracking == entry.tracking)
+        #expect(try tracking("1", entry: entry, in: context).hasTicket)
+        #expect(try tracking("1", entry: entry, in: context).lotteries.map(\.applications) == [2])
 
-        var emptied = entry.tracking
-        emptied.lotteries = []
-        entry.tracking = emptied
-        #expect(entry.ticket == TicketStatus.none.rawValue)
-        #expect(entry.lotteryEntries == nil)
-        #expect(!entry.tracking.hasTicket)
-        #expect(entry.tracking.lotteries.isEmpty)
+        try writeLotteries([], for: "1", entry: entry, dated: later, in: context)
+        #expect(try !tracking("1", entry: entry, in: context).hasTicket)
+        #expect(try tracking("1", entry: entry, in: context).lotteries.isEmpty)
+        withExtendedLifetime(database) {}
+    }
+
+    /// An entry folded into another does not touch the event's rounds, and
+    /// carries across a list it kept from before rows.
+    @Test func aFoldCarriesTheListAnEntryKeptFromBeforeRows() throws {
+        let (database, context) = try database()
+        entry("1", LibraryEntry.Answers(inLibrary: true), dated: [.inLibrary: later], in: context)
+        let older = entry("1", LibraryEntry.Answers(tracking: Tracking(note: "front row")),
+                          dated: [.tracking: earlier], in: context)
+        older.lotteryEntries = 2
+        try context.save()
+
+        try LibraryDatabase.deduplicate(in: context)
+        let kept = try #require(try entries("1", in: context).first)
+        #expect(kept.tracking.note == "front row")
+        #expect(kept.tracking.lotteries.map(\.applications) == [2])
         withExtendedLifetime(database) {}
     }
 

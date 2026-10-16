@@ -95,7 +95,7 @@ struct LotteriesView: View {
         .washBackground()
         .navigationTitle("Lotteries")
         .navigationSubtitle(subtitle(list))
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .sheet(item: $editing) { row in
             TicketDetailsView(event: row.event, tracking: store.tracking(for: row.event), opening: row.entry)
         }
@@ -217,11 +217,11 @@ struct LotteriesView: View {
         VStack(spacing: 8) {
             if half == .awaiting {
                 Text("Nothing Awaiting")
-                    .font(.system(size: 17, weight: .bold))
+                    .scalingFont(size: 17, weight: .bold)
                 Text("Enter a lottery from an event’s Ticket Details and it waits here for its results.")
             } else {
                 Text("Nothing Decided Yet")
-                    .font(.system(size: 17, weight: .bold))
+                    .scalingFont(size: 17, weight: .bold)
                 if showsPast {
                     Text("Rounds you record as won or lost gather here.")
                 } else {
@@ -229,7 +229,7 @@ struct LotteriesView: View {
                 }
             }
         }
-        .font(.system(size: 13))
+        .scalingFont(size: 13)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
         .fixedSize(horizontal: false, vertical: true)
@@ -343,17 +343,17 @@ struct LotteryRoundCard: View {
                     }
                     VStack(alignment: .leading, spacing: 5) {
                         LotteryText.round(of: entry)
-                            .font(.system(size: 12, weight: .semibold))
+                            .scalingFont(size: 12, weight: .semibold)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                         Text(row.event.title)
-                            .font(.system(size: 14.5, weight: .semibold))
+                            .scalingFont(size: 14.5, weight: .semibold)
                             .lineLimit(3)
                             .multilineTextAlignment(.leading)
                         // One line: a hall's full name is on the event's own
                         // sheet.
                         Text(verbatim: "\(row.event.shown(on: timeDisplay).dayLine) · \(row.event.venue)")
-                            .font(.system(size: 12))
+                            .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -373,7 +373,7 @@ struct LotteryRoundCard: View {
 
                     reading("Results") {
                         results(isOut: isOut)
-                            .font(.system(size: 13.5, weight: .semibold))
+                            .scalingFont(size: 13.5, weight: .semibold)
                             .monospacedDigit()
                             .foregroundStyle(isOut ? AnyShapeStyle(Color.brandTint) : AnyShapeStyle(.secondary))
                             .lineLimit(1)
@@ -401,6 +401,7 @@ struct LotteryRoundCard: View {
             .contentShape(.rect(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
+        .marksEventBeside(row.event.id, cornerRadius: 24)
         .overlayPreferenceValue(TileSpot.self) { spot in
             GeometryReader { proxy in
                 if let spot {
@@ -423,7 +424,7 @@ struct LotteryRoundCard: View {
     ) -> some View {
         VStack(alignment: alignment, spacing: 6) {
             Text(title)
-                .font(.system(size: 9.5, weight: .semibold))
+                .scalingFont(size: 9.5, weight: .semibold)
                 .textCase(.uppercase)
                 .kerning(0.57)
                 .foregroundStyle(Color.primary.opacity(0.48))
@@ -646,16 +647,16 @@ struct LotteryCardRow: View {
                 LotteryDayTile(row: row)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.event.title)
-                        .font(.system(size: 14, weight: .semibold))
+                        .scalingFont(size: 14, weight: .semibold)
                         .lineLimit(1)
                     LotteryText.roundLine(of: row.entry)
-                        .font(.system(size: 11.5))
+                        .scalingFont(size: 11.5)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 when(isOut: isOut)
-                    .font(.system(size: 12, weight: .semibold))
+                    .scalingFont(size: 12, weight: .semibold)
                     .monospacedDigit()
                     .foregroundStyle(isOut ? AnyShapeStyle(Color.brandTint) : AnyShapeStyle(.secondary))
                     .fixedSize()

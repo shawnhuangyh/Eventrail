@@ -186,7 +186,7 @@ private struct PlacingStep: View {
                 }
             }
             Text(detail)
-                .font(.system(size: 11.5))
+                .scalingFont(size: 11.5)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.leading, 32)

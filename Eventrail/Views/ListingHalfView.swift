@@ -102,7 +102,7 @@ struct ListingHalfView: View {
                         // Only reachable for the past half: the upcoming one is
                         // whole before this screen can be opened.
                         Text(half.emptyNote)
-                            .font(.system(size: 12))
+                            .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -135,7 +135,7 @@ struct ListingHalfView: View {
         // away for its own bar; it stays away until the reader is back past
         // that page, rather than coming back for one screen.
         .toolbar(.hidden, for: .tabBar)
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
     }
 
     /// Pages on while this half is still empty.

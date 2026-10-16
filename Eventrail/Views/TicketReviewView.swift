@@ -107,9 +107,9 @@ struct TicketReviewView: View {
     private var heading: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Which of these did you go to?")
-                .font(.system(size: 20, weight: .bold))
+                .scalingFont(size: 20, weight: .bold)
             Text("Each one picked counts as attended. Its round can be filled in later from the event's Ticket Details.")
-                .font(.system(size: 13))
+                .scalingFont(size: 13)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -154,15 +154,15 @@ struct TicketReviewPrompt: View {
             Button(action: open) {
                 HStack(spacing: 12) {
                     Image(systemName: "ticket")
-                        .font(.system(size: 19, weight: .medium))
+                        .scalingFont(size: 19, weight: .medium)
                         .foregroundStyle(Color.trackTicket)
                         .frame(width: 28)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("^[\(count) past event](inflect: true) without a ticket")
-                            .font(.system(size: 14.5, weight: .semibold))
+                            .scalingFont(size: 14.5, weight: .semibold)
                             .foregroundStyle(.primary)
                         Text("Pick the ones you went to")
-                            .font(.system(size: 12))
+                            .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

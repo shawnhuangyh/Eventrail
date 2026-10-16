@@ -1,5 +1,55 @@
 import SwiftUI
 
+extension View {
+    /// The system font at the design's `size`, grown and shrunk with the
+    /// reader's text size (Settings › Display & Brightness › Text Size) the
+    /// way the text style nearest that size is — for what is read rather than
+    /// tapped or glanced at: a list's rows, an event's page, Ticket Details
+    /// and Settings, on Shawn's word (October 2026).
+    ///
+    /// Everything else keeps the design's point sizes — the Passport, the
+    /// ticket stub (a picture), the capsules, chips and tiles, the Live
+    /// Activity, the widgets and the watch — and the whole app stops growing
+    /// at xxxLarge (``RootView``), the largest size short of the accessibility
+    /// sizes, where rows laid out side by side would have to stack.
+    func scalingFont(size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> some View {
+        modifier(ScalingFont(size: size, weight: weight, design: design))
+    }
+}
+
+private struct ScalingFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    let weight: Font.Weight
+    let design: Font.Design
+
+    init(size: CGFloat, weight: Font.Weight, design: Font.Design) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: Self.style(nearest: size))
+        self.weight = weight
+        self.design = design
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight, design: design))
+    }
+
+    /// The text style whose default size is nearest `size`, whose growth the
+    /// font follows: a caption grows less than the body does.
+    private static func style(nearest size: CGFloat) -> Font.TextStyle {
+        switch size {
+        case ..<11.5: .caption2
+        case ..<12.5: .caption
+        case ..<14: .footnote
+        case ..<15.5: .subheadline
+        case ..<16.5: .callout
+        case ..<18.5: .body
+        case ..<21: .title3
+        case ..<25: .title2
+        case ..<31: .title
+        default: .largeTitle
+        }
+    }
+}
+
 /// The small uppercase label that stands over a group of cards, or over a list
 /// of results.
 ///
@@ -17,8 +67,8 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 11.5, weight: .semibold))
             .kerning(0.35)
+            .scalingFont(size: 11.5, weight: .semibold)
             .textCase(.uppercase)
             .foregroundStyle(.tertiary)
             .padding(.horizontal, 6)
@@ -72,11 +122,11 @@ struct CardHeader<Trailing: View>: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(title)
-                    .font(.system(size: 17, weight: .bold))
+                    .scalingFont(size: 17, weight: .bold)
                 if let count {
                     Text(count.formatted())
-                        .font(.system(size: 12, weight: .medium))
                         .monospacedDigit()
+                        .scalingFont(size: 12, weight: .medium)
                         .foregroundStyle(.tertiary)
                 }
                 Spacer(minLength: 8)
@@ -84,8 +134,8 @@ struct CardHeader<Trailing: View>: View {
             }
             if let caption {
                 caption
-                    .font(.system(size: 11.5))
                     .monospacedDigit()
+                    .scalingFont(size: 11.5)
                     .foregroundStyle(.tertiary)
             }
         }
@@ -186,7 +236,7 @@ struct Footnote: View {
 
     private func styled(_ text: Text) -> some View {
         text
-            .font(.system(size: 11))
+            .scalingFont(size: 11)
             .foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -201,7 +201,7 @@ struct TicketDetailsView: View {
         TicketForm.header("Lotteries") {
             if let summary = lotterySummary(entries) {
                 summary
-                    .font(.system(size: 13, weight: .medium))
+                    .scalingFont(size: 13, weight: .medium)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
@@ -243,7 +243,7 @@ struct TicketDetailsView: View {
 
         if entries.isEmpty {
             Text("One entry for each lottery applied to — the choices ranked and how it went.")
-                .font(.system(size: 13))
+                .scalingFont(size: 13)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 4)
@@ -293,7 +293,7 @@ struct TicketDetailsView: View {
                     HStack(spacing: 7) {
                         TicketForm.seatClassBadge(record.seatClass)
                         LotteryText.seatClass(record.seatClass)
-                            .font(.system(size: 14.5, weight: .medium))
+                            .scalingFont(size: 14.5, weight: .medium)
                             .foregroundStyle(.secondary)
                     }
                     .fixedSize()
@@ -303,7 +303,7 @@ struct TicketDetailsView: View {
 
             if record.roundsWon > 1, let best = record.classOfWins {
                 Text("Tickets from \(record.roundsWon) rounds — the highest class, \(LotteryText.seatClass(best)), is used.")
-                    .font(.system(size: 13))
+                    .scalingFont(size: 13)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
@@ -319,7 +319,7 @@ struct TicketDetailsView: View {
         return TicketForm.section("Cost") {
             TicketForm.field(trailingInset: 6) {
                 Text(verbatim: Currencies.symbol(of: currency))
-                    .font(.system(size: 16, weight: .medium))
+                    .scalingFont(size: 16, weight: .medium)
                     .foregroundStyle(.tertiary)
                     .fixedSize()
                     .frame(minWidth: 20)
@@ -336,7 +336,7 @@ struct TicketDetailsView: View {
             }
             if let conversion {
                 Text(verbatim: conversion)
-                    .font(.system(size: 13))
+                    .scalingFont(size: 13)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
@@ -434,7 +434,7 @@ struct TicketDetailsView: View {
                       prompt: Text("Something only you will see"), axis: .vertical)
                 .lineLimit(3...12)
                 .textFieldStyle(.plain)
-                .font(.system(size: 16))
+                .scalingFont(size: 16)
                 .labelsHidden()
                 .padding(.horizontal, 14)
                 .padding(.vertical, 13)
@@ -470,11 +470,11 @@ private struct LotteryEntryCard: View {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 5) {
                         LotteryText.round(of: entry)
-                            .font(.system(size: 15.5, weight: .semibold))
+                            .scalingFont(size: 15.5, weight: .semibold)
                             .foregroundStyle(entry.round.isEmpty ? .secondary : .primary)
                         if let when = LotteryText.when(entry, isEventAhead: isEventAhead) {
                             when
-                                .font(.system(size: 12.5))
+                                .scalingFont(size: 12.5)
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
@@ -482,7 +482,7 @@ private struct LotteryEntryCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     LotteryResultPill(entry: entry, isEventAhead: isEventAhead)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
+                        .scalingFont(size: 11, weight: .bold)
                         .foregroundStyle(.tertiary)
                         .padding(.top, 7)
                 }
@@ -506,6 +506,8 @@ private struct LotteryEntryCard: View {
                 let isDimmed = !entry.isPending && !isWon
                 HStack(spacing: 10) {
                     if !entry.isFirstCome {
+                        // The design's size, in a column of a fixed width:
+                        // grown with the reader's text, "2nd" broke in two.
                         Text(verbatim: LotteryChoice.ordinal(index))
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.secondary)
@@ -514,18 +516,18 @@ private struct LotteryEntryCard: View {
                     HStack(spacing: 7) {
                         TicketForm.seatClassBadge(choice.seatClass)
                         LotteryText.seatClass(choice.seatClass)
-                            .font(.system(size: 14.5, weight: .medium))
+                            .scalingFont(size: 14.5, weight: .medium)
                             .foregroundStyle(isWon ? Color.trackAttended
                                              : choice.seatClass.isEmpty ? .secondary : .primary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Text(verbatim: "×\(choice.quantity)")
-                        .font(.system(size: 14, weight: .medium))
+                        .scalingFont(size: 14, weight: .medium)
                         .monospacedDigit()
                         .foregroundStyle(isWon ? Color.trackAttended : .primary)
                     if isWon {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
+                            .scalingFont(size: 12, weight: .bold)
                             .foregroundStyle(Color.trackAttended)
                             .accessibilityLabel(Text("Won"))
                     }
@@ -710,7 +712,7 @@ enum TicketForm {
     ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
-                .font(.system(size: 16, weight: .bold))
+                .scalingFont(size: 16, weight: .bold)
                 .frame(maxWidth: .infinity, alignment: .leading)
             accessory()
         }
@@ -724,7 +726,7 @@ enum TicketForm {
     ) -> some View {
         field(trailingInset: trailingInset) {
             Image(systemName: symbol)
-                .font(.system(size: 15))
+                .scalingFont(size: 15)
                 .foregroundStyle(.tertiary)
                 .frame(width: 20)
                 .accessibilityHidden(true)
@@ -744,7 +746,7 @@ enum TicketForm {
             content()
         }
         .textFieldStyle(.plain)
-        .font(.system(size: 16))
+        .scalingFont(size: 16)
         .labelsHidden()
         .padding(.leading, 14)
         .padding(.trailing, trailingInset)

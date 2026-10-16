@@ -69,14 +69,16 @@ struct SearchView: View {
                     controls
                 }
             }
+            // Beside an open iPhone Duo's fold, events or performers is
+            // chosen here rather than in the system's bar — see
+            // ``SearchScopes``. Inside the search field's reach, so it hears
+            // whether the search is up.
+            .safeAreaBar(edge: .top) { BesideFoldScopes(scope: $scope) }
             .washBackground()
             .navigationTitle("Search")
             .searchable(text: $query, prompt: Text("Search Eventernote events"))
-            .searchScopes($scope) {
-                ForEach(SearchScope.allCases) { option in
-                    Text(option.label).tag(option)
-                }
-            }
+            .searchPresentationToolbarBehavior(searchToolbarBehavior)
+            .modifier(SearchScopes(scope: $scope))
             .onSubmit(of: .search) { store.remember(search: term) }
             .navigationDestination(for: SiteListing.self) { listing in
                 switch listing {
@@ -84,10 +86,19 @@ struct SearchView: View {
                 case .justAdded: SiteListingView(listing: listing, filter: $justAddedFilter)
                 }
             }
-            .performerDestination()
-            .eventSheet($openEvent)
+            .venueDestination()
+            // Beside the results on an open iPhone Duo.
+            .eventPane($openEvent)
             .task(id: Request(term: term, scope: scope, filter: filter, order: order)) { await search() }
         }
+    }
+
+    /// The bar keeps its title while a search is up on an iPad. Left to hide
+    /// it there, the bar took the large title's leading margin away and left
+    /// the title standing — on the edge of the screen, half off it, whether
+    /// or not the screen was parted beside the results (iPadOS 27.1).
+    private var searchToolbarBehavior: SearchPresentationToolbarBehavior {
+        UIDevice.current.userInterfaceIdiom == .pad ? .avoidHidingContent : .automatic
     }
 
     /// Runs the search the field currently describes.
@@ -337,7 +348,7 @@ struct SearchView: View {
     private var keepLooking: some View {
         HStack(spacing: 10) {
             Text("^[\(events.items.count) result](inflect: true) read so far. The rest may hold more.")
-                .font(.system(size: 12.5, weight: .semibold))
+                .scalingFont(size: 12.5, weight: .semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Keep Looking") {
@@ -393,13 +404,13 @@ struct SearchView: View {
                     // Not a ``SectionLabel``: that carries its own inset, and
                     // this one is set by the row it shares with Clear.
                     Text("Recent")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .scalingFont(size: 11.5, weight: .semibold)
                         .kerning(0.35)
                         .textCase(.uppercase)
                         .foregroundStyle(.tertiary)
                     Spacer()
                     Button("Clear") { store.clearRecentSearches() }
-                        .font(.system(size: 12, weight: .medium))
+                        .scalingFont(size: 12, weight: .medium)
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.brandTint)
                 }
@@ -419,9 +430,9 @@ struct SearchView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Searching public Eventernote pages")
-                    .font(.system(size: 13.5, weight: .semibold))
+                    .scalingFont(size: 13.5, weight: .semibold)
                 Text("Results come from publicly accessible event pages. Nothing you tag here is written back to Eventernote.")
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -460,19 +471,19 @@ private struct SiteListingRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: listing.symbol)
-                .font(.system(size: 14, weight: .semibold))
+                .scalingFont(size: 14, weight: .semibold)
                 .foregroundStyle(Color.brandTint)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
                 Text(listing.title)
-                    .font(.system(size: 14.5, weight: .semibold))
+                    .scalingFont(size: 14.5, weight: .semibold)
                 listing.detail(on: Event.siteDay(of: .now))
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .scalingFont(size: 11, weight: .semibold)
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16)
@@ -503,6 +514,7 @@ struct SearchResultRow: View {
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)
+        .marksEventBeside(event.id)
         .glassPanel()
     }
 }
@@ -563,11 +575,11 @@ private struct PerformerRow: View {
             HStack(spacing: 13) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(performer.name)
-                        .font(.system(size: 14.5, weight: .semibold))
+                        .scalingFont(size: 14.5, weight: .semibold)
                         .lineLimit(1)
                     if let reading = performer.reading {
                         Text(reading)
-                            .font(.system(size: 12))
+                            .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -576,12 +588,12 @@ private struct PerformerRow: View {
 
                 if let fans = performer.fanCount {
                     Text("^[\(fans) fan](inflect: true)")
-                        .font(.system(size: 11.5, weight: .medium))
+                        .scalingFont(size: 11.5, weight: .medium)
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(13)
@@ -616,11 +628,11 @@ struct FeedFooter<Item: Identifiable & Sendable>: View {
         if let failure = feed.moreFailure {
             HStack(spacing: 10) {
                 Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .scalingFont(size: 13, weight: .semibold)
                     .foregroundStyle(Color.favorite)
                     .frame(width: 18)
                 Text(verbatim: failure)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .scalingFont(size: 12.5, weight: .semibold)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Try Again") {
@@ -662,4 +674,53 @@ struct SearchFailure: View {
 #Preview {
     SearchView()
         .library(EventStore.preview)
+}
+
+/// Events or performers: the system's scope bar under the search field — or,
+/// beside an open iPhone Duo's fold, the same choice over the results
+/// (``BesideFoldScopes``).
+///
+/// The system centres its scope bar across the whole screen, where it ran
+/// over the event open beside the results, and nothing moves it. So there
+/// the system is handed no scopes and the results carry their own, in the
+/// half they choose between. The system's scopes are emptied rather than
+/// taken off, so nothing under them is rebuilt as the Duo opens and folds.
+private struct SearchScopes: ViewModifier {
+    @Environment(\.opensEventsBeside) private var besideFold
+    @Binding var scope: SearchScope
+
+    func body(content: Content) -> some View {
+        content
+            .searchScopes($scope) {
+                if !besideFold {
+                    ForEach(SearchScope.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+            }
+    }
+}
+
+/// Events or performers over the results beside an open iPhone Duo's fold,
+/// shown while the search is up, as the system's scope bar would be. A view
+/// of its own so it can ask whether it is: only what the search field is
+/// attached to is told.
+private struct BesideFoldScopes: View {
+    @Environment(\.opensEventsBeside) private var besideFold
+    @Environment(\.isSearching) private var isSearching
+    @Binding var scope: SearchScope
+
+    var body: some View {
+        if besideFold, isSearching {
+            Picker("Search", selection: $scope) {
+                ForEach(SearchScope.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
 }

@@ -138,7 +138,7 @@ struct VenueView: View {
         // The bar takes the foot of the screen over, as an event's sheet
         // has it: the tab bar stands down while the page is up.
         .toolbar(.hidden, for: .tabBar)
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .task { await open() }
         // A page left open while the reader was away is owed the check it
         // made as it opened: past the window, it reads again.
@@ -286,11 +286,11 @@ struct VenueView: View {
         VStack(spacing: 11) {
             VStack(spacing: 5) {
                 Text(verbatim: link.name)
-                    .font(.system(size: 27, weight: .bold))
+                    .scalingFont(size: 27, weight: .bold)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 subtitle
-                    .font(.system(size: 13.5))
+                    .scalingFont(size: 13.5)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -442,22 +442,22 @@ struct VenueView: View {
     ) -> some View {
         let row = HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .scalingFont(size: 13, weight: .semibold)
                 .foregroundStyle(Color.brandTint)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
+                    .scalingFont(size: 11, weight: .medium)
                     .foregroundStyle(.tertiary)
                 // Imported text, printed as Eventernote printed it.
                 Text(verbatim: value)
-                    .font(.system(size: 13.5))
+                    .scalingFont(size: 13.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if destination != nil {
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
         }
@@ -480,7 +480,7 @@ struct VenueView: View {
             VStack(alignment: .leading, spacing: 10) {
                 CardHeader(title: "Getting there")
                 Text(verbatim: tips)
-                    .font(.system(size: 13))
+                    .scalingFont(size: 13)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -583,7 +583,7 @@ struct VenueView: View {
 
             if events.isEmpty {
                 Text(half.emptyNote)
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -651,17 +651,17 @@ struct VenueView: View {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(verbatim: performer.name)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .scalingFont(size: 14, weight: .semibold)
                                     .lineLimit(1)
                                 Text("^[\(performer.appearances) date](inflect: true) here")
-                                    .font(.system(size: 11.5))
+                                    .scalingFont(size: 11.5)
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
+                                .scalingFont(size: 11, weight: .semibold)
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(.horizontal, 4)

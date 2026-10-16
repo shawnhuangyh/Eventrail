@@ -129,8 +129,9 @@ struct EventStoreEventsTests {
         let arrived = LibraryEntry(eventID: "1")
         context.insert(arrived)
         arrived.give(LibraryEntry.Answers(inLibrary: true, isFavorite: true,
-                                          tracking: Tracking(ticket: .purchased, note: "front row")),
+                                          tracking: Tracking(note: "front row")),
                      dated: [:])
+        arrived.ticket = TicketStatus.purchased.rawValue
         arrived.modified = Date.now.addingTimeInterval(-3600).toTheMillisecond
         try context.save()
 
@@ -144,6 +145,48 @@ struct EventStoreEventsTests {
         #expect(store.tracking(for: event).note == "front row")
         // Marked bought by that build, the ticket reads as a won entry.
         #expect(store.tracking(for: event).hasTicket)
+    }
+
+    /// A change to the lotteries alone goes to their rows and leaves the
+    /// entry as it was, so it cannot carry an older note back over another
+    /// device's.
+    @Test func aLotteryChangeAloneLeavesTheEntryAlone() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.toggleLibraryMembership(event)
+        var record = store.tracking(for: event)
+        record.note = "front row"
+        store.setTracking(record, for: event)
+        store.saveNow()
+        let entry = try #require(try entries(in: store).first)
+        let written = entry.modified
+
+        record = store.tracking(for: event)
+        record.lotteries.append(LotteryEntry(round: "最速先行抽選", applications: 2))
+        store.setTracking(record, for: event)
+        store.saveNow()
+        #expect(entry.modified == written)
+        #expect(store.tracking(for: event).lotteries.map(\.applications) == [2])
+        #expect(store.tracking(for: event).note == "front row")
+        #expect(try store.database.context.fetch(FetchDescriptor<LibraryLottery>()).count == 1)
+    }
+
+    /// A removal takes the rounds out with everything else written on the
+    /// event, as rows that say so.
+    @Test func aRemovalTakesTheRoundsOut() throws {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        store.toggleLibraryMembership(event)
+        var record = store.tracking(for: event)
+        record.lotteries = [LotteryEntry(round: "最速先行抽選", applications: 2)]
+        store.setTracking(record, for: event)
+
+        store.remove(CollectionOfOne(event))
+        #expect(store.tracking(for: event).lotteries.isEmpty)
+        let rows = try store.database.context.fetch(FetchDescriptor<LibraryLottery>())
+        #expect(rows.count == 1)
+        let removed = rows.allSatisfy { $0.isRemoved }
+        #expect(removed)
     }
 
     /// Only the part given is dated: adding an event says nothing about its

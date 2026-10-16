@@ -96,6 +96,13 @@ struct EventPassportView: View {
     @State private var openExtreme: PassportExtreme?
     /// Which ranked list has its whole list open, if either.
     @State private var openRanking: PassportRanking?
+    /// The lottery card's list open, if one is, and the spending card's, and
+    /// the class that card's chips read its dearest and cheapest over — held
+    /// here rather than on the cards, which are made again as the Duo opens
+    /// and folds and its one page becomes two.
+    @State private var openLotteryList: PassportLotteryCard.LotteryList?
+    @State private var openTicketList: PassportSpendingCard.TicketList?
+    @State private var seatFilter: String?
     /// Whether every recorded event is open, rather than the top five.
     /// The event whose own sheet is open, if the reader tapped one.
     @State private var openEvent: Event?
@@ -108,6 +115,44 @@ struct EventPassportView: View {
     /// Deliberately not remembered between visits, for the reason
     /// ``PassportScope`` is not.
     @State private var spendingCurrency: String?
+    /// Where an open iPhone Duo's fold crosses the screen — see ``body``.
+    @State private var fold: Fold?
+
+    /// Whether the Duo is opening onto a screen whose fold is not known yet
+    /// — see ``View/readingDuoOpening(into:fold:)``.
+    @State private var isOpening = false
+    /// Whether the Passport is on screen — not in the Me tab out of sight,
+    /// nor under a page pushed over it. A drawer's sheet is held back while
+    /// it is not, for the reason an event's is beside a list
+    /// (``View/eventPane(_:)``).
+    @State private var isShown = false
+    /// Whether the screen is two pages either side of a fold down it.
+    private var isBook: Bool { fold?.axis == .vertical }
+    /// Where the iPhone Duo keeps its rail, if it does — where the two pages
+    /// go without ``barBand``.
+    @Environment(\.verticalBarEdge) private var barEdge
+    /// How deep the bar and the year chips under it reach over the two pages,
+    /// and whether either page has been scrolled in under them — see
+    /// ``barBand``.
+    @State private var barDepth: CGFloat = 0
+    @State private var pagesUnderBar: Set<PassportPage> = []
+    /// The drawer open beside the fold, over the Duo's two pages.
+    @State private var drawers = PassportDrawers()
+    /// The sheets an event opened from here has up over itself — Ticket
+    /// Details, the stub — and whether the drawers stood beside the fold as
+    /// the first went up: held there until the last is put away. A drawer
+    /// going as the Duo folds or opens took the event's sheet opened from it
+    /// along, and Ticket Details with it — see ``EventSheetsHold``.
+    @State private var sheetsHold = EventSheetsHold()
+    @State private var heldBeside: Bool?
+    /// Whether a drawer opens beside the fold, as a panel over the second
+    /// page: where the screen is two pages, or was as an event opened from
+    /// a drawer put a sheet up.
+    private var drawersBeside: Bool { heldBeside ?? isBook }
+    /// Whether the screen is laid out as two pages: two pages to lay out, and
+    /// the drawers beside the fold. A screen parted while an event opened from
+    /// a drawer's sheet holds a sheet up stays one page until it is put away.
+    private var showsBook: Bool { isBook && drawersBeside }
 
     /// How much of each ranked list a card shows before sending the rest to a
     /// screen of its own — the same five the Me tab's cards show, for the same
@@ -144,42 +189,54 @@ struct EventPassportView: View {
     }
 
     var body: some View {
-        ScrollView {
-            let stats = self.stats
-            VStack(spacing: 14) {
-                // Over the year chosen: a year of lotteries alone has nothing
-                // to stamp, and is said so rather than drawn as a map of none.
-                if stats.totalEvents == 0 {
-                    emptyState
-                } else {
-                    summaryCard(stats)
-                    PassportEventsCard(stats: stats)
-                    timeCard(stats)
+        let stats = self.stats
+        Group {
+            if let fold, showsBook {
+                // Two pages, as `DuoBookPassport.dc.html` draws the Duo held
+                // like a book: where the reader went and who and where most
+                // on the one before the fold, under the title, and how the
+                // tickets were had on the one after. Each scrolls on its own,
+                // and so laid out last and first.
+                //
+                // The year chips stand under the bar over both pages, the
+                // second page under them on the Duo too rather than from the
+                // top of the screen as the board draws it. Neither page draws
+                // a blur of its own under them: the system draws a scroll
+                // view's edge under the bar for that scroll view alone, a
+                // frosted band for the one the bar follows and a faint fade,
+                // or none, for the other, and the two stopped at the middle.
+                // On an iPad one band runs across the screen instead
+                // (``barBand``); on the Duo, on Shawn's word, none does.
+                FoldSplitLayout(fold: fold) {
+                    secondPage(stats)
+                    firstPage(stats)
                 }
-                // Under the empty state too: lotteries tried for and lost are
-                // the reader's record before any ticket is.
-                if !stats.topLotteries.isEmpty {
-                    PassportLotteryCard(stats: stats, limit: Self.cardLimit) { openEvent = $0 }
+                .scrollEdgeEffectHidden(true, for: .top)
+                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { barDepth = $0 }
+                .overlay(alignment: .top) {
+                    if barEdge == nil { barBand }
                 }
-                if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
-                    PassportSpendingCard(
-                        stats: stats,
-                        currency: Binding(get: { currency }, set: { spendingCurrency = $0 }),
-                        defaultCurrency: defaultCurrency
-                    ) { openEvent = $0 }
+                .safeAreaBar(edge: .top) { yearChips }
+            } else {
+                page {
+                    places(stats)
+                    tickets(stats)
+                    rankings(stats)
                 }
-                if !stats.topPerformers.isEmpty { performersCard(stats) }
-                if !stats.topVenues.isEmpty { venuesCard(stats) }
+                .safeAreaInset(edge: .top) { yearBar }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
+        .readingFold(into: $fold)
+        .readingDuoOpening(into: $isOpening, fold: fold)
+        .onAppear { isShown = true }
+        .onDisappear { isShown = false }
         .washBackground()
         .navigationTitle("Event Passport")
-        // Inline rather than large: iOS 26 draws a large title in the scrolling
-        // content, where the year bar inset lands on top of it.
-        .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .top) { yearBar }
+        // Inline rather than large on one page: iOS 26 draws a large title in
+        // the scrolling content, where the year bar inset lands on top of it.
+        // Large over the Duo's two, where the bar holds the title alone and
+        // the board heads the first page with it.
+        .navigationBarTitleDisplayMode(showsBook ? .large : .inline)
         .task(id: store.revision) { readPlacings() }
         .task(id: needsRates) {
             if needsRates { await ExchangeRates.shared.refreshIfStale() }
@@ -196,21 +253,155 @@ struct EventPassportView: View {
                 withAnimation(.snappy) { scope = .allTime }
             }
         }
-        .navigationDestination(for: VenueLink.self) { VenueView(link: $0) }
-        // Both See Alls open a drawer rather than pushing a screen: every one
+        // Every See All opens a drawer rather than pushing a screen: every one
         // of these lists is the card it sits under, read to the end, and the
-        // reader is meant to put it back down where they were.
+        // reader is meant to put it back down where they were. The cards'
+        // own are opened here too, so an open one outlives its card.
         //
         // The spans are read off the stats again rather than carried in the
         // enum, so the drawer is always the slice the card was showing.
-        .sheet(item: $openExtreme) { extreme in
+        .passportDrawer(item: $openExtreme) { extreme in
             PassportExtremesSheet(extreme: extreme, spans: extreme.spans(of: stats))
         }
-        .sheet(item: $openRanking) { PassportRankingSheet(ranking: $0) }
+        .passportDrawer(item: $openRanking) { PassportRankingSheet(ranking: $0) }
+        .passportDrawer(item: $openLotteryList) { PassportLotteryCard.drawer($0, stats: stats) }
+        .passportDrawer(item: $openTicketList) {
+            PassportSpendingCard.drawer($0, stats: stats, seatFilter: seatFilter)
+        }
         .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
         // An event named on this screen opens the same sheet every list in
         // the app ends in.
         .eventSheet($openEvent)
+        // Over the Duo's two pages a drawer opens over the second, beside
+        // the fold, rather than as a sheet across it — see
+        // ``View/passportDrawer(item:content:)``. Outside every drawer above,
+        // so each can hand its drawer up through the environment.
+        .environment(\.passportDrawers, drawersBeside ? drawers : nil)
+        // Nothing held back while an event opened from a drawer holds a sheet
+        // up: put away, the drawer's sheet would take it along.
+        .environment(\.holdsPassportSheets, heldBeside == nil && (isOpening || !isShown))
+        .overlay {
+            ZStack {
+                // Out of sight, rather than gone, while the screen is one page
+                // and an event opened from the panel holds a sheet up.
+                if let drawer = drawers.open, drawersBeside {
+                    PassportDrawerPanel(drawer: drawer, fold: fold, isTucked: !showsBook)
+                }
+            }
+            .animation(.snappy, value: drawers.open?.id)
+        }
+        // Outside the drawers, their sheets and the panel, so an event's
+        // page opened from any of them says here.
+        .environment(\.eventSheetsHold, sheetsHold)
+        .onChange(of: sheetsHold.isHeld) { _, isHeld in
+            heldBeside = isHeld ? drawersBeside : nil
+        }
+        // Folded, an open drawer is its presenter's sheet again; whatever is
+        // open as the Duo opens is handed back here.
+        .onChange(of: drawersBeside) { if !drawersBeside { drawers.open = nil } }
+    }
+
+    // MARK: - The pages
+
+    /// The blur under the bar and the year chips across both of an iPad's
+    /// pages: from the top of the screen to the foot of the chips, frosted as
+    /// the bar's own edge is over the page it follows, and faded out over its
+    /// last few points rather than cut off in a line. Only once a page has
+    /// been scrolled in under the bar, as the system's own edge shows only
+    /// over what passes beneath it: drawn at rest, it greyed the wash at the
+    /// top of the screen.
+    private var barBand: some View {
+        Rectangle()
+            .fill(.bar)
+            .mask {
+                LinearGradient(stops: [.init(color: .black, location: 0),
+                                       .init(color: .black, location: 0.82),
+                                       .init(color: .clear, location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .frame(height: barDepth + Self.bandFade)
+            .opacity(pagesUnderBar.isEmpty ? 0 : 1)
+            .animation(.easeOut(duration: 0.2), value: pagesUnderBar.isEmpty)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// How far past the chips the band runs, fading out.
+    private static let bandFade: CGFloat = 12
+
+    /// One of an iPad's two pages, for ``barBand``.
+    private enum PassportPage { case first, second }
+
+    /// The page before the fold: where the reader went, and who and where
+    /// most.
+    private func firstPage(_ stats: PassportStats) -> some View {
+        page {
+            places(stats)
+            rankings(stats)
+        }
+        .modifier(PageUnderBar(page: PassportPage.first, pages: $pagesUnderBar, isTracking: barEdge == nil))
+        .castingShadowsToTheFold()
+    }
+
+    /// The page after the fold: how the tickets were had.
+    private func secondPage(_ stats: PassportStats) -> some View {
+        page { tickets(stats) }
+            .modifier(PageUnderBar(page: PassportPage.second, pages: $pagesUnderBar, isTracking: barEdge == nil))
+            .castingShadowsToTheFold()
+            .standingAfterTheFold(underTheBar: true)
+    }
+
+    /// A scrolling column of cards.
+    private func page(@ViewBuilder _ cards: () -> some View) -> some View {
+        ScrollView {
+            VStack(spacing: 14) { cards() }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+        }
+    }
+
+    /// Where the reader has been: the map and its totals, the events and the
+    /// time spent at them.
+    @ViewBuilder
+    private func places(_ stats: PassportStats) -> some View {
+        // Over the year chosen: a year of lotteries alone has nothing to
+        // stamp, and is said so rather than drawn as a map of none.
+        if stats.totalEvents == 0 {
+            emptyState
+        } else {
+            summaryCard(stats)
+            PassportEventsCard(stats: stats)
+            timeCard(stats)
+        }
+    }
+
+    /// How the tickets were had and what they cost.
+    @ViewBuilder
+    private func tickets(_ stats: PassportStats) -> some View {
+        // Under the empty state too: lotteries tried for and lost are the
+        // reader's record before any ticket is.
+        if !stats.topLotteries.isEmpty {
+            PassportLotteryCard(stats: stats, limit: Self.cardLimit,
+                                openList: $openLotteryList) { openEvent = $0 }
+        }
+        if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
+            PassportSpendingCard(
+                stats: stats,
+                currency: Binding(get: { currency }, set: { spendingCurrency = $0 }),
+                defaultCurrency: defaultCurrency,
+                seatFilter: $seatFilter,
+                openList: $openTicketList
+            ) { openEvent = $0 }
+        }
+    }
+
+    /// Who and where most.
+    @ViewBuilder
+    private func rankings(_ stats: PassportStats) -> some View {
+        if !stats.topPerformers.isEmpty { performersCard(stats) }
+        if !stats.topVenues.isEmpty { venuesCard(stats) }
     }
 
     // MARK: - The year the screen is read over
@@ -232,6 +423,19 @@ struct EventPassportView: View {
     @ViewBuilder
     private var yearBar: some View {
         if years.count > 1 {
+            yearChips
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(.bar)
+        }
+    }
+
+    /// The year chips themselves, in a row that scrolls sideways once there
+    /// are more of them than fit — on a bar of their own on one page, under
+    /// the title on the Duo's first.
+    @ViewBuilder
+    private var yearChips: some View {
+        if years.count > 1 {
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
                     chip(for: .allTime)
@@ -245,9 +449,6 @@ struct EventPassportView: View {
             // offered, and inset against the top of the screen it is offered
             // the whole screen — which swallowed the navigation bar whole.
             .frame(height: 36)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity)
-            .background(.bar)
         }
     }
 
@@ -290,7 +491,10 @@ struct EventPassportView: View {
         let pins = pins(stats)
         return VStack(alignment: .leading, spacing: 0) {
             map(pins)
-                .aspectRatio(1 / 0.98, contentMode: .fit)
+                // Wider over the Duo's first page, in the board's proportion:
+                // square there, the map alone filled the screen's height.
+                // The whole country still fits — with more sea either side.
+                .aspectRatio(showsBook ? 439 / 290 : 1 / 0.98, contentMode: .fit)
                 .overlay(alignment: .bottomTrailing) {
                     // Both in the one corner, on the map rather than under it:
                     // they are readings of the map, and the figures below are
@@ -1019,6 +1223,9 @@ private struct PassportExtremesSheet: View {
 /// longer see behind it.
 private struct PassportRankingSheet: View {
     @Environment(EventStore.self) private var store
+    /// Set beside the Duo's fold, where the drawer is drawn on the
+    /// Passport's own stack — see ``body``.
+    @Environment(\.closesPassportDrawer) private var closesBesideFold
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     let ranking: PassportRanking
@@ -1033,48 +1240,65 @@ private struct PassportRankingSheet: View {
     }
 
     var body: some View {
-        let stats = self.stats
-        let rows = ranking.rows(of: stats)
-        let most = max(1, rows.first?.count ?? 1)
-
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
-                PassportSheetHeader(eyebrow: eyebrow(rows.count), title: ranking.title)
-                ScrollView {
-                    VStack(spacing: 13) {
-                        ForEach(rows) { row in
-                            let label = PassportRankRow(
-                                row: row, most: most, total: stats.totalEvents,
-                                tint: tint, showsShare: ranking.isPerformers)
-                            // Two links rather than one over an erased value: a
-                            // push is matched to its destination by the *type*
-                            // of what was pushed, and `AnyHashable` matches
-                            // neither.
-                            if ranking.isPerformers {
-                                NavigationLink(value: PerformerLink.billed(name: row.name)) { label }
-                                    .buttonStyle(.plain)
-                            } else {
-                                NavigationLink(value: VenueLink.named(row.name)) { label }
-                                    .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .glassPanel(cornerRadius: 28)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 24)
+        Group {
+            if closesBesideFold != nil {
+                // Beside the fold the drawer stands on the Passport's own
+                // stack, whose root registers a performer's and a hall's page:
+                // a stack inside a stack is not supported, so a row pushes
+                // onto the Passport's, the drawer going with the Passport and
+                // coming back with it.
+                list
+                    .washBackground()
+            } else {
+                NavigationStack {
+                    list
+                        // Hidden on the root only, so the drawer opens on its
+                        // own header and a pushed performer or hall still
+                        // gets a bar with a way back.
+                        .toolbar(.hidden, for: .navigationBar)
+                        .washBackground()
+                        .venueDestination()
                 }
             }
-            // Hidden on the root only, so the drawer opens on its own header
-            // and a pushed performer or hall still gets a bar with a way back.
-            .toolbar(.hidden, for: .navigationBar)
-            .washBackground()
-            .venueDestination()
         }
         // Opens half-height like the extremes and pulls up to full: these two
         // lists run to as many names as the reader has been to.
         .presentationDetents([.medium, .large])
         .opensFromOutside()
+    }
+
+    private var list: some View {
+        let stats = self.stats
+        let rows = ranking.rows(of: stats)
+        let most = max(1, rows.first?.count ?? 1)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            PassportSheetHeader(eyebrow: eyebrow(rows.count), title: ranking.title)
+            ScrollView {
+                VStack(spacing: 13) {
+                    ForEach(rows) { row in
+                        let label = PassportRankRow(
+                            row: row, most: most, total: stats.totalEvents,
+                            tint: tint, showsShare: ranking.isPerformers)
+                        // Two links rather than one over an erased value: a
+                        // push is matched to its destination by the *type*
+                        // of what was pushed, and `AnyHashable` matches
+                        // neither.
+                        if ranking.isPerformers {
+                            NavigationLink(value: PerformerLink.billed(name: row.name)) { label }
+                                .buttonStyle(.plain)
+                        } else {
+                            NavigationLink(value: VenueLink.named(row.name)) { label }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(16)
+                .glassPanel(cornerRadius: 28)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+            }
+        }
     }
 
     private func eyebrow(_ count: Int) -> Text {
@@ -1086,6 +1310,270 @@ private struct PassportRankingSheet: View {
     private var tint: Color { ranking.isPerformers ? .trackAttended : .brandTint }
 }
 
+/// Keeps whether one of the Passport's pages has been scrolled in under the
+/// bar — see `EventPassportView.barBand`. At rest a scroll view holds its
+/// content's top at its top inset.
+private struct PageUnderBar<Page: Hashable>: ViewModifier {
+    let page: Page
+    @Binding var pages: Set<Page>
+    /// Whether there is a band to show: on an iPad, not on the Duo.
+    let isTracking: Bool
+
+    func body(content: Content) -> some View {
+        if isTracking {
+            content.onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top > 0.5
+            } action: { _, isUnder in
+                if isUnder { pages.insert(page) } else { pages.remove(page) }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Drawers beside the fold
+
+extension EnvironmentValues {
+    /// Where a Passport drawer is handed to be drawn beside an open iPhone
+    /// Duo's fold rather than presented as a sheet — set by the Passport over
+    /// its two pages, and nil everywhere else.
+    @Entry var passportDrawers: PassportDrawers?
+    /// How a drawer drawn beside the fold is put away — set on the drawer
+    /// there, and nil in a sheet, which is dismissed.
+    @Entry var closesPassportDrawer: EnvironmentAction?
+    /// Whether a drawer's sheet is held back: while the Duo opens, until the
+    /// fold says whether the drawer is a panel there, and while the Passport
+    /// is out of sight — set by the Passport.
+    @Entry var holdsPassportSheets = false
+}
+
+extension View {
+    /// Opens a Passport drawer — a See All, read and put back down — as a
+    /// sheet, or over the Duo's two pages, as a panel over the second beside
+    /// the fold, as `DuoPassportSheet.dc.html` draws it. A system sheet there
+    /// is a form sheet centred across the crease.
+    ///
+    /// One binding drives both, as an event beside a list does: an open drawer
+    /// becomes a sheet as the Duo folds, and a sheet becomes the panel as it
+    /// opens. The panel is drawn by the Passport, which each presenter hands
+    /// its drawer to through ``PassportDrawers``.
+    ///
+    /// Presented from the Passport itself, never from a card: the cards are
+    /// made again as the Duo opens and folds and its one page becomes two,
+    /// and a drawer whose state a card held closed with it.
+    func passportDrawer<Item: Identifiable, Drawer: View>(
+        item: Binding<Item?>, @ViewBuilder content: @escaping (Item) -> Drawer
+    ) -> some View {
+        modifier(PassportDrawerPresenter(item: item, drawer: content))
+    }
+}
+
+/// The drawer open beside the fold, if one is: held by the Passport over its
+/// two pages and handed down to every presenter under it.
+@Observable
+final class PassportDrawers {
+    var open: PassportDrawer?
+}
+
+/// One drawer, as handed to the Passport to draw.
+///
+/// Its content as it stood when it opened — the cards behind are dimmed while
+/// it is up, so nothing it was drawn from changes under it but a sync.
+struct PassportDrawer {
+    let id: AnyHashable
+    /// Which presenter opened it, so only that one puts it away.
+    let owner: UUID
+    let content: AnyView
+    let close: EnvironmentAction
+}
+
+private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewModifier {
+    @Environment(\.passportDrawers) private var drawers
+    @Environment(\.holdsPassportSheets) private var holdsSheet
+    @Binding var item: Item?
+    let drawer: (Item) -> Drawer
+
+    @State private var owner = UUID()
+    /// The drawer the sheet shows: `item`, while there is no fold to hand it
+    /// to. Kept apart from `item` for the reason an event beside a list keeps
+    /// its sheet's apart (``View/eventPane(_:)``): SwiftUI says a sheet has
+    /// gone by emptying the binding it was presented with, a moment after,
+    /// and a sheet put away as the Duo opened would have emptied the panel
+    /// that took its drawer over.
+    @State private var sheetItem: Item?
+    /// Whether a sheet this put away has yet to say so — see ``sheetBinding``.
+    @State private var awaitsReceipt = false
+
+    /// What decides whether there is a drawer to hand over.
+    private struct Handing: Equatable {
+        var besideFold: Bool
+        var holdsSheet: Bool
+        var item: Item.ID?
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: sheetBinding) { drawer($0) }
+            .onChange(of: Handing(besideFold: drawers != nil, holdsSheet: holdsSheet, item: item?.id),
+                      initial: true) { old, new in
+                // Across the fold at once, as the fold is read: the system
+                // animates the screen changing.
+                if old.besideFold == new.besideFold, old.holdsSheet == new.holdsSheet {
+                    hand()
+                } else {
+                    withTransaction(\.disablesAnimations, true) { hand() }
+                }
+            }
+            .onDisappear {
+                if drawers?.open?.owner == owner { drawers?.open = nil }
+            }
+            // A receipt that never comes is not waited for long.
+            .task(id: awaitsReceipt) {
+                guard awaitsReceipt else { return }
+                try? await Task.sleep(for: .seconds(1.5))
+                guard !Task.isCancelled else { return }
+                awaitsReceipt = false
+                withTransaction(\.disablesAnimations, true) { hand() }
+            }
+    }
+
+    /// The sheet's item, which SwiftUI empties as a sheet goes: only where a
+    /// sheet is up does that put the drawer away. Where this put it away
+    /// itself, the nil is SwiftUI saying so, up to a second later — and a
+    /// sheet brought back meanwhile would take it for the reader putting that
+    /// one away. So a sheet put away here is brought back only once its nil
+    /// has come, as an event's sheet beside a list is (``View/eventPane(_:)``).
+    private var sheetBinding: Binding<Item?> {
+        Binding {
+            sheetItem
+        } set: { new in
+            guard new == nil else { return }
+            if awaitsReceipt {
+                awaitsReceipt = false
+                withTransaction(\.disablesAnimations, true) { hand() }
+                return
+            }
+            guard sheetItem != nil else { return }
+            sheetItem = nil
+            item = nil
+        }
+    }
+
+    private func hand() {
+        guard let drawers else {
+            showSheet(holdsSheet ? nil : item)
+            return
+        }
+        showSheet(nil)
+        if let item {
+            let binding = $item
+            drawers.open = PassportDrawer(id: AnyHashable(item.id), owner: owner,
+                                          content: AnyView(drawer(item)),
+                                          close: EnvironmentAction(id: UUID()) { binding.wrappedValue = nil })
+        } else if drawers.open?.owner == owner {
+            drawers.open = nil
+        }
+    }
+
+    /// Puts `item` up as the sheet, or the sheet away — and nothing up again
+    /// until the one put away has said so (``sheetBinding``).
+    private func showSheet(_ item: Item?) {
+        if item == nil {
+            if sheetItem != nil { awaitsReceipt = true }
+            sheetItem = nil
+        } else if !awaitsReceipt {
+            sheetItem = item
+        }
+    }
+}
+
+/// A drawer over the second of the Duo's two pages: the panel from the fold
+/// to the rail, its top a little under the top of the screen, and the rest of
+/// the Passport dimmed behind it — `DuoPassportSheet.dc.html`. Put away with
+/// its X, by a tap on what it dims, or by pulling its top down.
+///
+/// On an iPad, from the middle of the screen to its edge, and from under the
+/// bar rather than the top of the screen: the bar there keeps the title, the
+/// tab bar and the way back over both pages, and the panel's head ran under
+/// them.
+private struct PassportDrawerPanel: View {
+    @Environment(\.verticalBarEdge) private var barEdge
+    let drawer: PassportDrawer
+    /// The fold it opens beside — nil while it is tucked away.
+    let fold: Fold?
+    /// Whether it is out of sight: the screen gone back to one page while an
+    /// event opened from it holds a sheet up, which would go with it.
+    let isTucked: Bool
+
+    /// How far the panel has been pulled down by its top.
+    @State private var pull: CGFloat = 0
+
+    private static let dim = Color(red: 20 / 255, green: 16 / 255, blue: 40 / 255)
+    /// How far a pull has to go to put the panel away.
+    private static let pullToClose: CGFloat = 80
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Self.dim.opacity(0.18)
+                .ignoresSafeArea()
+                .contentShape(.rect)
+                .onTapGesture { drawer.close() }
+                .accessibilityHidden(true)
+                .transition(.opacity)
+
+            let shape = UnevenRoundedRectangle(topLeadingRadius: 30, topTrailingRadius: 30,
+                                               style: .continuous)
+            drawer.content
+                .environment(\.closesPassportDrawer, drawer.close)
+                .overlay(alignment: .top) { grabber }
+                .clipShape(shape)
+                .background {
+                    shape.fill(.background)
+                        .shadow(color: Self.dim.opacity(0.2), radius: 20, y: -10)
+                }
+                .offset(y: pull)
+                .padding(.leading, fold?.frame.maxX ?? 0)
+                .padding(.trailing, 8)
+                // From the top of the screen, as the board draws it — or from
+                // under the bar, without the rail — and down past the home
+                // indicator, as a sheet runs.
+                .padding(.top, barEdge != nil ? 40 : 8)
+                .ignoresSafeArea(.container, edges: barEdge != nil ? [.top, .bottom] : .bottom)
+                .accessibilityAddTraits(.isModal)
+                .accessibilityAction(.escape) { drawer.close() }
+                .transition(.move(edge: .bottom))
+        }
+        // There still, so whatever was opened from it stays up.
+        .opacity(isTucked ? 0 : 1)
+        .allowsHitTesting(!isTucked)
+        .accessibilityHidden(isTucked)
+    }
+
+    /// The handle a sheet carries, and the strip under it a pull starts on.
+    private var grabber: some View {
+        Capsule()
+            .fill(.tertiary)
+            .frame(width: 36, height: 5)
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity)
+            .frame(height: 20, alignment: .top)
+            .contentShape(.rect)
+            .gesture(
+                DragGesture()
+                    .onChanged { pull = max(0, $0.translation.height) }
+                    .onEnded { value in
+                        if value.translation.height > Self.pullToClose {
+                            drawer.close()
+                        } else {
+                            withAnimation(.snappy) { pull = 0 }
+                        }
+                    }
+            )
+            .accessibilityHidden(true)
+    }
+}
+
 /// The top of a passport drawer: what it is counting, what it is, and the way
 /// back out.
 ///
@@ -1094,6 +1582,9 @@ private struct PassportRankingSheet: View {
 /// decide anything.
 private struct PassportSheetHeader: View {
     @Environment(\.dismiss) private var dismiss
+    /// Set where the drawer is drawn beside the Duo's fold rather than
+    /// presented: there `dismiss` would take the whole Passport off the stack.
+    @Environment(\.closesPassportDrawer) private var close
 
     let eyebrow: Text
     let title: Text
@@ -1118,7 +1609,7 @@ private struct PassportSheetHeader: View {
                     .font(.system(size: 24, weight: .bold))
             }
             Spacer(minLength: 12)
-            Button { dismiss() } label: {
+            Button { if let close { close() } else { dismiss() } } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.secondary)
@@ -1338,13 +1829,14 @@ private struct PassportLotteryCard: View {
     let stats: PassportStats
     /// How many of the events applied for hardest the card shows.
     let limit: Int
+    /// The list of events open over the card, if any — held by the Passport,
+    /// which draws it (``drawer(_:stats:)``): the card is made again as the
+    /// Duo opens and folds, and an open list held here went with it.
+    @Binding var openList: LotteryList?
     let open: (Event) -> Void
 
-    /// The list of events open over the card, if any.
-    @State private var openList: LotteryList?
-
     /// What a list of events behind the card holds.
-    private enum LotteryList: Identifiable, Hashable {
+    enum LotteryList: Identifiable, Hashable {
         /// Every event applied for, behind Top Lottery Entries' See All.
         case top
         /// The events behind a row of By Round, by the round as written.
@@ -1370,26 +1862,29 @@ private struct PassportLotteryCard: View {
         }
         .padding(16)
         .glassPanel(cornerRadius: 28)
-        .sheet(item: $openList) { list in
-            switch list {
-            case .top:
-                PassportLotterySheet(title: Text("Top Lottery Entries"),
-                                     eyebrow: Text("^[\(stats.topLotteries.count) event](inflect: true) recorded"),
-                                     rows: stats.topLotteries.map(LotteryListRow.init))
-            case .round(let round):
-                let rows = (stats.roundEvents[round] ?? []).map(LotteryListRow.init)
-                PassportLotterySheet(title: Self.roundName(round),
-                                     eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
-            case .seat(let seatClass):
-                let rows = (stats.seatEvents[seatClass] ?? []).map(LotteryListRow.init)
-                PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
-                                     eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
-            case .wins(let seatClass):
-                let rows = (stats.winTypes.first { $0.seatClass == seatClass }?.wins ?? [])
-                    .map(LotteryListRow.init)
-                PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
-                                     eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
-            }
+    }
+
+    /// The list of events behind the card, as the Passport opens it.
+    @ViewBuilder
+    static func drawer(_ list: LotteryList, stats: PassportStats) -> some View {
+        switch list {
+        case .top:
+            PassportLotterySheet(title: Text("Top Lottery Entries"),
+                                 eyebrow: Text("^[\(stats.topLotteries.count) event](inflect: true) recorded"),
+                                 rows: stats.topLotteries.map(LotteryListRow.init))
+        case .round(let round):
+            let rows = (stats.roundEvents[round] ?? []).map(LotteryListRow.init)
+            PassportLotterySheet(title: Self.roundName(round),
+                                 eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
+        case .seat(let seatClass):
+            let rows = (stats.seatEvents[seatClass] ?? []).map(LotteryListRow.init)
+            PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
+                                 eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
+        case .wins(let seatClass):
+            let rows = (stats.winTypes.first { $0.seatClass == seatClass }?.wins ?? [])
+                .map(LotteryListRow.init)
+            PassportLotterySheet(title: SeatStyle.styles(for: stats)[seatClass].label,
+                                 eyebrow: Text("^[\(rows.count) event](inflect: true)"), rows: rows)
         }
     }
 
@@ -1829,16 +2324,18 @@ private struct PassportSpendingCard: View {
     @Binding var currency: String
     /// Settings' — marked Default in the menu.
     let defaultCurrency: String
+    /// The class the dearest and cheapest are read over; nil for every ticket.
+    /// Held by the Passport with the list below, for the reason the lottery
+    /// card's list is.
+    @Binding var seatFilter: String?
+    /// The list of tickets open over the card, if any — drawn by the Passport
+    /// (``drawer(_:stats:seatFilter:)``).
+    @Binding var openList: TicketList?
     /// Opens an event on the screen's own event sheet.
     let open: (Event) -> Void
 
-    /// The class the dearest and cheapest are read over; nil for every ticket.
-    @State private var seatFilter: String?
-    /// The list of tickets open over the card, if any.
-    @State private var openList: TicketList?
-
     /// What a list of tickets behind the card holds, and the order it runs in.
-    private enum TicketList: Identifiable, Hashable {
+    enum TicketList: Identifiable, Hashable {
         /// Every ticket under the chips, from the end whose See All opened
         /// it: dearest first under Highest, cheapest first under Lowest.
         case highest, lowest
@@ -1851,12 +2348,16 @@ private struct PassportSpendingCard: View {
 
     /// The chosen class, unless the year filter has just taken it away
     /// underneath the reader.
-    private var filter: String? {
+    private var filter: String? { Self.filter(seatFilter, in: stats) }
+
+    /// The tickets the two ends are read off, dearest first.
+    private var filtered: [PassportStats.Ticket] { Self.tickets(of: stats, in: filter) }
+
+    private static func filter(_ seatFilter: String?, in stats: PassportStats) -> String? {
         stats.ticketTypes.contains { $0.seatClass == seatFilter } ? seatFilter : nil
     }
 
-    /// The tickets the two ends are read off, dearest first.
-    private var filtered: [PassportStats.Ticket] {
+    private static func tickets(of stats: PassportStats, in filter: String?) -> [PassportStats.Ticket] {
         guard let filter else { return stats.tickets }
         return stats.tickets.filter { $0.seatClass == filter }
     }
@@ -1894,25 +2395,31 @@ private struct PassportSpendingCard: View {
         }
         .padding(16)
         .glassPanel(cornerRadius: 28)
-        .sheet(item: $openList) { list in
-            switch list {
-            case .highest:
-                PassportTicketSheet(tickets: filtered, title: Text("Highest Price"),
-                                    currency: stats.currency, styles: styles,
-                                    seatType: filter.map { styles[$0].label })
-            case .lowest:
-                // Reversed rather than sorted again, so the first row is the
-                // one the card shows as the cheapest, ties and all.
-                PassportTicketSheet(tickets: filtered.reversed(), title: Text("Lowest Price"),
-                                    currency: stats.currency, styles: styles,
-                                    seatType: filter.map { styles[$0].label })
-            case .seatClass(let seatClass):
-                // Every ticket of the class whatever the chips say: the row
-                // tapped is the slice's, not the filtered ends'.
-                PassportTicketSheet(tickets: stats.tickets.filter { $0.seatClass == seatClass },
-                                    title: styles[seatClass].label,
-                                    currency: stats.currency, styles: styles, seatType: nil)
-            }
+    }
+
+    /// The list of tickets behind the card, as the Passport opens it.
+    @ViewBuilder
+    static func drawer(_ list: TicketList, stats: PassportStats, seatFilter: String?) -> some View {
+        let styles = SeatStyle.styles(for: stats)
+        let filter = Self.filter(seatFilter, in: stats)
+        let filtered = Self.tickets(of: stats, in: filter)
+        switch list {
+        case .highest:
+            PassportTicketSheet(tickets: filtered, title: Text("Highest Price"),
+                                currency: stats.currency, styles: styles,
+                                seatType: filter.map { styles[$0].label })
+        case .lowest:
+            // Reversed rather than sorted again, so the first row is the
+            // one the card shows as the cheapest, ties and all.
+            PassportTicketSheet(tickets: filtered.reversed(), title: Text("Lowest Price"),
+                                currency: stats.currency, styles: styles,
+                                seatType: filter.map { styles[$0].label })
+        case .seatClass(let seatClass):
+            // Every ticket of the class whatever the chips say: the row
+            // tapped is the slice's, not the filtered ends'.
+            PassportTicketSheet(tickets: stats.tickets.filter { $0.seatClass == seatClass },
+                                title: styles[seatClass].label,
+                                currency: stats.currency, styles: styles, seatType: nil)
         }
     }
 

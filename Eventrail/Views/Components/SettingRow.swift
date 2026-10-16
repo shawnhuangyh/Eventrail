@@ -40,16 +40,21 @@ struct SettingRowLabel<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
+                .scalingFont(size: 14, weight: .semibold)
                 .foregroundStyle(tint)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .scalingFont(size: 14, weight: .semibold)
                     .foregroundStyle(titleTint)
+                    // On one line, a little smaller where the reader's text
+                    // size leaves a control beside it too little room: wrapped,
+                    // "Appearance" broke in the middle of the word.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 if let status {
                     status
-                        .font(.system(size: 11.5))
+                        .scalingFont(size: 11.5)
                         .monospacedDigit()
                         .foregroundStyle(needsAttention ? Color.favorite : .secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -98,7 +103,7 @@ struct SettingRowValue: View {
     var body: some View {
         HStack(spacing: 6) {
             text
-                .font(.system(size: 14))
+                .scalingFont(size: 14)
                 .monospacedDigit()
                 .foregroundStyle(Color(uiColor: .secondaryLabel))
             if let accessory {
@@ -115,7 +120,7 @@ struct SettingRowAccessory: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 11, weight: .semibold))
+            .scalingFont(size: 11, weight: .semibold)
             .foregroundStyle(Color(uiColor: .tertiaryLabel))
     }
 }

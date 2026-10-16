@@ -87,18 +87,27 @@ struct EventsView: View {
                     )
                 }
             }
-            .eventSheet($openEvent)
+            // Beside the list on an open iPhone Duo.
+            .eventPane($openEvent)
+            .venueDestination()
             .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
             // Nothing is left selected behind a filter that no longer shows it,
             // and nothing survives leaving the mode that picked it.
             .onChange(of: filter) { selection.removeAll() }
-            .onChange(of: isSelecting) { selection.removeAll() }
+            .onChange(of: isSelecting) {
+                selection.removeAll()
+                // Picking takes the screen over, beside the fold too: the event
+                // open beside the list goes, rather than keep its own buttons in
+                // the bar beside the picking's, or stay up once picked and removed.
+                if isSelecting { openEvent = nil }
+            }
             // Read again as the sheet closes, against the copy the sheet has
             // just read: the row was marked as it stood when tapped, and a
             // page that had changed since would otherwise come back Updated
-            // from the very sheet that showed the change.
+            // from the very sheet that showed the change. Beside the list, the
+            // event goes as another row is chosen rather than as a sheet closes.
             .onChange(of: openEvent) { closed, open in
-                guard open == nil, let closed, let current = store.event(id: closed.id),
+                guard let closed, open?.id != closed.id, let current = store.event(id: closed.id),
                       current.isUpcoming
                 else { return }
                 mark(current, read: true)

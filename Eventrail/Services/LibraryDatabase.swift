@@ -37,7 +37,7 @@ final class LibraryDatabase {
 
     /// ``LibraryMembership`` is in it only so what the builds before
     /// ``LibraryEntry`` wrote can be read once and taken in.
-    static let schema = Schema([LibraryEntry.self, LibraryEvent.self, FollowingReadMark.self,
+    static let schema = Schema([LibraryEntry.self, LibraryEvent.self, LibraryLottery.self, FollowingReadMark.self,
                                 FollowedPerformer.self, LibrarySettings.self, LibraryMembership.self])
 
     /// How syncing stands, in terms the Settings row can state plainly.
@@ -611,6 +611,8 @@ final class LibraryDatabase {
                                   folding: { $0.absorb($1) }, in: context)
         changed = try keepOne(of: LibraryEvent.self, by: \.eventID,
                               preferring: LibraryEvent.isPreferred, in: context) || changed
+        changed = try keepOne(of: LibraryLottery.self, by: LotteryKey.init,
+                              preferring: LibraryLottery.isPreferred, in: context) || changed
         changed = try keepOne(of: FollowingReadMark.self, by: \.eventID,
                               preferring: FollowingReadMark.isPreferred, in: context) || changed
         changed = try keepOne(of: FollowedPerformer.self, by: \.actorID,
@@ -652,6 +654,111 @@ final class LibraryDatabase {
         _ rows: [Row], by key: (Row) -> Key, preferring: (Row, Row) -> Bool
     ) -> [Key: Row] {
         Dictionary(rows.map { (key($0), $0) }, uniquingKeysWith: { preferring($0, $1) ? $0 : $1 })
+    }
+
+    // MARK: - Lotteries
+
+    /// What two rows for one lottery round share: the event and the round.
+    struct LotteryKey: Hashable {
+        let eventID: String
+        let entryID: String
+
+        init(_ row: LibraryLottery) {
+            eventID = row.eventID
+            entryID = row.entryID
+        }
+    }
+
+    /// Every event's lottery rows, by event and then by round — the row
+    /// ``deduplicate(in:)`` will keep for each round.
+    static func lotteryIndex(_ rows: [LibraryLottery]) -> [String: [String: LibraryLottery]] {
+        Dictionary(grouping: rows, by: \.eventID).mapValues { rows in
+            index(rows, by: \.entryID, preferring: LibraryLottery.isPreferred)
+        }
+    }
+
+    /// The rounds an event's rows hold, in the order the reader wrote them —
+    /// nil where it has no row yet, taken-out rounds included, and its list
+    /// is still the one its entry kept.
+    static func lotteries(in rows: [String: LibraryLottery]?) -> [LotteryEntry]? {
+        guard let rows, !rows.isEmpty else { return nil }
+        return rows.values
+            .sorted { ($0.position, $0.entryID) < ($1.position, $1.entryID) }
+            .compactMap(\.lottery)
+    }
+
+    /// What the reader wrote on an event: its entry's answers, with the
+    /// rounds its rows hold — or, where it has none yet, the list the entry
+    /// kept before rows.
+    static func tracking(of entry: LibraryEntry?, rows: [String: LibraryLottery]?) -> Tracking {
+        let lotteries = lotteries(in: rows)
+        guard let entry else { return Tracking(lotteries: lotteries ?? []) }
+        return entry.tracking(lotteries: lotteries)
+    }
+
+    /// When the newest of an event's lottery rows was written, if it has any.
+    static func lotteriesChanged(in rows: [String: LibraryLottery]?) -> Date? {
+        rows?.values.map(\.modified).max()
+    }
+
+    /// Writes `lotteries` as an event's rows, dated `when`, touching only the
+    /// rounds that move — a round added is a row inserted, a round changed or
+    /// moved the row rewritten, and a round taken out the row marked removed.
+    /// Answers whether anything moved.
+    ///
+    /// The first change to an event whose list is still the one its entry
+    /// kept writes the whole list into rows: a round left as it was is dated
+    /// when the entry last changed rather than now, so a device moving its
+    /// copy across cannot outrank a round another device has since changed
+    /// or taken out; one already taken out of the list is a removed row, so
+    /// the old list is never read again.
+    ///
+    /// `redating` dates again a round left as it was, where `when` is later
+    /// than its row says — what a restore raising its answers as of now asks
+    /// (``apply(_:to:)``). Not saved; the caller saves.
+    @discardableResult
+    static func writeLotteries(_ lotteries: [LotteryEntry], for eventID: String,
+                               rows: inout [String: [String: LibraryLottery]], entry: LibraryEntry?,
+                               dated when: Date, redating: Bool = false, in context: ModelContext) -> Bool {
+        var held = rows[eventID] ?? [:]
+        var changed = false
+        func row(for id: String) -> LibraryLottery {
+            if let row = held[id] { return row }
+            let row = LibraryLottery(eventID: eventID, entryID: id)
+            context.insert(row)
+            held[id] = row
+            return row
+        }
+        let wanted = Set(lotteries.map(\.id.uuidString))
+        if held.isEmpty, let entry {
+            // Moved across from the entry's own list, in one go.
+            let kept = entry.tracking.lotteries
+            let keptDate = entry.changed(.tracking)
+            for lottery in kept where !wanted.contains(lottery.id.uuidString) {
+                row(for: lottery.id.uuidString).write(nil, at: 0, dated: when)
+                changed = true
+            }
+            for (position, lottery) in lotteries.enumerated() {
+                let unchanged = kept.contains(lottery)
+                row(for: lottery.id.uuidString).write(lottery, at: position, dated: unchanged ? keptDate : when)
+                changed = true
+            }
+        } else {
+            for (position, lottery) in lotteries.enumerated() {
+                let target = row(for: lottery.id.uuidString)
+                if target.write(lottery, at: position, dated: when) {
+                    changed = true
+                } else if redating, when.toTheMillisecond > target.modified.toTheMillisecond {
+                    target.modified = when.toTheMillisecond
+                    changed = true
+                }
+            }
+            for (id, target) in held where !wanted.contains(id) {
+                changed = target.write(nil, at: target.position, dated: when) || changed
+            }
+        }
+        rows[eventID] = held
+        return changed
     }
 
     /// Deletes the Following reads of events that have been — the tab no
@@ -741,10 +848,11 @@ final class LibraryDatabase {
         }
         let entries = index(try context.fetch(FetchDescriptor<LibraryEntry>()), by: \.eventID,
                             preferring: LibraryEntry.isPreferred)
+        let lotteries = lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))
         for (id, entry) in entries {
             archive.membership[id] = Stamped(entry.inLibrary, at: entry.changed(.inLibrary))
             archive.favorites[id] = Stamped(entry.isFavorite, at: entry.changed(.favorite))
-            archive.tracking[id] = Stamped(entry.tracking, at: entry.changed(.tracking))
+            archive.tracking[id] = stampedTracking(of: entry, rows: lotteries[id])
             if archive.events[id] == nil { archive.events[id] = entry.kept }
         }
         let marks = index(try context.fetch(FetchDescriptor<FollowingReadMark>()), by: \.eventID,
@@ -769,6 +877,23 @@ final class LibraryDatabase {
         return archive.pruned()
     }
 
+    /// An event's record as an archive carries it: dated as its entry dates
+    /// its tracking, the lotteries as their newest row — the record as new as
+    /// the newer of the two, the other answer dated older within it.
+    static func stampedTracking(of entry: LibraryEntry, rows: [String: LibraryLottery]?) -> Stamped<Tracking> {
+        var record = tracking(of: entry, rows: rows)
+        let part = entry.changed(.tracking).toTheMillisecond
+        guard let listed = lotteriesChanged(in: rows)?.toTheMillisecond, listed != part else {
+            return Stamped(record, at: part)
+        }
+        if listed > part {
+            for field in Tracking.Field.allCases where field != .lotteries { record.edits[field] = part }
+            return Stamped(record, at: listed)
+        }
+        record.edits[.lotteries] = listed
+        return Stamped(record, at: part)
+    }
+
     /// Writes what `archive` holds into the rows, touching only those whose
     /// answer, or the date of it, moves. Additive: a row the archive says
     /// nothing about is left alone, since every caller hands in the library
@@ -789,6 +914,7 @@ final class LibraryDatabase {
                           preferring: FollowingReadMark.isPreferred)
         let performers = index(try context.fetch(FetchDescriptor<FollowedPerformer>()), by: \.actorID,
                                preferring: FollowedPerformer.isPreferred)
+        var lotteries = lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))
         var changed = false
 
         for (id, event) in archive.events where rows[id]?.facts != event {
@@ -806,16 +932,38 @@ final class LibraryDatabase {
             let held = entries[id]
             // Only what the archive holds is taken: an answer it has no record
             // of stays as this device has it.
-            var answers = held?.answers ?? LibraryEntry.Answers()
+            var heldAnswers = held?.answers ?? LibraryEntry.Answers()
+            heldAnswers.tracking = tracking(of: held, rows: lotteries[id])
+            var answers = heldAnswers
             if let membership = archive.membership[id] { answers.inLibrary = membership.value }
             if let favorite = archive.favorites[id] { answers.isFavorite = favorite.value }
             if let tracking = archive.tracking[id] {
                 answers.tracking = tracking.value
                 answers.tracking.edits = [:]
+                // The lotteries are rows of their own, dated as the archive
+                // dates the list — and dated again where it raises an
+                // unchanged list past what its rows say, as a restore does.
+                let listed = answers.tracking.lotteries
+                if listed != heldAnswers.tracking.lotteries || lotteries[id] != nil {
+                    changed = writeLotteries(listed, for: id, rows: &lotteries, entry: held,
+                                             dated: tracking.value.edits[.lotteries] ?? tracking.modified,
+                                             redating: true, in: context) || changed
+                }
+            }
+            // Whether there is anything to say, the lotteries included; the
+            // entry's own parts are settled with them set aside.
+            let saysNothing = answers.isEmpty
+            answers.tracking.lotteries = heldAnswers.tracking.lotteries
+            // The entry's tracking is dated by its own answers, not by the
+            // list beside it: dated by a newer list, it would outrank another
+            // device's newer note in the fold (``LibraryEntry/absorb(_:)``).
+            let answered = archive.tracking[id].map { record in
+                Tracking.Field.allCases.filter { $0 != .lotteries && $0 != .ticket }
+                    .map { record.value.edits[$0] ?? record.modified }.max() ?? record.modified
             }
             let records: [LibraryEntry.Part: Date?] = [.inLibrary: archive.membership[id]?.modified,
                                                        .favorite: archive.favorites[id]?.modified,
-                                                       .tracking: archive.tracking[id]?.modified]
+                                                       .tracking: answered]
             // A new entry is dated by every record the archive holds for it —
             // a removal is an answer too — and one already here by the parts
             // that move, and by those that stay but were given again later
@@ -823,13 +971,13 @@ final class LibraryDatabase {
             // event is settled against (``LibraryEntry/absorb(_:)``): left at
             // the older one, a copy given in between would outrank the answer
             // the archive just carried in.
-            let moved = Set(answers.parts(differingFrom: held?.answers ?? LibraryEntry.Answers()))
+            let moved = Set(answers.parts(differingFrom: heldAnswers))
             let dates = records.compactMapValues { $0 }.filter { part, when in
                 guard let held else { return true }
                 return moved.contains(part) || when.toTheMillisecond > held.changed(part).toTheMillisecond
             }
             // An event nobody said anything about needs no entry to say so.
-            guard held == nil ? !answers.isEmpty : !dates.isEmpty else { continue }
+            guard held == nil ? !saysNothing : !dates.isEmpty else { continue }
             let entry = held ?? LibraryEntry(eventID: id)
             if held == nil { context.insert(entry) }
             entry.give(answers, dated: dates)

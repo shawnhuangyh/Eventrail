@@ -45,14 +45,14 @@ struct AboutView: View {
                 .padding(.bottom, 2)
             // The app's name, not a string to translate.
             Text(verbatim: "Eventrail")
-                .font(.system(size: 22, weight: .bold))
+                .scalingFont(size: 22, weight: .bold)
                 .kerning(-0.3)
             version
-                .font(.system(size: 12.5))
+                .scalingFont(size: 12.5)
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
             Text("A companion for Eventernote: browse events, keep your own record of what you have been to and what you are going to, and follow the performers you care about.")
-                .font(.system(size: 12.5))
+                .scalingFont(size: 12.5)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -85,14 +85,14 @@ struct AboutView: View {
         Link(destination: url) {
             HStack(spacing: 12) {
                 Image(systemName: symbol)
-                    .font(.system(size: 14, weight: .semibold))
+                    .scalingFont(size: 14, weight: .semibold)
                     .foregroundStyle(.secondary)
                     .frame(width: 20)
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .scalingFont(size: 14, weight: .semibold)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .scalingFont(size: 12, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 16)

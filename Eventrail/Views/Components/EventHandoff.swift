@@ -92,17 +92,27 @@ extension View {
     /// Offers `event` to the reader's other devices for as long as this view
     /// is on screen and no event's sheet stands in front of it — see
     /// ``EventHandoff``. On the root of an event's sheet.
-    func advertisesHandoff(of event: Event) -> some View {
-        modifier(EventHandoffStand(event: event))
+    ///
+    /// `beneathSheets` for a page that is part of a screen rather than a
+    /// sheet over it — an event beside its list (``View/eventPane(_:)``):
+    /// the screen stands at the depth of the sheets presented over it, so the
+    /// page stands one shallower, under the one opened over it from outside
+    /// the app. At the same depth it was left to the fixed rule which of the
+    /// two was offered.
+    func advertisesHandoff(of event: Event, beneathSheets: Bool = false) -> some View {
+        modifier(EventHandoffStand(event: event, beneathSheets: beneathSheets))
     }
 }
 
 private struct EventHandoffStand: ViewModifier {
     let event: Event
+    let beneathSheets: Bool
 
     @Environment(EventHandoff.self) private var handoff: EventHandoff?
-    @Environment(\.outsideOpenDepth) private var depth
+    @Environment(\.outsideOpenDepth) private var outsideOpenDepth
     @State private var id = UUID()
+
+    private var depth: Int { beneathSheets ? outsideOpenDepth - 1 : outsideOpenDepth }
 
     func body(content: Content) -> some View {
         content

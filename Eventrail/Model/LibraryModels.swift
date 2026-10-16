@@ -19,6 +19,8 @@ import SwiftData
 //   most an older copy of a public page, which the next read mends.
 // - ``FollowingReadMark`` is a Following date's read, written as the reader
 //   opens a row — often, and on whichever device is in their hand.
+// - ``LibraryLottery`` is one lottery round the reader entered for an event,
+//   so two devices each adding a round while apart both keep theirs.
 //
 // CloudKit's rules shape every property here: each one has a default or is
 // optional, and nothing is `.unique` — two devices each writing a row for the
@@ -140,26 +142,35 @@ final class LibraryEntry {
     var seat: String = ""
     var seatClass: String = ""
     /// What the ticket cost in whole yen, as builds before costs had a
-    /// currency kept it. Read only where ``costHundredths`` is nil, and
-    /// emptied the first time the entry is written again — see ``tracking``.
+    /// currency kept it. Read only where ``price`` and ``costHundredths`` are
+    /// empty, and emptied as the cost is next changed — see ``tracking``.
     var cost: Int?
-    /// ``Tracking/cost`` in hundredths of its currency: ¥9,900 is 990000 and
-    /// $49.99 is 4999.
-    ///
-    /// A whole number rather than a `Decimal` column, because a whole number
-    /// is a CloudKit field of a kind every build and the Console read the same,
-    /// and a hundredth is as fine as any currency a ticket is sold in divides.
+    /// ``Tracking/cost`` in hundredths of its currency, as builds before
+    /// ``price`` kept it: ¥9,900 is 990000 and $49.99 is 4999. Read with
+    /// ``costCurrency`` only where ``price`` is empty, and emptied with it as
+    /// the cost is next changed.
     var costHundredths: Int?
-    /// ``Tracking/currency``: empty for yen written before costs had one.
+    /// ``Tracking/currency``, beside ``costHundredths``: empty for yen written
+    /// before costs had one.
     var costCurrency: String = ""
+    /// ``Tracking/cost`` and ``Tracking/currency`` as one answer: the amount
+    /// as typed, and its currency after a space — "9900 JPY", "49.99 USD" —
+    /// or the amount alone for yen written before costs had a currency.
+    /// Empty for not written down.
+    ///
+    /// One column rather than two, because CloudKit may settle two columns of
+    /// one record apart: a device that changed only the currency and another
+    /// that changed only the amount, apart, could leave an amount and a
+    /// currency nobody wrote together — ¥9,900 read as NT$9,900.
+    var price: String = ""
     /// How many lotteries were entered, as builds before each was an entry
-    /// kept it. Read only where ``lotteries`` holds nothing, as one entry
-    /// applied for that many times, and emptied the first time the entry is
-    /// written again — see ``tracking``.
+    /// kept it. Read only where ``lotteries`` holds nothing and the event has
+    /// no ``LibraryLottery`` rows, as one entry applied for that many times.
     var lotteryEntries: Int?
-    /// ``Tracking/lotteries`` as JSON, its keys sorted — see
-    /// ``LotteryEntry/columnText(of:)``. Text rather than data, so the
-    /// Console shows what a record holds. Empty for none.
+    /// ``Tracking/lotteries`` as JSON, as builds before ``LibraryLottery``
+    /// kept them — see ``LotteryEntry/columnText(of:)``. Read only where the
+    /// event has no rows of its own yet, and never written again: the first
+    /// change to the list writes it into rows (``LibraryDatabase/writeLotteries``).
     var lotteries: String = ""
     var note: String = ""
     /// When the reader last changed any of it — which of two entries for one
@@ -177,6 +188,46 @@ final class LibraryEntry {
 
     init(eventID: String) {
         self.eventID = eventID
+    }
+}
+
+/// One lottery round the reader entered for an event — a ``LotteryEntry``,
+/// in a record of its own.
+///
+/// Its own record rather than part of the event's ``LibraryEntry``, because
+/// CloudKit settles a record whole: kept as one list on the entry, two devices
+/// each adding a round while apart left whichever reached iCloud last, and the
+/// other round was gone. One round a record, each device's round is a record
+/// of its own and both stand; the same round changed on both is settled as
+/// any record is, by which reached iCloud last.
+///
+/// A round taken out is ``isRemoved`` rather than a deleted row, so it reaches
+/// every device, as a removal from the library does.
+@Model
+final class LibraryLottery {
+    /// Which of two rows for one round is kept, where they tie.
+    var uid: UUID = UUID()
+    /// Eventernote's id for the event the round was entered for.
+    var eventID: String = ""
+    /// ``LotteryEntry/id``, as text: what two rows for one round share, with
+    /// ``eventID`` — a round carried over from before entries has the same id
+    /// in every event.
+    var entryID: String = ""
+    /// The round as JSON, its keys sorted — see ``LotteryEntry/rowText(of:)``.
+    /// Text, so the Console shows what a record holds. Emptied as it is taken
+    /// out.
+    var entry: String = ""
+    var isRemoved: Bool = false
+    /// Where it stood in the list as the reader last wrote it — the order two
+    /// rounds of one kind are listed in (``Tracking/lotteriesInOrder``).
+    var position: Int = 0
+    /// When it was last written, to the millisecond — which of two rows for
+    /// one round is kept.
+    var modified: Date = Date.distantPast
+
+    init(eventID: String, entryID: String) {
+        self.eventID = eventID
+        self.entryID = entryID
     }
 }
 
@@ -461,56 +512,84 @@ extension LibraryEntry {
         }
         guard !dates.isEmpty else { return }
         give(answers, dated: dates)
+        // The list an older build kept on the entry is not written by
+        // ``tracking`` any more — rows are — so it comes across as it stands,
+        // for an event whose list has not been moved into rows yet.
+        if dates[.tracking] != nil {
+            update(\.lotteries, to: other.lotteries)
+            update(\.lotteryEntries, to: other.lotteryEntries)
+            update(\.ticket, to: other.ticket)
+        }
         update(\.modified, to: max(modified, other.modified.toTheMillisecond))
         if snapshot == nil { update(\.snapshot, to: other.snapshot) }
     }
 
+    /// What the reader wrote on the event, its lotteries the list this entry
+    /// kept before ``LibraryLottery`` — what an event with no rows of its own
+    /// yet reads. Every other event reads ``tracking(lotteries:)``.
+    ///
+    /// Set, it writes everything but the lotteries, which are rows of their
+    /// own (``LibraryDatabase/writeLotteries``): the old list stays as it is
+    /// until the first change to it moves it into rows.
     var tracking: Tracking {
-        get {
-            let amount = costHundredths.map { Decimal($0) / 100 } ?? cost.map { Decimal($0) }
-            let entries = LotteryEntry.entries(inColumn: lotteries)
-                ?? LotteryEntry.carriedOver(count: lotteryEntries)
-            var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
-                                  seatClass: seatClass, cost: amount, lotteries: entries, note: note,
-                                  currency: costCurrency)
-            // A ticket an older build marked bought reads as a won entry, and
-            // is written so — the ticket column emptied — with the next write.
-            record.foldLegacyTicket()
-            return record
-        }
+        get { tracking(lotteries: nil) }
         set {
-            // A list this build cannot read back whole — one a later build
-            // wrote, or one gone bad — reads as what it could make of it, and
-            // is written over only where the reader changed the list itself:
-            // a note edited beside it must not empty it on every device.
-            let writesLotteries = LotteryEntry.understands(column: lotteries)
-                || newValue.lotteries != tracking.lotteries
             update(\.seat, to: newValue.seat)
             update(\.seatClass, to: newValue.seatClass)
-            update(\.costHundredths, to: newValue.cost.map(Self.hundredths(of:)))
-            update(\.costCurrency, to: newValue.currency)
-            // The cost now lives in the two columns above, so the old one is
-            // emptied rather than left to be read back over an emptied cost.
-            update(\.cost, to: nil)
-            if writesLotteries {
-                // The old ticket answer with them: it is folded into the list
-                // as it is read, so the two are emptied and written together.
-                update(\.ticket, to: newValue.ticket.rawValue)
-                update(\.lotteries, to: LotteryEntry.columnText(of: newValue.lotteries))
-                // Emptied for the reason the old cost column is: a list taken
-                // down to nothing must not read back as the count again.
-                update(\.lotteryEntries, to: nil)
+            // Written only where the cost itself changed: a note edited beside
+            // a cost an older build wrote must not rewrite the cost, and race
+            // another device's change to it.
+            let held = tracking
+            if newValue.cost != held.cost || newValue.currency != held.currency {
+                update(\.price, to: Self.priceText(of: newValue.cost, in: newValue.currency))
+                // The cost now lives in the column above, so the old ones are
+                // emptied rather than left to be read back over an emptied cost.
+                update(\.costHundredths, to: nil)
+                update(\.costCurrency, to: "")
+                update(\.cost, to: nil)
             }
             update(\.note, to: newValue.note)
         }
     }
 
-    /// An amount in hundredths, to the nearest one.
-    private static func hundredths(of amount: Decimal) -> Int {
-        var scaled = amount * 100
-        var rounded = Decimal()
-        NSDecimalRound(&rounded, &scaled, 0, .plain)
-        return NSDecimalNumber(decimal: rounded).intValue
+    /// What the reader wrote on the event, with `lotteries` — its rows' list
+    /// (``LibraryDatabase/tracking(of:rows:)``) — in place of the old list
+    /// this entry kept, where there is one.
+    ///
+    /// The old ticket column goes with the old list: an event with rows holds
+    /// what it said among them already, folded in as the list was moved.
+    func tracking(lotteries rows: [LotteryEntry]?) -> Tracking {
+        let (amount, currency) = cost(in: price)
+            ?? (costHundredths.map { Decimal($0) / 100 } ?? cost.map { Decimal($0) }, costCurrency)
+        var record = Tracking(seat: seat, seatClass: seatClass, cost: amount, note: note, currency: currency)
+        if let rows {
+            record.lotteries = rows
+        } else {
+            record.ticket = TicketStatus(rawValue: ticket) ?? .none
+            record.lotteries = LotteryEntry.entries(inColumn: lotteries)
+                ?? LotteryEntry.carriedOver(count: lotteryEntries)
+            // A ticket an older build marked bought reads as a won entry, and
+            // is written so with the first change to the list.
+            record.foldLegacyTicket()
+        }
+        return record
+    }
+
+    /// A cost as ``price`` holds it: the amount, and its currency after a
+    /// space where it has one. Empty for none.
+    static func priceText(of amount: Decimal?, in currency: String) -> String {
+        guard let amount else { return "" }
+        return currency.isEmpty ? "\(amount)" : "\(amount) \(currency)"
+    }
+
+    /// The amount and currency ``price`` holds, or nil where it is empty — or
+    /// holds nothing this build can read, which reads as the older columns.
+    private func cost(in text: String) -> (Decimal?, String)? {
+        guard !text.isEmpty else { return nil }
+        let parts = text.split(separator: " ", maxSplits: 1)
+        guard let amount = parts.first.flatMap({ Decimal(string: String($0), locale: Locale(identifier: "en_US_POSIX")) })
+        else { return nil }
+        return (amount, parts.count > 1 ? String(parts[1]) : "")
     }
 
     /// The event as it stood when the reader last wrote here — what the entry
@@ -533,6 +612,50 @@ extension LibraryEntry {
         let written = entry.modified.toTheMillisecond, otherWritten = other.modified.toTheMillisecond
         if written != otherWritten { return written > otherWritten }
         return entry.uid.uuidString < other.uid.uuidString
+    }
+}
+
+extension LibraryLottery {
+    /// The round this row holds, or nil where it was taken out — or holds
+    /// none this build can read.
+    var lottery: LotteryEntry? {
+        isRemoved ? nil : LotteryEntry.entry(inRow: entry)
+    }
+
+    /// Writes `lottery` — nil takes the round out — at `position`, dated
+    /// `when`, touching only what moves. Answers whether anything did.
+    ///
+    /// A round this build cannot read back whole — one a later build wrote —
+    /// is written over only where the reader changed that round: moved, or
+    /// another round beside it changed, it keeps what this build would drop.
+    @discardableResult
+    func write(_ lottery: LotteryEntry?, at position: Int, dated when: Date) -> Bool {
+        guard let lottery else {
+            guard !isRemoved else { return false }
+            update(\.isRemoved, to: true)
+            update(\.entry, to: "")
+            update(\.modified, to: when.toTheMillisecond)
+            return true
+        }
+        var moved = false
+        if isRemoved || self.lottery != lottery {
+            update(\.isRemoved, to: false)
+            update(\.entry, to: LotteryEntry.rowText(of: lottery))
+            moved = true
+        }
+        if self.position != position {
+            update(\.position, to: position)
+            moved = true
+        }
+        if moved { update(\.modified, to: when.toTheMillisecond) }
+        return moved
+    }
+
+    /// The row written last, and the lower `uid` on a tie.
+    static func isPreferred(_ row: LibraryLottery, over other: LibraryLottery) -> Bool {
+        let written = row.modified.toTheMillisecond, otherWritten = other.modified.toTheMillisecond
+        if written != otherWritten { return written > otherWritten }
+        return row.uid.uuidString < other.uid.uuidString
     }
 }
 
@@ -673,3 +796,4 @@ extension LibraryEntry: ChangeAvoidingModel {}
 extension FollowedPerformer: ChangeAvoidingModel {}
 extension LibrarySettings: ChangeAvoidingModel {}
 extension FollowingReadMark: ChangeAvoidingModel {}
+extension LibraryLottery: ChangeAvoidingModel {}

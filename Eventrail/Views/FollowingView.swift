@@ -170,8 +170,8 @@ struct FollowingView: View {
             // Events: the tab bar stands down for the actions on what is picked.
             .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
             .toolbar { toolbar }
-            .performerDestination()
-            .eventSheet($openEvent)
+            .venueDestination()
+            .eventPane($openEvent)
             // The tab's own load places a ration of halls, which a list held
             // to areas can outrun: what nothing has placed is under Not Placed
             // until it is. So while the list is held to any, halls go on
@@ -200,7 +200,13 @@ struct FollowingView: View {
             // Turning the filter off lets go of what it was keeping, and
             // turning it back on starts from what is unread now.
             .onChange(of: unreadOnly) { readWhileFiltering.removeAll() }
-            .onChange(of: isSelecting) { selection.removeAll() }
+            .onChange(of: isSelecting) {
+                selection.removeAll()
+                // Picking takes the screen over, beside the fold too: the event
+                // open beside the list goes, rather than keep its own buttons in
+                // the bar beside the picking's, or stay up once picked and removed.
+                if isSelecting { openEvent = nil }
+            }
             // Nothing stays picked behind a filter that no longer shows it.
             .onChange(of: shownIDs) { _, shown in selection.formIntersection(shown) }
             .environment(\.imagesCheckedSince, imagesCheckedSince)
@@ -725,7 +731,7 @@ private struct FollowedDateRow: View {
                                 .fill(Color.brandTint)
                                 .frame(width: 6, height: 6)
                             Text(verbatim: billing.map(\.name).joined(separator: " · "))
-                                .font(.system(size: 11.5, weight: .semibold))
+                                .scalingFont(size: 11.5, weight: .semibold)
                                 .foregroundStyle(Color.brandTint)
                                 .lineLimit(1)
                         }
@@ -743,6 +749,7 @@ private struct FollowedDateRow: View {
         }
         .contentShape(.rect)
         .onTapGesture(perform: open)
+        .marksEventBeside(event.id)
         .glassPanel()
         .accessibilityElement(children: .contain)
     }

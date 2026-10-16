@@ -98,9 +98,15 @@ struct FavoriteEventsView: View {
                 )
             }
         }
-        .eventSheet($openEvent)
+        .eventPane($openEvent)
         .onChange(of: filter) { selection.removeAll() }
-        .onChange(of: isSelecting) { selection.removeAll() }
+        .onChange(of: isSelecting) {
+            selection.removeAll()
+            // Picking takes the screen over, beside the fold too: the event
+            // open beside the list goes, rather than keep its own buttons in
+            // the bar beside the picking's, or stay up once picked and removed.
+            if isSelecting { openEvent = nil }
+        }
     }
 
     private func section(_ group: EventGroup) -> some View {
@@ -128,7 +134,7 @@ struct FavoriteEventsView: View {
 
     private func note(_ line: LocalizedStringKey) -> some View {
         Text(line)
-            .font(.system(size: 12))
+            .scalingFont(size: 12)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)

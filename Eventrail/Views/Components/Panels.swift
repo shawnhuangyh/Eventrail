@@ -88,8 +88,10 @@ extension View {
     /// The sheet draws refresh notices of its own, because it covers the root
     /// that draws everybody else's — see ``refreshNotices(aboveBar:showing:)``.
     /// It places them itself, so they stand clear of its action bar.
-    func eventSheet(_ event: Binding<Event?>) -> some View {
-        sheet(item: event) { EventDetailView(event: $0) }
+    ///
+    /// `onDismiss` runs once the sheet has gone, not as it begins to go.
+    func eventSheet(_ event: Binding<Event?>, onDismiss: (() -> Void)? = nil) -> some View {
+        sheet(item: event, onDismiss: onDismiss) { EventDetailView(event: $0) }
     }
 
     /// Registers a performer's page on this stack.
