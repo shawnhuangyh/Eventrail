@@ -204,7 +204,7 @@ struct MeView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     accountTitle
-                        .font(.system(size: 16, weight: .semibold))
+                        .scalingFont(size: 16, weight: .semibold)
                         .lineLimit(1)
                     VStack(alignment: .leading, spacing: 3) {
                         if let handle = profile != nil ? handle : nil {
@@ -214,7 +214,7 @@ struct MeView: View {
                         accountCounts
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -236,7 +236,7 @@ struct MeView: View {
             .padding(16)
 
             refreshDetail
-                .font(.system(size: 12))
+                .scalingFont(size: 12)
                 .foregroundStyle(store.refreshFailure == nil ? .secondary : Color.favorite)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -399,10 +399,10 @@ struct MeView: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Text(label)
-                    .font(.system(size: 14, weight: .medium))
+                    .scalingFont(size: 14, weight: .medium)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 16)
@@ -546,7 +546,7 @@ struct MeView: View {
 
             if waiting.isEmpty {
                 Text(LotteryCardRow.emptyNote)
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -587,7 +587,7 @@ struct MeView: View {
 
             if favorites.isEmpty {
                 Text(FavoriteEventRow.emptyNote)
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -632,7 +632,7 @@ struct MeView: View {
 
             if performers.isEmpty {
                 Text(FollowedPerformerRow.emptyNote)
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)

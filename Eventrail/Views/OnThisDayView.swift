@@ -32,7 +32,7 @@ struct OnThisDayView: View {
                     // Reachable by staying on the screen past midnight, or by
                     // taking the last of them out of the library from its sheet.
                     Text("Nothing you went to fell on this day in an earlier year.")
-                        .font(.system(size: 12))
+                        .scalingFont(size: 12)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,7 +88,7 @@ struct OnThisDayView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             AttendedTag()
                             Text(event.title)
-                                .font(.system(size: 16, weight: .bold))
+                                .scalingFont(size: 16, weight: .bold)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -103,9 +103,9 @@ struct OnThisDayView: View {
                                 Text(event.venue)
                                     .lineLimit(1)
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 8, weight: .bold))
+                                    .scalingFont(size: 8, weight: .bold)
                             }
-                            .font(.system(size: 12.5, weight: .medium))
+                            .scalingFont(size: 12.5, weight: .medium)
                             .foregroundStyle(Color.brandTint)
                             .contentShape(.rect)
                         }
@@ -115,7 +115,7 @@ struct OnThisDayView: View {
 
                     if let times = timesLine(of: event) {
                         times
-                            .font(.system(size: 12))
+                            .scalingFont(size: 12)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -303,18 +303,18 @@ struct OnThisDayCard: View {
             FlyerThumbnail(url: memory.event.imageURL, width: 38, cornerRadius: 10)
             VStack(alignment: .leading, spacing: 3) {
                 memory.whenText
-                    .font(.system(size: 11.5, weight: .bold))
+                    .scalingFont(size: 11.5, weight: .bold)
                     .foregroundStyle(Color.trackAttended)
                 Text(memory.event.title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .scalingFont(size: 14, weight: .semibold)
                 Text(memory.event.venue)
-                    .font(.system(size: 11.5))
+                    .scalingFont(size: 11.5)
                     .foregroundStyle(.secondary)
             }
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .scalingFont(size: 11, weight: .semibold)
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16)
@@ -338,11 +338,11 @@ private struct OnThisDayNote: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: "text.alignleft")
-                .font(.system(size: 12, weight: .semibold))
+                .scalingFont(size: 12, weight: .semibold)
                 .foregroundStyle(.tertiary)
                 .padding(.top, 2)
             Text(note)
-                .font(.system(size: 13))
+                .scalingFont(size: 13)
                 .foregroundStyle(.secondary)
                 .lineSpacing(2)
                 .multilineTextAlignment(.leading)

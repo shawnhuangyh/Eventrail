@@ -125,6 +125,10 @@ struct RootView: View {
         .environment(opens)
         .environment(handoff)
         .tint(.brandTint)
+        // The reader's text size is followed up to xxxLarge and no further —
+        // see ``SwiftUI/View/scalingFont(size:weight:design:)``. Past it, the
+        // accessibility sizes would have rows laid out side by side stack.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only
         // ever catch up after an edit or a trip to the background, so a library

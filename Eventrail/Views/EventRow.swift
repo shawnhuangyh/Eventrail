@@ -35,22 +35,22 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
                 billing
                 VStack(alignment: .leading, spacing: 5) {
                     Text(event.title)
-                        .font(.system(size: 14.5, weight: .semibold))
+                        .scalingFont(size: 14.5, weight: .semibold)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                     caption
-                        .font(.system(size: 12))
+                        .scalingFont(size: 12)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     HStack(spacing: 7) {
                         Text(event.shown(on: timeDisplay).dayLine)
-                            .font(.system(size: 12, weight: .semibold))
+                            .scalingFont(size: 12, weight: .semibold)
                             .monospacedDigit()
                         Circle()
                             .fill(.tertiary)
                             .frame(width: 3, height: 3)
                         detail
-                            .font(.system(size: 12, weight: .medium))
+                            .scalingFont(size: 12, weight: .medium)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
@@ -153,7 +153,7 @@ struct LibraryRow: View {
                         // app deciding it mattered.
                         if let days = event.daysAway { DaysAway(days: days) }
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+                            .scalingFont(size: 11, weight: .semibold)
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -202,7 +202,7 @@ struct AppearanceRow: View {
                 HStack(spacing: 8) {
                     if status != .untracked { StatusBadge(status: status) }
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .scalingFont(size: 11, weight: .semibold)
                         .foregroundStyle(.tertiary)
                 }
             }

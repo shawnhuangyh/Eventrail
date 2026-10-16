@@ -35,7 +35,7 @@ struct FollowedPerformersView: View {
                 if performers.isEmpty {
                     // Reachable by unfollowing the last one from this screen.
                     Text(FollowedPerformerRow.emptyNote)
-                        .font(.system(size: 12))
+                        .scalingFont(size: 12)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)

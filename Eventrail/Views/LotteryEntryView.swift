@@ -195,7 +195,7 @@ struct LotteryEntryView: View {
                             .monospacedDigit()
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Text(verbatim: LotteryText.relative(day))
-                            .font(.system(size: 13, weight: .medium))
+                            .scalingFont(size: 13, weight: .medium)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     } else {
@@ -273,7 +273,7 @@ struct LotteryEntryView: View {
         TicketForm.section(entry.isFirstCome ? "Seat" : "Choices") {
             if !entry.isFirstCome {
                 Text("In order of preference")
-                    .font(.system(size: 13, weight: .medium))
+                    .scalingFont(size: 13, weight: .medium)
                     .foregroundStyle(.secondary)
             }
         } content: {
@@ -324,7 +324,7 @@ struct LotteryEntryView: View {
 
             HStack(spacing: 10) {
                 Text("^[\(choice.quantity) ticket](inflect: true)")
-                    .font(.system(size: 15.5))
+                    .scalingFont(size: 15.5)
                     .monospacedDigit()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 TicketForm.stepper(Binding(
@@ -354,7 +354,7 @@ struct LotteryEntryView: View {
                               isWon: Bool) -> some View {
         HStack(spacing: 8) {
             Text("\(LotteryChoice.ordinal(index)) Choice")
-                .font(.system(size: 15, weight: .semibold))
+                .scalingFont(size: 15, weight: .semibold)
                 .foregroundStyle(isWon ? Color.trackAttended : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if isWon { wonBadge }
@@ -417,7 +417,7 @@ struct LotteryEntryView: View {
 
             if isAhead(entry.day) {
                 Text("Won and Lost can be picked once the results are out.")
-                    .font(.system(size: 13))
+                    .scalingFont(size: 13)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
@@ -453,11 +453,11 @@ struct LotteryEntryView: View {
             Group {
                 if let won { Text("Won \(LotteryText.won(won))") } else { Text("Won") }
             }
-            .font(.system(size: 15.5, weight: .semibold))
+            .scalingFont(size: 15.5, weight: .semibold)
             .foregroundStyle(Color.trackAttended)
             if let subtitle = wonSubtitle(entry, choiceAt: index) {
                 subtitle
-                    .font(.system(size: 12.5))
+                    .scalingFont(size: 12.5)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }

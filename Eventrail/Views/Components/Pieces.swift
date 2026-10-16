@@ -368,10 +368,10 @@ struct FavoriteEventRow: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(event.title)
-                            .font(.system(size: 14, weight: .semibold))
+                            .scalingFont(size: 14, weight: .semibold)
                             .lineLimit(1)
                         Text(verbatim: "\(event.shown(on: timeDisplay).dayLine) · \(event.venue)")
-                            .font(.system(size: 11.5))
+                            .scalingFont(size: 11.5)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -484,10 +484,10 @@ struct FollowedPerformerRow: View {
     private var name: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(verbatim: performer.name)
-                .font(.system(size: 14, weight: .semibold))
+                .scalingFont(size: 14, weight: .semibold)
                 .lineLimit(1)
             detail
-                .font(.system(size: 11.5))
+                .scalingFont(size: 11.5)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -641,14 +641,14 @@ struct RefreshFailureNote: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "wifi.exclamationmark")
-                .font(.system(size: 13, weight: .semibold))
+                .scalingFont(size: 13, weight: .semibold)
                 .foregroundStyle(Color.favorite)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: message)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .scalingFont(size: 12.5, weight: .semibold)
                 Text("Showing what was read before.")
-                    .font(.system(size: 11.5))
+                    .scalingFont(size: 11.5)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

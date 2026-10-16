@@ -234,11 +234,11 @@ struct PerformerView: View {
         VStack(spacing: 11) {
             VStack(spacing: 5) {
                 Text(verbatim: link.name)
-                    .font(.system(size: 27, weight: .bold))
+                    .scalingFont(size: 27, weight: .bold)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 subtitle
-                    .font(.system(size: 13.5))
+                    .scalingFont(size: 13.5)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -439,7 +439,7 @@ struct PerformerView: View {
 
             if events.isEmpty {
                 Text(half.emptyNote)
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -507,17 +507,17 @@ struct PerformerView: View {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(verbatim: other.name)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .scalingFont(size: 14, weight: .semibold)
                                     .lineLimit(1)
                                 Text("^[\(other.shared) shared bill](inflect: true)")
-                                    .font(.system(size: 11.5))
+                                    .scalingFont(size: 11.5)
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
+                                .scalingFont(size: 11, weight: .semibold)
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(.horizontal, 4)

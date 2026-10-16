@@ -731,7 +731,7 @@ private struct FollowedDateRow: View {
                                 .fill(Color.brandTint)
                                 .frame(width: 6, height: 6)
                             Text(verbatim: billing.map(\.name).joined(separator: " · "))
-                                .font(.system(size: 11.5, weight: .semibold))
+                                .scalingFont(size: 11.5, weight: .semibold)
                                 .foregroundStyle(Color.brandTint)
                                 .lineLimit(1)
                         }

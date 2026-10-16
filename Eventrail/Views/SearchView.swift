@@ -348,7 +348,7 @@ struct SearchView: View {
     private var keepLooking: some View {
         HStack(spacing: 10) {
             Text("^[\(events.items.count) result](inflect: true) read so far. The rest may hold more.")
-                .font(.system(size: 12.5, weight: .semibold))
+                .scalingFont(size: 12.5, weight: .semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Keep Looking") {
@@ -404,13 +404,13 @@ struct SearchView: View {
                     // Not a ``SectionLabel``: that carries its own inset, and
                     // this one is set by the row it shares with Clear.
                     Text("Recent")
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .scalingFont(size: 11.5, weight: .semibold)
                         .kerning(0.35)
                         .textCase(.uppercase)
                         .foregroundStyle(.tertiary)
                     Spacer()
                     Button("Clear") { store.clearRecentSearches() }
-                        .font(.system(size: 12, weight: .medium))
+                        .scalingFont(size: 12, weight: .medium)
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.brandTint)
                 }
@@ -430,9 +430,9 @@ struct SearchView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Searching public Eventernote pages")
-                    .font(.system(size: 13.5, weight: .semibold))
+                    .scalingFont(size: 13.5, weight: .semibold)
                 Text("Results come from publicly accessible event pages. Nothing you tag here is written back to Eventernote.")
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -471,19 +471,19 @@ private struct SiteListingRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: listing.symbol)
-                .font(.system(size: 14, weight: .semibold))
+                .scalingFont(size: 14, weight: .semibold)
                 .foregroundStyle(Color.brandTint)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
                 Text(listing.title)
-                    .font(.system(size: 14.5, weight: .semibold))
+                    .scalingFont(size: 14.5, weight: .semibold)
                 listing.detail(on: Event.siteDay(of: .now))
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .scalingFont(size: 11, weight: .semibold)
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16)
@@ -575,11 +575,11 @@ private struct PerformerRow: View {
             HStack(spacing: 13) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(performer.name)
-                        .font(.system(size: 14.5, weight: .semibold))
+                        .scalingFont(size: 14.5, weight: .semibold)
                         .lineLimit(1)
                     if let reading = performer.reading {
                         Text(reading)
-                            .font(.system(size: 12))
+                            .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -588,12 +588,12 @@ private struct PerformerRow: View {
 
                 if let fans = performer.fanCount {
                     Text("^[\(fans) fan](inflect: true)")
-                        .font(.system(size: 11.5, weight: .medium))
+                        .scalingFont(size: 11.5, weight: .medium)
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(13)
@@ -628,11 +628,11 @@ struct FeedFooter<Item: Identifiable & Sendable>: View {
         if let failure = feed.moreFailure {
             HStack(spacing: 10) {
                 Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .scalingFont(size: 13, weight: .semibold)
                     .foregroundStyle(Color.favorite)
                     .frame(width: 18)
                 Text(verbatim: failure)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .scalingFont(size: 12.5, weight: .semibold)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Try Again") {

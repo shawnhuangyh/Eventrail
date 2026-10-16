@@ -102,7 +102,7 @@ struct ListingHalfView: View {
                         // Only reachable for the past half: the upcoming one is
                         // whole before this screen can be opened.
                         Text(half.emptyNote)
-                            .font(.system(size: 12))
+                            .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)

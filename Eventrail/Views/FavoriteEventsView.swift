@@ -134,7 +134,7 @@ struct FavoriteEventsView: View {
 
     private func note(_ line: LocalizedStringKey) -> some View {
         Text(line)
-            .font(.system(size: 12))
+            .scalingFont(size: 12)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)

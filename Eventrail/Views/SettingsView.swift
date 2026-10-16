@@ -249,7 +249,7 @@ struct SettingsView: View {
                      status: calendarStatus, needsAttention: true) {
                 if calendarDenied {
                     Link("Open Settings", destination: Self.systemSettings)
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .scalingFont(size: 12.5, weight: .semibold)
                         .foregroundStyle(Color.brandTint)
                         .buttonStyle(.plain)
                 }
@@ -301,7 +301,7 @@ struct SettingsView: View {
                             status: remindersStatus, needsAttention: true) {
                 if remindersStatus != nil {
                     Link("Open Settings", destination: Self.notificationSettings)
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .scalingFont(size: 12.5, weight: .semibold)
                         .foregroundStyle(Color.brandTint)
                         .buttonStyle(.plain)
                 }
@@ -441,7 +441,7 @@ struct SettingsView: View {
             SettingRowLabel("clock.arrow.circlepath", "Clear Cache") {
                 if cacheCleared {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .semibold))
+                        .scalingFont(size: 14, weight: .semibold)
                         .foregroundStyle(Color.trackAttended)
                         .transition(.scale.combined(with: .opacity))
                 }

@@ -399,14 +399,14 @@ struct EventDetailView: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(event.title)
-                    .font(.system(size: 20, weight: .bold))
+                    .scalingFont(size: 20, weight: .bold)
                     .kerning(-0.2)
                     .fixedSize(horizontal: false, vertical: true)
                 // An already-formatted date, so it is shown as given rather
                 // than as a localizable key. The day alone: the times are the
                 // timeline's, a card below.
                 Text(verbatim: shown.longDateLine)
-                    .font(.system(size: 13, weight: .medium))
+                    .scalingFont(size: 13, weight: .medium)
                     .foregroundStyle(.secondary)
                 venueLine
             }
@@ -476,7 +476,7 @@ struct EventDetailView: View {
     private var venueLine: some View {
         if event.venue.isEmpty {
             Text("Venue to be announced")
-                .font(.system(size: 13, weight: .medium))
+                .scalingFont(size: 13, weight: .medium)
                 .foregroundStyle(.secondary)
         } else {
             NavigationLink(value: event.venueLink) {
@@ -484,9 +484,9 @@ struct EventDetailView: View {
                     Text(event.venue)
                         .lineLimit(1)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .scalingFont(size: 9, weight: .bold)
                 }
-                .font(.system(size: 13, weight: .medium))
+                .scalingFont(size: 13, weight: .medium)
                 .foregroundStyle(Color.brandTint)
                 .contentShape(.rect)
             }
@@ -588,7 +588,7 @@ struct EventDetailView: View {
                     // Wraps rather than cutting off where the switch leaves it
                     // too little room: a countdown is no use with its end gone.
                     headline(for: progress, at: now)
-                        .font(.system(size: 20, weight: .bold))
+                        .scalingFont(size: 20, weight: .bold)
                         .kerning(-0.4)
                         .monospacedDigit()
                         .foregroundStyle(tint)
@@ -606,7 +606,7 @@ struct EventDetailView: View {
                 }
                 if let detail = detail(for: progress, at: now) {
                     detail
-                        .font(.system(size: 13, weight: .medium))
+                        .scalingFont(size: 13, weight: .medium)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                         .contentTransition(.numericText())
@@ -618,26 +618,23 @@ struct EventDetailView: View {
 
             stopsRow(progress, tint: tint)
 
-            HStack(spacing: 10) {
-                Label { runLine } icon: { Image(systemName: "timer") }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineLimit(1)
-                // The head count reads as a number needing a noun, so it says
-                // where it was counted.
-                if let listed = event.listedAttendees {
-                    Label {
-                        Text("\(listed.formatted()) going on Eventernote")
-                            .monospacedDigit()
-                    } icon: {
-                        Image(systemName: "person.2.fill")
-                    }
-                    .foregroundStyle(.tertiary)
-                    // Whole on one line; the run time beside it gives way.
-                    .fixedSize()
+            // Side by side, or one over the other where the reader's text
+            // size leaves no room for both whole: beside the head count, the
+            // run time was cut to "Runs 1…".
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    runLabel.fixedSize()
+                    Spacer(minLength: 0)
+                    attendeesLabel.fixedSize()
                 }
+                VStack(alignment: .leading, spacing: 6) {
+                    runLabel
+                    attendeesLabel
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .labelStyle(FooterLabelStyle())
-            .font(.system(size: 12.5, weight: .medium))
+            .scalingFont(size: 12.5, weight: .medium)
             .foregroundStyle(.secondary)
             .padding(.top, 13)
             .overlay(alignment: .top) {
@@ -729,6 +726,26 @@ struct EventDetailView: View {
         let minutes = max(1, Int((moment.timeIntervalSince(now) / 60).rounded(.up)))
         return Duration.seconds(minutes * 60)
             .formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+    }
+
+    /// How long the event runs, in the timeline card's footer.
+    private var runLabel: some View {
+        Label { runLine } icon: { Image(systemName: "timer") }
+    }
+
+    /// The head count, in the timeline card's footer — a number needing a
+    /// noun, so it says where it was counted.
+    @ViewBuilder
+    private var attendeesLabel: some View {
+        if let listed = event.listedAttendees {
+            Label {
+                Text("\(listed.formatted()) going on Eventernote")
+                    .monospacedDigit()
+            } icon: {
+                Image(systemName: "person.2.fill")
+            }
+            .foregroundStyle(.tertiary)
+        }
     }
 
     /// The dot before the headline, pulsing while the event is under way.
@@ -968,11 +985,11 @@ struct EventDetailView: View {
                 } label: {
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: "text.alignleft")
-                            .font(.system(size: 12, weight: .semibold))
+                            .scalingFont(size: 12, weight: .semibold)
                             .foregroundStyle(.tertiary)
                             .padding(.top, 2)
                         Text(tracking.note)
-                            .font(.system(size: 13))
+                            .scalingFont(size: 13)
                             .foregroundStyle(.secondary)
                             .lineSpacing(2)
                             .multilineTextAlignment(.leading)
@@ -1010,17 +1027,17 @@ struct EventDetailView: View {
                     .background(Color(.label), in: .rect(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Ticket Stub")
-                        .font(.system(size: 15, weight: .bold))
+                        .scalingFont(size: 15, weight: .bold)
                     Text(tracking.seat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                          ? "A keepsake image to save or share"
                          : "A keepsake image to share — mask the seat first")
-                        .font(.system(size: 12, weight: .medium))
+                        .scalingFont(size: 12, weight: .medium)
                         .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 15)
@@ -1395,7 +1412,7 @@ struct EventDetailView: View {
                 // thing this app adds to it. A translation is linked the same
                 // way, since the addresses are carried through it untouched.
                 Text(shown.linkingURLs)
-                    .font(.system(size: 13))
+                    .scalingFont(size: 13)
                     .tint(Color.brandTint)
                     .foregroundStyle(.secondary)
                     .lineSpacing(2)
@@ -1408,7 +1425,7 @@ struct EventDetailView: View {
                         withAnimation(.snappy) { isSummaryExpanded.toggle() }
                     } label: {
                         Text(isSummaryExpanded ? "Show less" : "Show more")
-                            .font(.system(size: 12.5, weight: .semibold))
+                            .scalingFont(size: 12.5, weight: .semibold)
                             .foregroundStyle(Color.brandTint)
                             .contentShape(.rect)
                     }
@@ -1670,17 +1687,17 @@ struct EventDetailView: View {
         Link(destination: link) {
             HStack(spacing: 12) {
                 Image(systemName: "link")
-                    .font(.system(size: 13, weight: .semibold))
+                    .scalingFont(size: 13, weight: .semibold)
                     .foregroundStyle(Color.brandTint)
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: host(of: link))
-                        .font(.system(size: 13.5, weight: .semibold))
+                        .scalingFont(size: 13.5, weight: .semibold)
                         .lineLimit(1)
                     if let path = trail(of: link) {
                         Text(verbatim: path)
-                            .font(.system(size: 11))
+                            .scalingFont(size: 11)
                             .foregroundStyle(.tertiary)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -1689,7 +1706,7 @@ struct EventDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
             }
             .padding(.vertical, 9)
@@ -1730,11 +1747,11 @@ struct EventDetailView: View {
                         HStack(spacing: 12) {
                             HStack(alignment: .firstTextBaseline, spacing: 6) {
                                 Text(performer.name)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .scalingFont(size: 14, weight: .semibold)
 
                                 if isFollowed(performer) {
                                     Image(systemName: "person.fill.checkmark")
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .scalingFont(size: 12, weight: .semibold)
                                         .foregroundStyle(Color.trackAttended)
                                         .accessibilityLabel("Followed")
                                 }
@@ -1742,7 +1759,7 @@ struct EventDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
+                                .scalingFont(size: 11, weight: .semibold)
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(.horizontal, 6)
@@ -1823,7 +1840,7 @@ struct EventDetailView: View {
                 HStack(spacing: 7) {
                     venueLines
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .scalingFont(size: 11, weight: .semibold)
                         .foregroundStyle(.tertiary)
                 }
                 .contentShape(.rect)
@@ -1835,11 +1852,11 @@ struct EventDetailView: View {
     private var venueLines: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(event.venue.isEmpty ? String(localized: "Venue to be announced") : event.venue)
-                .font(.system(size: 14.5, weight: .semibold))
+                .scalingFont(size: 14.5, weight: .semibold)
                 .fixedSize(horizontal: false, vertical: true)
             if let venueDetail = event.venueDetail {
                 Text(venueDetail)
-                    .font(.system(size: 12))
+                    .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1899,7 +1916,7 @@ private struct FooterLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 5) {
             configuration.icon
-                .font(.system(size: 11, weight: .semibold))
+                .scalingFont(size: 11, weight: .semibold)
                 .opacity(0.8)
             configuration.title
         }
