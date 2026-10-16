@@ -77,6 +77,7 @@ struct SearchView: View {
             .washBackground()
             .navigationTitle("Search")
             .searchable(text: $query, prompt: Text("Search Eventernote events"))
+            .searchPresentationToolbarBehavior(searchToolbarBehavior)
             .modifier(SearchScopes(scope: $scope))
             .onSubmit(of: .search) { store.remember(search: term) }
             .navigationDestination(for: SiteListing.self) { listing in
@@ -90,6 +91,14 @@ struct SearchView: View {
             .eventPane($openEvent)
             .task(id: Request(term: term, scope: scope, filter: filter, order: order)) { await search() }
         }
+    }
+
+    /// The bar keeps its title while a search is up on an iPad. Left to hide
+    /// it there, the bar took the large title's leading margin away and left
+    /// the title standing — on the edge of the screen, half off it, whether
+    /// or not the screen was parted beside the results (iPadOS 27.1).
+    private var searchToolbarBehavior: SearchPresentationToolbarBehavior {
+        UIDevice.current.userInterfaceIdiom == .pad ? .avoidHidingContent : .automatic
     }
 
     /// Runs the search the field currently describes.

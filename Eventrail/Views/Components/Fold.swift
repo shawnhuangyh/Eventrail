@@ -1,21 +1,27 @@
 import SwiftUI
 
-/// Where the fold of an open iPhone Duo crosses a view, if it does.
+/// Where the fold of an open iPhone Duo crosses a view, if it does — or, on
+/// an iPad held on its side, the middle the screen is parted at instead.
 ///
 /// Read from the system's own answer to the question — the `division` reserved
 /// region iOS 27.1 publishes "where content should split into separate
 /// regions, such as at the fold of a hinge" — rather than from a screen size,
-/// so nothing here knows the Duo's dimensions, and an iPhone or an iPad,
-/// which publish no division, never sees one. Read with the inactive regions
-/// too: the design parts its screens at the fold whether the Duo is opened
-/// flat or held half open like a book, and a list beside its event reads as
-/// well either way.
+/// so nothing here knows the Duo's dimensions, and an iPhone, which publishes
+/// no division, never sees one. Read with the inactive regions too: the
+/// design parts its screens at the fold whether the Duo is opened flat or
+/// held half open like a book, and a list beside its event reads as well
+/// either way.
+///
+/// An iPad has no fold, and is parted the same way wherever a screen is
+/// wider than it is tall and has room for two of a phone's width — see
+/// ``init(parting:)`` — so a list and its event, Me and the Passport stand
+/// side by side there as they do on the open Duo, by the same code.
 ///
 /// A fold that runs top to bottom (`axis == .vertical`, the Duo open on its
 /// side) puts two halves side by side, which is where a list and its event,
 /// the Me cards' two columns and the Passport's two pages go. One that runs
 /// across (the Duo turned upright) stacks them, which only the Me tab lays
-/// out against.
+/// out against. An iPad's only ever runs top to bottom.
 nonisolated struct Fold: Equatable, Sendable {
     /// The strip content keeps out of, in the view's own coordinates —
     /// the crease and the margins the system keeps around it for anything a
@@ -30,15 +36,40 @@ nonisolated struct Fold: Equatable, Sendable {
     /// help nobody.
     static let leastHalf: CGFloat = 240
 
+    /// How wide each half of an iPad's screen has to be for the screen to be
+    /// parted down its middle: about the narrowest iPhone's width, which is
+    /// what a list and an event page are laid out for. Every iPad held on its
+    /// side leaves more (566 points on an iPad mini); a window narrowed
+    /// beside another app's leaves less, and stays whole.
+    static let leastWindowHalf: CGFloat = 375
+
     /// The fold crossing the view `proxy` measures from one edge to the
-    /// other, if one does.
-    static func crossing(_ proxy: GeometryProxy) -> Fold? {
-        guard #available(iOS 27.1, *) else { return nil }
-        let bounds = CGRect(origin: .zero, size: proxy.size)
-        for region in proxy.reservedRegions(kind: .division, options: .includeInactive) {
-            if let fold = Fold(region.frame, in: bounds) { return fold }
+    /// other, if one does — and where none does and `partsWideViews` (an
+    /// iPad), the middle of a view wide enough to be parted there.
+    static func crossing(_ proxy: GeometryProxy, partsWideViews: Bool) -> Fold? {
+        if #available(iOS 27.1, *) {
+            let bounds = CGRect(origin: .zero, size: proxy.size)
+            for region in proxy.reservedRegions(kind: .division, options: .includeInactive) {
+                if let fold = Fold(region.frame, in: bounds) { return fold }
+            }
         }
-        return nil
+        return partsWideViews ? Fold(parting: proxy.size) : nil
+    }
+
+    /// The middle of a view of `size`, where it is wider than it is tall and
+    /// leaves at least ``leastWindowHalf`` either side: an iPad's screen held
+    /// on its side, or a window as wide.
+    ///
+    /// A strip of no width, since there is no crease to keep clear of: the
+    /// halves' own margins are the gap between them. The view's own shape
+    /// decides rather than the device's orientation, so a sheet — taller
+    /// than wide on an iPad, and narrower than two phones — is never parted,
+    /// nor a window narrowed beside another app's, and a window in Stage
+    /// Manager is parted once it is pulled out wide.
+    init?(parting size: CGSize) {
+        guard size.width > size.height, size.width / 2 >= Self.leastWindowHalf else { return nil }
+        self.init(frame: CGRect(x: size.width / 2, y: 0, width: 0, height: size.height),
+                  axis: .vertical)
     }
 
     /// The fold `frame` makes of a view of `bounds`, if it parts it into two
@@ -69,16 +100,20 @@ nonisolated struct Fold: Equatable, Sendable {
 
 extension View {
     /// Keeps `fold` up to date with the fold crossing this view — nil while
-    /// none does.
+    /// none does. On an iPad, the middle of the view wherever it is wide
+    /// enough to be parted there (``Fold/init(parting:)``).
     ///
     /// With animations off: a fold comes and goes as the Duo opens, folds
-    /// and turns, which the system animates, and what the screen does about
-    /// it — a sheet put away as its event moves into a half, or brought up
-    /// as the half goes — happens at once rather than as a second animation
-    /// after the system's. Seen sliding away on the opened screen, the
-    /// sheet read as the event being closed and opened again.
+    /// and turns, and as an iPad turns, which the system animates, and what
+    /// the screen does about it — a sheet put away as its event moves into a
+    /// half, or brought up as the half goes — happens at once rather than as
+    /// a second animation after the system's. Seen sliding away on the opened
+    /// screen, the sheet read as the event being closed and opened again.
     func readingFold(into fold: Binding<Fold?>) -> some View {
-        onGeometryChange(for: Fold?.self) { Fold.crossing($0) } action: { new in
+        let partsWideViews = UIDevice.current.userInterfaceIdiom == .pad
+        return onGeometryChange(for: Fold?.self) {
+            Fold.crossing($0, partsWideViews: partsWideViews)
+        } action: { new in
             withTransaction(\.disablesAnimations, true) { fold.wrappedValue = new }
         }
     }
@@ -186,12 +221,19 @@ extension View {
         scrollClipDisabled()
     }
 
-    /// Keeps the half after the fold clear of the navigation bar — see
-    /// ``FoldSplitLayout``: on the Duo's rail, where the bar holds only the
-    /// title over the half before the fold (the status bar and the buttons
-    /// are in the rail), the half after runs from the top of the screen, its
-    /// head level with the title as the boards draw it, and stays there
-    /// whatever the title does. Without the rail it is left under the bar.
+    /// Keeps the half after the fold still while the title over the half
+    /// before it moves — see ``FoldSplitLayout``.
+    ///
+    /// On the Duo's rail, where the bar holds only the title over the half
+    /// before the fold (the status bar and the buttons are in the rail), the
+    /// half after runs from the top of the screen, its head level with the
+    /// title as the boards draw it, and stays there whatever the title does.
+    ///
+    /// On an iPad the bar keeps the tab bar and the buttons, over both
+    /// halves, so the half after stays under it — but under the bar at its
+    /// deepest: held at the large title's depth as the list scrolls it away,
+    /// rather than following the bar up. Followed, the event beside My
+    /// Events slid up some seventy points as the list began to scroll.
     func standingAfterTheFold() -> some View {
         modifier(AfterTheFold())
     }
@@ -199,10 +241,21 @@ extension View {
 
 private struct AfterTheFold: ViewModifier {
     @Environment(\.verticalBarEdge) private var barEdge
+    /// How far down the bar reaches over the half, as it stands.
+    @State private var barDepth: CGFloat = 0
+    /// The deepest the bar has settled at while the half has stood — the
+    /// large title's depth, once it has been drawn — which the half is held
+    /// under on an iPad. Only once settled: as a screen first comes up, its
+    /// bar is laid out deeper for a frame or two (221 points, settling at
+    /// 157, beside My Events), and held there the half stood far below its
+    /// list's head.
+    @State private var heldDepth: CGFloat?
 
     /// From the top of the screen to the head of the half, the title's own
     /// margin.
     static let top: CGFloat = 16
+    /// How long the bar's depth has to stay put to have settled.
+    static let settling: Duration = .milliseconds(300)
 
     func body(content: Content) -> some View {
         if barEdge != nil {
@@ -214,6 +267,16 @@ private struct AfterTheFold: ViewModifier {
                 .scrollEdgeEffectHidden(true, for: .top)
         } else {
             content
+                .safeAreaPadding(.top, heldDepth ?? barDepth)
+                .ignoresSafeArea(.container, edges: .top)
+                // Read outside, where the half runs up under the bar, so the
+                // inset is the bar's as it stands.
+                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { barDepth = $0 }
+                .task(id: barDepth) {
+                    try? await Task.sleep(for: Self.settling)
+                    guard !Task.isCancelled else { return }
+                    heldDepth = max(heldDepth ?? 0, barDepth)
+                }
         }
     }
 }

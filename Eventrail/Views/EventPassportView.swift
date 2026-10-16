@@ -128,6 +128,14 @@ struct EventPassportView: View {
     @State private var isShown = false
     /// Whether the screen is two pages either side of a fold down it.
     private var isBook: Bool { fold?.axis == .vertical }
+    /// Where the iPhone Duo keeps its rail, if it does: nil on an iPad, whose
+    /// bar runs over both pages.
+    @Environment(\.verticalBarEdge) private var barEdge
+    /// How deep the bar and the year chips under it reach over an iPad's two
+    /// pages, and whether either page has been scrolled in under them — see
+    /// ``barBand``.
+    @State private var barDepth: CGFloat = 0
+    @State private var pagesUnderBar: Set<PassportPage> = []
     /// The drawer open beside the fold, over the Duo's two pages.
     @State private var drawers = PassportDrawers()
 
@@ -168,7 +176,7 @@ struct EventPassportView: View {
     var body: some View {
         let stats = self.stats
         Group {
-            if let fold, isBook {
+            if let fold, isBook, barEdge != nil {
                 // Two pages, as `DuoBookPassport.dc.html` draws the Duo held
                 // like a book: where the reader went and who and where most
                 // on the one before the fold, under the title and the year it
@@ -176,19 +184,29 @@ struct EventPassportView: View {
                 // Each scrolls on its own, the second from the top of the
                 // screen — and so laid out last and first.
                 FoldSplitLayout(fold: fold) {
-                    page { tickets(stats) }
-                        .castingShadowsToTheFold()
-                        .standingAfterTheFold()
-                    page {
-                        places(stats)
-                        rankings(stats)
-                    }
-                    .castingShadowsToTheFold()
-                    // Held under the title as the board draws them, on the
-                    // bar's own soft edge rather than a material: a block of
-                    // it stopped at the crease.
-                    .safeAreaBar(edge: .top) { yearChips }
+                    secondPage(stats)
+                    firstPage(stats)
+                        // Held under the title as the board draws them, on the
+                        // bar's own soft edge rather than a material: a block
+                        // of it stopped at the crease.
+                        .safeAreaBar(edge: .top) { yearChips }
                 }
+            } else if let fold, isBook {
+                // The same two pages on an iPad on its side, whose bar spans
+                // both, and so the chips under it too — and one blur under
+                // the two of them, across the screen (``barBand``). Each
+                // page's own stopped at the middle: the system draws a scroll
+                // view's edge under the bar for that scroll view alone, a
+                // frosted band for the one the bar follows and a faint fade
+                // for the other.
+                FoldSplitLayout(fold: fold) {
+                    secondPage(stats)
+                    firstPage(stats)
+                }
+                .scrollEdgeEffectHidden(true, for: .top)
+                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { barDepth = $0 }
+                .overlay(alignment: .top) { barBand }
+                .safeAreaBar(edge: .top) { yearChips }
             } else {
                 page {
                     places(stats)
@@ -264,6 +282,56 @@ struct EventPassportView: View {
     }
 
     // MARK: - The pages
+
+    /// The blur under the bar and the year chips across both of an iPad's
+    /// pages: from the top of the screen to the foot of the chips, frosted as
+    /// the bar's own edge is over the page it follows, and faded out over its
+    /// last few points rather than cut off in a line. Only once a page has
+    /// been scrolled in under the bar, as the system's own edge shows only
+    /// over what passes beneath it: drawn at rest, it greyed the wash at the
+    /// top of the screen.
+    private var barBand: some View {
+        Rectangle()
+            .fill(.bar)
+            .mask {
+                LinearGradient(stops: [.init(color: .black, location: 0),
+                                       .init(color: .black, location: 0.82),
+                                       .init(color: .clear, location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .frame(height: barDepth + Self.bandFade)
+            .opacity(pagesUnderBar.isEmpty ? 0 : 1)
+            .animation(.easeOut(duration: 0.2), value: pagesUnderBar.isEmpty)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// How far past the chips the band runs, fading out.
+    private static let bandFade: CGFloat = 12
+
+    /// One of an iPad's two pages, for ``barBand``.
+    private enum PassportPage { case first, second }
+
+    /// The page before the fold: where the reader went, and who and where
+    /// most.
+    private func firstPage(_ stats: PassportStats) -> some View {
+        page {
+            places(stats)
+            rankings(stats)
+        }
+        .modifier(PageUnderBar(page: PassportPage.first, pages: $pagesUnderBar))
+        .castingShadowsToTheFold()
+    }
+
+    /// The page after the fold: how the tickets were had.
+    private func secondPage(_ stats: PassportStats) -> some View {
+        page { tickets(stats) }
+            .modifier(PageUnderBar(page: PassportPage.second, pages: $pagesUnderBar))
+            .castingShadowsToTheFold()
+            .standingAfterTheFold()
+    }
 
     /// A scrolling column of cards.
     private func page(@ViewBuilder _ cards: () -> some View) -> some View {
@@ -1222,6 +1290,22 @@ private struct PassportRankingSheet: View {
     private var tint: Color { ranking.isPerformers ? .trackAttended : .brandTint }
 }
 
+/// Keeps whether one of the Passport's pages has been scrolled in under the
+/// bar — see `EventPassportView.barBand`. At rest a scroll view holds its
+/// content's top at its top inset.
+private struct PageUnderBar<Page: Hashable>: ViewModifier {
+    let page: Page
+    @Binding var pages: Set<Page>
+
+    func body(content: Content) -> some View {
+        content.onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top > 0.5
+        } action: { _, isUnder in
+            if isUnder { pages.insert(page) } else { pages.remove(page) }
+        }
+    }
+}
+
 // MARK: - Drawers beside the fold
 
 extension EnvironmentValues {
@@ -1352,7 +1436,13 @@ private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewMo
 /// to the rail, its top a little under the top of the screen, and the rest of
 /// the Passport dimmed behind it — `DuoPassportSheet.dc.html`. Put away with
 /// its X, by a tap on what it dims, or by pulling its top down.
+///
+/// On an iPad, from the middle of the screen to its edge, and from under the
+/// bar rather than the top of the screen: the bar there keeps the title, the
+/// tab bar and the way back over both pages, and the panel's head ran under
+/// them.
 private struct PassportDrawerPanel: View {
+    @Environment(\.verticalBarEdge) private var barEdge
     let drawer: PassportDrawer
     let fold: Fold
 
@@ -1385,10 +1475,11 @@ private struct PassportDrawerPanel: View {
                 .offset(y: pull)
                 .padding(.leading, fold.frame.maxX)
                 .padding(.trailing, 8)
-                // From the top of the screen, as the board draws it, and down
-                // past the home indicator, as a sheet runs.
-                .padding(.top, 40)
-                .ignoresSafeArea(.container, edges: [.top, .bottom])
+                // From the top of the screen, as the board draws it — or from
+                // under the bar, without the rail — and down past the home
+                // indicator, as a sheet runs.
+                .padding(.top, barEdge != nil ? 40 : 8)
+                .ignoresSafeArea(.container, edges: barEdge != nil ? [.top, .bottom] : .bottom)
                 .accessibilityAddTraits(.isModal)
                 .accessibilityAction(.escape, drawer.close)
                 .transition(.move(edge: .bottom))

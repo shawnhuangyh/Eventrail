@@ -94,7 +94,8 @@ struct MeView: View {
     private static let spacing: CGFloat = 14
 
     /// The six cards in one scrolling column — or, on an open iPhone Duo,
-    /// laid out around the fold.
+    /// laid out around the fold, and on an iPad on its side around its
+    /// middle, as the Duo open on its side.
     ///
     /// With the fold running down the screen, the Duo open on its side, each
     /// half is a column scrolling on its own, as the Passport's pages do: the

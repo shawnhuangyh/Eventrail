@@ -16,7 +16,8 @@ extension EnvironmentValues {
 
 extension View {
     /// Opens an event beside this screen where the iPhone Duo's fold runs down
-    /// it — the list in the half before the fold, the event in the half after,
+    /// it, or an iPad held on its side is parted down its middle (``Fold``) —
+    /// the list in the half before the fold, the event in the half after,
     /// as `DuoOpenEvents.dc.html` draws My Events — and as the sheet every list ends in
     /// everywhere else (``eventSheet(_:)``).
     ///

@@ -119,10 +119,11 @@ struct EventDetailView: View {
         /// A sheet over the screen it was opened from, with a stack of its own
         /// for the performers and the hall it pushes.
         case sheet
-        /// The half of an open iPhone Duo beside the list it was opened from —
-        /// see ``SwiftUI/View/eventPane(_:)``. No stack of its own:
-        /// what it pushes goes on the list's, and its actions join the list's
-        /// bar, under a close button that empties the half.
+        /// The half of an open iPhone Duo, or of an iPad on its side, beside
+        /// the list it was opened from — see ``SwiftUI/View/eventPane(_:)``.
+        /// No stack of its own: what it pushes goes on the list's, and its
+        /// actions join the list's bar, under a close button that empties
+        /// the half.
         case pane
     }
 
