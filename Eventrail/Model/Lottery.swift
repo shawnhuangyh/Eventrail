@@ -457,6 +457,34 @@ nonisolated extension LotteryEntry {
         text.isEmpty || entries(inColumn: text).map(columnText(of:)) == text
     }
 
+    /// One entry as its own row holds it (``LibraryLottery``): JSON, its keys
+    /// sorted, so an unchanged entry is the same text and not a change to send.
+    static func rowText(of entry: LotteryEntry) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return (try? encoder.encode(entry)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+    }
+
+    /// The entry a row holds, or nil where it holds none this build can read.
+    /// Read once per text and kept, for the reason a column is
+    /// (``entries(inColumn:)``).
+    static func entry(inRow text: String) -> LotteryEntry? {
+        guard !text.isEmpty else { return nil }
+        let key = "row:\(text)" as NSString
+        if let read = reads.object(forKey: key) { return read.entries?.first }
+        let entry = try? JSONDecoder().decode(LotteryEntry.self, from: Data(text.utf8))
+        reads.setObject(ColumnRead(entries: entry.map { [$0] }), forKey: key)
+        return entry
+    }
+
+    /// Whether this build reads back exactly what a row holds — what a row is
+    /// asked before it is written over, as a column is (``understands(column:)``):
+    /// an entry a later build wrote, read here with its new parts left out,
+    /// is written again only where the reader changed that entry.
+    static func understands(row text: String) -> Bool {
+        text.isEmpty || entry(inRow: text).map(rowText(of:)) == text
+    }
+
     /// `NSCache` is safe to use from any thread, and lets go of what it holds
     /// when memory runs short.
     nonisolated(unsafe) private static let reads: NSCache<NSString, ColumnRead> = {

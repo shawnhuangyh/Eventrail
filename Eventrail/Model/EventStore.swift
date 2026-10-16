@@ -128,6 +128,9 @@ final class EventStore {
     /// What the reader has said about each event, by event id, kept the same
     /// way.
     private var entries: [Event.ID: LibraryEntry] = [:]
+    /// The lottery rounds the reader entered, by event id and then by round,
+    /// kept the same way — see ``LibraryLottery``.
+    private var lotteryRows: [Event.ID: [String: LibraryLottery]] = [:]
     /// Every Following date's read, by event id, kept the same way.
     private var readMarks: [Event.ID: FollowingReadMark] = [:]
     private var performerRows: [Int: FollowedPerformer] = [:]
@@ -391,6 +394,7 @@ final class EventStore {
                                      by: \.eventID, preferring: LibraryEvent.isPreferred)
         entries = LibraryDatabase.index((try? context.fetch(FetchDescriptor<LibraryEntry>())) ?? [],
                                         by: \.eventID, preferring: LibraryEntry.isPreferred)
+        lotteryRows = LibraryDatabase.lotteryIndex((try? context.fetch(FetchDescriptor<LibraryLottery>())) ?? [])
         readMarks = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowingReadMark>())) ?? [],
                                           by: \.eventID, preferring: FollowingReadMark.isPreferred)
         performerRows = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? [],
@@ -466,12 +470,31 @@ final class EventStore {
     /// `keepingFacts` writes the event into its ``LibraryEvent`` too, for a
     /// change that is about the event as the reader sees it; a removal leaves
     /// the facts where they are.
+    ///
+    /// The lotteries are rows of their own (``LibraryLottery``), written
+    /// apart from the entry: a change to them alone leaves the entry as it
+    /// was, so it cannot carry an older note back over another device's.
     private func edit(_ event: Event, keepingFacts: Bool = true, _ change: (inout LibraryEntry.Answers) -> Void) {
         let held = entries[event.id]
-        var answers = held?.answers ?? LibraryEntry.Answers()
+        let heldAnswers = answers(of: event.id)
+        var answers = heldAnswers
         change(&answers)
         answers.tracking.edits = [:]
-        let given = answers.parts(differingFrom: held?.answers ?? LibraryEntry.Answers())
+        let listed = answers.tracking.lotteries
+        let listMoved = listed != heldAnswers.tracking.lotteries
+        // The entry's own parts, its lotteries set aside.
+        answers.tracking.lotteries = heldAnswers.tracking.lotteries
+        var given = answers.parts(differingFrom: heldAnswers)
+        // An event first written down by a lottery still gets an entry.
+        if held == nil, listMoved, !given.contains(.tracking) { given.append(.tracking) }
+        guard !given.isEmpty || listMoved else { return }
+        let now = Date.now
+        if listMoved {
+            LibraryDatabase.writeLotteries(listed, for: event.id, rows: &lotteryRows, entry: held,
+                                           dated: now, in: database.context)
+        }
+        records[event.id] = nil
+        converted[event.id] = nil
         guard !given.isEmpty else { return }
         if given.contains(.inLibrary) { owesMirror = true }
         if keepingFacts { keep(event, in: makeRow(for: event.id)) }
@@ -482,12 +505,17 @@ final class EventStore {
         }
         // Only the parts given now are dated now: an import adding the event
         // says nothing about a heart or a note another device's entry holds.
-        let now = Date.now
         entry.give(answers, dated: Dictionary(uniqueKeysWithValues: given.map { ($0, now) }))
         entry.modified = now.toTheMillisecond
         entry.kept = rows[event.id]?.facts ?? event
-        records[event.id] = nil
-        converted[event.id] = nil
+    }
+
+    /// What the reader has said about an event, its lotteries read from its
+    /// rows (``LibraryDatabase/tracking(of:rows:)``).
+    private func answers(of id: Event.ID) -> LibraryEntry.Answers {
+        var answers = entries[id]?.answers ?? LibraryEntry.Answers()
+        answers.tracking = tracking(of: id)
+        return answers
     }
 
     private func makeMark(for id: Event.ID) -> FollowingReadMark {
@@ -560,10 +588,14 @@ final class EventStore {
     var isLinked: Bool { eventernoteHandle != nil }
 
     func tracking(for event: Event) -> Tracking {
-        guard let entry = entries[event.id] else { return Tracking() }
-        if let record = records[event.id] { return record }
-        let record = entry.tracking
-        records[event.id] = record
+        tracking(of: event.id)
+    }
+
+    private func tracking(of id: Event.ID) -> Tracking {
+        if let record = records[id] { return record }
+        guard entries[id] != nil || lotteryRows[id] != nil else { return Tracking() }
+        let record = LibraryDatabase.tracking(of: entries[id], rows: lotteryRows[id])
+        records[id] = record
         return record
     }
 
@@ -628,7 +660,8 @@ final class EventStore {
     /// ticket status outlives the event it was written on, so this stays true
     /// while either is still held.
     var hasRecordsToDelete: Bool {
-        entries.values.contains { !$0.answers.isEmpty }
+        entries.keys.contains { !answers(of: $0).isEmpty }
+            || lotteryRows.values.contains { $0.values.contains { !$0.isRemoved } }
             || eventernoteHandle != nil
             || performerRows.values.contains(where: \.isFollowing)
     }
@@ -718,13 +751,21 @@ final class EventStore {
     /// is: a dropped record would let the other device's copy come straight back.
     func removeAllEvents() {
         let now = Date.now
-        for entry in entries.values where !entry.answers.isEmpty {
+        // Read before the entries are emptied: a list an entry still keeps
+        // from before rows is moved across as it is taken out.
+        let listed = Set(lotteryRows.keys).union(entries.keys).filter { !tracking(of: $0).lotteries.isEmpty }
+        for (id, entry) in entries where !answers(of: id).isEmpty {
             if entry.inLibrary { owesMirror = true }
             // Every part, given or not: an answer another device gave before
             // this is one the reader asked to be rid of too.
             entry.give(LibraryEntry.Answers(),
                        dated: Dictionary(uniqueKeysWithValues: LibraryEntry.Part.allCases.map { ($0, now) }))
             entry.modified = now.toTheMillisecond
+        }
+        // Every round taken out too, each as a record that says so.
+        for id in listed {
+            LibraryDatabase.writeLotteries([], for: id, rows: &lotteryRows, entry: entries[id],
+                                           dated: now, in: database.context)
         }
         records.removeAll(keepingCapacity: true)
         // Every Following date back to unread, on every device: written as a

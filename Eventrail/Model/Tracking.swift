@@ -228,12 +228,38 @@ nonisolated extension Tracking {
     /// over the record as it stands now. An answer that arrived from another
     /// device while the copy was open keeps what it arrived with, unless the
     /// reader changed that one too.
+    ///
+    /// The lotteries round by round, as they are kept (``LibraryLottery``):
+    /// a round another device added while the sheet was open stays, rather
+    /// than going because the sheet's copy of the list never had it.
     func applying(changesFrom original: Tracking, to edited: Tracking) -> Tracking {
         var record = self
         for field in Field.allCases where !edited.sameAnswer(for: field, as: original) {
-            record.take(field, from: edited)
+            if field == .lotteries {
+                record.lotteries = Self.lotteries(lotteries, changedFrom: original.lotteries, to: edited.lotteries)
+            } else {
+                record.take(field, from: edited)
+            }
         }
         return record
+    }
+
+    /// `current` with each round `edited` changed from `original` laid over
+    /// it: a round added there added, one taken out taken out, one changed
+    /// taken as changed — and every other round as it now stands.
+    static func lotteries(_ current: [LotteryEntry], changedFrom original: [LotteryEntry],
+                          to edited: [LotteryEntry]) -> [LotteryEntry] {
+        let before = Dictionary(original.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let after = Set(edited.map(\.id))
+        var list = current.filter { before[$0.id] == nil || after.contains($0.id) }
+        for entry in edited where entry != before[entry.id] {
+            if let index = list.firstIndex(where: { $0.id == entry.id }) {
+                list[index] = entry
+            } else {
+                list.append(entry)
+            }
+        }
+        return list
     }
 }
 
