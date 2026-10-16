@@ -234,13 +234,18 @@ extension View {
     /// deepest: held at the large title's depth as the list scrolls it away,
     /// rather than following the bar up. Followed, the event beside My
     /// Events slid up some seventy points as the list began to scroll.
-    func standingAfterTheFold() -> some View {
-        modifier(AfterTheFold())
+    ///
+    /// `underTheBar` holds it under the bar that way on the Duo's rail too,
+    /// for a screen whose bar carries something across both halves — the
+    /// Passport's year chips, and the one blur under them.
+    func standingAfterTheFold(underTheBar: Bool = false) -> some View {
+        modifier(AfterTheFold(underTheBar: underTheBar))
     }
 }
 
 private struct AfterTheFold: ViewModifier {
     @Environment(\.verticalBarEdge) private var barEdge
+    let underTheBar: Bool
     /// How far down the bar reaches over the half, as it stands.
     @State private var barDepth: CGFloat = 0
     /// The deepest the bar has settled at while the half has stood — the
@@ -258,7 +263,7 @@ private struct AfterTheFold: ViewModifier {
     static let settling: Duration = .milliseconds(300)
 
     func body(content: Content) -> some View {
-        if barEdge != nil {
+        if barEdge != nil, !underTheBar {
             content
                 .safeAreaPadding(.top, Self.top)
                 .ignoresSafeArea(.container, edges: .top)

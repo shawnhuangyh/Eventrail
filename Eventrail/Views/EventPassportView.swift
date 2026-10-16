@@ -128,11 +128,11 @@ struct EventPassportView: View {
     @State private var isShown = false
     /// Whether the screen is two pages either side of a fold down it.
     private var isBook: Bool { fold?.axis == .vertical }
-    /// Where the iPhone Duo keeps its rail, if it does: nil on an iPad, whose
-    /// bar runs over both pages.
+    /// Where the iPhone Duo keeps its rail, if it does — where the two pages
+    /// go without ``barBand``.
     @Environment(\.verticalBarEdge) private var barEdge
-    /// How deep the bar and the year chips under it reach over an iPad's two
-    /// pages, and whether either page has been scrolled in under them — see
+    /// How deep the bar and the year chips under it reach over the two pages,
+    /// and whether either page has been scrolled in under them — see
     /// ``barBand``.
     @State private var barDepth: CGFloat = 0
     @State private var pagesUnderBar: Set<PassportPage> = []
@@ -176,36 +176,31 @@ struct EventPassportView: View {
     var body: some View {
         let stats = self.stats
         Group {
-            if let fold, isBook, barEdge != nil {
+            if let fold, isBook {
                 // Two pages, as `DuoBookPassport.dc.html` draws the Duo held
                 // like a book: where the reader went and who and where most
-                // on the one before the fold, under the title and the year it
-                // is read over, and how the tickets were had on the one after.
-                // Each scrolls on its own, the second from the top of the
-                // screen — and so laid out last and first.
-                FoldSplitLayout(fold: fold) {
-                    secondPage(stats)
-                    firstPage(stats)
-                        // Held under the title as the board draws them, on the
-                        // bar's own soft edge rather than a material: a block
-                        // of it stopped at the crease.
-                        .safeAreaBar(edge: .top) { yearChips }
-                }
-            } else if let fold, isBook {
-                // The same two pages on an iPad on its side, whose bar spans
-                // both, and so the chips under it too — and one blur under
-                // the two of them, across the screen (``barBand``). Each
-                // page's own stopped at the middle: the system draws a scroll
+                // on the one before the fold, under the title, and how the
+                // tickets were had on the one after. Each scrolls on its own,
+                // and so laid out last and first.
+                //
+                // The year chips stand under the bar over both pages, the
+                // second page under them on the Duo too rather than from the
+                // top of the screen as the board draws it. Neither page draws
+                // a blur of its own under them: the system draws a scroll
                 // view's edge under the bar for that scroll view alone, a
-                // frosted band for the one the bar follows and a faint fade
-                // for the other.
+                // frosted band for the one the bar follows and a faint fade,
+                // or none, for the other, and the two stopped at the middle.
+                // On an iPad one band runs across the screen instead
+                // (``barBand``); on the Duo, on Shawn's word, none does.
                 FoldSplitLayout(fold: fold) {
                     secondPage(stats)
                     firstPage(stats)
                 }
                 .scrollEdgeEffectHidden(true, for: .top)
                 .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { barDepth = $0 }
-                .overlay(alignment: .top) { barBand }
+                .overlay(alignment: .top) {
+                    if barEdge == nil { barBand }
+                }
                 .safeAreaBar(edge: .top) { yearChips }
             } else {
                 page {
@@ -330,7 +325,7 @@ struct EventPassportView: View {
         page { tickets(stats) }
             .modifier(PageUnderBar(page: PassportPage.second, pages: $pagesUnderBar))
             .castingShadowsToTheFold()
-            .standingAfterTheFold()
+            .standingAfterTheFold(underTheBar: true)
     }
 
     /// A scrolling column of cards.
