@@ -1,0 +1,146 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Open an event in ${applicationName}" : {
+      "localizations" : {
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}でイベントを開く"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中打开活动"
+            ]
+          }
+        },
+        "zh-Hant" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中打開活動"
+            ]
+          }
+        }
+      }
+    },
+    "Search ${applicationName}" : {
+      "localizations" : {
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で検索"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "搜索${applicationName}"
+            ]
+          }
+        },
+        "zh-Hant" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "搜尋${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Search events in ${applicationName}" : {
+      "localizations" : {
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}でイベントを検索"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中搜索活动"
+            ]
+          }
+        },
+        "zh-Hant" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中搜尋活動"
+            ]
+          }
+        }
+      }
+    },
+    "Show my next event in ${applicationName}" : {
+      "localizations" : {
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で次のイベントを表示"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中显示我的下一场活动"
+            ]
+          }
+        },
+        "zh-Hant" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "在${applicationName}中顯示我的下一場活動"
+            ]
+          }
+        }
+      }
+    },
+    "What's my next event in ${applicationName}" : {
+      "localizations" : {
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}の次のイベントは"
+            ]
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}里我的下一场活动是什么"
+            ]
+          }
+        },
+        "zh-Hant" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}裡我的下一場活動是什麼"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -422,6 +422,15 @@ final class FollowedDates {
         return merged.sorted { $0.sortDate < $1.sortDate }
     }
 
+    /// A date read for anyone followed, by its id, on its hall's clock — what
+    /// a Following date found in Spotlight, or picked in Shortcuts, opens.
+    func event(id: Event.ID) -> Event? {
+        for listing in dates.values {
+            if let listed = listing.first(where: { $0.id == id }) { return onHallClock(listed) }
+        }
+        return nil
+    }
+
     /// Which of the followed performers are billed on an event — what a row
     /// shows to say whose date it is.
     func billed(on event: Event, among performers: [PerformerProfile]) -> [PerformerProfile] {

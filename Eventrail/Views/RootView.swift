@@ -1,3 +1,4 @@
+import CoreSpotlight
 import SwiftData
 import SwiftUI
 import Playgrounds
@@ -39,6 +40,12 @@ struct RootView: View {
     @State private var handoff = EventHandoff()
     @Environment(\.openURL) private var openURL
     private let reminders = LotteryReminders.shared
+    /// What Siri, Shortcuts or a Spotlight result asked for through an
+    /// intent — see ``IntentOpens``.
+    private let intentOpens = IntentOpens.shared
+    /// A term handed to the Search tab from outside the app — Spotlight's
+    /// Search in App, or Siri — which the tab types in and searches for.
+    @State private var searchRequest: String?
     /// Whether this launch still owes the reader the welcome.
     ///
     /// Seeded once from the per-device flag ``WelcomeView`` writes for itself
@@ -69,7 +76,7 @@ struct RootView: View {
             }
 
             Tab(value: AppTab.search, role: .search) {
-                SearchView().refreshNotices()
+                SearchView(request: $searchRequest).refreshNotices()
             }
         }
         // Selecting the search tab opens the field straight away, rather than
@@ -100,6 +107,19 @@ struct RootView: View {
         .onContinueUserActivity(EventHandoff.activityType) { activity in
             continueHandoff(activity)
         }
+        // A result tapped in Spotlight — see ``SpotlightIndex``.
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                  let request = SpotlightIndex.opening(identifier, in: store) else { return }
+            open(request)
+        }
+        // Search in App, under Spotlight's results: Eventernote's own search,
+        // with what was typed there.
+        .onContinueUserActivity(CSQueryContinuationActionType) { activity in
+            guard let term = activity.userInfo?[CSSearchQueryString] as? String else { return }
+            search(for: term)
+        }
+        .onChange(of: intentOpens.waiting, initial: true) { takeIntentOpen() }
         // The ticket sheet on the round's own page, where its result is
         // written down — or the event, where the round has gone since.
         .onChange(of: reminders.opened, initial: true) { openReminder() }
@@ -146,15 +166,20 @@ struct RootView: View {
             WidgetLink.shared.takeAnswers(into: store)
             WidgetLink.shared.send(from: store)
         }
+        // Spotlight's copy follows every write the same way, and the
+        // Following dates by itself — see ``SpotlightIndex``.
+        .task { SpotlightIndex.shared.update(from: store, followed: followed) }
         .onChange(of: store.revision) {
             WatchLink.shared.send(from: store)
             WidgetLink.shared.send(from: store)
+            SpotlightIndex.shared.update(from: store, followed: followed)
             reminders.schedule(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
         .onChange(of: timeDisplay) {
             WatchLink.shared.send(from: store)
             WidgetLink.shared.send(from: store)
+            SpotlightIndex.shared.update(from: store, followed: followed)
             EventActivities.shared.refreshSoon(from: store)
         }
         // Each results day still waiting is a reminder that evening, and the
@@ -166,8 +191,10 @@ struct RootView: View {
         // is the moment to pick up whatever another device wrote meanwhile.
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                // A reminder tapped while this window was on its way in.
+                // A reminder tapped, or an intent run, while this window was
+                // on its way in.
                 openReminder()
+                takeIntentOpen()
                 Task { await store.syncNow() }
                 Task { await EventActivities.shared.refresh(from: store) }
                 // An event whose day ended while the app was away leaves the
@@ -199,6 +226,43 @@ struct RootView: View {
         } else {
             opens.open(.event(event))
         }
+    }
+
+    /// Opens what an intent asked for, in this window — only while it is the
+    /// one in front, for the reason a reminder waits for it (``openReminder()``).
+    private func takeIntentOpen() {
+        guard scenePhase == .active, let request = intentOpens.waiting else { return }
+        intentOpens.waiting = nil
+        open(request)
+    }
+
+    /// Opens what Spotlight, Siri or Shortcuts asked for, over whatever is up.
+    /// An event this device no longer holds — removed, or a Following date
+    /// gone from the listing — opens its page in the browser, as a handed-off
+    /// event this device cannot read does.
+    private func open(_ request: IntentOpen) {
+        switch request {
+        case .event(let id):
+            if let event = store.event(id: id) ?? followed.event(id: id) {
+                opens.open(.event(event))
+            } else {
+                openURL(EventernoteClient.site.appending(path: "events/\(id)"))
+            }
+        case .performer(let profile):
+            opens.open(.performer(.profile(profile)))
+        case .venue(let link):
+            opens.open(.venue(link))
+        case .search(let term):
+            search(for: term)
+        }
+    }
+
+    /// The Search tab, searching Eventernote for `term`. Under a sheet, if one
+    /// is up: it is the reader's to put away.
+    private func search(for term: String) {
+        selection = .search
+        let term = term.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !term.isEmpty { searchRequest = term }
     }
 
     /// Opens the event another device offered through Handoff: the copy it

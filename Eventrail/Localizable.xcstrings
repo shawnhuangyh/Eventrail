@@ -3976,6 +3976,93 @@
         }
       }
     },
+    "entity.event" : {
+      "comment" : "What Siri, Shortcuts and Spotlight call one event.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Event"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベント"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活動"
+          }
+        }
+      }
+    },
+    "entity.performer" : {
+      "comment" : "What Siri, Shortcuts and Spotlight call one performer the reader follows.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Performer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出演者"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "藝人"
+          }
+        }
+      }
+    },
+    "entity.venue" : {
+      "comment" : "What Siri, Shortcuts and Spotlight call one hall an event is held at. Not the Venue of the Venue / Local clock switch.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Venue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場館"
+          }
+        }
+      }
+    },
     "Entries" : {
       "localizations" : {
         "ja" : {
@@ -7074,6 +7161,29 @@
         }
       }
     },
+    "Next Event" : {
+      "comment" : "The short title of the Siri shortcut that opens the soonest event in the library.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のイベント"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一场活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一場活動"
+          }
+        }
+      }
+    },
     "Night" : {
       "comment" : "A look for the ticket stub: a dark ticket on a night sky. Beside Light.",
       "localizations" : {
@@ -8449,6 +8559,29 @@
         }
       }
     },
+    "Open Performer" : {
+      "comment" : "The Shortcuts action that opens a followed performer's page.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出演者を開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開藝人"
+          }
+        }
+      }
+    },
     "Open Settings" : {
       "localizations" : {
         "ja" : {
@@ -8489,6 +8622,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在地圖中打開場館"
+          }
+        }
+      }
+    },
+    "Open Venue" : {
+      "comment" : "The Shortcuts action that opens a hall's page.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場を開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開場館"
           }
         }
       }
@@ -10261,6 +10417,29 @@
         }
       }
     },
+    "Search Eventernote" : {
+      "comment" : "The Shortcuts action, and its Siri shortcut, that opens the Search tab with a term typed in.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteを検索"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索 Eventernote"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋 Eventernote"
+          }
+        }
+      }
+    },
     "Search Eventernote events" : {
       "localizations" : {
         "ja" : {
@@ -10787,6 +10966,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "展開"
+          }
+        }
+      }
+    },
+    "Show Next Event" : {
+      "comment" : "The Shortcuts action that opens the soonest event in the library.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のイベントを表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示下一场活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示下一場活動"
           }
         }
       }
@@ -11760,6 +11962,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它們的抽選紀錄、門票詳情和備註也會從你的所有裝置中刪除。Eventernote 帳號中仍列出的活動會在下次重新整理時恢復，但這些內容不會恢復；其餘活動可從“搜尋”重新新增。"
+          }
+        }
+      }
+    },
+    "There are no upcoming events in your library." : {
+      "comment" : "What Siri says when asked for the next event and the library holds none still to come.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリに今後のイベントはありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库中没有即将到来的活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料庫中沒有即將到來的活動。"
           }
         }
       }
