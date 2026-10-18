@@ -556,9 +556,12 @@ enum VenueDirections {
 /// sheet and a hall's own page both do the asking, because the same answer is
 /// what their Directions button opens.
 ///
-/// Until that comes back, and for a hall Maps does not have, the panel is the
-/// pin on plain ground it has always been: a map that cannot say where the place
-/// is would be worse than not drawing one.
+/// Until that comes back the panel says it is looking, on plain ground: a map
+/// that cannot say where the place is would be worse than not drawing one. Once
+/// it has come back with nothing, the panel says so — which of the two it was,
+/// since a hall nobody has is settled and a search that did not get through is
+/// worth another try — rather than going on looking like the answer is still on
+/// its way.
 ///
 /// It takes the hall's name rather than the event at it: ``VenueView`` draws
 /// the same map with no event in front of it, and the name is all the pin was
@@ -566,10 +569,13 @@ enum VenueDirections {
 struct VenueMap: View {
     /// The hall as Eventernote names it, which is the pin's label.
     let venue: String
-    let place: VenuePlaces.Placing?
+    /// How the lookup came out, and nil while it is still being asked.
+    let lookup: VenuePlaces.Lookup?
     /// Opens the hall in Maps. A tap anywhere on the map does it, which is
     /// where panning around belongs.
     let open: () -> Void
+    /// Asks again, after a search that did not get through.
+    let retry: () -> Void
 
     /// Close enough to show which block the hall is on, far enough to show the
     /// station or the road that gets the reader there.
@@ -579,14 +585,69 @@ struct VenueMap: View {
 
     var body: some View {
         Group {
-            if let place {
+            switch lookup {
+            case .placed(let place):
                 map(around: place.item.location.coordinate, uncertainty: place.uncertainty)
-            } else {
-                pin.background(.quaternary)
+                    .accessibilityLabel("Venue map")
+            case nil:
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Finding the venue on the map…")
+                        .scalingFont(size: 13, weight: .semibold)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.quaternary)
+            case .unplaced:
+                notice("Couldn't find this venue on the map")
+            case .failed:
+                notice("Couldn't load the venue's location", retrying: true)
+            case .noHall:
+                // Nothing was looked for, and the line under the map already
+                // says why — the hall is still to be announced, or the event
+                // is not at one.
+                Image(systemName: "mappin.slash")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.quaternary)
+                    .accessibilityHidden(true)
             }
         }
         .frame(height: 150)
-        .accessibilityLabel("Venue map")
+    }
+
+    /// The panel once the lookup has come back with nothing: in place of the
+    /// pin, a pin struck through and the reason under it — and, after a search
+    /// that did not get through, a way to ask again.
+    private func notice(_ message: LocalizedStringKey, retrying: Bool = false) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "mappin.slash")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+            Text(message)
+                .scalingFont(size: 13, weight: .semibold)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            if retrying {
+                Button(action: retry) {
+                    Text("Try Again")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Color.brandTint)
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .capsulePanel()
+                .padding(.top, 2)
+            }
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.quaternary)
     }
 
     /// Fixed rather than scrollable: this sits inside a sheet that scrolls, and

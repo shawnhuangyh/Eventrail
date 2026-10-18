@@ -94,6 +94,13 @@ final class VenuePlaces {
             return plain.isEmpty ? name : plain
         }
 
+        /// What the name carries in brackets — for a hall abroad, often its
+        /// own local name, which OpenStreetMap is asked for once the name
+        /// outside them finds nothing (``VenueBuildings/queries(named:aliases:)``).
+        var aliases: [String] {
+            VenuePlaces.inBrackets(name)
+        }
+
         /// The cache's key. Both parts, so a re-import that finally supplies an
         /// address is a new question rather than an old answer.
         var key: String { "\(name)\n\(address ?? "")" }
@@ -289,6 +296,31 @@ final class VenuePlaces {
         let isFromMaps: Bool
     }
 
+    /// How a screen's question about one hall came out.
+    ///
+    /// More than the placing or nothing, because the map under a hall is drawn
+    /// differently for each of the ways there is no placing: an empty panel
+    /// read the same whether the answer was still on its way, every source had
+    /// been asked and had nothing, or the search had not got through at all.
+    enum Lookup: Sendable {
+        case placed(Placing)
+        /// Everything this device may ask was asked, now or before, and none
+        /// of it has the hall — or the one source that might is OpenStreetMap
+        /// and the reader has it switched off. Written down, and asked again
+        /// only once ``patience`` is up.
+        case unplaced
+        /// The search did not get through — offline, or refused. Nothing was
+        /// written down, so asking again may yet place it.
+        case failed
+        /// Nothing to ask about: no hall named yet, or one of the site's
+        /// placeholders for a stream or an undisclosed room (``Event/isAtHall``).
+        case noHall
+
+        var placing: Placing? {
+            if case .placed(let placing) = self { placing } else { nil }
+        }
+    }
+
     /// Whether this device may ask OpenStreetMap anything — which building at
     /// the block is the hall, and, on a phone whose Maps is the mainland
     /// provider, where a hall outside Japan and the mainland is. Off, a hall
@@ -341,10 +373,36 @@ final class VenuePlaces {
     /// on a Seoul campus had been written down as the campus. And once more
     /// now that a Korean address written in kanji is read as Korea: KINTEX
     /// had been written down as nowhere.
-    private static let ruleset = 12
+    ///
+    /// And again now that a hall abroad OpenStreetMap has nothing for by its
+    /// name is asked for by what the name carries in brackets — the hotel
+    /// behind ドーセット・ツェンワン香港（香港荃灣帝盛酒店） had been written
+    /// down as nowhere. Only "no such place" is asked again for that one
+    /// (``foundRuleset``): the brackets are tried only once everything before
+    /// them has found nothing.
+    private static let ruleset = 13
 
     /// The last ruleset whose answers *inside Japan* still stand.
     private static let japanRuleset = 8
+
+    /// The last ruleset whose answers that *found* the hall still stand,
+    /// anywhere and by whichever source.
+    ///
+    /// A hall abroad placed by its address alone stands too, though the
+    /// brackets might now find its building: an answer due to be asked again
+    /// is passed over by everything reading the kept answers — the calendar
+    /// mirror, the clocks — until a sheet or a refresh gets to it, and a pin
+    /// and a clock gone meanwhile cost more than a building found sooner.
+    private static let foundRuleset = 12
+
+    /// Whether `answer` was settled under a reading of Maps' answers that
+    /// still holds for it: this one, or an older one whose change could not
+    /// have moved it.
+    private static func stillStands(_ answer: Answer) -> Bool {
+        answer.ruleset == ruleset
+            || (answer.ruleset == japanRuleset && answer.isInJapan)
+            || (answer.ruleset == foundRuleset && answer.wasFound)
+    }
 
     /// How long "Maps has never heard of this hall" is believed for.
     ///
@@ -626,9 +684,9 @@ final class VenuePlaces {
     /// reader opens an event at a hall nothing has looked up yet, this is what
     /// goes and finds it and writes the answer down for everything after, the
     /// calendar mirror included.
-    func mapItem(for event: Event) async -> Placing? {
-        guard let venue = Venue(event) else { return nil }
-        return await mapItem(for: venue)
+    func lookUp(_ event: Event) async -> Lookup {
+        guard let venue = Venue(event) else { return .noHall }
+        return await lookUp(venue)
     }
 
     /// The same question asked about a hall rather than about something held
@@ -638,12 +696,12 @@ final class VenuePlaces {
     /// Keyed on exactly what an event's lookup is keyed on, so a hall the
     /// reader has already opened an event at is answered from what that
     /// lookup wrote down rather than asked about again.
-    func mapItem(forVenue name: String, address: String?) async -> Placing? {
-        guard let venue = Venue(name: name, address: address) else { return nil }
-        return await mapItem(for: venue)
+    func lookUp(venue name: String, address: String?) async -> Lookup {
+        guard let venue = Venue(name: name, address: address) else { return .noHall }
+        return await lookUp(venue)
     }
 
-    private func mapItem(for venue: Venue) async -> Placing? {
+    private func lookUp(_ venue: Venue) async -> Lookup {
         // A hall abroad that nothing has asked the clock of is asked again,
         // though it is placed perfectly well — see ``Answer/needsZone``. One
         // search settles it for good, and until it is settled every event held
@@ -665,7 +723,7 @@ final class VenuePlaces {
             if answer.latitude != known.latitude || answer.longitude != known.longitude {
                 placed.continuation.yield()
             }
-            return answer.placing
+            return answer.placing.map(Lookup.placed) ?? .unplaced
         }
         do {
             let found = try await search(venue, mayAskOpenStreetMap: true)
@@ -682,14 +740,14 @@ final class VenuePlaces {
                answer.latitude != known?.latitude || answer.longitude != known?.longitude {
                 placed.continuation.yield()
             }
-            return answer.placing
+            return answer.placing.map(Lookup.placed) ?? .unplaced
         } catch is Deferred {
             // Only OpenStreetMap could place it, and it may not be asked.
-            return nil
+            return .unplaced
         } catch {
             // Not written down, so the next screen to ask tries again.
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
-            return nil
+            return .failed
         }
     }
 
@@ -745,8 +803,7 @@ final class VenuePlaces {
     /// again, and a building it did not have is not asked for again either.
     /// Without this, every refresh would ask about every building afresh.
     private static func carrying(_ fresh: Answer, from known: Answer?) -> Answer {
-        guard fresh.source == Source.register.rawValue, let known,
-              known.ruleset == ruleset || (known.ruleset == japanRuleset && known.isInJapan)
+        guard fresh.source == Source.register.rawValue, let known, stillStands(known)
         else { return fresh }
         if known.source == Source.openStreetMap.rawValue {
             var kept = known
@@ -1030,7 +1087,7 @@ final class VenuePlaces {
         _ venue: Venue, at address: String?, country: String?
     ) async throws -> Found? {
         guard let place = try await VenueBuildings.shared.place(
-            named: venue.plainName, at: address, country: country)
+            named: venue.plainName, aliases: venue.aliases, at: address, country: country)
         else { return nil }
         let item = MKMapItem(
             location: CLLocation(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude),
@@ -1195,8 +1252,7 @@ final class VenuePlaces {
     /// again once the month is up, and anything settled under an older reading
     /// of Maps' answers is asked again now.
     private static func isWorthAskingAgain(_ answer: Answer) -> Bool {
-        let standsInJapan = answer.ruleset == japanRuleset && answer.isInJapan
-        guard answer.ruleset == ruleset || standsInJapan else { return true }
+        guard stillStands(answer) else { return true }
         return !answer.wasFound && answer.asked.timeIntervalSinceNow < -patience
     }
 
@@ -1228,6 +1284,34 @@ final class VenuePlaces {
             }
         }
         return kept.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Each part of `text` in brackets, the outermost whole — what
+    /// ``withoutBrackets(_:)`` leaves out. 香港荃灣帝盛酒店 from
+    /// ドーセット・ツェンワン香港（香港荃灣帝盛酒店）.
+    nonisolated static func inBrackets(_ text: String) -> [String] {
+        var parts: [String] = []
+        var part = ""
+        var depth = 0
+        for character in text {
+            if "（(【[".contains(character) {
+                if depth > 0 { part.append(character) }
+                depth += 1
+            } else if "）)】]".contains(character) {
+                guard depth > 0 else { continue }
+                depth -= 1
+                if depth > 0 {
+                    part.append(character)
+                } else {
+                    let whole = part.trimmingCharacters(in: .whitespaces)
+                    if !whole.isEmpty { parts.append(whole) }
+                    part = ""
+                }
+            } else if depth > 0 {
+                part.append(character)
+            }
+        }
+        return parts
     }
 }
 

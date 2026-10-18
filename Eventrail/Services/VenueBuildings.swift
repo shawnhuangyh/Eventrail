@@ -192,13 +192,18 @@ nonisolated struct VenueBuildings: Sendable {
     /// on its own is how a concert in Shanghai came to be pinned to a Mercedes
     /// showroom in Nara. Where it cannot, a name is believed only inside the
     /// country the address plainly names (`country`) — Hangul is Korea, 香港 is
-    /// Hong Kong — and not at all where it names none. Three requests at most,
-    /// paced like every other.
+    /// Hong Kong — and not at all where it names none. Three requests at most
+    /// for a name with no brackets, paced like every other; what is in the
+    /// brackets adds its own, and only where nothing before it was found.
     ///
     /// `address` may be nil — the hall's page published none, and the country
     /// was read off the event's title instead (see ``VenuePlaces``). Then the
     /// name is all there is, and it is believed only inside `country`.
-    func place(named name: String, at address: String?, country: String?) async throws -> Place? {
+    ///
+    /// `aliases` are what the hall's name carried in brackets, asked only
+    /// once the name itself has found nothing — see ``queries(named:aliases:)``.
+    func place(named name: String, aliases: [String] = [], at address: String?,
+               country: String?) async throws -> Place? {
         var anchor: Row?
         if let address, !address.isEmpty {
             await Self.pace.wait()
@@ -210,7 +215,7 @@ nonisolated struct VenueBuildings: Sendable {
         let within = country ?? anchor?.address?.countryCode
 
         if within != nil {
-            for query in Self.shortenings(of: name) {
+            for query in Self.queries(named: name, aliases: aliases) {
                 await Self.pace.wait()
                 let named = try await rows(for: query, in: within)
                 if let anchor, let reference = anchor.venueCoordinate {
@@ -226,6 +231,23 @@ nonisolated struct VenueBuildings: Sendable {
         }
         guard let anchor, let coordinate = anchor.venueCoordinate else { return nil }
         return Place(coordinate: coordinate, country: within, isBuilding: false)
+    }
+
+    /// What a hall abroad is searched for by, in order and each once: the name
+    /// and its shorter forms, then what the name carried in brackets and the
+    /// shorter forms of that.
+    ///
+    /// The brackets last, as a fallback for a name nobody has: in Japan they
+    /// hold another name the hall goes by and are dropped from every search,
+    /// but abroad Eventernote's members put the hall's own local name there —
+    /// ドーセット・ツェンワン香港（香港荃灣帝盛酒店） — and that is the one
+    /// OpenStreetMap carries, where the katakana finds nothing.
+    static func queries(named name: String, aliases: [String]) -> [String] {
+        var queries: [String] = []
+        for query in ([name] + aliases).flatMap(shortenings(of:)) where !queries.contains(query) {
+            queries.append(query)
+        }
+        return queries
     }
 
     /// The name, then shorter forms of it, cut where a dash or a space says

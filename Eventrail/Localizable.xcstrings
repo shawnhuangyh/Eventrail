@@ -3092,6 +3092,50 @@
         }
       }
     },
+    "Couldn't find this venue on the map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この会場は地図上で見つかりませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能在地图上找到此场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能在地圖上找到此場館"
+          }
+        }
+      }
+    },
+    "Couldn't load the venue's location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場の位置を読み込めませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法加载场馆位置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法載入場館位置"
+          }
+        }
+      }
+    },
     "Couldn't Save the Flyer" : {
       "localizations" : {
         "ja" : {
@@ -5051,6 +5095,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請入座"
+          }
+        }
+      }
+    },
+    "Finding the venue on the map…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図上で会場を検索中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在地图上查找场馆…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在地圖上查找場館…"
           }
         }
       }
