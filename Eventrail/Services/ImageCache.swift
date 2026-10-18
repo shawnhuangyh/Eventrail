@@ -103,6 +103,18 @@ actor ImageCache {
         return remember(stored, for: url)
     }
 
+    /// Which of `urls` this device holds a copy of, asking the host nothing.
+    func stored(_ urls: some Sequence<URL>) -> Set<URL> {
+        Set(urls.filter { FileManager.default.fileExists(atPath: paths(for: $0).image.path) })
+    }
+
+    /// The bytes this device holds for `url`, read off the disk and not kept
+    /// in memory — for ``SpotlightIndex``, which makes a small copy of every
+    /// flyer held and draws none of them.
+    func storedData(for url: URL) -> Data? {
+        try? Data(contentsOf: paths(for: url).image)
+    }
+
     /// The image at `url`: from memory, from this device, or downloaded — in
     /// that order, and each downloaded once however many ask.
     ///

@@ -454,7 +454,7 @@ struct EventPassportView: View {
 
     /// The chosen year is filled rather than merely tinted.
     ///
-    /// Every other chip in the app tints its label and leaves the glass alone,
+    /// Every other chip in the app tints its label and leaves its pill alone,
     /// because those filters narrow a list the reader can still see the whole
     /// of. This one silently changes nine cards at once, so it is the one
     /// filter worth reading from across the room.
@@ -520,10 +520,10 @@ struct EventPassportView: View {
             figures(stats)
                 .padding(16)
         }
-        // Clipped as well as glassed: the glass is only the background, and
-        // the map would otherwise square off the panel's top corners.
+        // Clipped as well as set on a panel: the panel is only the background,
+        // and the map would otherwise square off its top corners.
         .clipShape(.rect(cornerRadius: 28, style: .continuous))
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
     private func prefectures(_ stats: PassportStats) -> some View {
@@ -533,7 +533,7 @@ struct EventPassportView: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
-            .glassCapsule()
+            .capsulePanel()
     }
 
     /// The country, with a dot on every hall anything has been able to place.
@@ -608,17 +608,17 @@ struct EventPassportView: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
-        .glassCapsule()
+        .capsulePanel()
     }
 
     /// What the slice adds up to, set out the way a passport sets out its
     /// holder: the two that say how much across the top, the three that say
     /// how many under them.
     ///
-    /// Bare rather than five tiles of glass — a panel of glass holding tiles
-    /// of glass is a box of boxes — and named over the figure rather than
-    /// under it, which is the other way round from the row of four in the card
-    /// below. Those four are one number said four ways, so the figure leads;
+    /// Bare rather than five tiles — a panel holding tiles is a box of boxes —
+    /// and named over the figure rather than under it, which is the other way
+    /// round from the row of four in the card below. Those four are one number
+    /// said four ways, so the figure leads;
     /// these five are five different facts, so the name does.
     private func figures(_ stats: PassportStats) -> some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -709,7 +709,7 @@ struct EventPassportView: View {
             }
         }
         .padding(16)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
     private func unit(_ value: Int, suffix: String) -> some View {
@@ -823,7 +823,7 @@ struct EventPassportView: View {
             }
         }
         .padding(16)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
     // MARK: - The empty screen
@@ -848,14 +848,14 @@ struct EventPassportView: View {
                 Button("Record Tickets") {
                     reviewing = TicketReviewList(events: unticketed)
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(.borderedProminent)
                 .tint(Color.brandTint)
                 .padding(.top, 6)
             }
         }
         .padding(28)
         .frame(maxWidth: .infinity)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
         .padding(.top, 30)
     }
 
@@ -1011,13 +1011,13 @@ private struct PassportEventsCard: View {
                 .accessibilityLabel(Text("Events per \(Text(shown.label))"))
         }
         .padding(16)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
-    /// Tinted rather than filled, and flat rather than glass: the year filter
+    /// Tinted rather than filled, and bare rather than a pill: the year filter
     /// over the whole screen is the one control worth reading from across the
-    /// room, and a second capsule of glass inside a panel of glass would both
-    /// outshout it and box the card.
+    /// room, and a second capsule inside a panel would both outshout it and
+    /// box the card.
     private var picker: some View {
         HStack(spacing: 6) {
             Text("Events Per")
@@ -1294,7 +1294,7 @@ private struct PassportRankingSheet: View {
                     }
                 }
                 .padding(16)
-                .glassPanel(cornerRadius: 28)
+                .panel(cornerRadius: 28)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
@@ -1798,7 +1798,7 @@ private struct PassportLotterySheet: View {
                     }
                 }
                 .padding(16)
-                .glassPanel(cornerRadius: 28)
+                .panel(cornerRadius: 28)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
@@ -1861,7 +1861,7 @@ private struct PassportLotteryCard: View {
             topEntries
         }
         .padding(16)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
     /// The list of events behind the card, as the Passport opens it.
@@ -2394,7 +2394,7 @@ private struct PassportSpendingCard: View {
             }
         }
         .padding(16)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
     /// The list of tickets behind the card, as the Passport opens it.

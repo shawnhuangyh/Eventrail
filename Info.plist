@@ -21,6 +21,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>CoreSpotlightContinuation</key>
+	<true/>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>moe.shawn.Eventrail.event</string>

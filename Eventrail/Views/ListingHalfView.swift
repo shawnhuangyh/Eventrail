@@ -110,7 +110,7 @@ struct ListingHalfView: View {
                     }
                 }
                 .padding(.vertical, 6)
-                .glassPanel(cornerRadius: 28)
+                .panel(cornerRadius: 28)
 
                 if feed.moreFailure == nil, events.isEmpty, feed.hasMore, !feed.isLoadingMore {
                     // Still paging towards this half's first row.

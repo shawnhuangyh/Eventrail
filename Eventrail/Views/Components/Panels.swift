@@ -35,7 +35,7 @@ struct LibraryToggle: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
-        .glassCircle(interactive: true)
+        .circlePanel()
         .accessibilityLabel(isSaved ? "Remove from my events" : "Add to my events")
         .confirmingRemoval(isPresented: $isConfirmingRemoval) {
             withAnimation(.snappy) { store.remove(CollectionOfOne(event)) }

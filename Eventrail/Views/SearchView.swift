@@ -11,6 +11,11 @@ struct SearchView: View {
     @Environment(EventStore.self) private var store
     @Query private var settingsRows: [LibrarySettings]
 
+    /// A term handed in from outside the app — Spotlight's Search in App, or
+    /// Siri — typed into the field and searched for as if submitted, then let
+    /// go of.
+    var request: Binding<String?> = .constant(nil)
+
     @State private var query = ""
     @State private var scope: SearchScope = .events
     @State private var events = Feed<Event>()
@@ -90,7 +95,18 @@ struct SearchView: View {
             // Beside the results on an open iPhone Duo.
             .eventPane($openEvent)
             .task(id: Request(term: term, scope: scope, filter: filter, order: order)) { await search() }
+            .onChange(of: request.wrappedValue, initial: true) { takeRequest() }
         }
+    }
+
+    /// Searches events for the term handed in, and remembers it as a search
+    /// submitted here is remembered.
+    private func takeRequest() {
+        guard let handed = request.wrappedValue else { return }
+        request.wrappedValue = nil
+        scope = .events
+        query = handed
+        store.remember(search: term)
     }
 
     /// The bar keeps its title while a search is up on an iPad. Left to hide
@@ -339,7 +355,7 @@ struct SearchView: View {
             Button("Clear Filter") {
                 withAnimation(.snappy) { filter = SearchFilter() }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.bordered)
         }
         .padding(.top, 48)
     }
@@ -355,12 +371,12 @@ struct SearchView: View {
                 fruitlessPages = 0
                 Task { await readOn() }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.bordered)
             .controlSize(.small)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .glassPanel()
+        .panel()
     }
 
     @ViewBuilder
@@ -423,7 +439,7 @@ struct SearchView: View {
                             .buttonStyle(.plain)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
-                            .glassCapsule(interactive: true)
+                            .capsulePanel()
                     }
                 }
             }
@@ -438,7 +454,7 @@ struct SearchView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .glassPanel()
+            .panel()
             .padding(.top, 6)
         }
         .padding(.horizontal, 18)
@@ -456,7 +472,7 @@ struct SearchView: View {
                     SiteListingRow(listing: listing)
                 }
                 .buttonStyle(.plain)
-                .glassPanel(interactive: true)
+                .panel()
             }
         }
     }
@@ -515,7 +531,7 @@ struct SearchResultRow: View {
         .contentShape(.rect)
         .onTapGesture(perform: open)
         .marksEventBeside(event.id)
-        .glassPanel()
+        .panel()
     }
 }
 
@@ -599,7 +615,7 @@ private struct PerformerRow: View {
             .padding(13)
         }
         .buttonStyle(.plain)
-        .glassPanel(interactive: true)
+        .panel()
     }
 }
 
@@ -641,12 +657,12 @@ struct FeedFooter<Item: Identifiable & Sendable>: View {
                         landed()
                     }
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.bordered)
                 .controlSize(.small)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 11)
-            .glassPanel()
+            .panel()
         } else if feed.isLoadingMore {
             SearchProgress(compact: true)
         }
@@ -665,7 +681,7 @@ struct SearchFailure: View {
             Text(verbatim: message)
         } actions: {
             Button("Try Again") { Task { await retry() } }
-                .buttonStyle(.glass)
+                .buttonStyle(.bordered)
         }
         .padding(.top, 40)
     }

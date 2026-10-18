@@ -2,8 +2,10 @@ import SwiftUI
 
 /// What the app has been asked to open from outside it — an event, from its
 /// Live Activity tapped or handed off from another device (``EventHandoff``);
-/// a lottery round, from its results-day reminder — and where it is opened:
-/// over whatever the reader has up.
+/// a lottery round, from its results-day reminder; an event, a performer or a
+/// hall found in Spotlight or asked for through Siri or Shortcuts
+/// (``SpotlightIndex``, ``IntentOpens``) — and where it is opened: over
+/// whatever the reader has up.
 ///
 /// A sheet presented from the root while another sheet is up is one SwiftUI
 /// does not present at all: a reminder tapped with an event's sheet open, as
@@ -59,11 +61,17 @@ enum OutsideOpen: Identifiable {
     case event(Event)
     /// The ticket sheet, on the round's own page.
     case round(LotteryRow)
+    /// A performer's page, from Spotlight or Siri, in a sheet of its own.
+    case performer(PerformerLink)
+    /// A hall's page, the same way.
+    case venue(VenueLink)
 
     var id: String {
         switch self {
         case .event(let event): "event/\(event.id)"
         case .round(let row): "round/\(row.id)"
+        case .performer(let link): "performer/\(link)"
+        case .venue(let link): "venue/\(link)"
         }
     }
 }
@@ -119,6 +127,10 @@ private struct OutsideOpenPresenter: ViewModifier {
                     case .round(let row):
                         TicketDetailsView(event: row.event, tracking: store?.tracking(for: row.event) ?? Tracking(),
                                           opening: row.entry)
+                    case .performer(let link):
+                        OutsidePage { PerformerView(link: link) }
+                    case .venue(let link):
+                        OutsidePage { VenueView(link: link) }
                     }
                 }
                 .onAppear { opens?.delivered(open) }
@@ -153,5 +165,34 @@ private struct OutsideOpenPresenter: ViewModifier {
                 try? await Task.sleep(for: .milliseconds(100))
             }
         }
+    }
+}
+
+/// A performer's or a hall's page opened from outside the app, as a sheet with
+/// a stack of its own — as an event's sheet holds one for a performer billed
+/// on it, so a name or an event on the page opens inside it.
+///
+/// The pages draw their own notices above their bars; the See All behind
+/// either has no bar and draws none, so the stack draws them there.
+private struct OutsidePage<Page: View>: View {
+    @ViewBuilder let page: Page
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var path = NavigationPath()
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            page
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close", systemImage: "xmark") { dismiss() }
+                    }
+                }
+                .venueDestination()
+        }
+        .refreshNotices(showing: !path.isEmpty)
+        .refreshNoticesInSheet()
+        .presentationDragIndicator(.visible)
+        .opensFromOutside()
     }
 }

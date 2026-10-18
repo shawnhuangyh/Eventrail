@@ -753,7 +753,7 @@ struct TicketStubView: View {
                     Label("Save Image", systemImage: "square.and.arrow.down")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.bordered)
                 .tint(.primary)
                 .disabled(file == nil)
                 shareButton(file)
@@ -836,7 +836,7 @@ struct TicketStubView: View {
                     .disabled(true)
             }
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.borderedProminent)
         .tint(Color.brandTint)
     }
 

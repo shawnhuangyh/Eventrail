@@ -457,7 +457,7 @@ struct PerformerView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
         .padding(.horizontal, 18)
     }
 
@@ -529,7 +529,7 @@ struct PerformerView: View {
             }
         }
         .padding(17)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
         .padding(.horizontal, 18)
     }
 

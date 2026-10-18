@@ -550,13 +550,14 @@ final class EventStore {
     // is drawn again when that row changes and not when another does.
 
     /// The library, for the work done here rather than on a screen: the
-    /// calendar, the halls, a refresh, the watch and the reminders.
+    /// calendar, the halls, a refresh, the watch, the reminders and Spotlight
+    /// (``SpotlightIndex``).
     ///
     /// Through the same kept copies a screen's list is (``events(of:where:)``):
     /// read after every write by the calendar, the watch and the reminders
     /// each, building nine hundred events out of their columns every time
     /// was the most of what a write cost.
-    private var library: [Event] {
+    var library: [Event] {
         events(of: entries.values, where: \.inLibrary)
     }
 
@@ -1795,6 +1796,16 @@ final class EventStore {
 
     func isFollowing(_ performer: PerformerProfile) -> Bool {
         performerRows[performer.id]?.isFollowing == true
+    }
+
+    /// Everyone followed whom the app can name, by name — the rows
+    /// ``FollowedPerformer/followed`` queries, for the work done here rather
+    /// than on a screen: Spotlight, and Siri and Shortcuts asking for one.
+    var followedProfiles: [PerformerProfile] {
+        performerRows.values
+            .filter(\.isFollowing)
+            .compactMap(\.profile)
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// Follows a performer, or stops following them.

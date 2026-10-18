@@ -128,7 +128,7 @@ struct FavoriteEventsView: View {
                 }
             }
             .padding(.vertical, 6)
-            .glassPanel()
+            .panel()
         }
     }
 
@@ -139,7 +139,7 @@ struct FavoriteEventsView: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .glassPanel()
+            .panel()
     }
 
     /// The subtitle carries the count that matters at the moment: how many are

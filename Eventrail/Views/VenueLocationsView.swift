@@ -55,7 +55,7 @@ struct VenueLocationsView: View {
 
                     refreshRow
                 }
-                .glassPanel(interactive: true)
+                .panel()
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -92,7 +92,7 @@ struct VenueLocationsView: View {
                 detail: "Shown by name until one of the three finds it."
             )
         }
-        .glassPanel()
+        .panel()
     }
 
     /// Why the switch is here at all, said before anything else: outside
@@ -117,7 +117,7 @@ struct VenueLocationsView: View {
                 detail: "Halls placed while you were there keep the block or building they were given. Refresh Venue Locations once you are elsewhere, and Apple Maps is asked for them again."
             )
         }
-        .glassPanel()
+        .panel()
     }
 
     private var refreshRow: some View {

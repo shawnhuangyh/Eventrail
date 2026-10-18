@@ -108,7 +108,7 @@ struct MeView: View {
     /// on an iPhone, then the rest two by two, each list sampling fewer rows,
     /// one run of cards with nothing held back for the fold. Not
     /// `DuoTurnedMe.dc.html`'s two cards side by side stretched to the fold,
-    /// which left both mostly empty glass, nor a gap kept over the fold,
+    /// which left both mostly empty panel, nor a gap kept over the fold,
     /// which read as a hole.
     @ViewBuilder
     private var cards: some View {
@@ -184,7 +184,7 @@ struct MeView: View {
     private var isGrid: Bool { fold?.axis == .horizontal }
 
     /// How tall a card's panel is drawn: as tall as its row in the grid, as
-    /// tall as it needs everywhere else. Before the glass, so the panel grows
+    /// tall as it needs everywhere else. Before the panel, so the panel grows
     /// with it.
     private var cardHeight: CGFloat? { isGrid ? .infinity : nil }
 
@@ -229,7 +229,7 @@ struct MeView: View {
                         .padding(.vertical, 9)
                 }
                 .buttonStyle(.plain)
-                .glassCapsule(interactive: true)
+                .capsulePanel()
                 .disabled(store.isRefreshing || handle == nil)
                 .frame(maxHeight: .infinity, alignment: .top)
             }
@@ -272,7 +272,7 @@ struct MeView: View {
         // for the height it is offered, and spread the rows apart.
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxHeight: cardHeight, alignment: .top)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
     /// The account's own name when Eventernote has printed one, since that is
@@ -443,7 +443,7 @@ struct MeView: View {
     ///
     /// One card, built the way the two cards under it are: a ``CardHeader``
     /// with the way into the rest on its right, and the contents laid directly
-    /// on the glass beneath it. The whole card is the way in, so the counts
+    /// on the panel beneath it. The whole card is the way in, so the counts
     /// push as readily as the See All does.
     ///
     /// The three are the Passport's own numbers rather than the library's:
@@ -472,15 +472,15 @@ struct MeView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(cornerRadius: 28, interactive: true)
+        .panel(cornerRadius: 28)
     }
 
     /// One of the three counts, drawn on the card rather than in a
     /// ``StatTile`` of its own.
     ///
     /// The tints are the ones this screen has always given these three numbers;
-    /// the panel is gone, because these sit *inside* one now and glass set in
-    /// glass reads as a smudge. What separates them instead is a hairline, the
+    /// the panel is gone, because these sit *inside* one now and a panel set
+    /// in a panel reads as a box of boxes. What separates them instead is a hairline, the
     /// same one the Passport's own Time at Events strip uses — three counts
     /// standing loose in a row read as three things that happen to be near each
     /// other rather than as one reading of a library.
@@ -565,7 +565,7 @@ struct MeView: View {
             }
         }
         .frame(maxHeight: cardHeight, alignment: .top)
-        .glassPanel()
+        .panel()
     }
 
     // MARK: - Favorites
@@ -606,7 +606,7 @@ struct MeView: View {
             }
         }
         .frame(maxHeight: cardHeight, alignment: .top)
-        .glassPanel()
+        .panel()
     }
 
     // MARK: - Followed performers
@@ -649,7 +649,7 @@ struct MeView: View {
             }
         }
         .frame(maxHeight: cardHeight, alignment: .top)
-        .glassPanel()
+        .panel()
     }
 
     /// The way into the whole of a list the card only samples. It stands there

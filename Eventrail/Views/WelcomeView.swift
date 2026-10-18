@@ -214,7 +214,7 @@ struct WelcomeView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .glassPanel(interactive: true)
+            .panel()
         }
     }
 
@@ -255,7 +255,7 @@ struct WelcomeView: View {
                 SettingRowLabel("calendar", "Calendar Sync")
             }
             .settingRowPadding()
-            .glassPanel()
+            .panel()
         }
     }
 
@@ -266,7 +266,7 @@ struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 18, content: features)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(18)
-            .glassPanel()
+            .panel()
     }
 
     private func feature(_ symbol: String, _ title: LocalizedStringKey,
@@ -306,17 +306,16 @@ struct WelcomeView: View {
                 .padding(.bottom, 8)
             }
 
-            // The system's own prominent glass rather than a flat fill: it is
-            // the one thing on this screen that is always tappable, and on iOS
-            // 26 that is what a primary action is made of. The tint carries the
-            // app's colour through it instead of painting over it.
+            // The system's own prominent button: it is the one thing on this
+            // screen that is always tappable, and filled in the app's colour it
+            // reads as the way on.
             Button(action: advance) {
                 callToAction
                     .font(.system(size: 16.5, weight: .semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
             .controlSize(.extraLarge)
             .tint(Color.brandTint)

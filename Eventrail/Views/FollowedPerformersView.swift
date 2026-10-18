@@ -51,7 +51,7 @@ struct FollowedPerformersView: View {
                 }
             }
             .padding(.vertical, 6)
-            .glassPanel()
+            .panel()
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }

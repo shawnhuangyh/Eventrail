@@ -62,7 +62,7 @@ struct AboutView: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .padding(.vertical, 22)
-        .glassPanel()
+        .panel()
         .padding(.top, 8)
     }
 
@@ -78,7 +78,7 @@ struct AboutView: View {
             SettingRowDivider()
             linkRow("exclamationmark.bubble", "Report a Problem", to: Self.issues)
         }
-        .glassPanel(interactive: true)
+        .panel()
     }
 
     private func linkRow(_ symbol: String, _ title: LocalizedStringKey, to url: URL) -> some View {

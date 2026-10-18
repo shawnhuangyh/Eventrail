@@ -646,8 +646,7 @@ struct EventDetailView: View {
         .padding(18)
         // Tinted, faintly, while the event is under way: the one time the
         // card is about now rather than about a date.
-        .glassBackground(in: .rect(cornerRadius: 28, style: .continuous),
-                         tint: progress.isUnderway ? tint.opacity(0.1) : nil)
+        .panel(cornerRadius: 28, tint: progress.isUnderway ? tint.opacity(0.1) : nil)
         .padding(.horizontal, 18)
     }
 
@@ -1000,7 +999,7 @@ struct EventDetailView: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .glassPanel(cornerRadius: 18, interactive: true)
+                .panel(cornerRadius: 18)
                 .accessibilityLabel(Text("Notes"))
                 .accessibilityValue(Text(tracking.note))
                 .accessibilityHint("Opens the ticket details")
@@ -1018,8 +1017,7 @@ struct EventDetailView: View {
             isMakingStub = true
         } label: {
             HStack(spacing: 13) {
-                // The label's own colours rather than `.primary`, which glass
-                // draws vibrant — a grey square rather than an ink-dark one.
+                // The label's own colours, an ink-dark square in either mode.
                 Image(systemName: "ticket")
                     .font(.system(size: 18))
                     .foregroundStyle(Color(.systemBackground))
@@ -1045,7 +1043,7 @@ struct EventDetailView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(cornerRadius: 22, interactive: true)
+        .panel(cornerRadius: 22)
         .accessibilityElement(children: .combine)
     }
 
@@ -1073,7 +1071,7 @@ struct EventDetailView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(cornerRadius: 22, interactive: true)
+        .panel(cornerRadius: 22)
         .accessibilityLabel(Text(title))
         .accessibilityValue(Text("\(value), \(detail)"))
         .accessibilityHint("Opens the ticket details")
@@ -1433,7 +1431,7 @@ struct EventDetailView: View {
                 }
             }
             .padding(18)
-            .glassPanel(cornerRadius: 28)
+            .panel(cornerRadius: 28)
             .padding(.horizontal, 18)
             .task(id: translationTargetID) {
                 dropTranslation(unlessFor: translationTargetID)
@@ -1664,7 +1662,7 @@ struct EventDetailView: View {
                                     .foregroundStyle(Color.brandTint)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 7)
-                                    .glassCapsule(interactive: true)
+                                    .capsulePanel()
                             }
                             .buttonStyle(.plain)
                         }
@@ -1672,7 +1670,7 @@ struct EventDetailView: View {
                 }
             }
             .padding(18)
-            .glassPanel(cornerRadius: 28)
+            .panel(cornerRadius: 28)
             .padding(.horizontal, 18)
         }
     }
@@ -1772,7 +1770,7 @@ struct EventDetailView: View {
             }
         }
         .padding(18)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
         .padding(.horizontal, 18)
     }
 
@@ -1792,9 +1790,7 @@ struct EventDetailView: View {
         VStack(spacing: 0) {
             VenueMap(venue: event.venue, place: place) { openVenueInMaps(directions: false) }
                 // The map alone is clipped, and only where the card's own
-                // corners are. Clipping the whole card clips the glass with
-                // it, and a clipped glass effect stops sampling what is behind
-                // it and flattens to a plain light fill.
+                // corners are: the card's panel rounds the rest.
                 .clipShape(.rect(topLeadingRadius: 28, bottomLeadingRadius: 0,
                                  bottomTrailingRadius: 0, topTrailingRadius: 28,
                                  style: .continuous))
@@ -1814,13 +1810,13 @@ struct EventDetailView: View {
                             .padding(.vertical, 9)
                     }
                     .buttonStyle(.plain)
-                    .glassCapsule(interactive: true)
+                    .capsulePanel()
                 }
             }
             .padding(.horizontal, 17)
             .padding(.vertical, 15)
         }
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
         .padding(.horizontal, 18)
     }
 

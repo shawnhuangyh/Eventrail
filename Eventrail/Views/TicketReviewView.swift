@@ -56,7 +56,7 @@ struct TicketReviewView: View {
                             EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail) {
                                 EmptyView()
                             }
-                            .glassPanel()
+                            .panel()
                             .listRowInsets(GroupHeader.rowInsets)
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
@@ -182,7 +182,7 @@ struct TicketReviewPrompt: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .glassPanel(interactive: true)
+        .panel()
     }
 }
 

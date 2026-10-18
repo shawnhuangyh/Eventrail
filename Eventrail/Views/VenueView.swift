@@ -385,10 +385,7 @@ struct VenueView: View {
                     VenueDirections.open(profile.name, at: place, directions: false, with: openURL)
                 }
                 // Only the map is clipped, and only where the card's own
-                // corners are. Clipping the whole card — which is what it used
-                // to do — clips the glass with it, and a clipped glass effect
-                // stops sampling what is behind it and flattens to a plain
-                // light fill.
+                // corners are: the card's panel rounds the rest.
                 .clipShape(.rect(topLeadingRadius: 28, bottomLeadingRadius: 0,
                                  bottomTrailingRadius: 0, topTrailingRadius: 28,
                                  style: .continuous))
@@ -418,7 +415,7 @@ struct VenueView: View {
                 .padding(.horizontal, 17)
                 .padding(.vertical, 6)
             }
-            .glassPanel(cornerRadius: 28)
+            .panel(cornerRadius: 28)
             .padding(.horizontal, 18)
         }
     }
@@ -486,7 +483,7 @@ struct VenueView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(17)
-            .glassPanel(cornerRadius: 28)
+            .panel(cornerRadius: 28)
             .padding(.horizontal, 18)
         }
     }
@@ -601,7 +598,7 @@ struct VenueView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
         .padding(.horizontal, 18)
     }
 
@@ -673,7 +670,7 @@ struct VenueView: View {
             }
         }
         .padding(17)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
         .padding(.horizontal, 18)
     }
 
