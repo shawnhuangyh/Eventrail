@@ -94,6 +94,13 @@ final class VenuePlaces {
             return plain.isEmpty ? name : plain
         }
 
+        /// What the name carries in brackets — for a hall abroad, often its
+        /// own local name, which OpenStreetMap is asked for once the name
+        /// outside them finds nothing (``VenueBuildings/queries(named:aliases:)``).
+        var aliases: [String] {
+            VenuePlaces.inBrackets(name)
+        }
+
         /// The cache's key. Both parts, so a re-import that finally supplies an
         /// address is a new question rather than an old answer.
         var key: String { "\(name)\n\(address ?? "")" }
@@ -366,10 +373,36 @@ final class VenuePlaces {
     /// on a Seoul campus had been written down as the campus. And once more
     /// now that a Korean address written in kanji is read as Korea: KINTEX
     /// had been written down as nowhere.
-    private static let ruleset = 12
+    ///
+    /// And again now that a hall abroad OpenStreetMap has nothing for by its
+    /// name is asked for by what the name carries in brackets — the hotel
+    /// behind ドーセット・ツェンワン香港（香港荃灣帝盛酒店） had been written
+    /// down as nowhere. Only "no such place" is asked again for that one
+    /// (``foundRuleset``): the brackets are tried only once everything before
+    /// them has found nothing.
+    private static let ruleset = 13
 
     /// The last ruleset whose answers *inside Japan* still stand.
     private static let japanRuleset = 8
+
+    /// The last ruleset whose answers that *found* the hall still stand,
+    /// anywhere and by whichever source.
+    ///
+    /// A hall abroad placed by its address alone stands too, though the
+    /// brackets might now find its building: an answer due to be asked again
+    /// is passed over by everything reading the kept answers — the calendar
+    /// mirror, the clocks — until a sheet or a refresh gets to it, and a pin
+    /// and a clock gone meanwhile cost more than a building found sooner.
+    private static let foundRuleset = 12
+
+    /// Whether `answer` was settled under a reading of Maps' answers that
+    /// still holds for it: this one, or an older one whose change could not
+    /// have moved it.
+    private static func stillStands(_ answer: Answer) -> Bool {
+        answer.ruleset == ruleset
+            || (answer.ruleset == japanRuleset && answer.isInJapan)
+            || (answer.ruleset == foundRuleset && answer.wasFound)
+    }
 
     /// How long "Maps has never heard of this hall" is believed for.
     ///
@@ -770,8 +803,7 @@ final class VenuePlaces {
     /// again, and a building it did not have is not asked for again either.
     /// Without this, every refresh would ask about every building afresh.
     private static func carrying(_ fresh: Answer, from known: Answer?) -> Answer {
-        guard fresh.source == Source.register.rawValue, let known,
-              known.ruleset == ruleset || (known.ruleset == japanRuleset && known.isInJapan)
+        guard fresh.source == Source.register.rawValue, let known, stillStands(known)
         else { return fresh }
         if known.source == Source.openStreetMap.rawValue {
             var kept = known
@@ -1055,7 +1087,7 @@ final class VenuePlaces {
         _ venue: Venue, at address: String?, country: String?
     ) async throws -> Found? {
         guard let place = try await VenueBuildings.shared.place(
-            named: venue.plainName, at: address, country: country)
+            named: venue.plainName, aliases: venue.aliases, at: address, country: country)
         else { return nil }
         let item = MKMapItem(
             location: CLLocation(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude),
@@ -1220,8 +1252,7 @@ final class VenuePlaces {
     /// again once the month is up, and anything settled under an older reading
     /// of Maps' answers is asked again now.
     private static func isWorthAskingAgain(_ answer: Answer) -> Bool {
-        let standsInJapan = answer.ruleset == japanRuleset && answer.isInJapan
-        guard answer.ruleset == ruleset || standsInJapan else { return true }
+        guard stillStands(answer) else { return true }
         return !answer.wasFound && answer.asked.timeIntervalSinceNow < -patience
     }
 
@@ -1253,6 +1284,34 @@ final class VenuePlaces {
             }
         }
         return kept.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Each part of `text` in brackets, the outermost whole — what
+    /// ``withoutBrackets(_:)`` leaves out. 香港荃灣帝盛酒店 from
+    /// ドーセット・ツェンワン香港（香港荃灣帝盛酒店）.
+    nonisolated static func inBrackets(_ text: String) -> [String] {
+        var parts: [String] = []
+        var part = ""
+        var depth = 0
+        for character in text {
+            if "（(【[".contains(character) {
+                if depth > 0 { part.append(character) }
+                depth += 1
+            } else if "）)】]".contains(character) {
+                guard depth > 0 else { continue }
+                depth -= 1
+                if depth > 0 {
+                    part.append(character)
+                } else {
+                    let whole = part.trimmingCharacters(in: .whitespaces)
+                    if !whole.isEmpty { parts.append(whole) }
+                    part = ""
+                }
+            } else if depth > 0 {
+                part.append(character)
+            }
+        }
+        return parts
     }
 }
 

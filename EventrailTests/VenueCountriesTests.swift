@@ -132,4 +132,24 @@ struct VenueNameTests {
     @Test func aLongVowelIsNotABreak() {
         #expect(VenueBuildings.shortenings(of: "ぴあアリーナMM") == ["ぴあアリーナMM"])
     }
+
+    /// The hall's local name, which members put in brackets after the
+    /// katakana: the outermost part whole, each part once.
+    @Test func whatANameCarriesInBracketsIsReadOut() {
+        #expect(VenuePlaces.inBrackets("ドーセット・ツェンワン香港（香港荃灣帝盛酒店）") == ["香港荃灣帝盛酒店"])
+        #expect(VenuePlaces.inBrackets("ワールド記念ホール(神戸ポートアイランドホール)") == ["神戸ポートアイランドホール"])
+        #expect(VenuePlaces.inBrackets("A【B（C）】 D[E]") == ["B（C）", "E"])
+        #expect(VenuePlaces.inBrackets("日本武道館").isEmpty)
+        #expect(VenuePlaces.inBrackets("Hall（）").isEmpty)
+    }
+
+    /// The bracketed name only after the name and its shorter forms, each
+    /// query once.
+    @Test func theBracketedNameIsAskedForLast() {
+        #expect(VenueBuildings.queries(named: "ドーセット・ツェンワン香港", aliases: ["香港荃灣帝盛酒店"])
+                == ["ドーセット・ツェンワン香港", "香港荃灣帝盛酒店"])
+        #expect(VenueBuildings.queries(named: "歷山酒店-宴會廳", aliases: ["歷山酒店"])
+                == ["歷山酒店-宴會廳", "歷山酒店"])
+        #expect(VenueBuildings.queries(named: "ぴあアリーナMM", aliases: []) == ["ぴあアリーナMM"])
+    }
 }
