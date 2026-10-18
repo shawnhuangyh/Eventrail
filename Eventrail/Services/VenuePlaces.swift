@@ -289,6 +289,31 @@ final class VenuePlaces {
         let isFromMaps: Bool
     }
 
+    /// How a screen's question about one hall came out.
+    ///
+    /// More than the placing or nothing, because the map under a hall is drawn
+    /// differently for each of the ways there is no placing: an empty panel
+    /// read the same whether the answer was still on its way, every source had
+    /// been asked and had nothing, or the search had not got through at all.
+    enum Lookup: Sendable {
+        case placed(Placing)
+        /// Everything this device may ask was asked, now or before, and none
+        /// of it has the hall — or the one source that might is OpenStreetMap
+        /// and the reader has it switched off. Written down, and asked again
+        /// only once ``patience`` is up.
+        case unplaced
+        /// The search did not get through — offline, or refused. Nothing was
+        /// written down, so asking again may yet place it.
+        case failed
+        /// Nothing to ask about: no hall named yet, or one of the site's
+        /// placeholders for a stream or an undisclosed room (``Event/isAtHall``).
+        case noHall
+
+        var placing: Placing? {
+            if case .placed(let placing) = self { placing } else { nil }
+        }
+    }
+
     /// Whether this device may ask OpenStreetMap anything — which building at
     /// the block is the hall, and, on a phone whose Maps is the mainland
     /// provider, where a hall outside Japan and the mainland is. Off, a hall
@@ -626,9 +651,9 @@ final class VenuePlaces {
     /// reader opens an event at a hall nothing has looked up yet, this is what
     /// goes and finds it and writes the answer down for everything after, the
     /// calendar mirror included.
-    func mapItem(for event: Event) async -> Placing? {
-        guard let venue = Venue(event) else { return nil }
-        return await mapItem(for: venue)
+    func lookUp(_ event: Event) async -> Lookup {
+        guard let venue = Venue(event) else { return .noHall }
+        return await lookUp(venue)
     }
 
     /// The same question asked about a hall rather than about something held
@@ -638,12 +663,12 @@ final class VenuePlaces {
     /// Keyed on exactly what an event's lookup is keyed on, so a hall the
     /// reader has already opened an event at is answered from what that
     /// lookup wrote down rather than asked about again.
-    func mapItem(forVenue name: String, address: String?) async -> Placing? {
-        guard let venue = Venue(name: name, address: address) else { return nil }
-        return await mapItem(for: venue)
+    func lookUp(venue name: String, address: String?) async -> Lookup {
+        guard let venue = Venue(name: name, address: address) else { return .noHall }
+        return await lookUp(venue)
     }
 
-    private func mapItem(for venue: Venue) async -> Placing? {
+    private func lookUp(_ venue: Venue) async -> Lookup {
         // A hall abroad that nothing has asked the clock of is asked again,
         // though it is placed perfectly well — see ``Answer/needsZone``. One
         // search settles it for good, and until it is settled every event held
@@ -665,7 +690,7 @@ final class VenuePlaces {
             if answer.latitude != known.latitude || answer.longitude != known.longitude {
                 placed.continuation.yield()
             }
-            return answer.placing
+            return answer.placing.map(Lookup.placed) ?? .unplaced
         }
         do {
             let found = try await search(venue, mayAskOpenStreetMap: true)
@@ -682,14 +707,14 @@ final class VenuePlaces {
                answer.latitude != known?.latitude || answer.longitude != known?.longitude {
                 placed.continuation.yield()
             }
-            return answer.placing
+            return answer.placing.map(Lookup.placed) ?? .unplaced
         } catch is Deferred {
             // Only OpenStreetMap could place it, and it may not be asked.
-            return nil
+            return .unplaced
         } catch {
             // Not written down, so the next screen to ask tries again.
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
-            return nil
+            return .failed
         }
     }
 

@@ -76,9 +76,11 @@ struct EventDetailView: View {
     /// Per device — see ``TranslationTarget``.
     @AppStorage(TranslationTarget.storageKey) private var translationTargetID = ""
 
-    /// Where Maps says the hall is. Nil until the lookup comes back, and for a
-    /// hall Maps has never heard of.
-    @State private var place: VenuePlaces.Placing?
+    /// How the hall's lookup came out, with the question it answered (see
+    /// ``venueKey``). Nil until the first comes back.
+    @State private var venueLookup: (key: String, answer: VenuePlaces.Lookup)?
+    /// Raised by the map's Try Again, which asks the same question again.
+    @State private var venueAttempts = 0
 
     /// Why the Live Activity could not be started, while that is being said.
     @State private var liveActivityFailure: String?
@@ -105,6 +107,13 @@ struct EventDetailView: View {
         let url: URL?
         let name: String
         let checkedSince: Date?
+    }
+
+    /// What the hall's lookup is asked from: the hall, and how many times the
+    /// reader has asked again.
+    private struct VenueQuestion: Equatable {
+        let key: String
+        let attempt: Int
     }
 
     @Environment(\.openURL) private var openURL
@@ -160,6 +169,42 @@ struct EventDetailView: View {
     /// what finally places a hall Maps does not answer to by name.
     private var venueKey: String {
         "\(event.venue)\n\(event.publishedAddress ?? "")"
+    }
+
+    /// Where Maps says the hall is — the last placing to come back, kept while
+    /// the hall is asked about again. Nil until one does, and for a hall
+    /// nobody has.
+    private var place: VenuePlaces.Placing? {
+        venueLookup?.answer.placing
+    }
+
+    /// What the map under the hall draws: the lookup's answer, but only for
+    /// the question being asked now.
+    ///
+    /// A placing of the hall as it stood before its page brought the address
+    /// is still drawn until the new answer lands, as it always was; any other
+    /// answer from then reads as still looking. So does "nobody has it" for a
+    /// hall with no address on an event whose page is still being read — a
+    /// search row carries no address, and the one the page brings is what
+    /// most halls are found by. Where that read failed, the hall was never
+    /// really asked about, and the map says it could not load.
+    private var mapLookup: VenuePlaces.Lookup? {
+        guard let venueLookup else { return nil }
+        guard venueLookup.key == venueKey else {
+            return place.map(VenuePlaces.Lookup.placed)
+        }
+        if case .unplaced = venueLookup.answer, event.publishedAddress == nil, !event.isDetailed {
+            return isImporting || importFailure == nil ? nil : .failed
+        }
+        return venueLookup.answer
+    }
+
+    /// The map's Try Again: the page again first where it has not been read,
+    /// since the address it brings is what the hall is looked up by.
+    private func retryVenueLookup() async {
+        venueLookup = nil
+        if !event.isDetailed { await readPage(byHand: true) }
+        venueAttempts += 1
     }
 
     /// Opens Maps on the hall this event is at — see ``VenueDirections``.
@@ -329,12 +374,13 @@ struct EventDetailView: View {
         // The first time an event at a hall nothing has looked up yet is
         // opened, this is what goes and finds it — whether or not the reader
         // mirrors anything to their calendar.
-        .task(id: venueKey) {
-            let found = await VenuePlaces.shared.mapItem(for: event)
+        .task(id: VenueQuestion(key: venueKey, attempt: venueAttempts)) {
+            let key = venueKey
+            let found = await VenuePlaces.shared.lookUp(event)
             // Asked again once the page brings the address: the answer for the
             // name alone, landing after it, would draw over the better one.
             guard !Task.isCancelled else { return }
-            place = found
+            venueLookup = (key, found)
         }
     }
 
@@ -1788,7 +1834,11 @@ struct EventDetailView: View {
 
     private var venueCard: some View {
         VStack(spacing: 0) {
-            VenueMap(venue: event.venue, place: place) { openVenueInMaps(directions: false) }
+            VenueMap(venue: event.venue, lookup: mapLookup) {
+                openVenueInMaps(directions: false)
+            } retry: {
+                Task { await retryVenueLookup() }
+            }
                 // The map alone is clipped, and only where the card's own
                 // corners are: the card's panel rounds the rest.
                 .clipShape(.rect(topLeadingRadius: 28, bottomLeadingRadius: 0,

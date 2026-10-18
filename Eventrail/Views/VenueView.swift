@@ -69,9 +69,11 @@ struct VenueView: View {
     /// sections the reader should never see.
     @State private var hasReadListing = false
     @State private var openEvent: Event?
-    /// Where Maps says the hall is. Nil until the lookup comes back, and for a
-    /// hall Maps has never heard of.
-    @State private var place: VenuePlaces.Placing?
+    /// How the hall's lookup came out, with the question it answered (see
+    /// ``mapKey``). Nil until the first comes back.
+    @State private var mapLookup: (key: String, answer: VenuePlaces.Lookup)?
+    /// Raised by the map's Try Again, which asks the same question again.
+    @State private var mapAttempts = 0
     /// Why the last read did not replace what is on screen, if it did not.
     @State private var refreshFailure: String?
     /// The read going on now, so a Refresh can wait for it — see
@@ -156,7 +158,14 @@ struct VenueView: View {
         // Asked once the hall's own page has come back, because the address on
         // it is what places a hall — and asked again if either half of the
         // question ever changes.
-        .task(id: mapKey) { await placeOnMap() }
+        .task(id: MapQuestion(key: mapKey, attempt: mapAttempts)) { await placeOnMap() }
+    }
+
+    /// What the hall's lookup is asked from: the hall, and how many times the
+    /// reader has asked again.
+    private struct MapQuestion: Equatable {
+        let key: String?
+        let attempt: Int
     }
 
     // MARK: - Loading
@@ -272,12 +281,29 @@ struct VenueView: View {
     }
 
     private func placeOnMap() async {
-        guard let profile else { return }
-        let found = await VenuePlaces.shared.mapItem(forVenue: profile.name, address: profile.address)
+        guard let profile, let key = mapKey else { return }
+        let found = await VenuePlaces.shared.lookUp(venue: profile.name, address: profile.address)
         // A refresh that changed the address asks again, and the answer for
         // the old one, landing after it, would draw over it.
         guard !Task.isCancelled else { return }
-        place = found
+        mapLookup = (key, found)
+    }
+
+    /// Where Maps says the hall is — the last placing to come back, kept while
+    /// the hall is asked about again. Nil until one does, and for a hall
+    /// nobody has.
+    private var place: VenuePlaces.Placing? {
+        mapLookup?.answer.placing
+    }
+
+    /// What the map draws: the lookup's answer, but only for the question
+    /// being asked now. A placing from before a refresh changed the address is
+    /// still drawn until the new answer lands; any other answer from then
+    /// reads as still looking.
+    private var shownLookup: VenuePlaces.Lookup? {
+        guard let mapLookup else { return nil }
+        guard mapLookup.key == mapKey else { return place.map(VenuePlaces.Lookup.placed) }
+        return mapLookup.answer
     }
 
     // MARK: - Where it is
@@ -381,8 +407,11 @@ struct VenueView: View {
     private var placeCard: some View {
         if let profile {
             VStack(spacing: 0) {
-                VenueMap(venue: profile.name, place: place) {
+                VenueMap(venue: profile.name, lookup: shownLookup) {
                     VenueDirections.open(profile.name, at: place, directions: false, with: openURL)
+                } retry: {
+                    mapLookup = nil
+                    mapAttempts += 1
                 }
                 // Only the map is clipped, and only where the card's own
                 // corners are: the card's panel rounds the rest.
