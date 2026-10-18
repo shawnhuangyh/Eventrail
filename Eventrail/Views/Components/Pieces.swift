@@ -50,7 +50,7 @@ struct StatusBadge: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 4)
-        .glassCapsule()
+        .capsulePanel()
         .accessibilityElement(children: .combine)
     }
 }
@@ -167,7 +167,7 @@ struct StatTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 13)
         .padding(.vertical, 15)
-        .glassPanel(cornerRadius: 24)
+        .panel(cornerRadius: 24)
         .accessibilityElement(children: .combine)
     }
 }
@@ -238,14 +238,14 @@ struct GroupHeader: View {
         .padding(.vertical, 2)
     }
 
-    /// The glass both halves are set in.
+    /// The pill both halves are set in.
     ///
-    /// The wash goes *under* the glass rather than over it: the pill refracts
-    /// an opaque slice of it, so a flyer scrolling behind a pinned header
-    /// cannot darken what it is covering.
+    /// The wash goes *under* the pill: the pill is drawn translucent, and over
+    /// an opaque slice of the wash a flyer scrolling behind a pinned header
+    /// cannot show through it.
     private func pill<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
-            .glassCapsule()
+            .capsulePanel()
             .background(Color.washBase, in: .capsule)
     }
 }
@@ -328,7 +328,7 @@ struct FlowLayout: Layout {
 ///
 /// The heart is a sibling of the row's own button rather than a button inside
 /// its label. Nested, the row's tap target covers it and a tap on the heart
-/// opens the event instead of un-favoriting it. It is the same circular glass
+/// opens the event instead of un-favoriting it. It is the same circular
 /// control the Following tab's rows carry, so the one gesture that takes a row
 /// out of a list looks the same wherever the list is.
 struct FavoriteEventRow: View {
@@ -391,7 +391,7 @@ struct FavoriteEventRow: View {
                         .frame(width: 38, height: 38)
                 }
                 .buttonStyle(.plain)
-                .glassCircle(interactive: true)
+                .circlePanel()
                 .accessibilityLabel("Remove from favorites")
             }
         }
@@ -409,8 +409,8 @@ struct FavoriteEventRow: View {
 /// that stops following them.
 ///
 /// Shared by the Me card and the full list behind its See All. The unfollow
-/// button sits beside the link rather than inside it, and wears the same
-/// circular glass, for the reasons ``FavoriteEventRow`` gives.
+/// button sits beside the link rather than inside it, and is the same
+/// circular control, for the reasons ``FavoriteEventRow`` gives.
 struct FollowedPerformerRow: View {
     @Environment(EventStore.self) private var store
     @Environment(FollowedDates.self) private var followed
@@ -461,7 +461,7 @@ struct FollowedPerformerRow: View {
                         .frame(width: 38, height: 38)
                 }
                 .buttonStyle(.plain)
-                .glassCircle(interactive: true)
+                .circlePanel()
                 .accessibilityLabel("Stop following")
                 .confirmationDialog("Stop following them?", isPresented: $isConfirmingUnfollow,
                                     titleVisibility: .visible) {
@@ -656,6 +656,6 @@ struct RefreshFailureNote: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .glassPanel()
+        .panel()
     }
 }

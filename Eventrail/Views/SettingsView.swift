@@ -125,7 +125,7 @@ struct SettingsView: View {
 
     // MARK: - The shape of the screen
 
-    /// A heading and the one glass card under it. Rows that share a card share
+    /// A heading and the one card under it. Rows that share a card share
     /// a question.
     private func section<Rows: View>(
         _ title: LocalizedStringKey,
@@ -135,7 +135,7 @@ struct SettingsView: View {
             SectionLabel(label: title)
                 .padding(.top, 14)
             VStack(spacing: 0, content: rows)
-                .glassPanel(interactive: true)
+                .panel()
         }
     }
 
@@ -167,7 +167,7 @@ struct SettingsView: View {
     /// screen of its own — three answers need no more room than that.
     ///
     /// A segmented control rather than a menu: on iOS 26 a menu opened from
-    /// a row grows out of the glass card holding it, and the whole General
+    /// a row grew out of the glass card then holding it, and the whole General
     /// card vanished for as long as the menu was open.
     private var appearanceRow: some View {
         SettingRowLabel("circle.lefthalf.filled", "Appearance") {

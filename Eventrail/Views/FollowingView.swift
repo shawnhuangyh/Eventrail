@@ -512,7 +512,7 @@ struct FollowingView: View {
             .padding(.vertical, 9)
         }
         .buttonStyle(.plain)
-        .glassCapsule(interactive: true)
+        .capsulePanel()
     }
 
     // MARK: - The dates themselves
@@ -590,7 +590,7 @@ struct FollowingView: View {
             Button("Clear Filter") {
                 withAnimation(.snappy) { filter = FollowingFilter() }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
@@ -605,7 +605,7 @@ struct FollowingView: View {
             Button("Show All Events") {
                 withAnimation(.snappy) { unreadOnly = false }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
@@ -750,7 +750,7 @@ private struct FollowedDateRow: View {
         .contentShape(.rect)
         .onTapGesture(perform: open)
         .marksEventBeside(event.id)
-        .glassPanel()
+        .panel()
         .accessibilityElement(children: .contain)
     }
 }

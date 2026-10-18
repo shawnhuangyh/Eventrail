@@ -86,16 +86,44 @@ extension View {
         background(WashBackground())
     }
 
-    /// The design's panel treatment: Liquid Glass in a soft-cornered rectangle.
-    func glassPanel(cornerRadius: CGFloat = 26, interactive: Bool = false) -> some View {
-        glassBackground(in: .rect(cornerRadius: cornerRadius, style: .continuous),
-                        interactive: interactive)
+    /// The design's panel, in a soft-cornered rectangle: a veil of white over
+    /// the wash and a hairline round it — what its Liquid Glass showed in
+    /// front of the wash, drawn without the glass.
+    ///
+    /// Every card, row and pill on a page is drawn this way; glass is kept
+    /// for the controls that float over a page (``glassBackground(in:interactive:tint:)``).
+    /// Glass is drawn afresh in every frame it moves in, and a row is never
+    /// still while its list scrolls. Measured on My Events in the iPad
+    /// simulator with seven hundred events, rows in glass — or with a glass
+    /// pill on them — dropped about one frame in six and kept the main thread
+    /// a fifth busier; the same rows in flat colour dropped almost none, and
+    /// the hairline cost too little to tell apart. A blur or a shadow under
+    /// the panel cost nearly as much as the glass, so there is neither.
+    ///
+    /// `tint` washes the panel in a colour of its own — what the timeline
+    /// card wears while its event is under way.
+    func panel(cornerRadius: CGFloat = 26, tint: Color? = nil) -> some View {
+        background(PanelBackground(shape: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+                                   tint: tint))
     }
 
+    /// A pill drawn as ``panel(cornerRadius:tint:)`` draws a card.
+    func capsulePanel() -> some View {
+        background(PanelBackground(shape: Capsule(), tint: nil))
+    }
+
+    /// A round button drawn as ``panel(cornerRadius:tint:)`` draws a card.
+    func circlePanel() -> some View {
+        background(PanelBackground(shape: Circle(), tint: nil))
+    }
+
+    /// A pill of Liquid Glass, for a control that floats over a page — the
+    /// capsule at the foot of a list, the Passport's year chips.
     func glassCapsule(interactive: Bool = false) -> some View {
         glassBackground(in: .capsule, interactive: interactive)
     }
 
+    /// A round button of Liquid Glass, for a close or back button over a page.
     func glassCircle(interactive: Bool = false) -> some View {
         glassBackground(in: .circle, interactive: interactive)
     }
@@ -116,6 +144,21 @@ extension View {
         #else
         glassEffect(Glass.regular.tint(tint).interactive(interactive), in: shape)
         #endif
+    }
+}
+
+/// What ``View/panel(cornerRadius:tint:)`` and its pill and circle draw
+/// behind their content.
+private struct PanelBackground<S: InsettableShape>: View {
+    let shape: S
+    let tint: Color?
+
+    var body: some View {
+        shape.fill(Color.panelFill)
+            .overlay {
+                if let tint { shape.fill(tint) }
+            }
+            .overlay(shape.strokeBorder(Color.panelRim, lineWidth: 1))
     }
 }
 

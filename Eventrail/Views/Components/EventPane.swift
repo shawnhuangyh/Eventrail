@@ -95,8 +95,9 @@ extension View {
     }
 
     /// Marks a row as the one whose event is open beside the list — the
-    /// design's tinted panel with its ring. Goes before the row's glass, so
-    /// the tint lies under the row's words rather than over them.
+    /// design's tinted panel with its ring. Goes before the row's
+    /// ``View/panel(cornerRadius:tint:)``, so the tint lies on the panel and
+    /// under the row's words.
     func marksEventBeside(_ id: Event.ID, cornerRadius: CGFloat = 26) -> some View {
         modifier(BesideMark(id: id, cornerRadius: cornerRadius))
     }

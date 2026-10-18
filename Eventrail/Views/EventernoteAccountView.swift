@@ -179,7 +179,7 @@ struct AccountFinder: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .glassPanel(cornerRadius: 14)
+        .panel(cornerRadius: 14)
     }
 
     /// Takes a `Text` rather than a key: one of the two things said this way is
@@ -193,7 +193,7 @@ struct AccountFinder: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 16)
-            .glassPanel(cornerRadius: 24)
+            .panel(cornerRadius: 24)
     }
 
     /// Confirms the typed name against the live page, a pause after the last
@@ -265,7 +265,7 @@ struct FoundAccount: View {
             row.contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(interactive: true)
+        .panel()
         .accessibilityAddTraits(isChosen ? [.isSelected] : [])
     }
 

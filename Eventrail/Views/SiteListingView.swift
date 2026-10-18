@@ -333,7 +333,7 @@ struct SiteListingView: View {
             Button("Clear Filter") {
                 withAnimation(.snappy) { filter = SearchFilter() }
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.bordered)
         }
         .padding(.top, 48)
     }

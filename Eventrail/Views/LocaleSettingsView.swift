@@ -28,12 +28,12 @@ struct LocaleSettingsView: View {
                     SettingRowDivider()
                     translationRow
                 }
-                .glassPanel(interactive: true)
+                .panel()
 
                 SectionLabel(label: "Currency")
                     .padding(.top, 14)
                 currencyRow
-                    .glassPanel(interactive: true)
+                    .panel()
                 // The one row here that says what it does: "default" reads as
                 // the currency every ticket is in, when each ticket keeps its
                 // own and this only decides what the Passport adds up in.
@@ -91,8 +91,8 @@ struct LocaleSettingsView: View {
 
     /// The language descriptions are translated into, chosen from a menu
     /// on the row. The menu hangs off the value alone — never the whole row
-    /// wrapped in a `Menu`: on iOS 26 a menu grows out of the glass holding
-    /// its label, and that took the whole card away for as long as it was
+    /// wrapped in a `Menu`: on iOS 26 a menu grew out of the glass card then
+    /// holding its label, and that took the whole card away for as long as it was
     /// open (see Appearance). The value is drawn by ``SettingRowValue`` like
     /// every other answer on these screens, which the system's menu-style
     /// picker would not take a font from. "The app's own language" comes

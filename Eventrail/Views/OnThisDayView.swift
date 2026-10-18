@@ -37,7 +37,7 @@ struct OnThisDayView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(16)
-                        .glassPanel()
+                        .panel()
                 } else {
                     ForEach(today.memories) { memory in
                         VStack(alignment: .leading, spacing: 10) {
@@ -159,7 +159,7 @@ struct OnThisDayView: View {
         }
         .padding(16)
         .marksEventBeside(event.id, cornerRadius: 28)
-        .glassPanel(cornerRadius: 28)
+        .panel(cornerRadius: 28)
     }
 
     /// "Doors 17:30 · Start 18:30 · Ran 2h 40m" — whichever of those the
@@ -210,7 +210,7 @@ struct OnThisDayView: View {
     }
 
     /// One of the two readings under the event, set into the card rather than
-    /// in glass of its own. Not a button: the record is answered on the
+    /// on a panel of its own. Not a button: the record is answered on the
     /// event's sheet, which Open Event opens.
     private func tile(symbol: String, tint: Color, value: Text, isWritten: Bool,
                       detail: Text) -> some View {
@@ -245,7 +245,7 @@ struct OnThisDayView: View {
                 .contentShape(.capsule)
         }
         .buttonStyle(.plain)
-        .glassCapsule(interactive: true)
+        .capsulePanel()
     }
 }
 
@@ -289,7 +289,7 @@ struct OnThisDayCard: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassPanel(interactive: true)
+        .panel()
     }
 
     /// "October 10 · 2 events you went to".
@@ -328,9 +328,9 @@ struct OnThisDayCard: View {
 
 /// What the reader wrote about the event, set into its card on the screen.
 private struct OnThisDayNote: View {
-    /// The fill of anything set into a glass card here — the note, and the
-    /// screen's ticket and seat — rather than glass in glass, which reads as a
-    /// smudge.
+    /// The fill of anything set into a card here — the note, and the
+    /// screen's ticket and seat — rather than a panel in a panel, which reads
+    /// as a box of boxes.
     static let fill = TicketForm.controlFill.opacity(0.6)
 
     let note: String
@@ -357,8 +357,8 @@ private struct OnThisDayNote: View {
     }
 }
 
-/// Attended, in green, as the badge on a row says it — tinted rather than in
-/// glass of its own, since it sits in a card.
+/// Attended, in green, as the badge on a row says it — tinted rather than on
+/// a pill of its own, since it sits in a card.
 private struct AttendedTag: View {
     var body: some View {
         HStack(spacing: 5) {

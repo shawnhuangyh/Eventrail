@@ -412,7 +412,7 @@ struct LotteryRoundCard: View {
                 }
             }
         }
-        .glassPanel(cornerRadius: 24)
+        .panel(cornerRadius: 24)
     }
 
     /// One reading in the card's foot: what it is, small and in capitals,

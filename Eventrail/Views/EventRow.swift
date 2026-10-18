@@ -169,7 +169,7 @@ struct LibraryRow: View {
         }
         .buttonStyle(.plain)
         .marksEventBeside(event.id)
-        .glassPanel(interactive: true)
+        .panel()
         .accessibilityHint("Opens the event")
     }
 }
