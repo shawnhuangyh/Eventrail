@@ -651,10 +651,15 @@ struct EventDetailView: View {
                     // as the dot before it is.
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         clockOffset
-                        clockSwitch
+                        if offersClockSwitch {
+                            clockSwitch
+                        }
                     }
                     .alignmentGuide(.firstTextBaseline) { $0[.firstTextBaseline] + 3 }
                 }
+                // The hall's clock usually arrives a second after the sheet
+                // opens, and the switch goes then if it is this device's.
+                .animation(.snappy, value: offersClockSwitch)
                 if let detail = detail(for: progress, at: now) {
                     detail
                         .scalingFont(size: 13, weight: .medium)
@@ -850,6 +855,8 @@ struct EventDetailView: View {
     /// A capsule of its own rather than a segmented picker, as the design
     /// draws it: the system's control is too tall and too wide to sit beside
     /// the headline. VoiceOver is handed the picker it stands for.
+    ///
+    /// Only where ``offersClockSwitch`` says there are two clocks.
     private var clockSwitch: some View {
         HStack(spacing: 2) {
             ForEach(TimeDisplay.allCases) { option in
@@ -885,6 +892,19 @@ struct EventDetailView: View {
                 }
             }
         }
+    }
+
+    /// Whether the switch has two clocks to choose between: not where the
+    /// hall keeps this device's own time zone, since both would print the
+    /// same times. Compared by zone, not by offset, on Shawn's word — so a
+    /// reader in Seoul still has the switch on a Tokyo date.
+    ///
+    /// Kept where the hall's clock is not known (``venueZone`` nil): whether
+    /// the two are one is not known either, and the switch is then all that
+    /// says the times are the hall's.
+    private var offersClockSwitch: Bool {
+        guard let venueZone else { return true }
+        return venueZone.identifier != TimeZone.current.identifier
     }
 
     /// Which clock this sheet's times are on, where the app has established it
