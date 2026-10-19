@@ -201,10 +201,15 @@ struct EventDetailView: View {
 
     /// The map's Try Again: the page again first where it has not been read,
     /// since the address it brings is what the hall is looked up by.
+    ///
+    /// Asked again only where the page left the question as it was: an
+    /// address it brought is a new question, already being asked, and
+    /// raising the attempt as well asked Maps twice.
     private func retryVenueLookup() async {
         venueLookup = nil
+        let asked = venueKey
         if !event.isDetailed { await readPage(byHand: true) }
-        venueAttempts += 1
+        if venueKey == asked { venueAttempts += 1 }
     }
 
     /// Opens Maps on the hall this event is at — see ``VenueDirections``.

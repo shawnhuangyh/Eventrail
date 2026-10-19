@@ -487,7 +487,7 @@ struct LibraryDatabaseTests {
         context.insert(row)
         row.entry = later
         row.modified = earlier
-        #expect(!LotteryEntry.understands(row: later))
+        #expect(!readsBackWhole(later))
 
         var list = try tracking("1", entry: nil, in: context).lotteries
         #expect(list.map(\.applications) == [3])
@@ -498,8 +498,95 @@ struct LibraryDatabaseTests {
         list = try tracking("1", entry: nil, in: context).lotteries
         list[0].result = .won(nil)
         try writeLotteries(list, for: "1", entry: nil, dated: .now, in: context)
-        #expect(LotteryEntry.understands(row: row.entry))
+        #expect(readsBackWhole(row.entry))
         #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.isWon) == [true, false])
+        withExtendedLifetime(database) {}
+    }
+
+    /// Whether this build reads back exactly what a row holds.
+    private func readsBackWhole(_ text: String) -> Bool {
+        LotteryEntry.entry(inRow: text).map(LotteryEntry.rowText(of:)) == text
+    }
+
+    /// A round written in a form this build cannot read at all — a results
+    /// day as a later build might write one.
+    private let unreadableRound =
+        #"{"applications":2,"day":"2026-10-12T09:00","id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","result":"pending","round":"最速先行抽選"}"#
+
+    private func unreadableRow(in context: ModelContext) -> LibraryLottery {
+        let row = LibraryLottery(eventID: "1", entryID: "5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22")
+        context.insert(row)
+        row.entry = unreadableRound
+        row.modified = earlier
+        return row
+    }
+
+    /// A round this build cannot read is in no list it reads, and a round
+    /// added or changed beside it does not take it out: on the device that
+    /// wrote it, it is the reader's. Emptying the whole record does.
+    @Test func aRoundThisBuildCannotReadOutlivesAnEditBesideIt() throws {
+        let (database, context) = try database()
+        let row = unreadableRow(in: context)
+        #expect(row.holdsUnreadableRound)
+
+        var list = try tracking("1", entry: nil, in: context).lotteries
+        #expect(list.isEmpty)
+        list.append(LotteryEntry(round: "プレイガイド先行"))
+        try writeLotteries(list, for: "1", entry: nil, dated: .now, in: context)
+        try writeLotteries([], for: "1", entry: nil, dated: .now, in: context)
+        #expect(!row.isRemoved)
+        #expect(row.entry == unreadableRound)
+
+        var rows = LibraryDatabase.lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))
+        LibraryDatabase.writeLotteries([], for: "1", rows: &rows, entry: nil, dated: .now, clearing: true, in: context)
+        #expect(row.isRemoved)
+        withExtendedLifetime(database) {}
+    }
+
+    /// The store's own archive merged back — what the old iCloud zone, a
+    /// reopened file and a restore all do for the events they say nothing
+    /// new about — writes nothing: not the rounds' dates, and not a round
+    /// this build cannot read.
+    @Test func theStoreMergedBackOntoItselfWritesNothing() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.give(LibraryEntry.Answers(inLibrary: true, tracking: Tracking(note: "front row")),
+                   dated: [.inLibrary: earlier, .tracking: earlier])
+        entry.modified = earlier
+        let first = LotteryEntry(round: "最速先行抽選", applications: 2)
+        let second = LotteryEntry(round: "プレイガイド先行")
+        try writeLotteries([first], for: "1", entry: entry, dated: earlier, in: context)
+        try writeLotteries([first, second], for: "1", entry: entry, dated: later, in: context)
+        let unreadable = unreadableRow(in: context)
+        try context.save()
+
+        let held = try LibraryDatabase.archive(in: context)
+        #expect(try !LibraryDatabase.apply(held.merging(LibraryArchive()), to: context))
+        #expect(!context.hasChanges)
+        let firstRow = try #require(try lotteryRows("1", in: context)?[first.id.uuidString])
+        #expect(firstRow.modified.toTheMillisecond == earlier.toTheMillisecond)
+        #expect(!unreadable.isRemoved)
+        withExtendedLifetime(database) {}
+    }
+
+    /// A restore raises an event this device holds nothing for as of now,
+    /// and its rounds with it — a round taken out here comes back.
+    @Test func aRestoreBringsBackARoundTakenOutHere() throws {
+        let (database, context) = try database()
+        let round = LotteryEntry(round: "最速先行抽選", applications: 2)
+        try writeLotteries([round], for: "1", entry: nil, dated: earlier, in: context)
+        try writeLotteries([], for: "1", entry: nil, dated: earlier, in: context)
+        try context.save()
+        var backup = LibraryArchive()
+        backup.membership["1"] = Stamped(true, at: earlier)
+        backup.tracking["1"] = Stamped(Tracking(lotteries: [round]), at: earlier)
+
+        let restored = try LibraryDatabase.archive(in: context).restoring(backup)
+        #expect(try LibraryDatabase.apply(restored, to: context))
+        let row = try #require(try lotteryRows("1", in: context)?[round.id.uuidString])
+        #expect(!row.isRemoved)
+        #expect(row.modified > later)
         withExtendedLifetime(database) {}
     }
 

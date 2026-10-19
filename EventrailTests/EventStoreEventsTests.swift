@@ -373,4 +373,54 @@ struct EventStoreEventsTests {
         let rows = try kept(in: store)
         #expect(store.events(of: rows, where: \.inLibrary) == store.events(of: rows, where: \.inLibrary))
     }
+
+    /// Spotlight follows the writes that can move what it holds — public
+    /// facts only — so a note, a lottery or a heart leaves the count alone,
+    /// and an event added or a performer followed moves it.
+    @Test func onlyAWriteToWhatAnyoneSeesMovesTheFactsRevision() {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        var seen = store.factsRevision
+        store.toggleLibraryMembership(event)
+        #expect(store.factsRevision > seen)
+        // As the pause after an edit does: what a save sees is what changed
+        // since the last write to the store.
+        store.saveNow()
+
+        seen = store.factsRevision
+        store.setTracking(Tracking(note: "front row"), for: event)
+        store.saveNow()
+        store.setTracking(Tracking(lotteries: [LotteryEntry(round: "最速先行抽選")], note: "front row"), for: event)
+        store.saveNow()
+        store.toggleFavorite(event)
+        store.saveNow()
+        #expect(store.factsRevision == seen)
+
+        store.toggleFollow(PerformerProfile(id: 1, name: "Someone", reading: nil, fanCount: nil, slug: "someone"))
+        #expect(store.factsRevision > seen)
+    }
+
+    /// A round a later build wrote, which this one cannot read, stays through
+    /// a round added beside it, and goes with the rest of the record when the
+    /// event is taken out — as it does with Delete All.
+    @Test func aRoundThisBuildCannotReadGoesOnlyWithTheWholeRecord() throws {
+        let database = LibraryDatabase(at: .memory, syncing: false)
+        let context = database.context
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.give(LibraryEntry.Answers(inLibrary: true), dated: [.inLibrary: .now])
+        let row = LibraryLottery(eventID: "1", entryID: "5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22")
+        context.insert(row)
+        row.entry = #"{"applications":2,"day":"2026-10-12T09:00","id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","result":"pending","round":"最速先行抽選"}"#
+        try context.save()
+        let store = EventStore(database: database, libraryFile: nil, calendar: nil, venues: nil, pageReads: nil)
+        let event = Fixtures.event(id: "1")
+
+        store.setTracking(Tracking(lotteries: [LotteryEntry(round: "プレイガイド先行")]), for: event)
+        store.setTracking(Tracking(), for: event)
+        #expect(!row.isRemoved)
+
+        store.remove([event])
+        #expect(row.isRemoved)
+    }
 }

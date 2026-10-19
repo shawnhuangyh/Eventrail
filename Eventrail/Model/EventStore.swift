@@ -405,6 +405,7 @@ final class EventStore {
         stale = nil
         records.removeAll(keepingCapacity: true)
         revision += 1
+        factsRevision += 1
     }
 
     /// The events these entries stand for — what a screen's `@Query` of
@@ -474,7 +475,12 @@ final class EventStore {
     /// The lotteries are rows of their own (``LibraryLottery``), written
     /// apart from the entry: a change to them alone leaves the entry as it
     /// was, so it cannot carry an older note back over another device's.
-    private func edit(_ event: Event, keepingFacts: Bool = true, _ change: (inout LibraryEntry.Answers) -> Void) {
+    ///
+    /// `clearing` is a change that empties the whole record — a removal —
+    /// and takes out the rounds this build cannot read with the rest, which
+    /// no list it reads holds (``LibraryDatabase/writeLotteries``).
+    private func edit(_ event: Event, keepingFacts: Bool = true, clearing: Bool = false,
+                      _ change: (inout LibraryEntry.Answers) -> Void) {
         let held = entries[event.id]
         let heldAnswers = answers(of: event.id)
         var answers = heldAnswers
@@ -482,6 +488,7 @@ final class EventStore {
         answers.tracking.edits = [:]
         let listed = answers.tracking.lotteries
         let listMoved = listed != heldAnswers.tracking.lotteries
+            || (clearing && lotteryRows[event.id]?.values.contains(where: \.holdsUnreadableRound) == true)
         // The entry's own parts, its lotteries set aside.
         answers.tracking.lotteries = heldAnswers.tracking.lotteries
         var given = answers.parts(differingFrom: heldAnswers)
@@ -491,12 +498,15 @@ final class EventStore {
         let now = Date.now
         if listMoved {
             LibraryDatabase.writeLotteries(listed, for: event.id, rows: &lotteryRows, entry: held,
-                                           dated: now, in: database.context)
+                                           dated: now, clearing: clearing, in: database.context)
         }
         records[event.id] = nil
         converted[event.id] = nil
         guard !given.isEmpty else { return }
-        if given.contains(.inLibrary) { owesMirror = true }
+        if given.contains(.inLibrary) {
+            owesMirror = true
+            owesFactsRevision = true
+        }
         if keepingFacts { keep(event, in: makeRow(for: event.id)) }
         let entry = held ?? LibraryEntry(eventID: event.id)
         if held == nil {
@@ -729,7 +739,7 @@ final class EventStore {
     /// me", which is a separate answer from whether it is in the library.
     func remove(_ events: some Sequence<Event>) {
         for event in events {
-            edit(event, keepingFacts: false) {
+            edit(event, keepingFacts: false, clearing: true) {
                 $0.inLibrary = false
                 $0.tracking = Tracking()
             }
@@ -753,10 +763,16 @@ final class EventStore {
     func removeAllEvents() {
         let now = Date.now
         // Read before the entries are emptied: a list an entry still keeps
-        // from before rows is moved across as it is taken out.
-        let listed = Set(lotteryRows.keys).union(entries.keys).filter { !tracking(of: $0).lotteries.isEmpty }
+        // from before rows is moved across as it is taken out. A round this
+        // build cannot read is in no list it reads, so its row says it is held.
+        let listed = Set(lotteryRows.keys).union(entries.keys).filter { id in
+            !tracking(of: id).lotteries.isEmpty || lotteryRows[id]?.values.contains { !$0.isRemoved } == true
+        }
         for (id, entry) in entries where !answers(of: id).isEmpty {
-            if entry.inLibrary { owesMirror = true }
+            if entry.inLibrary {
+                owesMirror = true
+                owesFactsRevision = true
+            }
             // Every part, given or not: an answer another device gave before
             // this is one the reader asked to be rid of too.
             entry.give(LibraryEntry.Answers(),
@@ -766,7 +782,7 @@ final class EventStore {
         // Every round taken out too, each as a record that says so.
         for id in listed {
             LibraryDatabase.writeLotteries([], for: id, rows: &lotteryRows, entry: entries[id],
-                                           dated: now, in: database.context)
+                                           dated: now, clearing: true, in: database.context)
         }
         records.removeAll(keepingCapacity: true)
         // Every Following date back to unread, on every device: written as a
@@ -1621,6 +1637,8 @@ final class EventStore {
                 // calendar entry a different hour as well as a map.
                 if self?.retimeEvents() == true { self?.save() }
                 self?.mirrorSoon()
+                // Where Spotlight says the events held there are.
+                self?.factsRevision += 1
             }
         }
     }
@@ -1657,13 +1675,19 @@ final class EventStore {
                 stale?.insert(row.eventID)
                 // An event's facts are what its entry is written from.
                 owesMirror = true
+                owesFactsRevision = true
             }
             if let entry = model as? LibraryEntry {
                 stale?.insert(entry.eventID)
                 records[entry.eventID] = nil
             }
+            if model is FollowedPerformer { owesFactsRevision = true }
         }
         revision += 1
+        if owesFactsRevision {
+            owesFactsRevision = false
+            factsRevision += 1
+        }
         pendingSave?.cancel()
         pendingSave = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
@@ -1720,6 +1744,18 @@ final class EventStore {
     /// would not do: a removal leaves a tombstone behind and an emptied note
     /// keeps its record, so the library can change without changing size.
     private(set) var revision = 0
+    /// Counts the writes that may move what the library shows anyone, rather
+    /// than the reader's own record: what is in it, an event's facts, who is
+    /// followed, where a hall stands — and everything that lands from
+    /// elsewhere, which may be any of those.
+    ///
+    /// What Spotlight follows (``SpotlightIndex``), which indexes public facts
+    /// only. Following ``revision``, it built every item again on the main
+    /// actor after a note was typed or a Following date read, only to find
+    /// that none of them had moved.
+    private(set) var factsRevision = 0
+    /// Whether a write since the last save moved what ``factsRevision`` counts.
+    @ObservationIgnored private var owesFactsRevision = false
     @ObservationIgnored private var converted: [Event.ID: Event?] = [:]
     /// Each event's record as last read from its entry (``tracking(for:)``).
     /// Every row a screen badges and every event the Passport adds up asks

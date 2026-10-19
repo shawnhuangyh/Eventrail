@@ -380,28 +380,43 @@ final class VenuePlaces {
     /// down as nowhere. Only "no such place" is asked again for that one
     /// (``foundRuleset``): the brackets are tried only once everything before
     /// them has found nothing.
-    private static let ruleset = 13
+    nonisolated static let ruleset = 13
 
-    /// The last ruleset whose answers *inside Japan* still stand.
-    private static let japanRuleset = 8
+    /// The last ruleset whose reading changed an answer *inside Japan*: one
+    /// made under it or any later one still stands there.
+    nonisolated private static let japanRuleset = 8
 
-    /// The last ruleset whose answers that *found* the hall still stand,
-    /// anywhere and by whichever source.
+    /// The ruleset from which an answer that *found* the hall still stands,
+    /// anywhere and by whichever source — made under it or any later one.
     ///
     /// A hall abroad placed by its address alone stands too, though the
     /// brackets might now find its building: an answer due to be asked again
     /// is passed over by everything reading the kept answers — the calendar
     /// mirror, the clocks — until a sheet or a refresh gets to it, and a pin
     /// and a clock gone meanwhile cost more than a building found sooner.
-    private static let foundRuleset = 12
+    nonisolated private static let foundRuleset = 12
 
     /// Whether `answer` was settled under a reading of Maps' answers that
     /// still holds for it: this one, or an older one whose change could not
     /// have moved it.
     private static func stillStands(_ answer: Answer) -> Bool {
-        answer.ruleset == ruleset
-            || (answer.ruleset == japanRuleset && answer.isInJapan)
-            || (answer.ruleset == foundRuleset && answer.wasFound)
+        stillStands(madeUnder: answer.ruleset, found: answer.wasFound, inJapan: answer.isInJapan)
+    }
+
+    /// ``stillStands(_:)`` for an answer made under `made`.
+    ///
+    /// From a ruleset on, never at it alone: compared for equality, every
+    /// raise of ``ruleset`` sent back every hall in Japan placed under the
+    /// one before — the calendar's pins and the Passport's dots gone until a
+    /// sheet or a refresh asked each again — unless the thresholds were moved
+    /// by hand with it. A later build's answer stands too: this one cannot
+    /// know what that reading changed, and asking again would only write the
+    /// older reading over it.
+    nonisolated static func stillStands(madeUnder made: Int?, found: Bool, inJapan: Bool) -> Bool {
+        guard let made else { return false }
+        return made >= ruleset
+            || (made >= japanRuleset && inJapan)
+            || (made >= foundRuleset && found)
     }
 
     /// How long "Maps has never heard of this hall" is believed for.

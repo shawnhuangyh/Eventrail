@@ -622,6 +622,14 @@ extension LibraryLottery {
         isRemoved ? nil : LotteryEntry.entry(inRow: entry)
     }
 
+    /// Whether the row holds a round this build cannot read at all — one a
+    /// later build wrote in a form this one does not know. It is left out of
+    /// the list this build reads, so it must not be taken for a round the
+    /// reader took out of that list (``LibraryDatabase/writeLotteries``).
+    var holdsUnreadableRound: Bool {
+        !isRemoved && !entry.isEmpty && LotteryEntry.entry(inRow: entry) == nil
+    }
+
     /// Writes `lottery` — nil takes the round out — at `position`, dated
     /// `when`, touching only what moves. Answers whether anything did.
     ///

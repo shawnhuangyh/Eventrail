@@ -16,9 +16,11 @@ import UniformTypeIdentifiers
 /// Public facts only, never the reader's record — see ``EventEntity``.
 ///
 /// Written the way ``WidgetLink`` writes the widgets' copy: from ``RootView``,
-/// a second after the library last changed — and here after the Following
-/// dates change too, which no write to the library marks — as the app opens,
-/// and only where an item changed. Every item carries a fingerprint of what
+/// a second after a write that can move what the index holds
+/// (``EventStore/factsRevision``: not a note, a ticket or a read, which are
+/// never in it) — and here after the Following dates change too, which no
+/// write to the library marks — as the app opens and comes back, and only
+/// where an item changed. Every item carries a fingerprint of what
 /// it shows; what was written is kept in a file, and the index's own client
 /// state is a digest of that file. So a launch that finds the index as it
 /// left it writes nothing, and an index the system emptied — or a file the

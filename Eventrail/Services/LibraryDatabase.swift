@@ -713,13 +713,20 @@ final class LibraryDatabase {
     /// or taken out; one already taken out of the list is a removed row, so
     /// the old list is never read again.
     ///
+    /// A round this build cannot read (``LibraryLottery/holdsUnreadableRound``)
+    /// is missing from every list it is handed, and is left as it is rather
+    /// than taken out: written by a later build, it is the reader's on every
+    /// device that can read it. Only `clearing` takes it out too — a removal
+    /// of the event, or Delete All, which empty the whole record.
+    ///
     /// `redating` dates again a round left as it was, where `when` is later
     /// than its row says — what a restore raising its answers as of now asks
     /// (``apply(_:to:)``). Not saved; the caller saves.
     @discardableResult
     static func writeLotteries(_ lotteries: [LotteryEntry], for eventID: String,
                                rows: inout [String: [String: LibraryLottery]], entry: LibraryEntry?,
-                               dated when: Date, redating: Bool = false, in context: ModelContext) -> Bool {
+                               dated when: Date, redating: Bool = false, clearing: Bool = false,
+                               in context: ModelContext) -> Bool {
         var held = rows[eventID] ?? [:]
         var changed = false
         func row(for id: String) -> LibraryLottery {
@@ -753,7 +760,7 @@ final class LibraryDatabase {
                     changed = true
                 }
             }
-            for (id, target) in held where !wanted.contains(id) {
+            for (id, target) in held where !wanted.contains(id) && (clearing || !target.holdsUnreadableRound) {
                 changed = target.write(nil, at: target.position, dated: when) || changed
             }
         }
@@ -943,11 +950,16 @@ final class LibraryDatabase {
                 // The lotteries are rows of their own, dated as the archive
                 // dates the list — and dated again where it raises an
                 // unchanged list past what its rows say, as a restore does.
+                // Only there: the store's own archive dates each list by its
+                // newest row, and merged back as it stands it would carry
+                // every older round up to that date and send it again.
                 let listed = answers.tracking.lotteries
-                if listed != heldAnswers.tracking.lotteries || lotteries[id] != nil {
-                    changed = writeLotteries(listed, for: id, rows: &lotteries, entry: held,
-                                             dated: tracking.value.edits[.lotteries] ?? tracking.modified,
-                                             redating: true, in: context) || changed
+                let listedDate = tracking.value.edits[.lotteries] ?? tracking.modified
+                let raises = listedDate.toTheMillisecond
+                    > (lotteriesChanged(in: lotteries[id])?.toTheMillisecond ?? .distantPast)
+                if listed != heldAnswers.tracking.lotteries || (raises && lotteries[id] != nil) {
+                    changed = writeLotteries(listed, for: id, rows: &lotteries, entry: held, dated: listedDate,
+                                             redating: raises, in: context) || changed
                 }
             }
             // Whether there is anything to say, the lotteries included; the

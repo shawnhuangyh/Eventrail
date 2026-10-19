@@ -166,13 +166,14 @@ struct RootView: View {
             WidgetLink.shared.takeAnswers(into: store)
             WidgetLink.shared.send(from: store)
         }
-        // Spotlight's copy follows every write the same way, and the
-        // Following dates by itself — see ``SpotlightIndex``.
+        // Spotlight's copy follows the writes that can move what it holds —
+        // public facts only, so not a note or a read — and the Following
+        // dates by itself. See ``SpotlightIndex``.
         .task { SpotlightIndex.shared.update(from: store, followed: followed) }
+        .onChange(of: store.factsRevision) { SpotlightIndex.shared.update(from: store, followed: followed) }
         .onChange(of: store.revision) {
             WatchLink.shared.send(from: store)
             WidgetLink.shared.send(from: store)
-            SpotlightIndex.shared.update(from: store, followed: followed)
             reminders.schedule(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
@@ -203,6 +204,8 @@ struct RootView: View {
                 // A Won or Lost tapped on the Lotteries widget while away.
                 WidgetLink.shared.takeAnswers(into: store)
                 WidgetLink.shared.send(from: store)
+                // The flyers cached since the last pass, which no write marks.
+                SpotlightIndex.shared.update(from: store, followed: followed)
                 // Notifications may have been turned on or off in Settings.
                 reminders.schedule(from: store)
             } else {
