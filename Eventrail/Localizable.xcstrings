@@ -296,6 +296,204 @@
         }
       }
     },
+    "%@ between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "間隔%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "间隔 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "間隔 %@"
+          }
+        }
+      }
+    },
+    "%@ between · couldn't work out travel time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "間隔%@・移動時間を計算できませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "间隔 %@ · 无法计算路程时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "間隔 %@ · 無法計算交通時間"
+          }
+        }
+      }
+    },
+    "%@ between · working out travel time…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "間隔%@・移動時間を計算中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "间隔 %@ · 正在计算路程时间…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "間隔 %@ · 正在計算交通時間…"
+          }
+        }
+      }
+    },
+    "%@ by car · %@ to spare" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "車で%1$@・余裕%2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "驾车 %1$@ · 富余 %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開車 %1$@ · 餘裕 %2$@"
+          }
+        }
+      }
+    },
+    "%@ by car, only %@ between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "車で%1$@、間隔は%2$@だけ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "驾车需 %1$@，间隔只有 %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開車需 %1$@，間隔只有 %2$@"
+          }
+        }
+      }
+    },
+    "%@ by car, with no time between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "車で%@、間隔がありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "驾车需 %@，中间没有间隔"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開車需 %@，中間沒有間隔"
+          }
+        }
+      }
+    },
+    "%@ by transit · %@ to spare" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交通機関で%1$@・余裕%2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公共交通 %1$@ · 富余 %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大眾運輸 %1$@ · 餘裕 %2$@"
+          }
+        }
+      }
+    },
+    "%@ by transit, only %@ between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交通機関で%1$@、間隔は%2$@だけ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公共交通需 %1$@，间隔只有 %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大眾運輸需 %1$@，間隔只有 %2$@"
+          }
+        }
+      }
+    },
+    "%@ by transit, with no time between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交通機関で%@、間隔がありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公共交通需 %@，中间没有间隔"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大眾運輸需 %@，中間沒有間隔"
+          }
+        }
+      }
+    },
     "%@ came back. Anything newer on this device was kept." : {
       "localizations" : {
         "ja" : {
@@ -425,6 +623,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "剩餘 %@ · %@ 結束"
+          }
+        }
+      }
+    },
+    "%@ on foot · %@ to spare" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "徒歩%1$@・余裕%2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步行 %1$@ · 富余 %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步行 %1$@ · 餘裕 %2$@"
+          }
+        }
+      }
+    },
+    "%@ on foot, only %@ between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "徒歩%1$@、間隔は%2$@だけ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步行需 %1$@，间隔只有 %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步行需 %1$@，間隔只有 %2$@"
+          }
+        }
+      }
+    },
+    "%@ on foot, with no time between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "徒歩%@、間隔がありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步行需 %@，中间没有间隔"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "步行需 %@，中間沒有間隔"
           }
         }
       }
@@ -5478,6 +5742,28 @@
         }
       }
     },
+    "From %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@〜"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 起"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 起"
+          }
+        }
+      }
+    },
     "From a backup file" : {
       "localizations" : {
         "ja" : {
@@ -5496,6 +5782,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "來自備份檔案"
+          }
+        }
+      }
+    },
+    "From one show's end to the next one's start" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終演から次の開演まで"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从上一场结束到下一场开演"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從上一場結束到下一場開演"
           }
         }
       }
@@ -7010,6 +7318,28 @@
         }
       }
     },
+    "May overlap by %@ — no end time announced" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@重なる可能性（終演時刻は未発表）"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可能重叠 %@（结束时间未公布）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可能重疊 %@（結束時間未公布）"
+          }
+        }
+      }
+    },
     "Me" : {
       "localizations" : {
         "ja" : {
@@ -7981,6 +8311,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未公布"
+          }
+        }
+      }
+    },
+    "Not checked — times to be announced" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時刻が未発表のため未確認"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间未公布，无法检查"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間未公布，無法檢查"
+          }
+        }
+      }
+    },
+    "Not enough time to get there from another event that day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ日の別のイベントから移動する時間が足りません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从当天另一场活动赶过来时间不够"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從當天另一場活動趕過來時間不夠"
           }
         }
       }
@@ -9155,6 +9529,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中國大陸以外"
+          }
+        }
+      }
+    },
+    "Overlaps another event that day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ日の別のイベントと時間が重なっています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与当天另一场活动时间重叠"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "與當天另一場活動時間重疊"
+          }
+        }
+      }
+    },
+    "Overlaps by %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@重なっています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间重叠 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間重疊 %@"
           }
         }
       }
@@ -10570,6 +10988,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "與 App 語言相同"
+          }
+        }
+      }
+    },
+    "Same Day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ日のイベント"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同日活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同日活動"
+          }
+        }
+      }
+    },
+    "Same venue · %@ between" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ会場・間隔%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一场馆 · 间隔 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一場館 · 間隔 %@"
           }
         }
       }

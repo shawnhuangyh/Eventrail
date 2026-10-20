@@ -100,6 +100,8 @@ struct EventDetailView: View {
     @State private var flyerSaveFailure: PhotoSaveFailure?
     /// Whether ``TicketStubView`` is up over this sheet.
     @State private var isMakingStub = false
+    /// Another event of the same day, opened from the Same Day card.
+    @State private var openedSameDay: Event?
 
     /// What ``flyerFile`` is written from: the flyer, the title it is named
     /// for, and the last refresh by hand it has to be as fresh as.
@@ -285,6 +287,14 @@ struct EventDetailView: View {
                 VStack(spacing: 14) {
                     header
                     timelineCard
+                    // Beside the hours, since that is what it is about. Only
+                    // where the reader keeps another event that day.
+                    let sameDay = sameDay
+                    if !sameDay.isEmpty {
+                        SameDayCard(event: event, pairs: sameDay, lookup: mapLookup, clock: clock) {
+                            openedSameDay = $0
+                        }
+                    }
                     // Only for an event the reader keeps. Tracking answers
                     // questions about an event they mean to be at — the ticket,
                     // the seat, what it cost — so on an event that is not in
@@ -331,6 +341,7 @@ struct EventDetailView: View {
         .sheet(isPresented: $isMakingStub, onDismiss: releaseHold) {
             TicketStubView(event: event)
         }
+        .eventSheet($openedSameDay, onDismiss: releaseHold)
         .onChange(of: holdsSheet) { _, holds in
             if holds { sheetsHold?.set(holdID, holding: true) }
         }
@@ -548,9 +559,10 @@ struct EventDetailView: View {
 
     /// Whether this page has a sheet of its own up that a change of the
     /// screen's layout would take away with it — Ticket Details, which writes
-    /// nothing until its checkmark, and the ticket stub. Said to the screen
+    /// nothing until its checkmark, the ticket stub, and another event of the
+    /// day opened from the Same Day card. Said to the screen
     /// (``EventSheetsHold``), which holds the page where it is meanwhile.
-    private var holdsSheet: Bool { isEditingTicket || isMakingStub }
+    private var holdsSheet: Bool { isEditingTicket || isMakingStub || openedSameDay != nil }
 
     /// Lets the screen move this page again, once the last of its sheets has
     /// gone — gone, not going: let go of as it began to go, the screen put
@@ -597,6 +609,18 @@ struct EventDetailView: View {
         .buttonStyle(.plain)
         .glassCircle(interactive: true)
         .accessibilityLabel("Close")
+    }
+
+    // MARK: - The same day
+
+    /// The other events the reader keeps on this one's day, each paired with
+    /// it — see ``SameDay``. Kept or not, this one is checked against the
+    /// library, so a date opened from Following or Search says what it would
+    /// clash with before it is added. Only while it is still ahead: a clash on
+    /// a day gone by is nothing to act on.
+    private var sameDay: [SameDay] {
+        guard event.isUpcoming else { return [] }
+        return SameDay.pairs(of: event, among: store.library.filter(\.isUpcoming))
     }
 
     // MARK: - The event's clock

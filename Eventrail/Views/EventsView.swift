@@ -45,6 +45,16 @@ struct EventsView: View {
         selection.compactMap { store.event(id: $0) }
     }
 
+    /// The events still ahead that clash with another of their day — they
+    /// overlap, or a journey a sheet has asked Maps about takes longer than
+    /// the time between them. Nothing is asked of Maps here: a row marks what
+    /// the event's sheet found. See ``SameDay``.
+    private var clashes: [Event.ID: SameDay.Clash] {
+        guard filter == .upcoming else { return [:] }
+        let travelTimes = TravelTimes.shared
+        return SameDay.clashes(in: library.filter(\.isUpcoming)) { travelTimes.travel(for: $0)?.seconds }
+    }
+
     /// The past events that have arrived with no ticket since the reader last
     /// went through them — what the row at the head of Past offers.
     private var awaitingTickets: [Event] {
@@ -116,7 +126,8 @@ struct EventsView: View {
     }
 
     private var list: some View {
-        List(selection: $selection) {
+        let clashes = clashes
+        return List(selection: $selection) {
             // A section of its own with no gap after it, as Following's chips
             // have: the gap a month opens with is for the month before it.
             // Held still while picking, for the reason the capsule is put away.
@@ -155,7 +166,7 @@ struct EventsView: View {
                         // Following: a past one is history rather than news, and
                         // its record has been pruned with the event anyway.
                         let unread = event.isUpcoming ? store.unread(event) : nil
-                        LibraryRow(event: event, unread: unread) {
+                        LibraryRow(event: event, unread: unread, clash: clashes[event.id]) {
                             if event.isUpcoming { mark(event, read: true) }
                             openEvent = event
                         }

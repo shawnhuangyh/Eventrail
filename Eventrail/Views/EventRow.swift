@@ -129,11 +129,29 @@ struct LibraryRow: View {
     /// Why the reader has not looked at this event yet, for the tag above the
     /// title — nil where they have, and on every event already past.
     var unread: FollowingUnread? = nil
+    /// Why it cannot be made beside another event the reader keeps that day,
+    /// for the mark after its time — see ``SameDay``. Nil where it can, as
+    /// far as is known, and on every list but My Events' Upcoming.
+    var clash: SameDay.Clash? = nil
     let open: () -> Void
+
+    /// The time, and a warning after it where the event clashes with another
+    /// of the day. Only the mark: the event's sheet says what it clashes with
+    /// and why.
+    private var detail: Text {
+        let time = event.shown(on: timeDisplay).timeDetail
+        guard let clash else { return time }
+        let mark = Text(Image(systemName: "exclamationmark.triangle.fill"))
+            .foregroundStyle(.red)
+            .accessibilityLabel(clash == .overlap
+                                ? Text("Overlaps another event that day")
+                                : Text("Not enough time to get there from another event that day"))
+        return Text("\(time) \(mark)")
+    }
 
     var body: some View {
         Button(action: open) {
-            EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail) {
+            EventRowContent(event: event, detail: detail) {
                 // Above the title, where Following carries it after the names:
                 // a library row has no billing line to put it on the end of.
                 if let unread { UnreadTag(unread: unread) }
