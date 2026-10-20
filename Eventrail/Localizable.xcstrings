@@ -2787,6 +2787,28 @@
         }
       }
     },
+    "Choose from Photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真から選ぶ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从照片中选取"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從照片中選取"
+          }
+        }
+      }
+    },
     "Chūgoku, Shikoku, Kyūshū and Okinawa" : {
       "localizations" : {
         "ja" : {
@@ -3029,6 +3051,28 @@
         }
       }
     },
+    "Cost: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "料金：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "票价：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "票價：%@"
+          }
+        }
+      }
+    },
     "Could not reach Eventernote. Nothing was imported." : {
       "localizations" : {
         "ja" : {
@@ -3135,6 +3179,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法載入場館位置"
+          }
+        }
+      }
+    },
+    "Couldn't Open the Camera" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラを開けませんでした"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开相机"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法打開相機"
           }
         }
       }
@@ -4617,6 +4683,28 @@
         }
       }
     },
+    "Eventrail isn't allowed to use the camera. You can allow it in Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrailにはカメラの使用が許可されていません。設定で許可できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 未获准使用相机。你可以在“设置”中允许。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 未獲准使用相機。你可以在「設定」中允許。"
+          }
+        }
+      }
+    },
     "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. An event you remove here comes back on the next refresh if your account still lists it. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
       "localizations" : {
         "ja" : {
@@ -5010,6 +5098,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "減少張數"
+          }
+        }
+      }
+    },
+    "Fill In" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填写"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填寫"
+          }
+        }
+      }
+    },
+    "Fill In Anyway" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このまま入力"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然填写"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然填寫"
+          }
+        }
+      }
+    },
+    "Fill in from this ticket?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このチケットから入力しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要用这张门票填写吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要用這張門票填寫嗎？"
           }
         }
       }
@@ -7605,6 +7759,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未設公布日"
+          }
+        }
+      }
+    },
+    "No Seat or Price Found" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座席や料金が見つかりません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到座位或票价"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到座位或票價"
           }
         }
       }
@@ -10464,6 +10640,50 @@
         }
       }
     },
+    "Scan Paper Ticket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紙のチケットをスキャン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫描纸质门票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "掃描紙本門票"
+          }
+        }
+      }
+    },
+    "Scan Ticket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットを読み取る"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫描门票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "掃描門票"
+          }
+        }
+      }
+    },
     "Search" : {
       "localizations" : {
         "ja" : {
@@ -10637,6 +10857,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "席種"
+          }
+        }
+      }
+    },
+    "Seat Type: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "席種：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "席种：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "席種：%@"
+          }
+        }
+      }
+    },
+    "Seat: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座席：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座位：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "座位：%@"
           }
         }
       }
@@ -11991,6 +12255,28 @@
         }
       }
     },
+    "The ticket is dated %@, and this event is on %@." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットの日付は%1$@、このイベントは%2$@です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "门票上的日期是%1$@，而这场活动在%2$@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "門票上的日期是%1$@，而這場活動在%2$@。"
+          }
+        }
+      }
+    },
     "Their dates stop appearing in Following, on this device and on your other devices. Anyone your Eventernote account still favorites comes back on the next refresh." : {
       "localizations" : {
         "ja" : {
@@ -12120,6 +12406,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此票種"
+          }
+        }
+      }
+    },
+    "This ticket is for another day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別の日のチケットです"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是另一天的门票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這是另一天的門票"
           }
         }
       }
@@ -12452,6 +12760,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天"
+          }
+        }
+      }
+    },
+    "Try again with a picture that shows the ticket's seat and price clearly." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットの座席と料金がはっきり写った画像でもう一度お試しください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请换一张清楚显示座位和票价的门票图片再试一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請換一張清楚顯示座位和票價的門票圖片再試一次。"
           }
         }
       }
