@@ -70,6 +70,7 @@ struct RootView: View {
             Tab("Following", systemImage: "person.2", value: AppTab.following) {
                 FollowingView().refreshNotices()
             }
+            .badge(unreadFollowing)
 
             Tab("Me", systemImage: "person.crop.circle", value: AppTab.me) {
                 MeView().refreshNotices()
@@ -212,6 +213,13 @@ struct RootView: View {
                 store.saveNow()
             }
         }
+    }
+
+    /// How many Following dates the reader has not looked at — the count the
+    /// tab's own subtitle gives, carried on its item in the tab bar too, so
+    /// it is seen from every tab. None leaves the item without a badge.
+    private var unreadFollowing: Int {
+        followed.events(for: store.followedProfiles).count(where: store.isUnread)
     }
 
     /// Opens the round a results-day reminder was tapped for, in this window
