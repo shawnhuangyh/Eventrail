@@ -229,8 +229,10 @@ struct EventDetailView: View {
     /// Beside the list, in the list's own stack: the page, and its actions in
     /// the list's bar — on the Duo, the top of the system's rail, where the
     /// design draws them — under a close button in a capsule of its own, as
-    /// the sheet's heads the rail (``closeItem``). Closed, the half is empty
-    /// until another row is chosen.
+    /// the sheet's heads the rail (``closeItem``). The actions are a capsule
+    /// of their own too, apart from the list's buttons after them: run
+    /// together, the list's pencil joined the event's capsule as one of its
+    /// actions. Closed, the half is empty until another row is chosen.
     ///
     /// Tucked away out of sight — the screen gone whole while this holds a
     /// sheet up, see ``View/eventPane(_:)`` — it is handed no close button,
@@ -245,6 +247,7 @@ struct EventDetailView: View {
                     }
                     ToolbarSpacer(.fixed, placement: .primaryAction)
                     ToolbarItemGroup(placement: .primaryAction) { actions }
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
                 }
             }
             // Beneath any sheet over the list: an event opened over it from
@@ -1312,20 +1315,18 @@ struct EventDetailView: View {
             .tint(liveActivity == .running ? .trackAttended : .brandTint)
         }
 
-        if !keepsBarShort {
-            ShareLink(item: event.sourceURL)
-                .tint(.brandTint)
-        }
+        ShareLink(item: event.sourceURL)
+            .tint(.brandTint)
 
         moreMenu
             .tint(.brandTint)
     }
 
-    /// Whether the bar keeps to the heart of it — keeping the event, and the
-    /// menu — leaving the clock and Share to the menu, which carries both
-    /// again. Beside a list, where the close button heads the list's bar and
-    /// the list's own buttons follow: on the Duo's rail Following's filter
-    /// and pencil were folded into a second ⋯ to make room for them.
+    /// Whether the bar keeps to keeping the event, Share and the menu, leaving
+    /// the clock to the menu, which carries it again. Beside a list, where the
+    /// close button heads the list's bar and the list's own buttons follow:
+    /// on the Duo's rail, with the clock and Share both in the bar, Following's
+    /// filter and pencil were folded into a second ⋯ to make room for them.
     private var keepsBarShort: Bool {
         closeBeside != nil
     }
