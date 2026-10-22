@@ -85,6 +85,7 @@ struct SearchView: View {
             .safeAreaBar(edge: .top) { BesideFoldScopes(scope: $scope) }
             .washBackground()
             .navigationTitle("Search")
+            .largeTitleOnMac(Text("Search"))
             .searchable(text: $query, prompt: Text("Search Eventernote events"))
             .searchPresentationToolbarBehavior(searchToolbarBehavior)
             .modifier(SearchScopes(scope: $scope))

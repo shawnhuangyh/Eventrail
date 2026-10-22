@@ -163,6 +163,7 @@ struct TicketDetailsView: View {
                         if hasChanges { isConfirmingDiscard = true } else { dismiss() }
                     }
                     .tint(.primary)
+                    .keyboardShortcut(.cancelAction)
                     // Asked from the button, so the dialog points at what
                     // opened it.
                     .confirmationDialog("Discard your changes?", isPresented: $isConfirmingDiscard,
@@ -258,14 +259,14 @@ struct TicketDetailsView: View {
             }
             // Not asked about first, as no swipe to delete on iOS is.
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    withAnimation(.snappy) {
-                        tracking.lotteries.wrappedValue.removeAll { $0.id == entry.id }
-                    }
-                }
+                Button("Delete", systemImage: "trash", role: .destructive) { delete(entry) }
                 // Said outright, as My Events says it: the role alone left the
                 // button in the app's tint rather than the system red.
                 .tint(.red)
+            }
+            // The swipe again, from a right-click on a Mac.
+            .contextMenuOnMac {
+                Button("Delete", systemImage: "trash", role: .destructive) { delete(entry) }
             }
             .formRow()
         }
@@ -318,6 +319,14 @@ struct TicketDetailsView: View {
     /// once its page is saved.
     private func addEntry() {
         path.append(LotteryEntry(applications: 0, choices: [LotteryChoice()]))
+    }
+
+    /// Takes an entry out of the sheet's copy — written down only on its
+    /// checkmark, as every other answer here is.
+    private func delete(_ entry: LotteryEntry) {
+        withAnimation(.snappy) {
+            tracking.lotteries.wrappedValue.removeAll { $0.id == entry.id }
+        }
     }
 
     /// Where the reader sat, as the ticket printed it, with the class of seat

@@ -2,7 +2,16 @@
   "sourceLanguage" : "en",
   "strings" : {
     "Open an event in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
       "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Open an event in ${applicationName}"
+            ]
+          }
+        },
         "ja" : {
           "stringSet" : {
             "state" : "translated",
@@ -30,39 +39,22 @@
       }
     },
     "Search ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
       "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Search ${applicationName}",
+              "Search events in ${applicationName}"
+            ]
+          }
+        },
         "ja" : {
           "stringSet" : {
             "state" : "translated",
             "values" : [
-              "${applicationName}で検索"
-            ]
-          }
-        },
-        "zh-Hans" : {
-          "stringSet" : {
-            "state" : "translated",
-            "values" : [
-              "搜索${applicationName}"
-            ]
-          }
-        },
-        "zh-Hant" : {
-          "stringSet" : {
-            "state" : "translated",
-            "values" : [
-              "搜尋${applicationName}"
-            ]
-          }
-        }
-      }
-    },
-    "Search events in ${applicationName}" : {
-      "localizations" : {
-        "ja" : {
-          "stringSet" : {
-            "state" : "translated",
-            "values" : [
+              "${applicationName}で検索",
               "${applicationName}でイベントを検索"
             ]
           }
@@ -71,6 +63,7 @@
           "stringSet" : {
             "state" : "translated",
             "values" : [
+              "搜索${applicationName}",
               "在${applicationName}中搜索活动"
             ]
           }
@@ -79,6 +72,7 @@
           "stringSet" : {
             "state" : "translated",
             "values" : [
+              "搜尋${applicationName}",
               "在${applicationName}中搜尋活動"
             ]
           }
@@ -86,39 +80,22 @@
       }
     },
     "Show my next event in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
       "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Show my next event in ${applicationName}",
+              "What's my next event in ${applicationName}"
+            ]
+          }
+        },
         "ja" : {
           "stringSet" : {
             "state" : "translated",
             "values" : [
-              "${applicationName}で次のイベントを表示"
-            ]
-          }
-        },
-        "zh-Hans" : {
-          "stringSet" : {
-            "state" : "translated",
-            "values" : [
-              "在${applicationName}中显示我的下一场活动"
-            ]
-          }
-        },
-        "zh-Hant" : {
-          "stringSet" : {
-            "state" : "translated",
-            "values" : [
-              "在${applicationName}中顯示我的下一場活動"
-            ]
-          }
-        }
-      }
-    },
-    "What's my next event in ${applicationName}" : {
-      "localizations" : {
-        "ja" : {
-          "stringSet" : {
-            "state" : "translated",
-            "values" : [
+              "${applicationName}で次のイベントを表示",
               "${applicationName}の次のイベントは"
             ]
           }
@@ -127,6 +104,7 @@
           "stringSet" : {
             "state" : "translated",
             "values" : [
+              "在${applicationName}中显示我的下一场活动",
               "${applicationName}里我的下一场活动是什么"
             ]
           }
@@ -135,6 +113,7 @@
           "stringSet" : {
             "state" : "translated",
             "values" : [
+              "在${applicationName}中顯示我的下一場活動",
               "${applicationName}裡我的下一場活動是什麼"
             ]
           }

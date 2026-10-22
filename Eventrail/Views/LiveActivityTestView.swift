@@ -1,4 +1,4 @@
-#if DEBUG
+#if DEBUG && !targetEnvironment(macCatalyst)
 @preconcurrency import ActivityKit
 import SwiftUI
 import UIKit

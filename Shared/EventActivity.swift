@@ -1,4 +1,6 @@
+#if !targetEnvironment(macCatalyst)
 import ActivityKit
+#endif
 import Foundation
 
 /// A Live Activity for one event the reader holds a ticket for: on the Lock
@@ -10,7 +12,7 @@ import Foundation
 /// event is here; the times and the seat are in ``ContentState``, since the
 /// page can publish a door time — and the reader write a seat — after the
 /// activity was asked for.
-nonisolated struct EventActivityAttributes: ActivityAttributes {
+nonisolated struct EventActivityAttributes: Codable {
     let eventID: String
     let title: String
     let venue: String
@@ -106,3 +108,8 @@ nonisolated extension EventActivityAttributes {
             .appending(path: "\(eventID).jpg", directoryHint: .notDirectory)
     }
 }
+
+#if !targetEnvironment(macCatalyst)
+// ActivityKit is not on Mac Catalyst, where nothing asks for an activity.
+extension EventActivityAttributes: ActivityAttributes {}
+#endif

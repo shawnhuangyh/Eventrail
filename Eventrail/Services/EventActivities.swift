@@ -28,6 +28,9 @@ import UIKit
 /// — for a door time or a seat written since, and for the island's outline,
 /// which only takes one colour. There is no server to push updates from, and
 /// none is wanted.
+///
+/// **The Mac has none**: ActivityKit is not on Mac Catalyst, so there this is
+/// never enabled, the sheet offers nothing, and every call asks nothing.
 @MainActor @Observable
 final class EventActivities {
     static let shared = EventActivities()
@@ -59,7 +62,9 @@ final class EventActivities {
     private weak var store: EventStore?
     /// The refresh at the next change of stage, while the app is running.
     private var wake: Task<Void, Never>?
+    #if !targetEnvironment(macCatalyst)
     private var watched: Set<Activity<EventActivityAttributes>.ID> = []
+    #endif
     /// Events whose activity is being asked for — its flyer fetched, the
     /// request not yet made — so a second tap asks nothing and a refresh in
     /// between leaves the flyer alone.
@@ -71,6 +76,9 @@ final class EventActivities {
     private var pendingRefresh: Task<Void, Never>?
 
     private init() {
+        #if targetEnvironment(macCatalyst)
+        isEnabled = false
+        #else
         let authorization = ActivityAuthorizationInfo()
         isEnabled = authorization.areActivitiesEnabled
         Task {
@@ -81,6 +89,7 @@ final class EventActivities {
         }
         for activity in Activity<EventActivityAttributes>.activities { watch(activity) }
         read()
+        #endif
     }
 
     /// Whether the sheet offers one for `event`: kept, held a ticket for, with
@@ -126,6 +135,7 @@ final class EventActivities {
     /// has one, and refuses where, started now, it would end before the event
     /// did — see ``refusal(for:at:in:)``.
     func start(for event: Event, tracking: Tracking) async throws {
+        #if !targetEnvironment(macCatalyst)
         guard !Self.live.contains(where: { $0.attributes.eventID == event.id }) else { return }
         if let refusal = Self.refusal(for: event) { throw refusal }
         let now = Date.now
@@ -143,10 +153,12 @@ final class EventActivities {
             pushType: nil)
         read()
         scheduleWake()
+        #endif
     }
 
     /// Ends the event's activity, or calls off a scheduled one.
     func stop(for event: Event) async {
+        #if !targetEnvironment(macCatalyst)
         for activity in Activity<EventActivityAttributes>.activities
         where activity.attributes.eventID == event.id {
             await activity.end(nil, dismissalPolicy: .immediate)
@@ -154,6 +166,7 @@ final class EventActivities {
         dropPosters()
         read()
         scheduleWake()
+        #endif
     }
 
     /// Brings what is up into line with the library a second from now, where
@@ -201,6 +214,7 @@ final class EventActivities {
     }
 
     private func catchUp() async {
+        #if !targetEnvironment(macCatalyst)
         let store = self.store
         let now = Date.now
         for activity in Self.live {
@@ -227,9 +241,12 @@ final class EventActivities {
             }
         }
         dropPosters()
+        #endif
     }
 
     // MARK: - Keeping track
+
+    #if !targetEnvironment(macCatalyst)
 
     /// The activities still to come or still on — what a refresh looks after.
     private static var live: [Activity<EventActivityAttributes>] {
@@ -258,10 +275,14 @@ final class EventActivities {
         }
         if statuses != self.statuses { self.statuses = statuses }
     }
+    #else
+    private func read() {}
+    #endif
 
     /// Asks to run again at the next change of stage: in this process while
     /// it lasts, and as a background refresh for when it does not.
     private func scheduleWake() {
+        #if !targetEnvironment(macCatalyst)
         wake?.cancel()
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.refreshTask)
         let next = Self.live.compactMap(\.content.state.nextChange).min()
@@ -275,6 +296,7 @@ final class EventActivities {
         request.earliestBeginDate = next
         // Refused in the Simulator, which runs no background refresh.
         try? BGTaskScheduler.shared.submit(request)
+        #endif
     }
 
     // MARK: - What an activity says
@@ -298,6 +320,7 @@ final class EventActivities {
 
     // MARK: - The flyer
 
+    #if !targetEnvironment(macCatalyst)
     /// Leaves the event's flyer where the extension can read it, sized for the
     /// largest place the activity draws it (36 × 50 points, at 3×). The
     /// extension cannot download anything as it draws, and a picture larger
@@ -346,4 +369,5 @@ final class EventActivities {
             if !kept.contains(id), !starting.contains(id) { try? FileManager.default.removeItem(at: file) }
         }
     }
+    #endif
 }

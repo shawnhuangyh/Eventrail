@@ -69,6 +69,10 @@ struct WelcomeView: View {
             .scrollBounceBehavior(.basedOnSize)
             footer
         }
+        // A phone's width down the middle of a Mac's window, rather than a
+        // button and cards stretched across all of it.
+        .frame(maxWidth: isMac ? 560 : .infinity)
+        .frame(maxWidth: .infinity)
         .washBackground()
         .onAppear {
             wantsCloud = store.iCloudSyncEnabled
@@ -197,6 +201,7 @@ struct WelcomeView: View {
                     SettingRowLabel("icloud", "iCloud Sync",
                                     status: cloudStatus, needsAttention: true)
                 }
+                .settingSwitch()
                 .settingRowPadding()
                 // A switch that cannot do anything is worse than no switch:
                 // this build has no iCloud capability, and the row says so.
@@ -254,6 +259,7 @@ struct WelcomeView: View {
             Toggle(isOn: $wantsCalendar) {
                 SettingRowLabel("calendar", "Calendar Sync")
             }
+            .settingSwitch()
             .settingRowPadding()
             .panel()
         }

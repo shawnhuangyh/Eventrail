@@ -73,6 +73,7 @@ struct FavoriteEventsView: View {
         .washBackground()
         .navigationTitle("Favorite Events")
         .navigationSubtitle(subtitle)
+        .largeTitleOnMac(Text("Favorite Events"), subtitle: subtitle)
         .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
         .toolbar {
             PencilToolbar(isSelecting: $isSelecting, title: "Select Events",

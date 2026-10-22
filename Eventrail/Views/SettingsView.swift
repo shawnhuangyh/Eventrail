@@ -31,12 +31,15 @@ struct SettingsView: View {
     @State private var isConfirmingDeleteAll = false
     @State private var isConfirmingClearCache = false
     @State private var isChoosingBackup = false
-    /// The backup file waiting for the share sheet, rewritten on every change.
+    /// The backup file waiting for the share sheet — or a Mac's save panel —
+    /// rewritten on every change.
     @State private var exported: URL?
     /// Why the last attempt to write it failed, until one succeeds. Kept apart
     /// from `exported` being nil, which is also the moment before a file is on
     /// disk: a failure is said and can be tried again, not left dimmed.
     @State private var exportFailure: String?
+    /// The save panel a Mac exports the backup through — see ``exportRow``.
+    @State private var isSavingBackup = false
     /// The welcome, asked for again. Its own state rather than the flag
     /// ``RootView`` watches: replaying it is not un-launching the app, and a
     /// device that has seen it has still seen it.
@@ -110,6 +113,7 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", systemImage: "checkmark") { dismiss() }
+                        .keyboardShortcut(.cancelAction)
                 }
             }
             .fullScreenCover(isPresented: $isReplayingWelcome) {
@@ -121,6 +125,7 @@ struct SettingsView: View {
         .refreshNotices()
         .refreshNoticesInSheet()
         .opensFromOutside()
+        .standsAsSettings()
     }
 
     // MARK: - The shape of the screen
@@ -209,6 +214,7 @@ struct SettingsView: View {
             SettingRowLabel("icloud", "iCloud Sync",
                      status: syncStatus, needsAttention: syncNeedsAttention)
         }
+        .settingSwitch()
         .settingRowPadding()
     }
 
@@ -255,6 +261,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .settingSwitch()
         .settingRowPadding()
     }
 
@@ -307,6 +314,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .settingSwitch()
         .settingRowPadding()
         .task { await reminders.refreshAuthorization() }
     }
@@ -326,7 +334,24 @@ struct SettingsView: View {
         let row = SettingRowLabel("square.and.arrow.up", "Export Backup",
                                   status: exportStatus, needsAttention: true)
             .settingRowPadding()
-        if let exported {
+        if let exported, isMac {
+            // A Mac's share menu offers nowhere to save a file, so there the
+            // backup goes out through the save panel.
+            Button {
+                isSavingBackup = true
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+            .fileExporter(isPresented: $isSavingBackup, document: BackupFile(url: exported),
+                          contentType: .eventrailBackup,
+                          defaultFilename: exported.deletingPathExtension().lastPathComponent) { result in
+                if case .failure(let error) = result,
+                   (error as? CocoaError)?.code != .userCancelled {
+                    exportFailure = error.localizedDescription
+                }
+            }
+        } else if let exported {
             ShareLink(item: exported) { row }
                 .buttonStyle(.plain)
         } else if exportFailure != nil {

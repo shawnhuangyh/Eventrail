@@ -84,7 +84,9 @@ struct EventDetailView: View {
 
     /// Why the Live Activity could not be started, while that is being said.
     @State private var liveActivityFailure: String?
-    #if DEBUG
+    /// Whether the page is laid out in two columns — see ``leastWideWidth``.
+    @State private var isWide = false
+    #if DEBUG && !targetEnvironment(macCatalyst)
     /// The Live Activity bench is up — see ``LiveActivityTestView``.
     @State private var isTestingLiveActivity = false
     #endif
@@ -289,32 +291,26 @@ struct EventDetailView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     header
-                    timelineCard
-                    // Beside the hours, since that is what it is about. Only
-                    // where the reader keeps another event that day.
-                    let sameDay = sameDay
-                    if !sameDay.isEmpty {
-                        SameDayCard(event: event, pairs: sameDay, lookup: mapLookup, clock: clock) {
-                            openedSameDay = $0
+                    if isWide {
+                        // The cards' own margins meet between the columns,
+                        // twice as wide as a margin; drawn together, the gap
+                        // is the one between two cards in a column.
+                        HStack(alignment: .top, spacing: -22) {
+                            VStack(spacing: 14) { eventCards }
+                            VStack(spacing: 14) {
+                                venueCard
+                                if !event.performers.isEmpty { performersCard }
+                                linksCard
+                                provenanceLines
+                            }
                         }
+                    } else {
+                        eventCards
+                        if !event.performers.isEmpty { performersCard }
+                        venueCard
+                        linksCard
+                        provenanceLines
                     }
-                    // Only for an event the reader keeps. Tracking answers
-                    // questions about an event they mean to be at — the ticket,
-                    // the seat, what it cost — so on an event that is not in
-                    // the library there is nothing for it to be about, and a
-                    // date opened from Following or Search shows the facts
-                    // alone until it is added. A removal keeps whatever was
-                    // written, so re-adding brings the tiles back as they were.
-                    if store.isInLibrary(event) { ticketTiles }
-                    summaryCard
-                    if !event.performers.isEmpty { performersCard }
-                    venueCard
-                    linksCard
-                    if let importFailure {
-                        RefreshFailureNote(message: importFailure)
-                            .padding(.horizontal, 16)
-                    }
-                    footnote
                 }
                 // As wide as the sheet and no wider. A card's layout can come
                 // out a hair over the width it was offered — the timeline card
@@ -330,6 +326,9 @@ struct EventDetailView: View {
             // No pull: a pull down from the top of a sheet is how it is put
             // away. The page is read again from Refresh in the menu instead —
             // see ``RefreshMenuItem``.
+            .onGeometryChange(for: Bool.self) { proxy in
+                isMac && proxy.size.width >= Self.leastWideWidth
+            } action: { isWide = $0 }
 
             if floatsCloseButton {
                 closeButton
@@ -340,16 +339,18 @@ struct EventDetailView: View {
         .washBackground()
         .sheet(isPresented: $isEditingTicket, onDismiss: releaseHold) {
             TicketDetailsView(event: event, tracking: store.tracking(for: event))
+                .macSheetSize(.form)
         }
         .sheet(isPresented: $isMakingStub, onDismiss: releaseHold) {
             TicketStubView(event: event)
+                .macSheetSize(.form)
         }
         .eventSheet($openedSameDay, onDismiss: releaseHold)
         .onChange(of: holdsSheet) { _, holds in
             if holds { sheetsHold?.set(holdID, holding: true) }
         }
         .onDisappear { sheetsHold?.set(holdID, holding: false) }
-        #if DEBUG
+        #if DEBUG && !targetEnvironment(macCatalyst)
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)
         }
@@ -402,6 +403,48 @@ struct EventDetailView: View {
             venueLookup = (key, found)
         }
     }
+
+    /// What the event is, and what the reader made of it: its hours, the
+    /// other events of its day, the ticket and the overview — the page's
+    /// first column where it has two (``isWide``).
+    @ViewBuilder
+    private var eventCards: some View {
+        timelineCard
+        // Beside the hours, since that is what it is about. Only
+        // where the reader keeps another event that day.
+        let sameDay = sameDay
+        if !sameDay.isEmpty {
+            SameDayCard(event: event, pairs: sameDay, lookup: mapLookup, clock: clock) {
+                openedSameDay = $0
+            }
+        }
+        // Only for an event the reader keeps. Tracking answers
+        // questions about an event they mean to be at — the ticket,
+        // the seat, what it cost — so on an event that is not in
+        // the library there is nothing for it to be about, and a
+        // date opened from Following or Search shows the facts
+        // alone until it is added. A removal keeps whatever was
+        // written, so re-adding brings the tiles back as they were.
+        if store.isInLibrary(event) { ticketTiles }
+        summaryCard
+    }
+
+    /// Why the page could not be read, where it could not, and where its
+    /// facts came from — the foot of the page, or of its second column.
+    @ViewBuilder
+    private var provenanceLines: some View {
+        if let importFailure {
+            RefreshFailureNote(message: importFailure)
+                .padding(.horizontal, 16)
+        }
+        footnote
+    }
+
+    /// How wide the page has to be to be laid out in two columns, as the Mac
+    /// design draws an event beside its list: the hall, its performers and
+    /// the links beside the rest. Only on a Mac, whose window leaves that
+    /// much beside a list; an iPad's half never does.
+    nonisolated static let leastWideWidth: CGFloat = 760
 
     /// Imports the event's own page for the times, billing, description and
     /// head count a search row does not carry — and reads it again when the
@@ -599,6 +642,9 @@ struct EventDetailView: View {
     ///
     /// The label survives as the accessibility one. A close button with no
     /// name is a button VoiceOver can only call "x mark".
+    ///
+    /// Escape presses it too, as it does every sheet's way out: a sheet on a
+    /// Mac cannot be pulled down.
     private var closeButton: some View {
         Button {
             dismiss()
@@ -612,6 +658,7 @@ struct EventDetailView: View {
         .buttonStyle(.plain)
         .glassCircle(interactive: true)
         .accessibilityLabel("Close")
+        .keyboardShortcut(.cancelAction)
     }
 
     // MARK: - The same day
@@ -1014,7 +1061,7 @@ struct EventDetailView: View {
 
     private func stopBar(_ filled: Double, tint: Color) -> some View {
         ProgressView(value: min(max(filled, 0), 1))
-            .progressViewStyle(.linear)
+            .linearProgressAsOnPad()
             .tint(tint)
             .frame(minWidth: 20, idealWidth: 20, maxWidth: .infinity)
             .alignmentGuide(.timeMiddle) { $0[VerticalAlignment.center] }
@@ -1283,6 +1330,7 @@ struct EventDetailView: View {
         ToolbarItem(placement: .bottomBar) {
             Button("Close", systemImage: "xmark") { dismiss() }
                 .tint(.primary)
+                .keyboardShortcut(.cancelAction)
         }
     }
 
@@ -1377,7 +1425,7 @@ struct EventDetailView: View {
                 Task { await refreshPage() }
             }
 
-            #if DEBUG
+            #if DEBUG && !targetEnvironment(macCatalyst)
             Divider()
             Button {
                 isTestingLiveActivity = true

@@ -43,17 +43,54 @@ nonisolated struct Fold: Equatable, Sendable {
     /// beside another app's leaves less, and stays whole.
     static let leastWindowHalf: CGFloat = 375
 
+    /// How a screen with no fold is parted where it is wide enough — see
+    /// ``crossing(_:parting:)``.
+    enum Parting: Sendable {
+        /// Down the middle: an iPad held on its side (``init(parting:)``).
+        case middle
+        /// After a list's width, the rest beside it: a Mac's window
+        /// (``init(listBeside:)``).
+        case list
+    }
+
+    /// The width a Mac's window keeps for a list before the event beside
+    /// it, as the Mac design draws every list: its rows 440 points wide
+    /// between the half's own margins.
+    static let macListWidth: CGFloat = 472
+
+    /// How narrow the room beside a Mac's list may be and still be laid out
+    /// as an event's page.
+    static let leastMacPane: CGFloat = 480
+
     /// The fold crossing the view `proxy` measures from one edge to the
-    /// other, if one does — and where none does and `partsWideViews` (an
-    /// iPad), the middle of a view wide enough to be parted there.
-    static func crossing(_ proxy: GeometryProxy, partsWideViews: Bool) -> Fold? {
+    /// other, if one does — and where none does, the view parted as
+    /// `parting` says wherever it is wide enough: nil parts nothing (an
+    /// iPhone).
+    static func crossing(_ proxy: GeometryProxy, parting: Parting?) -> Fold? {
+        #if !targetEnvironment(macCatalyst)
         if #available(iOS 27.1, *) {
             let bounds = CGRect(origin: .zero, size: proxy.size)
             for region in proxy.reservedRegions(kind: .division, options: .includeInactive) {
                 if let fold = Fold(region.frame, in: bounds) { return fold }
             }
         }
-        return partsWideViews ? Fold(parting: proxy.size) : nil
+        #endif
+        switch parting {
+        case .middle: return Fold(parting: proxy.size)
+        case .list: return Fold(listBeside: proxy.size)
+        case nil: return nil
+        }
+    }
+
+    /// The edge of a list's width (``macListWidth``) in a view of `size`,
+    /// where the room beside it leaves at least ``leastMacPane``: a Mac's
+    /// window, which keeps its list as wide however wide it is pulled, and
+    /// gives the event beside it the rest. A strip of no width, as the
+    /// middle of an iPad is (``init(parting:)``).
+    init?(listBeside size: CGSize) {
+        guard size.width - Self.macListWidth >= Self.leastMacPane else { return nil }
+        self.init(frame: CGRect(x: Self.macListWidth, y: 0, width: 0, height: size.height),
+                  axis: .vertical)
     }
 
     /// The middle of a view of `size`, where it is wider than it is tall and
@@ -116,13 +153,22 @@ extension View {
     /// it is tall — parted as if on its side the moment a search field or a
     /// ticket's note was tapped, which put the event's sheet away with the
     /// ticket being written in it.
-    func readingFold(into fold: Binding<Fold?>) -> some View {
-        let partsWideViews = UIDevice.current.userInterfaceIdiom == .pad
+    ///
+    /// `parting` is how the screen is parted where it has no fold and is
+    /// wide enough: down the middle on an iPad, and on a Mac as the screen
+    /// asks — a list keeps its width with the event beside it (`.list`),
+    /// while the Me tab and the Passport part down the middle as on an iPad.
+    func readingFold(into fold: Binding<Fold?>, parting: Fold.Parting = .middle) -> some View {
+        let parting: Fold.Parting? = switch UIDevice.current.userInterfaceIdiom {
+        case .pad: .middle
+        case .mac: parting
+        default: nil
+        }
         return background {
             Color.clear
                 .ignoresSafeArea(.keyboard)
                 .onGeometryChange(for: Fold?.self) {
-                    Fold.crossing($0, partsWideViews: partsWideViews)
+                    Fold.crossing($0, parting: parting)
                 } action: { new in
                     withTransaction(\.disablesAnimations, true) { fold.wrappedValue = new }
                 }
@@ -156,6 +202,9 @@ private struct DuoOpening: ViewModifier {
     private static let patience: Duration = .seconds(3)
 
     func body(content: Content) -> some View {
+        #if targetEnvironment(macCatalyst)
+        content
+        #else
         if #available(iOS 27.1, *) {
             content
                 .onHingeChange { old, new in
@@ -177,6 +226,7 @@ private struct DuoOpening: ViewModifier {
         } else {
             content
         }
+        #endif
     }
 }
 
@@ -249,6 +299,9 @@ extension View {
     /// `underTheBar` holds it under the bar that way on the Duo's rail too,
     /// for a screen whose bar carries something across both halves — the
     /// Passport's year chips, and the one blur under them.
+    ///
+    /// On a Mac the bar stands still, and the half after — or any column
+    /// after the first — only gives up its edge under the bar.
     func standingAfterTheFold(underTheBar: Bool = false) -> some View {
         modifier(AfterTheFold(underTheBar: underTheBar))
     }
@@ -274,7 +327,16 @@ private struct AfterTheFold: ViewModifier {
     static let settling: Duration = .milliseconds(300)
 
     func body(content: Content) -> some View {
-        if barEdge != nil, !underTheBar {
+        if isMac {
+            // A Mac's title stands still over the half before the fold — see
+            // ``SwiftUI/View/largeTitleOnMac(_:subtitle:trailing:)`` — and
+            // the half after keeps to its own safe area under the window's
+            // toolbar. Without its edge under the bar: on a Mac every scroll
+            // view but the one the bar follows drew it at rest, a frosted
+            // band across the top of the column with a hard edge under it.
+            content
+                .scrollEdgeEffectHidden(true, for: .top)
+        } else if barEdge != nil, !underTheBar {
             content
                 .safeAreaPadding(.top, Self.top)
                 .ignoresSafeArea(.container, edges: .top)
@@ -303,6 +365,10 @@ extension EnvironmentValues {
     /// keeps none. Read through here rather than as `toolbarVerticalEdge`,
     /// which iOS 26 does not have.
     var verticalBarEdge: HorizontalEdge? {
+        #if targetEnvironment(macCatalyst)
+        nil
+        #else
         if #available(iOS 27.1, *) { toolbarVerticalEdge } else { nil }
+        #endif
     }
 }

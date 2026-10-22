@@ -58,6 +58,7 @@ struct FollowedPerformersView: View {
         .washBackground()
         .navigationTitle("Following Performers")
         .navigationSubtitle(subtitle)
+        .largeTitleOnMac(Text("Following Performers"), subtitle: subtitle)
         .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
         .toolbar {
             PencilToolbar(isSelecting: $isSelecting, title: "Select Performers",

@@ -102,7 +102,7 @@ struct FollowingView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List(selection: $selection) {
+            List(selection: $selection.listSelection()) {
                 if performers.isEmpty {
                     nobodyFollowed.bareRow()
                 } else {
@@ -162,10 +162,11 @@ struct FollowingView: View {
                 if !performers.isEmpty, !isSelecting { filterCapsule }
             }
             .monthSections()
-            .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
+            .pickingEditMode(isSelecting)
             .washBackground()
             .navigationTitle("Following")
             .navigationSubtitle(subtitle)
+            .largeTitleOnMac(Text("Following"), subtitle: subtitle)
             // Selecting takes the bottom of the screen over, as it does in My
             // Events: the tab bar stands down for the actions on what is picked.
             .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
@@ -534,19 +535,36 @@ struct FollowingView: View {
                         // In edit mode the row belongs to the selection, not to
                         // the sheet or to the controls drawn on it.
                         .allowsHitTesting(!isSelecting)
+                        .pickedByClickOnMac(isSelecting, isPicked: selection.contains(event.id)) {
+                            selection.toggle(event.id)
+                        }
                         .listRowInsets(GroupHeader.rowInsets)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         // Toward the dot, as in Mail: a swipe from the leading
                         // edge reads the row, or unreads it.
+                        // Not while picking, which a Mac does out of edit mode.
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                mark([event], read: isUnread)
-                            } label: {
-                                Label(isUnread ? "Read" : "Unread",
-                                      systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                            if !isSelecting {
+                                Button {
+                                    mark([event], read: isUnread)
+                                } label: {
+                                    Label(isUnread ? "Read" : "Unread",
+                                          systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                                }
+                                .tint(Color.brandTint)
                             }
-                            .tint(Color.brandTint)
+                        }
+                        // The swipe again, from a right-click on a Mac.
+                        .contextMenuOnMac {
+                            if !isSelecting {
+                                Button {
+                                    mark([event], read: isUnread)
+                                } label: {
+                                    Label(isUnread ? "Mark as Read" : "Mark as Unread",
+                                          systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                                }
+                            }
                         }
                 }
             } header: {

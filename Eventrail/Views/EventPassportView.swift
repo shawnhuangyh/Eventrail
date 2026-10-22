@@ -127,7 +127,16 @@ struct EventPassportView: View {
     /// (``View/eventPane(_:)``).
     @State private var isShown = false
     /// Whether the screen is two pages either side of a fold down it.
-    private var isBook: Bool { fold?.axis == .vertical }
+    private var isBook: Bool { fold?.axis == .vertical && !isTriptych }
+    /// How wide the screen is — read on a Mac alone, whose window can hold
+    /// the cards in three columns (``isTriptych``).
+    @State private var width: CGFloat = 0
+    /// Whether the cards stand in three columns, as the Mac design draws the
+    /// Passport: where the reader went, who and where most with what the
+    /// tickets cost, and how the lotteries went. Only on a Mac whose window
+    /// is wide enough; its drawers open as sheets there.
+    private var isTriptych: Bool { isMac && width >= Self.leastTriptychWidth }
+    private static let leastTriptychWidth: CGFloat = 1100
     /// Where the iPhone Duo keeps its rail, if it does — where the two pages
     /// go without ``barBand``.
     @Environment(\.verticalBarEdge) private var barEdge
@@ -191,7 +200,19 @@ struct EventPassportView: View {
     var body: some View {
         let stats = self.stats
         Group {
-            if let fold, showsBook {
+            if isTriptych {
+                // The columns' own margins meet between them, twice a margin.
+                HStack(alignment: .top, spacing: -16) {
+                    page { places(stats) }
+                    page {
+                        rankings(stats)
+                        spending(stats)
+                    }
+                    .standingAfterTheFold()
+                    page { lotteries(stats) }
+                        .standingAfterTheFold()
+                }
+            } else if let fold, showsBook {
                 // Two pages, as `DuoBookPassport.dc.html` draws the Duo held
                 // like a book: where the reader went and who and where most
                 // on the one before the fold, under the title, and how the
@@ -205,8 +226,10 @@ struct EventPassportView: View {
                 // view's edge under the bar for that scroll view alone, a
                 // frosted band for the one the bar follows and a faint fade,
                 // or none, for the other, and the two stopped at the middle.
-                // On an iPad one band runs across the screen instead
-                // (``barBand``); on the Duo, on Shawn's word, none does.
+                // On an iPad and a Mac one band runs across the screen instead
+                // (``barBand``) — on a Mac under the title and the chips beside
+                // it, where without it the pages ran under them unfrosted; on
+                // the Duo, on Shawn's word, none does.
                 FoldSplitLayout(fold: fold) {
                     secondPage(stats)
                     firstPage(stats)
@@ -216,17 +239,25 @@ struct EventPassportView: View {
                 .overlay(alignment: .top) {
                     if barEdge == nil { barBand }
                 }
-                .safeAreaBar(edge: .top) { yearChips }
+                .safeAreaBar(edge: .top) {
+                    if !isMac { yearChips }
+                }
             } else {
                 page {
                     places(stats)
                     tickets(stats)
                     rankings(stats)
                 }
-                .safeAreaInset(edge: .top) { yearBar }
+                .safeAreaInset(edge: .top) {
+                    if !isMac { yearBar }
+                }
             }
         }
+        // On a Mac the year chips stand on the title's line, as the Mac design
+        // draws them, in every layout.
+        .largeTitleOnMac(Text("Event Passport")) { yearChips }
         .readingFold(into: $fold)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .readingDuoOpening(into: $isOpening, fold: fold)
         .onAppear { isShown = true }
         .onDisappear { isShown = false }
@@ -235,8 +266,9 @@ struct EventPassportView: View {
         // Inline rather than large on one page: iOS 26 draws a large title in
         // the scrolling content, where the year bar inset lands on top of it.
         // Large over the Duo's two, where the bar holds the title alone and
-        // the board heads the first page with it.
-        .navigationBarTitleDisplayMode(showsBook ? .large : .inline)
+        // the board heads the first page with it. Never large on a Mac, which
+        // draws its own title (``largeTitleOnMac``).
+        .navigationBarTitleDisplayMode(showsBook && !isMac ? .large : .inline)
         .task(id: store.revision) { readPlacings() }
         .task(id: needsRates) {
             if needsRates { await ExchangeRates.shared.refreshIfStale() }
@@ -268,7 +300,7 @@ struct EventPassportView: View {
         .passportDrawer(item: $openTicketList) {
             PassportSpendingCard.drawer($0, stats: stats, seatFilter: seatFilter)
         }
-        .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
+        .sheet(item: $reviewing) { TicketReviewView(events: $0.events).macSheetSize(.form) }
         // An event named on this screen opens the same sheet every list in
         // the app ends in.
         .eventSheet($openEvent)
@@ -303,8 +335,8 @@ struct EventPassportView: View {
 
     // MARK: - The pages
 
-    /// The blur under the bar and the year chips across both of an iPad's
-    /// pages: from the top of the screen to the foot of the chips, frosted as
+    /// The blur under the bar and the year chips across both of an iPad's or
+    /// a Mac's pages: from the top of the screen to the foot of the chips, frosted as
     /// the bar's own edge is over the page it follows, and faded out over its
     /// last few points rather than cut off in a line. Only once a page has
     /// been scrolled in under the bar, as the system's own edge shows only
@@ -380,12 +412,23 @@ struct EventPassportView: View {
     /// How the tickets were had and what they cost.
     @ViewBuilder
     private func tickets(_ stats: PassportStats) -> some View {
-        // Under the empty state too: lotteries tried for and lost are the
-        // reader's record before any ticket is.
+        lotteries(stats)
+        spending(stats)
+    }
+
+    /// How the lotteries went — under the empty state too: lotteries tried
+    /// for and lost are the reader's record before any ticket is.
+    @ViewBuilder
+    private func lotteries(_ stats: PassportStats) -> some View {
         if !stats.topLotteries.isEmpty {
             PassportLotteryCard(stats: stats, limit: Self.cardLimit,
                                 openList: $openLotteryList) { openEvent = $0 }
         }
+    }
+
+    /// What the tickets cost.
+    @ViewBuilder
+    private func spending(_ stats: PassportStats) -> some View {
         if !stats.tickets.isEmpty || stats.unconvertedTickets > 0 {
             PassportSpendingCard(
                 stats: stats,
@@ -494,7 +537,7 @@ struct EventPassportView: View {
                 // Wider over the Duo's first page, in the board's proportion:
                 // square there, the map alone filled the screen's height.
                 // The whole country still fits — with more sea either side.
-                .aspectRatio(showsBook ? 439 / 290 : 1 / 0.98, contentMode: .fit)
+                .aspectRatio(showsBook || isTriptych ? 439 / 290 : 1 / 0.98, contentMode: .fit)
                 .overlay(alignment: .bottomTrailing) {
                     // Both in the one corner, on the map rather than under it:
                     // they are readings of the map, and the figures below are
@@ -1316,7 +1359,7 @@ private struct PassportRankingSheet: View {
 private struct PageUnderBar<Page: Hashable>: ViewModifier {
     let page: Page
     @Binding var pages: Set<Page>
-    /// Whether there is a band to show: on an iPad, not on the Duo.
+    /// Whether there is a band to show: on an iPad and a Mac, not on the Duo.
     let isTracking: Bool
 
     func body(content: Content) -> some View {
@@ -1414,7 +1457,7 @@ private struct PassportDrawerPresenter<Item: Identifiable, Drawer: View>: ViewMo
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: sheetBinding) { drawer($0) }
+            .sheet(item: sheetBinding) { drawer($0).macSheetSize(.form) }
             .onChange(of: Handing(besideFold: drawers != nil, holdsSheet: holdsSheet, item: item?.id),
                       initial: true) { old, new in
                 // Across the fold at once, as the fold is read: the system
@@ -1618,6 +1661,7 @@ private struct PassportSheetHeader: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
+            .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)

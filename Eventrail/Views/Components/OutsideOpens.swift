@@ -4,8 +4,9 @@ import SwiftUI
 /// Live Activity tapped or handed off from another device (``EventHandoff``);
 /// a lottery round, from its results-day reminder; an event, a performer or a
 /// hall found in Spotlight or asked for through Siri or Shortcuts
-/// (``SpotlightIndex``, ``IntentOpens``) — and where it is opened: over
-/// whatever the reader has up.
+/// (``SpotlightIndex``, ``IntentOpens``); Settings, from the menu bar
+/// (``AppCommands``) — and where it is opened: over whatever the reader has
+/// up.
 ///
 /// A sheet presented from the root while another sheet is up is one SwiftUI
 /// does not present at all: a reminder tapped with an event's sheet open, as
@@ -34,6 +35,18 @@ final class OutsideOpens {
     /// own, which stands in front as it appears and would otherwise open the
     /// same request again over it.
     @ObservationIgnored fileprivate var claimant: UUID?
+    /// How many Settings sheets the window has up — from the Me tab's gear,
+    /// or from the menu bar (``View/standsAsSettings()``).
+    @ObservationIgnored fileprivate var settingsUp = 0
+
+    /// Settings, from the menu bar, over whatever is up — and nothing where
+    /// Settings already is. A sheet of the root's own was not presented while
+    /// another sheet was up, and the flag it was asked for by stayed set, so
+    /// the menu item did nothing again in that window.
+    func openSettings() {
+        guard settingsUp == 0 else { return }
+        open(.settings)
+    }
 
     func open(_ request: OutsideOpen) {
         // The same request tapped twice is still the one being presented.
@@ -65,6 +78,8 @@ enum OutsideOpen: Identifiable {
     case performer(PerformerLink)
     /// A hall's page, the same way.
     case venue(VenueLink)
+    /// Settings, from the menu bar.
+    case settings
 
     var id: String {
         switch self {
@@ -72,6 +87,7 @@ enum OutsideOpen: Identifiable {
         case .round(let row): "round/\(row.id)"
         case .performer(let link): "performer/\(link)"
         case .venue(let link): "venue/\(link)"
+        case .settings: "settings"
         }
     }
 }
@@ -92,12 +108,33 @@ extension View {
     func opensFromOutside() -> some View {
         modifier(OutsideOpenPresenter())
     }
+
+    /// Counts a Settings sheet as up in its window for as long as it is, so
+    /// the menu bar opens no second one over it (``OutsideOpens/openSettings()``).
+    func standsAsSettings() -> some View {
+        modifier(SettingsStanding())
+    }
+}
+
+private struct SettingsStanding: ViewModifier {
+    @Environment(OutsideOpens.self) private var opens: OutsideOpens?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { opens?.settingsUp += 1 }
+            .onDisappear {
+                if let opens { opens.settingsUp = max(0, opens.settingsUp - 1) }
+            }
+    }
 }
 
 private struct OutsideOpenPresenter: ViewModifier {
     @Environment(OutsideOpens.self) private var opens: OutsideOpens?
     @Environment(EventStore.self) private var store: EventStore?
     @Environment(\.outsideOpenDepth) private var depth
+    /// Handed to the sheet again: from the root of a Mac's window, a sheet
+    /// would open without it — see ``RootEnvironment``.
+    @Environment(\.rootEnvironment) private var root
 
     @State private var id = UUID()
     /// What this presenter took, held here rather than read off ``opens``:
@@ -124,16 +161,24 @@ private struct OutsideOpenPresenter: ViewModifier {
                     switch open {
                     case .event(let event):
                         EventDetailView(event: event)
+                            .macSheetSize(.event)
                     case .round(let row):
                         TicketDetailsView(event: row.event, tracking: store?.tracking(for: row.event) ?? Tracking(),
                                           opening: row.entry)
+                            .macSheetSize(.form)
                     case .performer(let link):
                         OutsidePage { PerformerView(link: link) }
+                            .macSheetSize(.form)
                     case .venue(let link):
                         OutsidePage { VenueView(link: link) }
+                            .macSheetSize(.form)
+                    case .settings:
+                        SettingsView()
+                            .macSheetSize(.form)
                     }
                 }
                 .onAppear { opens?.delivered(open) }
+                .rootEnvironment(root)
             }
             // Outermost, so what this holds and what it presents both stand
             // a sheet deeper than it does.
@@ -186,6 +231,7 @@ private struct OutsidePage<Page: View>: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Close", systemImage: "xmark") { dismiss() }
+                            .keyboardShortcut(.cancelAction)
                     }
                 }
                 .venueDestination()

@@ -691,6 +691,7 @@ struct TicketStubView: View {
                 .buttonStyle(.plain)
                 .glassCircle(interactive: true)
                 .accessibilityLabel("Close")
+                .keyboardShortcut(.cancelAction)
                 Spacer()
             }
         }

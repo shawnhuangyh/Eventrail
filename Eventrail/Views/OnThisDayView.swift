@@ -59,8 +59,9 @@ struct OnThisDayView: View {
         .washBackground()
         .navigationTitle("On This Day")
         .navigationSubtitle(subtitle(of: today))
+        .largeTitleOnMac(Text("On This Day"), subtitle: subtitle(of: today))
         .eventPane($openEvent)
-        .sheet(item: $stubEvent) { TicketStubView(event: $0) }
+        .sheet(item: $stubEvent) { TicketStubView(event: $0).macSheetSize(.form) }
     }
 
     /// Today, and how much there is under it.

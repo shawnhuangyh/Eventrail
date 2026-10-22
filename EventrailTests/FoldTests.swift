@@ -59,4 +59,16 @@ struct FoldTests {
         #expect(Fold(parting: CGSize(width: 700, height: 500)) == nil)
         #expect(Fold(parting: CGSize(width: 750, height: 600)) != nil)
     }
+
+    /// A Mac's window keeps a list's width before the event beside it, however
+    /// wide it is pulled, and stays whole where that leaves too little room
+    /// for the event — whatever its shape, since a Mac's window is not turned.
+    @Test func aMacWindowKeepsAListsWidthBeforeTheEvent() throws {
+        let window = try #require(Fold(listBeside: CGSize(width: 1440, height: 848)))
+        #expect(window.axis == .vertical)
+        #expect(window.frame == CGRect(x: Fold.macListWidth, y: 0, width: 0, height: 848))
+        #expect(Fold(listBeside: CGSize(width: 2400, height: 1300))?.frame.minX == Fold.macListWidth)
+        #expect(Fold(listBeside: CGSize(width: 900, height: 1000)) == nil)
+        #expect(Fold(listBeside: CGSize(width: Fold.macListWidth + Fold.leastMacPane, height: 1000)) != nil)
+    }
 }

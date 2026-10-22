@@ -17,6 +17,10 @@ import WidgetKit
 /// The Lotteries widget's Won and Lost run in the extension, which must not
 /// write to the store, so they leave their answer beside the copy
 /// (``WidgetAnswer``) and this takes it in.
+///
+/// **The Mac has none**: the extension is the iPhone's and the iPad's alone,
+/// so there this writes nothing, takes in nothing, and never reaches the App
+/// Group's container.
 @MainActor
 final class WidgetLink {
     static let shared = WidgetLink()
@@ -34,6 +38,7 @@ final class WidgetLink {
     /// edits — a note typed, a key at a time — reads the library once, after
     /// the last of them.
     func send(from store: EventStore) {
+        guard !isMac else { return }
         pending?.cancel()
         pending = Task { [weak self, weak store] in
             try? await Task.sleep(for: .seconds(1))
@@ -78,6 +83,7 @@ final class WidgetLink {
     /// the round has since come to apply with several, it is left for the
     /// reader to give here.
     func takeAnswers(into store: EventStore) {
+        guard !isMac else { return }
         let waiting = WidgetAnswer.waiting()
         guard !waiting.isEmpty else { return }
         for (file, answer) in waiting.sorted(by: { $0.answer.given < $1.answer.given }) {

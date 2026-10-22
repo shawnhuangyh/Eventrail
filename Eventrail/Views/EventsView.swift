@@ -67,6 +67,7 @@ struct EventsView: View {
             .washBackground()
             .navigationTitle("My Events")
             .navigationSubtitle(subtitle)
+            .largeTitleOnMac(Text("My Events"), subtitle: subtitle)
             // Selecting takes the bottom of the screen over, the way it does
             // everywhere else on iOS: the tab bar stands down so the actions for
             // what is selected can stand where the thumb already is.
@@ -100,7 +101,7 @@ struct EventsView: View {
             // Beside the list on an open iPhone Duo.
             .eventPane($openEvent)
             .venueDestination()
-            .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
+            .sheet(item: $reviewing) { TicketReviewView(events: $0.events).macSheetSize(.form) }
             // Nothing is left selected behind a filter that no longer shows it,
             // and nothing survives leaving the mode that picked it.
             .onChange(of: filter) { selection.removeAll() }
@@ -127,7 +128,7 @@ struct EventsView: View {
 
     private var list: some View {
         let clashes = clashes
-        return List(selection: $selection) {
+        return List(selection: $selection.listSelection()) {
             // A section of its own with no gap after it, as Following's chips
             // have: the gap a month opens with is for the month before it.
             // Held still while picking, for the reason the capsule is put away.
@@ -175,13 +176,17 @@ struct EventsView: View {
                             // take the tap, and only the strip the List draws
                             // its mark in would pick the row.
                             .allowsHitTesting(!isSelecting)
+                            .pickedByClickOnMac(isSelecting, isPicked: selection.contains(event.id)) {
+                                selection.toggle(event.id)
+                            }
                             .listRowInsets(GroupHeader.rowInsets)
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             // Toward the tag, as on Following: a swipe from the
                             // leading edge reads the row, or unreads it.
+                            // Not while picking, which a Mac does out of edit mode.
                             .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                if event.isUpcoming {
+                                if event.isUpcoming, !isSelecting {
                                     let isUnread = unread != nil
                                     Button {
                                         mark(event, read: isUnread)
@@ -198,8 +203,29 @@ struct EventsView: View {
                             // with it. No destructive role: that sends the row
                             // off the screen before the answer is in.
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button("Remove", systemImage: "trash") { swipedAway = event.id }
-                                    .tint(.red)
+                                if !isSelecting {
+                                    Button("Remove", systemImage: "trash") { swipedAway = event.id }
+                                        .tint(.red)
+                                }
+                            }
+                            // Both swipes again, from a right-click on a Mac. In
+                            // a menu the destructive role only reddens the item.
+                            .contextMenuOnMac {
+                                if !isSelecting {
+                                    if event.isUpcoming {
+                                        let isUnread = unread != nil
+                                        Button {
+                                            mark(event, read: isUnread)
+                                        } label: {
+                                            Label(isUnread ? "Mark as Read" : "Mark as Unread",
+                                                  systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                                        }
+                                        Divider()
+                                    }
+                                    Button("Remove Event", systemImage: "trash", role: .destructive) {
+                                        swipedAway = event.id
+                                    }
+                                }
                             }
                             .confirmingRemoval(isPresented: Binding(
                                 get: { swipedAway == event.id },
@@ -225,7 +251,7 @@ struct EventsView: View {
             if !isSelecting, !groups.isEmpty { EventListMenu(grouping: $grouping) }
         }
         .monthSections()
-        .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
+        .pickingEditMode(isSelecting)
     }
 
     /// The subtitle carries the count that matters at the moment: how many are

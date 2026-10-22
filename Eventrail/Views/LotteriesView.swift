@@ -95,9 +95,11 @@ struct LotteriesView: View {
         .washBackground()
         .navigationTitle("Lotteries")
         .navigationSubtitle(subtitle(list))
+        .largeTitleOnMac(Text("Lotteries"), subtitle: subtitle(list))
         .eventPane($openEvent)
         .sheet(item: $editing) { row in
             TicketDetailsView(event: row.event, tracking: store.tracking(for: row.event), opening: row.entry)
+                .macSheetSize(.form)
         }
     }
 
@@ -312,8 +314,9 @@ private struct LotteryListMenu: View {
 /// The card opens the event; the tile's menu sits over it rather than inside
 /// it, a sibling of the card's button laid over the spot the tile holds, so a
 /// tap on the tile opens its menu and not the event (``FavoriteEventRow``'s
-/// heart, for the same reason). A round of an event that is over has no
-/// menu: its tile is drawn in the card, and a tap anywhere opens the event.
+/// heart, for the same reason). On a Mac a right-click anywhere on the card
+/// opens the same menu. A round of an event that is over has no menu: its
+/// tile is drawn in the card, and a tap anywhere opens the event.
 struct LotteryRoundCard: View {
     /// Which clock the event's day is printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
@@ -413,6 +416,11 @@ struct LotteryRoundCard: View {
             }
         }
         .panel(cornerRadius: 24)
+        // The tile's menu again, from a right-click anywhere on the card on a
+        // Mac, where a mouse cannot swipe a result in.
+        .contextMenuOnMac {
+            if !row.isOver { resultChoices }
+        }
     }
 
     /// One reading in the card's foot: what it is, small and in capitals,
@@ -474,34 +482,8 @@ struct LotteryRoundCard: View {
     /// results day is still to come only Pending can be picked, and it says
     /// when that day is.
     private var resultMenu: some View {
-        let drawable = entry.canBeDrawn()
-        return Menu {
-            Section("Result") {
-                Toggle(isOn: given(.pending)) {
-                    Text("Pending")
-                    if !drawable { LotteryText.day(of: entry, isEventAhead: true) }
-                }
-                if entry.choices.isEmpty {
-                    Toggle(isOn: given(.won(nil))) { Text("Won") }
-                        .disabled(!drawable)
-                }
-                ForEach(Array(entry.choices.enumerated()), id: \.element.id) { index, choice in
-                    Toggle(isOn: given(.won(choice.id))) {
-                        if entry.choices.count > 1 {
-                            Text("Won \(LotteryChoice.ordinal(index)) Choice")
-                        } else {
-                            Text("Won")
-                        }
-                        LotteryText.won(choice)
-                    }
-                    .disabled(!drawable)
-                }
-                Toggle(isOn: given(.lost)) { Text("Lost") }
-                    .disabled(!drawable)
-            }
-            Section {
-                Button("Edit Entry", systemImage: "square.and.pencil", action: edit)
-            }
+        Menu {
+            resultChoices
         } label: {
             LotteryDayTile(row: row, showsResult: true)
         }
@@ -510,6 +492,38 @@ struct LotteryRoundCard: View {
         .accessibilityLabel(Text("Result"))
         .accessibilityValue(LotteryText.result(entry.outcome, firstCome: false))
         .sensoryFeedback(.selection, trigger: entry.outcome)
+    }
+
+    /// What the tile's menu holds — and the card's right-click on a Mac.
+    @ViewBuilder
+    private var resultChoices: some View {
+        let drawable = entry.canBeDrawn()
+        Section("Result") {
+            Toggle(isOn: given(.pending)) {
+                Text("Pending")
+                if !drawable { LotteryText.day(of: entry, isEventAhead: true) }
+            }
+            if entry.choices.isEmpty {
+                Toggle(isOn: given(.won(nil))) { Text("Won") }
+                    .disabled(!drawable)
+            }
+            ForEach(Array(entry.choices.enumerated()), id: \.element.id) { index, choice in
+                Toggle(isOn: given(.won(choice.id))) {
+                    if entry.choices.count > 1 {
+                        Text("Won \(LotteryChoice.ordinal(index)) Choice")
+                    } else {
+                        Text("Won")
+                    }
+                    LotteryText.won(choice)
+                }
+                .disabled(!drawable)
+            }
+            Toggle(isOn: given(.lost)) { Text("Lost") }
+                .disabled(!drawable)
+        }
+        Section {
+            Button("Edit Entry", systemImage: "square.and.pencil", action: edit)
+        }
     }
 
     /// On where it is the round's result, and a tap on it gives it.

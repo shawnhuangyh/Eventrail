@@ -131,6 +131,28 @@ struct BackupPicker: ViewModifier {
     }
 }
 
+/// A backup already written to disk, as the save panel a Mac exports it
+/// through takes it (``SettingsView``): a Mac's share menu offers nowhere to
+/// save a file. Only ever written out — a backup comes back in through
+/// ``BackupPicker``.
+nonisolated struct BackupFile: FileDocument {
+    static let readableContentTypes: [UTType] = [.eventrailBackup]
+
+    let url: URL
+
+    init(url: URL) {
+        self.url = url
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        throw CocoaError(.featureUnsupported)
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        try FileWrapper(url: url, options: .immediate)
+    }
+}
+
 extension View {
     /// Restores whatever backup file is put into `file`.
     ///

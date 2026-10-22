@@ -91,7 +91,10 @@ extension View {
     ///
     /// `onDismiss` runs once the sheet has gone, not as it begins to go.
     func eventSheet(_ event: Binding<Event?>, onDismiss: (() -> Void)? = nil) -> some View {
-        sheet(item: event, onDismiss: onDismiss) { EventDetailView(event: $0) }
+        sheet(item: event, onDismiss: onDismiss) {
+            EventDetailView(event: $0)
+                .macSheetSize(.event)
+        }
     }
 
     /// Registers a performer's page on this stack.

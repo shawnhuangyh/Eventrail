@@ -1,7 +1,9 @@
 import CoreSpotlight
 import SwiftData
 import SwiftUI
+#if canImport(Playgrounds)
 import Playgrounds
+#endif
 
 enum AppTab: Hashable {
     case events, following, search, me
@@ -32,8 +34,9 @@ struct RootView: View {
     @State private var openedBackup: URL?
     /// An event opened from outside the app — its Live Activity, tapped, or
     /// another device's sheet, handed off — or a lottery round, from its
-    /// results-day reminder (``LotteryReminders``): opened over whatever sheet
-    /// is up — see ``OutsideOpens``.
+    /// results-day reminder (``LotteryReminders``), or Settings, from the menu
+    /// bar (``AppCommands``): opened over whatever sheet is up — see
+    /// ``OutsideOpens``.
     @State private var opens = OutsideOpens()
     /// The event in the frontmost sheet, offered to the reader's other
     /// devices — see ``EventHandoff``.
@@ -127,6 +130,9 @@ struct RootView: View {
         // Inside the environment lines below, for the store; over the tabs,
         // which stand a sheet deeper for it.
         .opensFromOutside()
+        .hidesWindowTitleOnMac()
+        .focusedSceneValue(\.appTab, $selection)
+        .focusedSceneValue(\.outsideOpens, opens)
         // Asked about first: tapping a file is not by itself a request to fold
         // its contents into the library.
         //
@@ -138,13 +144,9 @@ struct RootView: View {
         // everything: the first launch has no tab worth showing yet.
         .fullScreenCover(isPresented: $isWelcoming) {
             WelcomeView()
+                .rootEnvironment(rootEnvironment)
         }
-        .library(store)
-        .environment(followed)
-        .environment(venues)
-        .environment(notices)
-        .environment(opens)
-        .environment(handoff)
+        .rootEnvironment(rootEnvironment)
         .tint(.brandTint)
         // The reader's text size is followed up to xxxLarge and no further —
         // see ``SwiftUI/View/scalingFont(size:weight:design:)``. Past it, the
@@ -191,28 +193,59 @@ struct RootView: View {
         // Edits are written after a short pause; leaving the app cuts that
         // short, so the last one is flushed here rather than lost. Coming back
         // is the moment to pick up whatever another device wrote meanwhile.
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase) { old, phase in
             if phase == .active {
                 // A reminder tapped, or an intent run, while this window was
                 // on its way in.
                 openReminder()
                 takeIntentOpen()
-                Task { await store.syncNow() }
-                Task { await EventActivities.shared.refresh(from: store) }
-                // An event whose day ended while the app was away leaves the
-                // watch's list too.
-                WatchLink.shared.send(from: store)
-                // A Won or Lost tapped on the Lotteries widget while away.
-                WidgetLink.shared.takeAnswers(into: store)
-                WidgetLink.shared.send(from: store)
-                // The flyers cached since the last pass, which no write marks.
-                SpotlightIndex.shared.update(from: store, followed: followed)
-                // Notifications may have been turned on or off in Settings.
-                reminders.schedule(from: store)
+                if old == .background || Self.owesCatchUp { catchUp() }
             } else {
                 store.saveNow()
             }
         }
+    }
+
+    /// When the app last caught up on coming back (``catchUp()``) — once for
+    /// the process, whose store every window shares.
+    private static var caughtUp: Date?
+
+    /// How long a window that only lost the focus is back before the app
+    /// catches up again.
+    private static let catchUpPatience: TimeInterval = 5 * 60
+
+    /// Whether coming back from a window that only lost the focus is owed a
+    /// catch-up. From the background it always is. A window only loses the
+    /// focus on a Mac at every switch to another app or to another of its
+    /// windows, and on an iPhone at a glance at Notification Center — and
+    /// each was a pass over the whole calendar and Spotlight's copy, the
+    /// latter on the main actor.
+    private static var owesCatchUp: Bool {
+        caughtUp.map { Date.now.timeIntervalSince($0) >= catchUpPatience } ?? true
+    }
+
+    /// What coming back to the app catches up on.
+    private func catchUp() {
+        Self.caughtUp = .now
+        Task { await store.syncNow() }
+        Task { await EventActivities.shared.refresh(from: store) }
+        // An event whose day ended while the app was away leaves the
+        // watch's list too.
+        WatchLink.shared.send(from: store)
+        // A Won or Lost tapped on the Lotteries widget while away.
+        WidgetLink.shared.takeAnswers(into: store)
+        WidgetLink.shared.send(from: store)
+        // The flyers cached since the last pass, which no write marks.
+        SpotlightIndex.shared.update(from: store, followed: followed)
+        // Notifications may have been turned on or off in Settings.
+        reminders.schedule(from: store)
+    }
+
+    /// What every screen is handed through the environment, and every sheet
+    /// presented from here again — see ``RootEnvironment``.
+    private var rootEnvironment: RootEnvironment {
+        RootEnvironment(store: store, followed: followed, venues: venues,
+                        notices: notices, opens: opens, handoff: handoff)
     }
 
     /// How many Following dates the reader has not looked at — the count the
@@ -349,7 +382,55 @@ final class Launch {
     }
 }
 
+/// What the root hands every screen through the environment: the library and
+/// its rows, the dates and the halls read from Eventernote, and the objects
+/// the root keeps for refresh notices, opens from outside and Handoff.
+///
+/// One value, so a sheet presented from the root can be handed it again
+/// (``SwiftUI/View/rootEnvironment(_:)``). **On a Mac a sheet presented from
+/// the root of a window takes its environment from the window rather than
+/// from the view it is attached to**, so it opened without any of this: the
+/// Settings sheet opened from the menu bar crashed reading the store, and so
+/// would the Welcome screen and anything opened from outside the app. Handed
+/// again on every platform, where it changes nothing.
+struct RootEnvironment: Equatable {
+    let store: EventStore
+    let followed: FollowedDates
+    let venues: VenueRegions
+    let notices: RefreshNotices
+    let opens: OutsideOpens
+    let handoff: EventHandoff
+
+    static func == (lhs: RootEnvironment, rhs: RootEnvironment) -> Bool {
+        lhs.store === rhs.store && lhs.followed === rhs.followed && lhs.venues === rhs.venues
+            && lhs.notices === rhs.notices && lhs.opens === rhs.opens && lhs.handoff === rhs.handoff
+    }
+}
+
+extension EnvironmentValues {
+    /// The root's environment, for a presenter to hand the sheet it presents
+    /// — see ``RootEnvironment``. Nil only in a preview.
+    @Entry var rootEnvironment: RootEnvironment?
+}
+
 extension View {
+    /// Everything the root hands down (``RootEnvironment``) — at the root, and
+    /// again on a sheet presented from it. Nil, in a preview, hands nothing.
+    @ViewBuilder
+    func rootEnvironment(_ root: RootEnvironment?) -> some View {
+        if let root {
+            library(root.store)
+                .environment(root.followed)
+                .environment(root.venues)
+                .environment(root.notices)
+                .environment(root.opens)
+                .environment(root.handoff)
+                .environment(\.rootEnvironment, root)
+        } else {
+            self
+        }
+    }
+
     /// The store, and the rows it writes for the screens to query — for the
     /// root of the app and for a preview.
     ///
@@ -361,6 +442,8 @@ extension View {
     }
 }
 
+#if canImport(Playgrounds)
 #Playground {
     _ = EventGroup.groups(of: PreviewData.events, filter: .upcoming, grouping: .date).map(\.label)
 }
+#endif

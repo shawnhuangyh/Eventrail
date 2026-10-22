@@ -49,13 +49,22 @@ struct MeView: View {
 
     /// Where the iPhone Duo's fold crosses the screen — see ``cards``.
     @State private var fold: Fold?
+    /// How wide the screen is — read on a Mac alone, whose window can hold
+    /// the cards in two columns (``leastTwoColumnWidth``).
+    @State private var width: CGFloat = 0
+
+    /// How wide a Mac's window has to be for the cards to stand in two
+    /// columns: two phones' cards.
+    private static let leastTwoColumnWidth: CGFloat = 2 * Fold.leastWindowHalf
 
     var body: some View {
         NavigationStack {
             cards
             .readingFold(into: $fold)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .washBackground()
             .navigationTitle("Me")
+            .largeTitleOnMac(Text("Me"))
             .venueDestination()
             .navigationDestination(for: PassportLink.self) { _ in EventPassportView() }
             .navigationDestination(for: MeList.self) { list in
@@ -74,9 +83,11 @@ struct MeView: View {
             .eventSheet($openEvent)
             .sheet(isPresented: $isLinking) {
                 EventernoteAccountSheet()
+                    .macSheetSize(.form)
             }
             .sheet(isPresented: $isShowingSettings) {
                 SettingsView()
+                    .macSheetSize(.form)
             }
             // The same read the Following tab does, and the same object holds
             // it — whichever screen the reader opens first pays for it, and
@@ -110,10 +121,37 @@ struct MeView: View {
     /// `DuoTurnedMe.dc.html`'s two cards side by side stretched to the fold,
     /// which left both mostly empty panel, nor a gap kept over the fold,
     /// which read as a hole.
+    ///
+    /// On a Mac whose window is wide enough, two columns, each scrolling on
+    /// its own: the account, today's memories, the Passport and the
+    /// lotteries, then the two lists — on Shawn's word, where the Mac design
+    /// draws three, with the Passport and the lotteries a column of their own.
     @ViewBuilder
     private var cards: some View {
         // Once a drawing, over the whole library: read twice in the grid.
         let today = onThisDay
+        if isMac, width >= Self.leastTwoColumnWidth {
+            // The columns' own margins meet between them, twice a margin.
+            HStack(alignment: .top, spacing: -16) {
+                column {
+                    accountCard
+                    onThisDayCard(today)
+                    passportCard
+                    lotteriesCard
+                }
+                column {
+                    favoritesCard
+                    followingCard
+                }
+                .standingAfterTheFold()
+            }
+        } else {
+            foldedCards(today)
+        }
+    }
+
+    @ViewBuilder
+    private func foldedCards(_ today: OnThisDay) -> some View {
         switch fold {
         case let fold? where fold.axis == .vertical:
             FoldSplitLayout(fold: fold) {
@@ -245,6 +283,7 @@ struct MeView: View {
 
             if let fraction = refreshFraction {
                 ProgressView(value: fraction)
+                    .linearProgressAsOnPad()
                     .tint(Color.trackTicket)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 14)

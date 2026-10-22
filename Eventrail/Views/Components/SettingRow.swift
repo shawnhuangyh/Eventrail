@@ -132,6 +132,18 @@ struct SettingRowChevron: View {
     }
 }
 
+extension Toggle {
+    /// A settings row's switch, drawn as an iPhone and an iPad draw it, where
+    /// a Mac would draw a checkbox before the name.
+    ///
+    /// On each switch, never on a screen: a toggle in a menu on the screen —
+    /// Default Currency's choices — takes the style too, and a menu cannot
+    /// draw a switch; on a Mac every choice came out split in two and greyed.
+    func settingSwitch() -> some View {
+        toggleStyle(.switch)
+    }
+}
+
 extension View {
     /// The inset every settings row shares, on whatever the reader taps.
     func settingRowPadding() -> some View {
