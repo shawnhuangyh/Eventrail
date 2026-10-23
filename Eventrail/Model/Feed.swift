@@ -27,6 +27,11 @@ final class Feed<Item: Identifiable & Sendable> {
     private(set) var hasMore = false
     // The listing itself is not something a view observes, only its results.
     @ObservationIgnored private var source: Source?
+    /// Which listing the pages on screen are of, moved on by every load, every
+    /// restore and every clear: a page still on its way for the listing before
+    /// — the reader scrolled to the end, then retyped the term — is let go
+    /// when it lands, rather than added to the new one's rows.
+    @ObservationIgnored private var generation = 0
 
     typealias Source = @Sendable (Int) async throws -> EventernotePage<Item>
 
@@ -41,15 +46,18 @@ final class Feed<Item: Identifiable & Sendable> {
     /// it were the first.
     func load(startingAt first: Int = 1, from source: @escaping Source) async {
         self.source = source
+        generation += 1
+        let generation = generation
         page = 0
         hasMore = false
         failure = nil
         moreFailure = nil
         isLoading = true
-        defer { isLoading = false }
+        defer { if generation == self.generation { isLoading = false } }
 
         do {
             let result = try await source(first)
+            guard generation == self.generation else { return }
             items = result.items
             total = result.total
             hasMore = result.hasMore
@@ -57,7 +65,7 @@ final class Feed<Item: Identifiable & Sendable> {
         } catch is CancellationError {
             // A retyped query supersedes this one; the newer load owns the state.
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, generation == self.generation else { return }
             items = []
             total = 0
             page = first
@@ -73,6 +81,7 @@ final class Feed<Item: Identifiable & Sendable> {
     func restore(_ items: [Item], total: Int, pagesRead: Int, hasMore: Bool,
                  from source: @escaping Source) {
         self.source = source
+        generation += 1
         self.items = items
         self.total = total
         page = pagesRead
@@ -91,9 +100,11 @@ final class Feed<Item: Identifiable & Sendable> {
         guard let source, hasMore, moreFailure == nil, !isLoading, !isLoadingMore else { return }
         isLoadingMore = true
         defer { isLoadingMore = false }
+        let generation = generation
 
         do {
             let result = try await source(page + 1)
+            guard generation == self.generation else { return }
             let known = Set(items.map(\.id))
             items += result.items.filter { !known.contains($0.id) }
             total = result.total
@@ -101,7 +112,7 @@ final class Feed<Item: Identifiable & Sendable> {
             page += 1
         } catch is CancellationError {
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, generation == self.generation else { return }
             // Keep the pages already shown, and keep the listing open: a
             // failed page is not the last one.
             moreFailure = error.localizedDescription
@@ -116,6 +127,7 @@ final class Feed<Item: Identifiable & Sendable> {
 
     func clear() {
         source = nil
+        generation += 1
         items = []
         total = 0
         page = 0

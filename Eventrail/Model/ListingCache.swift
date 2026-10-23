@@ -145,7 +145,11 @@ extension ListingCache {
     /// no error. A read that outlives its page still lands in the cache.
     ///
     /// Stops at the first page that fails, which is also what makes a
-    /// refusal for asking too often end the run rather than extend it.
+    /// refusal for asking too often end the run rather than extend it — and
+    /// after ``pageLimit`` pages, paced as ``FollowedDates`` paces a run: a
+    /// hall with hundreds of dates announced was read whole in one burst.
+    /// What is past the limit is still there to scroll on to, read a page at a
+    /// time as the reader reaches it.
     static func read<Subject: Codable & Sendable>(
         subject resolve: @escaping @Sendable () async throws -> Subject?,
         listing: @escaping @Sendable (Subject, Int) async throws -> EventernotePage<Event>
@@ -159,7 +163,8 @@ extension ListingCache {
                 var page = 0
                 var total = 0
                 var hasMore = true
-                while hasMore {
+                while hasMore, page < pageLimit {
+                    if page > 0 { try await Task.sleep(for: pace) }
                     page += 1
                     let result = try await listing(subject, page)
                     let arrived = result.items.filter { known.insert($0.id).inserted }
@@ -177,6 +182,13 @@ extension ListingCache {
             }
         }.value
     }
+}
+
+extension ListingCache {
+    /// The most pages a read asks for in one go, as ``FollowedDates`` asks.
+    nonisolated static let pageLimit = 10
+    /// The pause between two of them.
+    nonisolated static let pace: Duration = .milliseconds(200)
 }
 
 // MARK: - What each page is filed under

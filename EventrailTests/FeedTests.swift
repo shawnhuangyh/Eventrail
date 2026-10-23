@@ -46,6 +46,28 @@ struct FeedTests {
         #expect(feed.hasMore)
     }
 
+    /// The reader scrolled to the end, then searched again: the page still on
+    /// its way for the search before is let go when it lands, not added to
+    /// the new search's rows.
+    @Test func aPageLandingForTheListingBeforeIsLetGo() async {
+        let (released, release) = AsyncStream<Void>.makeStream()
+        let feed = Feed<Row>()
+        await feed.load { page in
+            if page == 2 { for await _ in released { break } }
+            return EventernotePage(items: [Row(id: 100 + page)], total: 4, page: page, pageSize: 1)
+        }
+        let late = Task { await feed.loadMore() }
+        while !feed.isLoadingMore { await Task.yield() }
+
+        await feed.load { page in EventernotePage(items: [Row(id: 200 + page)], total: 4, page: page, pageSize: 1) }
+        release.yield()
+        release.finish()
+        await late.value
+
+        #expect(feed.items.map(\.id) == [201])
+        #expect(feed.page == 1)
+    }
+
     @Test func aNewLoadForgetsTheFailedPage() async {
         let listing = Listing()
         let feed = Feed<Row>()

@@ -220,10 +220,21 @@ final class FollowedDates {
         readAt = [:]
         failure = nil
         generation += 1
+        let writing = pendingSave
         pendingSave?.cancel()
         pendingSave = nil
         guard persists else { return }
-        try? FileManager.default.removeItem(at: Self.cacheURL)
+        let url = Self.cacheURL
+        try? FileManager.default.removeItem(at: url)
+        // A write already under way goes on past the cancel, and landed after
+        // the removal: the next launch read the cleared dates back as fresh.
+        // So the file is taken away again once that write is down.
+        if let writing {
+            Task {
+                await writing.value
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
     }
 
     /// What a screen's read of these performers is identified by: who they
@@ -319,6 +330,7 @@ final class FollowedDates {
 
     private func read(_ performers: [PerformerProfile]) async -> Outcome? {
         var landed = 0
+        var missing: [String] = []
         // A run the cache was cleared under writes nothing more, and leaves
         // the state alone for whichever run replaced it.
         let generation = generation
@@ -359,8 +371,10 @@ final class FollowedDates {
                     return Outcome(asked: performers.count, read: landed, failure: failure)
                 }
                 // Named, because "could not be reached" about a list of four
-                // people does not say which four are missing.
-                failure = "\(performer.name): \(error.localizedDescription)"
+                // people does not say which four are missing — every one of
+                // them, not only the last to fail.
+                missing.append(performer.name)
+                failure = "\(missing.formatted(.list(type: .and))): \(error.localizedDescription)"
             }
         }
         return Outcome(asked: performers.count, read: landed, failure: failure)
