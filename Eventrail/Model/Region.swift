@@ -126,6 +126,9 @@ enum Region: String, CaseIterable, Identifiable, Hashable {
     /// with, as 1600 Main St does.
     nonisolated static func droppingPostalCode(_ address: String) -> String {
         var address = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Only an address opening with 〒 or a figure is searched: this is
+        // asked of every date on Following each time the area filter counts.
+        guard let first = address.first, first == "〒" || first.isNumber else { return address }
         if let code = address.prefixMatch(of: /〒?\s*[0-9０-９]{3}\s*[-－‐‑–—−ー]?\s*[0-9０-９]{4}(?![0-9０-９])/) {
             address = String(address[code.range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
         }

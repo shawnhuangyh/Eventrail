@@ -390,8 +390,8 @@ final class Launch {
         let venues = VenueRegions()
         followed.hallZone = { event in
             if venues.region(of: event) != nil { return Event.publishedZone }
-            if let kept = store.event(id: event.id), kept.timeZone != Event.publishedZone {
-                return kept.timeZone
+            if let kept = store.keptTimeZone(of: event.id), kept != Event.publishedZone {
+                return kept
             }
             if let zone = venues.timeZone(of: event) { return zone }
             return VenuePlaces.shared.timeZone(ofHallNamed: event.venue)

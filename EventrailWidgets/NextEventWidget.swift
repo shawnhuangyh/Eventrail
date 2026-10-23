@@ -38,7 +38,7 @@ nonisolated struct NextEventProvider: TimelineProvider {
         let isPreview = context.isPreview
         let placeholder = placeholder(in: context)
         Task {
-            let first = await Self.timeline(at: .now).entries.first
+            let first = await Self.firstEntry(at: .now)
             // The gallery shows what the widget looks like, which an empty
             // library would not.
             completion(isPreview && first?.event == nil ? placeholder : first ?? placeholder)
@@ -53,6 +53,25 @@ nonisolated struct NextEventProvider: TimelineProvider {
     /// midnight, which moves the day count on, and the doors, the start and
     /// the end of each event shown — then the next one, once it is over.
     static func timeline(at now: Date) async -> Timeline<NextEventEntry> {
+        let plan = plan(at: now)
+        let flyers = await WidgetFlyers.files(for: plan.compactMap(\.event).map { ($0.id, $0.flyer) })
+        let entries = plan.map { time, event in
+            NextEventEntry(date: time, event: event, flyer: event.flatMap { flyers[$0.id] })
+        }
+        return Timeline(entries: entries, policy: .atEnd)
+    }
+
+    /// The timeline's first entry alone, with its own flyer and no other
+    /// fetched — what a snapshot draws, which waited on the flyer of every
+    /// event of the next two days.
+    static func firstEntry(at now: Date) async -> NextEventEntry? {
+        guard let (time, event) = plan(at: now).first else { return nil }
+        let flyers = await WidgetFlyers.files(for: event.map { [($0.id, $0.flyer)] } ?? [])
+        return NextEventEntry(date: time, event: event, flyer: event.flatMap { flyers[$0.id] })
+    }
+
+    /// The moments of ``timeline(at:)``, and the event shown at each.
+    private static func plan(at now: Date) -> [(time: Date, event: WidgetEvent?)] {
         let events = (WidgetLibrary.read() ?? .empty).upcoming
         let horizon = now.addingTimeInterval(2 * 24 * 60 * 60)
         var moments: Set<Date> = [now]
@@ -61,12 +80,7 @@ nonisolated struct NextEventProvider: TimelineProvider {
             moments.formUnion([event.doors, event.starts, event.runsTo, event.leaves].compactMap(\.self))
         }
         let times = moments.filter { $0 >= now && $0 <= horizon }.sorted().prefix(60)
-        let shown = times.map { time in events.first { $0.leaves > time } }
-        let flyers = await WidgetFlyers.files(for: shown.compactMap(\.self).map { ($0.id, $0.flyer) })
-        let entries = zip(times, shown).map { time, event in
-            NextEventEntry(date: time, event: event, flyer: event.flatMap { flyers[$0.id] })
-        }
-        return Timeline(entries: entries, policy: .atEnd)
+        return times.map { time in (time, events.first { $0.leaves > time }) }
     }
 }
 

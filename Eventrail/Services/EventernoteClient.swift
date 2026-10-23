@@ -205,8 +205,9 @@ nonisolated struct EventernoteClient: Sendable {
     // MARK: - One event
 
     /// Imports an event's own page, and the venue's page behind it for the
-    /// address and capacity the detail sheet prints.
-    @concurrent func detail(for event: Event) async throws -> Event {
+    /// address and capacity the detail sheet prints — read once a run where a
+    /// run hands in its `halls`.
+    @concurrent func detail(for event: Event, halls: HallPages? = nil) async throws -> Event {
         let page = try await html(at: "/events/\(event.id)", query: [:])
         guard var imported = EventernotePages.event(in: page, id: event.id) else {
             throw Failure.unreadable
@@ -218,15 +219,42 @@ nonisolated struct EventernoteClient: Sendable {
         // asking a site that had said to stop (``Failure/isRateLimited``).
         if let placeID = imported.placeID {
             do {
-                let venue = try await html(at: "/places/\(placeID)", query: [:])
-                imported.venueDetail = EventernotePages.venueDetail(in: venue)
-                imported.venueAddress = EventernotePages.venueAddress(in: venue)
+                let read = { @Sendable in
+                    let venue = try await html(at: "/places/\(placeID)", query: [:])
+                    return HallPage(detail: EventernotePages.venueDetail(in: venue),
+                                    address: EventernotePages.venueAddress(in: venue))
+                }
+                let hall = if let halls { try await halls.page(placeID, read: read) } else { try await read() }
+                imported.venueDetail = hall.detail
+                imported.venueAddress = hall.address
             } catch let failure as Failure where failure.isRateLimited {
                 throw failure
             } catch {}
         }
         imported.readAt = .now
         return event.merging(imported)
+    }
+
+    /// What an event's read takes from its hall's page.
+    struct HallPage: Sendable {
+        let detail: String?
+        let address: String?
+    }
+
+    /// The hall pages one run of reads has asked for, by place id — so a run
+    /// over a library's events, a few dozen halls between nine hundred of
+    /// them, reads each hall's page once rather than once an event: the run
+    /// of requests the site stops answering. A page asked for while another
+    /// read of it is on its way waits for that one.
+    actor HallPages {
+        private var pages: [Int: Task<HallPage, any Error>] = [:]
+
+        func page(_ id: Int, read: @escaping @Sendable () async throws -> HallPage) async throws -> HallPage {
+            if let asked = pages[id] { return try await asked.value }
+            let asking = Task { try await read() }
+            pages[id] = asking
+            return try await asking.value
+        }
     }
 
     // MARK: - One venue

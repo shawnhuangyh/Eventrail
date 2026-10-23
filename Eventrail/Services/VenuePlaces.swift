@@ -538,21 +538,29 @@ final class VenuePlaces {
     /// the sheets have looked up. An event at a hall nobody has opened yet is
     /// simply absent, and its entry carries the hall's name and no map until a
     /// later mirror, after the reader has opened it.
+    ///
+    /// Each hall's placing made once, however many of the events are held
+    /// there: a placing carries a map item, and nine hundred of them made
+    /// for a library's worth of a few dozen halls was most of a Spotlight
+    /// pass.
     func mapItems(for events: [Event]) -> [Event.ID: Placing] {
         let cache = cache
-        var read: [String] = []
+        var byHall: [String: Placing?] = [:]
         let placed: [Event.ID: Placing] = events.reduce(into: [:]) { placed, event in
-            // Read under the same rule a sheet reads it under, so an answer
-            // settled by a reading since found wrong is not still being
-            // written into the reader's calendar.
-            guard let venue = Venue(event),
-                  let answer = cache[venue.key], !Self.isWorthAskingAgain(answer),
-                  let placing = answer.placing
-            else { return }
-            placed[event.id] = placing
-            read.append(venue.key)
+            guard let venue = Venue(event) else { return }
+            let placing: Placing?
+            if let made = byHall[venue.key] {
+                placing = made
+            } else {
+                // Read under the same rule a sheet reads it under, so an
+                // answer settled by a reading since found wrong is not still
+                // being written into the reader's calendar.
+                placing = cache[venue.key].flatMap { Self.isWorthAskingAgain($0) ? nil : $0.placing }
+                byHall[venue.key] = .some(placing)
+            }
+            if let placing { placed[event.id] = placing }
         }
-        note(read)
+        note(byHall.compactMap { $0.value == nil ? nil : $0.key })
         return placed
     }
 

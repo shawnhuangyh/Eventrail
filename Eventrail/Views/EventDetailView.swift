@@ -674,7 +674,7 @@ struct EventDetailView: View {
     /// a day gone by is nothing to act on.
     private var sameDay: [SameDay] {
         guard event.isUpcoming else { return [] }
-        return SameDay.pairs(of: event, among: store.library.filter(\.isUpcoming))
+        return SameDay.pairs(of: event, among: store.upcoming(onDayOf: event))
     }
 
     // MARK: - The event's clock

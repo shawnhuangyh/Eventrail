@@ -133,6 +133,10 @@ final class EventStore {
     private var lotteryRows: [Event.ID: [String: LibraryLottery]] = [:]
     /// Every Following date's read, by event id, kept the same way.
     private var readMarks: [Event.ID: FollowingReadMark] = [:]
+    /// The library by day, as ``upcoming(onDayOf:)`` last made it.
+    @ObservationIgnored private var libraryByDay: (revision: Int, days: [Date: [Event]])?
+    /// What ``unread(_:)`` last answered for each event — see there.
+    @ObservationIgnored private var unreadAnswers: [Event.ID: (event: Event, read: FollowingRead?, answer: FollowingUnread?)] = [:]
     private var performerRows: [Int: FollowedPerformer] = [:]
     private var settingsRow: LibrarySettings?
 
@@ -427,15 +431,7 @@ final class EventStore {
     /// what its rows say. Reading `revision` here is also what redraws a
     /// screen served from the kept copies.
     func events(of entries: some Sequence<LibraryEntry>, where flag: KeyPath<LibraryEntry, Bool>) -> [Event] {
-        if convertedAt != revision {
-            if let stale {
-                for id in stale { converted[id] = nil }
-            } else {
-                converted.removeAll(keepingCapacity: true)
-            }
-            stale = []
-            convertedAt = revision
-        }
+        forgetStaleCopies()
         var listed = Set<Event.ID>()
         return entries.compactMap { queried in
             let id = queried.eventID
@@ -449,6 +445,34 @@ final class EventStore {
             converted[id] = .some(event)
             return event
         }
+    }
+
+    /// Lets go of the kept copies a write since the last ask has made stale
+    /// — see ``events(of:where:)``.
+    private func forgetStaleCopies() {
+        guard convertedAt != revision else { return }
+        if let stale {
+            for id in stale { converted[id] = nil }
+        } else {
+            converted.removeAll(keepingCapacity: true)
+        }
+        stale = []
+        convertedAt = revision
+    }
+
+    /// A row's facts, through the copies ``events(of:where:)`` keeps — what
+    /// a pass over every row reads them by, rather than building nine hundred
+    /// events from their columns each time.
+    ///
+    /// Only a row's own: where it holds none, the copy kept for its event is
+    /// the entry's (``LibraryEntry/kept``), which is not the row's to write.
+    private func facts(ofRow id: Event.ID) -> Event? {
+        guard let row = rows[id], row.hasFacts || !row.title.isEmpty else { return nil }
+        forgetStaleCopies()
+        if let kept = converted[id], let kept { return kept }
+        let facts = row.facts
+        converted[id] = .some(facts)
+        return facts
     }
 
     /// The row an event's facts are written to, made where there is none.
@@ -577,6 +601,21 @@ final class EventStore {
         library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
     }
 
+    /// The library's events on the day `event`'s hall prints it on
+    /// (``Event/localDay``), still to come — what its Same Day card pairs it
+    /// with (``SameDay/pairs(of:among:)``).
+    ///
+    /// From an index of the library by day, made once per ``revision``: the
+    /// card is drawn with every redraw of an event's sheet, and finding the
+    /// day of every event in the library each time was a calendar's work per
+    /// event.
+    func upcoming(onDayOf event: Event) -> [Event] {
+        if libraryByDay?.revision != revision {
+            libraryByDay = (revision, Dictionary(grouping: library, by: \.localDay))
+        }
+        return libraryByDay?.days[event.localDay]?.filter(\.isUpcoming) ?? []
+    }
+
     /// Every event in the library the reader went to (``hasAttended(_:)``),
     /// in no order — what the On This Day widget picks each day's from.
     var attended: [Event] {
@@ -680,6 +719,14 @@ final class EventStore {
     /// The freshest copy of an event this app holds, wherever it came from.
     func event(id: Event.ID) -> Event? {
         rows[id]?.facts ?? entries[id]?.kept ?? seen[id]
+    }
+
+    /// The clock the library's copy of an event keeps, read through the
+    /// copies kept for its row (``facts(ofRow:)``) rather than built from its
+    /// columns — what ``FollowedDates/hallZone`` asks of every Following date
+    /// on every redraw.
+    func keptTimeZone(of id: Event.ID) -> TimeZone? {
+        (facts(ofRow: id) ?? entries[id]?.kept ?? seen[id])?.timeZone
     }
 
     // MARK: - Writing
@@ -813,10 +860,19 @@ final class EventStore {
 
     /// Why a Following row is unread — new, or changed since it was read —
     /// or nil where it is read.
+    ///
+    /// Kept for each event with the copy and the mark it was worked out from,
+    /// and worked out again only where either has moved: every row of
+    /// Following and My Events, and the tab's badge over all of them, ask on
+    /// every redraw, and each answer hashes the row.
     func unread(_ event: Event) -> FollowingUnread? {
-        var read = LibraryArchive()
-        read.followingReads = readMarks[event.id]?.read.map { [event.id: $0] }
-        return read.unread(event)
+        let read = readMarks[event.id]?.read?.value
+        if let known = unreadAnswers[event.id], known.read == read, known.event == event {
+            return known.answer
+        }
+        let answer = FollowingRead.unread(event, read: read)
+        unreadAnswers[event.id] = (event, read, answer)
+        return answer
     }
 
     /// Marks these rows read as the listing prints them now, or unread again.
@@ -1273,6 +1329,8 @@ final class EventStore {
         refreshStage = .reimporting(read: 0, total: events.count)
 
         let client = client
+        // Each hall's page read once for the run — see ``EventernoteClient/HallPages``.
+        let halls = EventernoteClient.HallPages()
         let asked = Date.now
         let inFlight = 4
         var read = 0
@@ -1287,7 +1345,7 @@ final class EventStore {
                 next = events.index(after: next)
                 group.addTask {
                     do {
-                        return (try await client.detail(for: event), false)
+                        return (try await client.detail(for: event, halls: halls), false)
                     } catch {
                         return (nil, (error as? EventernoteClient.Failure)?.isRateLimited == true)
                     }
@@ -1615,10 +1673,10 @@ final class EventStore {
     private func retimeEvents() -> Bool {
         guard let venues else { return false }
         var moved = false
-        let held = rows.values.compactMap(\.facts)
+        let held = rows.keys.compactMap(facts(ofRow:))
         let zones = venues.timeZones(for: held + Array(seen.values))
         for (id, zone) in zones {
-            if let row = rows[id], let event = row.facts, event.timeZone != zone {
+            if let row = rows[id], let event = facts(ofRow: id), event.timeZone != zone {
                 row.write(event.published(in: zone))
                 converted[id] = nil
                 moved = true

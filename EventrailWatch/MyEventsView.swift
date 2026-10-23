@@ -35,7 +35,7 @@ struct MyEventsView: View {
         // What the system hands over where an activity carried no link —
         // every one of this app's does, so this is only a fallback.
         .onContinueUserActivity(NSUserActivityTypeLiveActivity) { _ in
-            let moments = store.events(at: .now).map { EventMoment($0, showsLocalTime: store.showsLocalTime, at: .now) }
+            let moments = store.moments(at: .now)
             let current = moments.first { $0.event.hasTicket && $0.stage != nil && $0.stage != .wrapped }
                 ?? moments.first { $0.daysAway == 0 }
             show(current?.event.id)
@@ -43,27 +43,26 @@ struct MyEventsView: View {
     }
 
     private var list: some View {
-        let changes = store.events(at: .now)
-            .flatMap { EventMoment($0, showsLocalTime: store.showsLocalTime, at: .now).changes }
+        let changes = store.moments(at: .now).flatMap(\.changes)
         return TimelineView(StageSchedule(changes: changes, step: 60)) { context in
-            let events = store.events(at: context.date)
+            let moments = store.moments(at: context.date)
             if store.library == nil {
                 ContentUnavailableView("Open Eventrail on Your iPhone", systemImage: "iphone",
                                        description: Text("Your events come from the app on your iPhone."))
-            } else if events.isEmpty {
+            } else if moments.isEmpty {
                 ContentUnavailableView("No Upcoming Events", systemImage: "calendar",
                                        description: Text("Events you add on your iPhone appear here."))
             } else {
                 List(selection: $selection) {
-                    ForEach(events) { event in
-                        NavigationLink(value: event.id) {
-                            EventCard(moment: EventMoment(event, showsLocalTime: store.showsLocalTime, at: context.date))
+                    ForEach(moments, id: \.event.id) { moment in
+                        NavigationLink(value: moment.event.id) {
+                            EventCard(moment: moment)
                         }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(EventCard.background)
-                                .strokeBorder(.white.opacity(event.id == selection ? 0.45 : 0), lineWidth: 1.5)
+                                .strokeBorder(.white.opacity(moment.event.id == selection ? 0.45 : 0), lineWidth: 1.5)
                         )
                     }
                 }

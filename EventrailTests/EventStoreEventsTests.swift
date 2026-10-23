@@ -256,6 +256,35 @@ struct EventStoreEventsTests {
         #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
     }
 
+    /// What a row says of itself is kept between asks, and follows its mark
+    /// and its copy as either moves.
+    @Test func aRowsUnreadStateFollowsItsMarkAndItsCopy() {
+        let store = store()
+        let event = Fixtures.event(id: "1", date: Fixtures.day(fromToday: 7))
+        #expect(store.unread(event) == .new)
+        #expect(store.unread(event) == .new)
+        store.markRead([event], read: true)
+        #expect(store.unread(event) == nil)
+        let renamed = Fixtures.event(id: "1", title: "Renamed", date: Fixtures.day(fromToday: 7))
+        #expect(store.unread(renamed) == .updated)
+        #expect(store.unread(event) == nil)
+        store.markRead([event], read: false)
+        #expect(store.unread(event) == .new)
+    }
+
+    /// The events kept on one event's day, from the library as it stands
+    /// after each write.
+    @Test func theSameDayIsReadFromTheLibraryAsItStands() {
+        let store = store()
+        let one = Fixtures.event(id: "1", date: Fixtures.day(fromToday: 7))
+        let other = Fixtures.event(id: "2", date: Fixtures.day(fromToday: 7))
+        let later = Fixtures.event(id: "3", date: Fixtures.day(fromToday: 8))
+        for event in [one, other, later] { store.toggleLibraryMembership(event) }
+        #expect(Set(store.upcoming(onDayOf: one).map(\.id)) == ["1", "2"])
+        store.remove([other])
+        #expect(store.upcoming(onDayOf: one).map(\.id) == ["1"])
+    }
+
     /// Taken out, an event keeps its facts: a row emptied on one device lands
     /// empty on every other, and an entry arriving there has nothing to show.
     @Test func anEventTakenOutKeepsItsFacts() throws {

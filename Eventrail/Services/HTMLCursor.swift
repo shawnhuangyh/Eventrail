@@ -15,6 +15,30 @@ nonisolated struct HTMLCursor {
         position = self.html.startIndex
     }
 
+    /// Where `marker` next occurs in `text`, matched byte for byte in place
+    /// (`memmem`) — some thirty times faster than Foundation's `range(of:)`
+    /// over a listing of a hundred rows, measured, and a page is walked with
+    /// hundreds of these. (The standard library's own `firstRange(of:)` over
+    /// the bytes was ten times slower than Foundation's.) The markers are the
+    /// site's own markup, written as it writes it, so a match of bytes is the
+    /// match that was meant; and UTF-8 matches only on a character's first
+    /// byte. A page not stored as UTF-8 has no bytes to hand, and is searched
+    /// by Foundation.
+    static func find(_ marker: String, in text: Substring) -> Range<Substring.Index>? {
+        var marker = marker
+        let found = marker.withUTF8 { needle in
+            text.utf8.withContiguousStorageIfAvailable { bytes -> Range<Substring.Index>? in
+                guard let base = bytes.baseAddress, let wanted = needle.baseAddress, !needle.isEmpty,
+                      let hit = memmem(base, bytes.count, wanted, needle.count)
+                else { return nil }
+                let lower = text.utf8.index(text.utf8.startIndex, offsetBy: UnsafeRawPointer(hit) - UnsafeRawPointer(base))
+                return lower ..< text.utf8.index(lower, offsetBy: needle.count)
+            }
+        }
+        if let found { return found }
+        return text.range(of: marker)
+    }
+
     /// Everything still ahead of the cursor.
     var rest: Substring { html[position...] }
 
@@ -23,14 +47,14 @@ nonisolated struct HTMLCursor {
     /// field read out of a later record.
     @discardableResult
     mutating func advance(past marker: String) -> Bool {
-        guard let range = rest.range(of: marker) else { return false }
+        guard let range = Self.find(marker, in: rest) else { return false }
         position = range.upperBound
         return true
     }
 
     /// The markup between the cursor and the next `marker`, consuming both.
     mutating func take(upTo marker: String) -> Substring? {
-        guard let range = rest.range(of: marker) else { return nil }
+        guard let range = Self.find(marker, in: rest) else { return nil }
         defer { position = range.upperBound }
         return html[position ..< range.lowerBound]
     }
@@ -49,7 +73,7 @@ nonisolated struct HTMLCursor {
     func slices(startingAt marker: String) -> [Substring] {
         var starts: [Substring.Index] = []
         var searchFrom = position
-        while let range = html[searchFrom...].range(of: marker) {
+        while let range = Self.find(marker, in: html[searchFrom...]) {
             starts.append(range.lowerBound)
             searchFrom = range.upperBound
         }

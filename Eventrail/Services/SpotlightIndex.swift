@@ -95,15 +95,13 @@ final class SpotlightIndex {
         if before != nil, plan.isEmpty { return }
 
         var changed: [SpotlightEntry] = []
-        var thumbnails: [String: Data] = [:]
+        var flyered: [(id: String, flyer: URL)] = []
         var made: Set<String> = []
         for entry in entries where plan.writes.contains(entry.identifier) && made.insert(entry.identifier).inserted {
             changed.append(entry)
-            if let flyer = entry.flyer, flyers.contains(flyer),
-               let bytes = await ImageCache.shared.storedData(for: flyer) {
-                thumbnails[entry.identifier] = await Self.thumbnail(of: bytes)
-            }
+            if let flyer = entry.flyer, flyers.contains(flyer) { flyered.append((entry.identifier, flyer)) }
         }
+        let thumbnails = await Self.thumbnails(of: flyered)
 
         do {
             try await writer.write(changed, thumbnails: thumbnails, deleting: plan.deletes, whole: before == nil,
@@ -171,6 +169,30 @@ final class SpotlightIndex {
         EventEntity.all(in: store, followed: followed).map(SpotlightEntry.event)
             + PerformerEntity.all(in: store).map(SpotlightEntry.performer)
             + VenueEntity.all(in: store).map(SpotlightEntry.venue)
+    }
+
+    /// The flyers held for these items, made small, a few at a time — one
+    /// after another, a whole index's worth waited on each read and each
+    /// encode in turn.
+    private static func thumbnails(of flyers: [(id: String, flyer: URL)]) async -> [String: Data] {
+        await withTaskGroup(of: (String, Data?).self, returning: [String: Data].self) { group in
+            var made: [String: Data] = [:]
+            var waiting = flyers[...]
+            var running = 0
+            while !waiting.isEmpty || running > 0 {
+                while running < 4, let item = waiting.popFirst() {
+                    group.addTask {
+                        guard let bytes = await ImageCache.shared.storedData(for: item.flyer) else { return (item.id, nil) }
+                        return (item.id, await thumbnail(of: bytes))
+                    }
+                    running += 1
+                }
+                guard let (id, data) = await group.next() else { break }
+                running -= 1
+                made[id] = data
+            }
+            return made
+        }
     }
 
     /// A flyer small enough to ride in the index: Spotlight draws it at the

@@ -30,6 +30,13 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
     /// see ``LibraryArchive/pruned()``.
     var day: Date
 
+    /// Why `event` is unread, read against `read` — the mark kept for it, or
+    /// none — or nil where it is read.
+    static func unread(_ event: Event, read: FollowingRead?) -> FollowingUnread? {
+        guard let read, read.fingerprint != nil else { return .new }
+        return read.matches(event) ? nil : .updated
+    }
+
     func matches(_ event: Event) -> Bool {
         guard let fingerprint else { return false }
         if fingerprint == event.listingFingerprint { return true }

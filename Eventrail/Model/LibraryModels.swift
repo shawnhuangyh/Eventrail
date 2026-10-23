@@ -538,9 +538,11 @@ extension LibraryEntry {
             update(\.seatClass, to: newValue.seatClass)
             // Written only where the cost itself changed: a note edited beside
             // a cost an older build wrote must not rewrite the cost, and race
-            // another device's change to it.
-            let held = tracking
-            if newValue.cost != held.cost || newValue.currency != held.currency {
+            // another device's change to it. Read from its own columns, not
+            // through the whole record, whose old lottery list every keystroke
+            // in a note decoded again.
+            let held = heldCost
+            if newValue.cost != held.amount || newValue.currency != held.currency {
                 update(\.price, to: Self.priceText(of: newValue.cost, in: newValue.currency))
                 // The cost now lives in the column above, so the old ones are
                 // emptied rather than left to be read back over an emptied cost.
@@ -559,8 +561,7 @@ extension LibraryEntry {
     /// The old ticket column goes with the old list: an event with rows holds
     /// what it said among them already, folded in as the list was moved.
     func tracking(lotteries rows: [LotteryEntry]?) -> Tracking {
-        let (amount, currency) = cost(in: price)
-            ?? (costHundredths.map { Decimal($0) / 100 } ?? cost.map { Decimal($0) }, costCurrency)
+        let (amount, currency) = heldCost
         var record = Tracking(seat: seat, seatClass: seatClass, cost: amount, note: note, currency: currency)
         if let rows {
             record.lotteries = rows
@@ -573,6 +574,12 @@ extension LibraryEntry {
             record.foldLegacyTicket()
         }
         return record
+    }
+
+    /// The cost as written: ``price``, or where that is empty the columns
+    /// before it.
+    private var heldCost: (amount: Decimal?, currency: String) {
+        cost(in: price) ?? (costHundredths.map { Decimal($0) / 100 } ?? cost.map { Decimal($0) }, costCurrency)
     }
 
     /// A cost as ``price`` holds it: the amount, and its currency after a

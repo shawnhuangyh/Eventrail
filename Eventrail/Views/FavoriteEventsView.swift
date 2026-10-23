@@ -29,20 +29,17 @@ struct FavoriteEventsView: View {
     /// facts are kept with the heart all the same.
     private var favorites: [Event] { store.events(of: hearted, where: \.isFavorite).upcomingFirst() }
 
-    private var groups: [EventGroup] {
-        EventGroup.groups(of: favorites, filter: filter, grouping: grouping)
-    }
-
-    /// Picking reaches what the filter is showing and no further.
-    private var shownIDs: Set<Event.ID> {
-        Set(groups.flatMap { $0.events.map(\.id) })
-    }
-
     private var chosen: [Event] {
         selection.compactMap { store.event(id: $0) }
     }
 
     var body: some View {
+        // Worked out once a drawing, as My Events works its own out.
+        let favorites = self.favorites
+        let groups = EventGroup.groups(of: favorites, filter: filter, grouping: grouping)
+        // Picking reaches what the filter is showing and no further.
+        let shownIDs = Set(groups.flatMap { $0.events.map(\.id) })
+        let subtitle = subtitle(count: favorites.count)
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if !favorites.isEmpty {
@@ -140,13 +137,13 @@ struct FavoriteEventsView: View {
 
     /// The subtitle carries the count that matters at the moment: how many are
     /// about to go, rather than how many there are.
-    private var subtitle: Text {
+    private func subtitle(count: Int) -> Text {
         if isSelecting {
             selection.isEmpty
                 ? Text("Select events to remove")
                 : Text("^[\(selection.count) event](inflect: true) selected")
         } else {
-            Text("^[\(favorites.count) event](inflect: true)")
+            Text("^[\(count) event](inflect: true)")
         }
     }
 

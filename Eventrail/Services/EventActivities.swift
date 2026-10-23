@@ -142,8 +142,11 @@ final class EventActivities {
         guard let state = Self.state(for: event, seat: tracking.seat, at: now),
               starting.insert(event.id).inserted else { return }
         defer { starting.remove(event.id) }
-        // Before the request, so the first time it is drawn has the flyer.
-        await Self.keepPoster(for: event)
+        // Before the request, so the first time it is drawn has the flyer —
+        // but not for long: a tap on a slow connection waited out the whole
+        // download before anything happened. Left without it, the activity's
+        // next refresh fetches it (``catchUp()``).
+        await Self.keepPoster(for: event, waitingAtMost: .seconds(2))
         let attributes = EventActivityAttributes(
             eventID: event.id, title: event.title, venue: event.venue,
             link: event.sourceURL, opens: now)
@@ -323,11 +326,23 @@ final class EventActivities {
     /// largest place the activity draws it (36 × 50 points, at 3×). The
     /// extension cannot download anything as it draws, and a picture larger
     /// than the presentation can stop the system starting the activity at all.
-    private static func keepPoster(for event: Event) async {
+    ///
+    /// Waiting on the host no longer than `limit`, where one is given.
+    private static func keepPoster(for event: Event, waitingAtMost limit: Duration? = nil) async {
         guard let url = event.imageURL,
               let file = EventActivityAttributes.posterFile(for: event.id) else { return }
         var image = await ImageCache.shared.storedImage(for: url)
-        if image == nil { image = await ImageCache.shared.image(for: url) }
+        if image == nil, let limit {
+            image = await withTaskGroup(of: UIImage?.self) { group in
+                group.addTask { await ImageCache.shared.image(for: url) }
+                group.addTask { try? await Task.sleep(for: limit); return nil }
+                let first = await group.next() ?? nil
+                group.cancelAll()
+                return first
+            }
+        } else if image == nil {
+            image = await ImageCache.shared.image(for: url)
+        }
         guard let image, let data = downsized(image).jpegData(compressionQuality: 0.8) else { return }
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)

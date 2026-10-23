@@ -146,8 +146,7 @@ nonisolated struct LibraryArchive: Codable, Equatable, Sendable {
 
     /// Why this copy of a Following row is unread, or nil where it is read.
     func unread(_ event: Event) -> FollowingUnread? {
-        guard let read = followingReads?[event.id]?.value, read.fingerprint != nil else { return .new }
-        return read.matches(event) ? nil : .updated
+        FollowingRead.unread(event, read: followingReads?[event.id]?.value)
     }
 
     /// The performers the reader follows and the app can still name.
