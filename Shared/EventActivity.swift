@@ -4,10 +4,12 @@ import ActivityKit
 import Foundation
 
 /// A Live Activity for one event the reader holds a ticket for: on the Lock
-/// Screen and in the Dynamic Island from two hours before its doors until the
-/// show is over, as `Eventrail v3.dc.html` draws it.
+/// Screen and in the Dynamic Island from when the reader turns it on — no
+/// earlier than eight hours before the show is over — until it is, as
+/// `Eventrail v3.dc.html` draws it. Started from the event's sheet and never
+/// scheduled: iOS ends every scheduled one as the app is updated.
 ///
-/// Compiled into the app, which starts, schedules, updates and ends it, and
+/// Compiled into the app, which starts, updates and ends it, and
 /// into the widget extension, which draws it. What never changes over the
 /// event is here; the times and the seat are in ``ContentState``, since the
 /// page can publish a door time — and the reader write a seat — after the
@@ -19,9 +21,9 @@ nonisolated struct EventActivityAttributes: Codable {
     /// The event's Eventernote page. Tapping the activity opens the app on
     /// the event's sheet with it.
     let link: URL
-    /// When the activity was set to come on: the window's opening, or the
-    /// moment it was asked for where that was already inside it. Kept so the
-    /// app can tell that a door time published since has moved the window.
+    /// When the activity came on — the moment the reader asked for it, or,
+    /// for one an older build or the debug bench scheduled, the moment it was
+    /// set to.
     let opens: Date
 
     struct ContentState: Codable, Hashable, Sendable {

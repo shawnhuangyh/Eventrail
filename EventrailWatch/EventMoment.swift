@@ -235,7 +235,12 @@ struct EventMoment {
         }
     }
 
-    private var isInLottery: Bool { (event.lotteryEntries ?? 0) > 0 }
+    /// Applied for, or standing somewhere in a lottery — a round written down
+    /// with no applications counted is still one, and the line under the
+    /// heading says so.
+    private var isInLottery: Bool {
+        (event.lotteryEntries ?? 0) > 0 || event.lottery.flatMap(LotteryStanding.init(rawValue:)) != nil
+    }
 
     /// Where the lotteries stand, and still to be announced in a copy sent
     /// before lotteries had results.
@@ -246,11 +251,13 @@ struct EventMoment {
     /// What it cost, or how many entries went into the lottery.
     var costLine: Text {
         if let cost = event.cost {
-            // Cents only where there are any: ¥8,800, $49.99.
+            // Cents only where there are any: ¥8,800, $49.99 — and as many as
+            // the currency has where there are, as the phone prints it.
             var whole = Decimal(), value = cost
             NSDecimalRound(&whole, &value, 0, .plain)
-            return Text(cost, format: .currency(code: event.currency ?? "JPY")
-                .precision(.fractionLength(whole == cost ? 0 : 2)))
+            return whole == cost
+                ? Text(cost, format: .currency(code: event.currency ?? "JPY").precision(.fractionLength(0)))
+                : Text(cost, format: .currency(code: event.currency ?? "JPY"))
         }
         if let entries = event.lotteryEntries, entries > 0 {
             return Text("^[\(entries) entry](inflect: true)")
@@ -259,12 +266,14 @@ struct EventMoment {
     }
 
     var ticketLine: (text: Text, color: Color) {
+        // A win before the ticket: a win is the ticket, and the phone sends
+        // the ticket as held for one — read first, every win said Purchased.
+        if lotteryStanding == .won { return (Text("Won"), EventActivityStage.doorsOpen.tint) }
         if event.hasTicket { return (Text("Purchased"), EventActivityStage.beforeDoors.tint) }
         switch lotteryStanding {
-        case .won: return (Text("Won"), EventActivityStage.doorsOpen.tint)
         case .pending: return (Text("Results pending"), Self.ahead)
         case .lost: return (Text("Not won"), .white.opacity(0.55))
-        case nil: break
+        case .won, nil: break
         }
         return (Text("Add one on iPhone"), .white.opacity(0.55))
     }

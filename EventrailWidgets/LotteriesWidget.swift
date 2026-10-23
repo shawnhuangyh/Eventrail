@@ -48,12 +48,19 @@ nonisolated struct LotteriesProvider: TimelineProvider {
     }
 
     /// An entry now and at each of the week's midnights, when a results day
-    /// comes and the days left move on. A round given a result here, and not
-    /// yet taken in by the app, is left out from the moment it was given.
+    /// comes and the days left move on — and as each event is over, on its
+    /// hall's clock, when its rounds go: Tokyo's midnight is the morning in
+    /// Los Angeles, and a round kept to the reader's next midnight offered
+    /// Won and Lost for a show over most of a day before. A round given a
+    /// result here, and not yet taken in by the app, is left out from the
+    /// moment it was given.
     static func timeline(at now: Date) -> Timeline<LotteriesEntry> {
         let answered = Set(WidgetAnswer.waiting().map(\.answer.roundID))
         let rounds = (WidgetLibrary.read() ?? .empty).rounds.filter { !answered.contains($0.id) }
-        let entries = ([now] + Calendar.gregorian().midnights(after: now, count: 7)).map { time in
+        let midnights = Calendar.gregorian().midnights(after: now, count: 7)
+        let ends = rounds.map(\.eventEnds).filter { $0 > now && $0 < (midnights.last ?? now) }
+        let times = Set([now] + midnights + ends).sorted()
+        let entries = times.map { time in
             LotteriesEntry(date: time, rounds: rounds.filter { $0.eventEnds > time })
         }
         return Timeline(entries: entries, policy: .atEnd)

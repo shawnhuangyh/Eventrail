@@ -159,7 +159,7 @@ struct LotteryTile: View {
         VStack(spacing: 1) {
             Group {
                 if let day = round.day {
-                    Text(verbatim: day.date().formatted(.dateTime.month(.abbreviated)))
+                    Text(verbatim: day.date().formatted(.gregorian().month(.abbreviated)))
                 } else {
                     Text(String(localized: "lottery.tile.noDay", defaultValue: "Day",
                                 comment: "Over a question mark, on a lottery round's tile where no results day was announced."))

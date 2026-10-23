@@ -175,7 +175,7 @@ struct OnThisDayFace: View {
 
     /// "2024", as the event's own day names its year.
     private func year(_ memory: WidgetMemory) -> String {
-        memory.day.date().formatted(.dateTime.year())
+        memory.day.date().formatted(.gregorian().year())
     }
 
     /// Today — "Oct 14".
