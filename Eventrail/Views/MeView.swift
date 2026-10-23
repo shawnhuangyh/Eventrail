@@ -49,19 +49,23 @@ struct MeView: View {
 
     /// Where the iPhone Duo's fold crosses the screen — see ``cards``.
     @State private var fold: Fold?
-    /// How wide the screen is — read on a Mac alone, whose window can hold
-    /// the cards in two columns (``leastTwoColumnWidth``).
-    @State private var width: CGFloat = 0
+    /// Whether a Mac's window is wide enough for the cards to stand in two
+    /// columns (``leastTwoColumnWidth``) — measured as the answer rather than
+    /// the width, which redrew the tab on every point a window was dragged
+    /// through, and on every turn of an iPhone or an iPad.
+    @State private var isTwoColumn = false
 
     /// How wide a Mac's window has to be for the cards to stand in two
     /// columns: two phones' cards.
-    private static let leastTwoColumnWidth: CGFloat = 2 * Fold.leastWindowHalf
+    nonisolated private static let leastTwoColumnWidth: CGFloat = 2 * Fold.leastWindowHalf
 
     var body: some View {
         NavigationStack {
             cards
             .readingFold(into: $fold)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .onGeometryChange(for: Bool.self) {
+                isMac && $0.size.width >= Self.leastTwoColumnWidth
+            } action: { isTwoColumn = $0 }
             .washBackground()
             .navigationTitle("Me")
             .largeTitleOnMac(Text("Me"))
@@ -130,7 +134,7 @@ struct MeView: View {
     private var cards: some View {
         // Once a drawing, over the whole library: read twice in the grid.
         let today = onThisDay
-        if isMac, width >= Self.leastTwoColumnWidth {
+        if isTwoColumn {
             // The columns' own margins meet between them, twice a margin.
             HStack(alignment: .top, spacing: -16) {
                 column {

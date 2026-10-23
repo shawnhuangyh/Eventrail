@@ -208,6 +208,34 @@ struct MarkReadButton: View {
     }
 }
 
+/// One row's read or unread, on Following and My Events alike: from the
+/// swipe from the leading edge (Read, Unread, in the app's tint) and, on a
+/// Mac, from the right-click menu that stands in for it (`inMenu`: Mark as
+/// Read, Mark as Unread), so the two never drift apart.
+struct RowReadButton: View {
+    /// Whether the row is unread — the button reads it, or unreads it.
+    let isUnread: Bool
+    var inMenu = false
+    /// Marks the row read where it is unread, and unread where it is read.
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: isUnread ? "envelope.open" : "envelope.badge")
+        }
+        .tint(inMenu ? nil : Color.brandTint)
+    }
+
+    private var title: LocalizedStringKey {
+        switch (inMenu, isUnread) {
+        case (false, true): "Read"
+        case (false, false): "Unread"
+        case (true, true): "Mark as Read"
+        case (true, false): "Mark as Unread"
+        }
+    }
+}
+
 /// The bottom-left control while past events are being picked on My Events,
 /// where the Upcoming half keeps ``MarkReadButton``: a ticket held for every
 /// picked event that has none (``EventStore/recordTickets(for:)``), which is

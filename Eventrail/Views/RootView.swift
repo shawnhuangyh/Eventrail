@@ -63,6 +63,12 @@ struct RootView: View {
     /// changes — see ``WatchLink`` and ``WidgetLink`` — and to print a Live
     /// Activity on the new clock.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+    /// Whether this window has been in the background since it was last
+    /// active — when it always catches up (``catchUp()``). Read off the phase
+    /// it went through rather than the one it comes back from: a scene coming
+    /// back from the background passes through inactive, so the phase before
+    /// active is never the background.
+    @State private var wasInBackground = false
 
     var body: some View {
         TabView(selection: $selection) {
@@ -131,8 +137,11 @@ struct RootView: View {
         // which stand a sheet deeper for it.
         .opensFromOutside()
         .hidesWindowTitleOnMac()
-        .focusedSceneValue(\.appTab, $selection)
-        .focusedSceneValue(\.outsideOpens, opens)
+        // Not while the first launch's welcome is up: nothing can be opened
+        // over it, and Settings asked for meanwhile opened by itself the
+        // moment the reader finished it.
+        .focusedSceneValue(\.appTab, isWelcoming ? nil : $selection)
+        .focusedSceneValue(\.outsideOpens, isWelcoming ? nil : opens)
         // Asked about first: tapping a file is not by itself a request to fold
         // its contents into the library.
         //
@@ -146,12 +155,8 @@ struct RootView: View {
             WelcomeView()
                 .rootEnvironment(rootEnvironment)
         }
+        // The store and the rest, the app's tint and its text sizes.
         .rootEnvironment(rootEnvironment)
-        .tint(.brandTint)
-        // The reader's text size is followed up to xxxLarge and no further —
-        // see ``SwiftUI/View/scalingFont(size:weight:design:)``. Past it, the
-        // accessibility sizes would have rows laid out side by side stack.
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only
         // ever catch up after an edit or a trip to the background, so a library
@@ -193,14 +198,19 @@ struct RootView: View {
         // Edits are written after a short pause; leaving the app cuts that
         // short, so the last one is flushed here rather than lost. Coming back
         // is the moment to pick up whatever another device wrote meanwhile.
-        .onChange(of: scenePhase) { old, phase in
-            if phase == .active {
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
                 // A reminder tapped, or an intent run, while this window was
                 // on its way in.
                 openReminder()
                 takeIntentOpen()
-                if old == .background || Self.owesCatchUp { catchUp() }
-            } else {
+                if wasInBackground || Self.owesCatchUp { catchUp() }
+                wasInBackground = false
+            case .background:
+                wasInBackground = true
+                store.saveNow()
+            default:
                 store.saveNow()
             }
         }
@@ -415,7 +425,14 @@ extension EnvironmentValues {
 
 extension View {
     /// Everything the root hands down (``RootEnvironment``) — at the root, and
-    /// again on a sheet presented from it. Nil, in a preview, hands nothing.
+    /// again on a sheet presented from it. Nil, in a preview, hands nothing
+    /// but the tint and the text sizes.
+    ///
+    /// With the app's tint and its text sizes, which a sheet presented from
+    /// the root of a Mac's window lost with the rest: the reader's text size
+    /// is followed up to xxxLarge and no further — see
+    /// ``SwiftUI/View/scalingFont(size:weight:design:)`` — since past it, the
+    /// accessibility sizes would have rows laid out side by side stack.
     @ViewBuilder
     func rootEnvironment(_ root: RootEnvironment?) -> some View {
         if let root {
@@ -426,8 +443,11 @@ extension View {
                 .environment(root.opens)
                 .environment(root.handoff)
                 .environment(\.rootEnvironment, root)
+                .tint(.brandTint)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         } else {
-            self
+            tint(.brandTint)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
     }
 

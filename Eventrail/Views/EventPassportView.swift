@@ -128,15 +128,17 @@ struct EventPassportView: View {
     @State private var isShown = false
     /// Whether the screen is two pages either side of a fold down it.
     private var isBook: Bool { fold?.axis == .vertical && !isTriptych }
-    /// How wide the screen is — read on a Mac alone, whose window can hold
-    /// the cards in three columns (``isTriptych``).
-    @State private var width: CGFloat = 0
     /// Whether the cards stand in three columns, as the Mac design draws the
     /// Passport: where the reader went, who and where most with what the
     /// tickets cost, and how the lotteries went. Only on a Mac whose window
     /// is wide enough; its drawers open as sheets there.
-    private var isTriptych: Bool { isMac && width >= Self.leastTriptychWidth }
-    private static let leastTriptychWidth: CGFloat = 1100
+    ///
+    /// Measured as the answer, not as the width: a width kept in state redrew
+    /// the screen, and counted the library again, on every point a window was
+    /// dragged through — and on every turn of an iPhone or an iPad, which
+    /// never read it.
+    @State private var isTriptych = false
+    nonisolated private static let leastTriptychWidth: CGFloat = 1100
     /// Where the iPhone Duo keeps its rail, if it does — where the two pages
     /// go without ``barBand``.
     @Environment(\.verticalBarEdge) private var barEdge
@@ -202,16 +204,26 @@ struct EventPassportView: View {
         Group {
             if isTriptych {
                 // The columns' own margins meet between them, twice a margin.
+                //
+                // One band under the title and the chips across all three
+                // (``barBand``), as across an iPad's two pages, and none of
+                // the columns' own edges: the system draws one only for the
+                // column the bar follows, and the other two ran under the
+                // title and the chips unfrosted.
                 HStack(alignment: .top, spacing: -16) {
                     page { places(stats) }
+                        .modifier(PageUnderBar(page: PassportPage.first, pages: $pagesUnderBar, isTracking: true))
                     page {
                         rankings(stats)
                         spending(stats)
                     }
-                    .standingAfterTheFold()
+                    .modifier(PageUnderBar(page: PassportPage.second, pages: $pagesUnderBar, isTracking: true))
                     page { lotteries(stats) }
-                        .standingAfterTheFold()
+                        .modifier(PageUnderBar(page: PassportPage.third, pages: $pagesUnderBar, isTracking: true))
                 }
+                .scrollEdgeEffectHidden(true, for: .top)
+                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { barDepth = $0 }
+                .overlay(alignment: .top) { barBand }
             } else if let fold, showsBook {
                 // Two pages, as `DuoBookPassport.dc.html` draws the Duo held
                 // like a book: where the reader went and who and where most
@@ -257,7 +269,9 @@ struct EventPassportView: View {
         // draws them, in every layout.
         .largeTitleOnMac(Text("Event Passport")) { yearChips }
         .readingFold(into: $fold)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .onGeometryChange(for: Bool.self) {
+            isMac && $0.size.width >= Self.leastTriptychWidth
+        } action: { isTriptych = $0 }
         .readingDuoOpening(into: $isOpening, fold: fold)
         .onAppear { isShown = true }
         .onDisappear { isShown = false }
@@ -331,6 +345,10 @@ struct EventPassportView: View {
         // Folded, an open drawer is its presenter's sheet again; whatever is
         // open as the Duo opens is handed back here.
         .onChange(of: drawersBeside) { if !drawersBeside { drawers.open = nil } }
+        // The pages laid out afresh start at their tops: one scrolled in under
+        // the bar before kept the band up over pages at rest.
+        .onChange(of: isTriptych) { pagesUnderBar = [] }
+        .onChange(of: showsBook) { pagesUnderBar = [] }
     }
 
     // MARK: - The pages
@@ -363,8 +381,8 @@ struct EventPassportView: View {
     /// How far past the chips the band runs, fading out.
     private static let bandFade: CGFloat = 12
 
-    /// One of an iPad's two pages, for ``barBand``.
-    private enum PassportPage { case first, second }
+    /// One of an iPad's two pages, or a Mac's three columns, for ``barBand``.
+    private enum PassportPage { case first, second, third }
 
     /// The page before the fold: where the reader went, and who and where
     /// most.
@@ -1301,6 +1319,7 @@ private struct PassportRankingSheet: View {
                         .toolbar(.hidden, for: .navigationBar)
                         .washBackground()
                         .venueDestination()
+                        .padNavigationBarOnMac()
                 }
             }
         }
@@ -1385,6 +1404,9 @@ extension EnvironmentValues {
     /// How a drawer drawn beside the fold is put away — set on the drawer
     /// there, and nil in a sheet, which is dismissed.
     @Entry var closesPassportDrawer: EnvironmentAction?
+    /// Whether the drawer drawn beside the fold is out of sight — see
+    /// ``PassportDrawerPanel``.
+    @Entry var passportDrawerIsTucked = false
     /// Whether a drawer's sheet is held back: while the Duo opens, until the
     /// fold says whether the drawer is a panel there, and while the Passport
     /// is out of sight — set by the Passport.
@@ -1569,6 +1591,7 @@ private struct PassportDrawerPanel: View {
                                                style: .continuous)
             drawer.content
                 .environment(\.closesPassportDrawer, drawer.close)
+                .environment(\.passportDrawerIsTucked, isTucked)
                 .overlay(alignment: .top) { grabber }
                 .clipShape(shape)
                 .background {
@@ -1628,6 +1651,10 @@ private struct PassportSheetHeader: View {
     /// Set where the drawer is drawn beside the Duo's fold rather than
     /// presented: there `dismiss` would take the whole Passport off the stack.
     @Environment(\.closesPassportDrawer) private var close
+    /// Whether the panel is out of sight (``PassportDrawerPanel``), where
+    /// Escape is not the X's: it is there still, and Escape would put away a
+    /// drawer nobody can see.
+    @Environment(\.passportDrawerIsTucked) private var isTucked
 
     let eyebrow: Text
     let title: Text
@@ -1661,7 +1688,7 @@ private struct PassportSheetHeader: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
-            .keyboardShortcut(.cancelAction)
+            .keyboardShortcut(isTucked ? nil : .cancelAction)
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)

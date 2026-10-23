@@ -156,6 +156,7 @@ struct TicketDetailsView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Ticket Details")
             .navigationBarTitleDisplayMode(.inline)
+            .padNavigationBarOnMac()
             .toolbar {
                 // Plain beside the checkmark's blue: the X writes nothing.
                 ToolbarItem(placement: .cancellationAction) {
@@ -163,7 +164,11 @@ struct TicketDetailsView: View {
                         if hasChanges { isConfirmingDiscard = true } else { dismiss() }
                     }
                     .tint(.primary)
-                    .keyboardShortcut(.cancelAction)
+                    // Not while a round's page is pushed: its copy of the
+                    // entry is not in `hasChanges`, so Escape would throw it
+                    // away unasked. The page takes Escape itself once it has
+                    // something to lose (``LotteryEntryView``).
+                    .keyboardShortcut(path.isEmpty ? .cancelAction : nil)
                     // Asked from the button, so the dialog points at what
                     // opened it.
                     .confirmationDialog("Discard your changes?", isPresented: $isConfirmingDiscard,

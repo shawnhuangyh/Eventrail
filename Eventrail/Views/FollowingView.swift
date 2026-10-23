@@ -546,24 +546,13 @@ struct FollowingView: View {
                         // Not while picking, which a Mac does out of edit mode.
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             if !isSelecting {
-                                Button {
-                                    mark([event], read: isUnread)
-                                } label: {
-                                    Label(isUnread ? "Read" : "Unread",
-                                          systemImage: isUnread ? "envelope.open" : "envelope.badge")
-                                }
-                                .tint(Color.brandTint)
+                                RowReadButton(isUnread: isUnread) { mark([event], read: isUnread) }
                             }
                         }
                         // The swipe again, from a right-click on a Mac.
                         .contextMenuOnMac {
                             if !isSelecting {
-                                Button {
-                                    mark([event], read: isUnread)
-                                } label: {
-                                    Label(isUnread ? "Mark as Read" : "Mark as Unread",
-                                          systemImage: isUnread ? "envelope.open" : "envelope.badge")
-                                }
+                                RowReadButton(isUnread: isUnread, inMenu: true) { mark([event], read: isUnread) }
                             }
                         }
                 }

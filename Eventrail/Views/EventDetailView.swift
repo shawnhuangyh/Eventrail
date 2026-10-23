@@ -267,6 +267,8 @@ struct EventDetailView: View {
             detail
                 .toolbar(.hidden, for: .navigationBar)
                 .toolbar { actionBar }
+                // For the pages pushed on it, which have a bar.
+                .padNavigationBarOnMac()
                 // Inside the stack at the root, so the notice stands above the
                 // action bar rather than over it — the bar is part of the
                 // root's safe area, and nothing here has to know its height.
@@ -644,7 +646,7 @@ struct EventDetailView: View {
     /// name is a button VoiceOver can only call "x mark".
     ///
     /// Escape presses it too, as it does every sheet's way out: a sheet on a
-    /// Mac cannot be pulled down.
+    /// Mac cannot be pulled down (``closeShortcut``).
     private var closeButton: some View {
         Button {
             dismiss()
@@ -658,7 +660,17 @@ struct EventDetailView: View {
         .buttonStyle(.plain)
         .glassCircle(interactive: true)
         .accessibilityLabel("Close")
-        .keyboardShortcut(.cancelAction)
+        .keyboardShortcut(closeShortcut)
+    }
+
+    /// Escape, on the way out — but not while this page has a sheet of its
+    /// own up (``holdsSheet``). A key the sheet in front does not take falls
+    /// through to the one under it: with a round's page pushed in Ticket
+    /// Details, which keeps no Escape of its own while it has nothing to
+    /// lose, Escape put away this page and Ticket Details with it, and every
+    /// answer changed there.
+    private var closeShortcut: KeyboardShortcut? {
+        holdsSheet ? nil : .cancelAction
     }
 
     // MARK: - The same day
@@ -1330,7 +1342,7 @@ struct EventDetailView: View {
         ToolbarItem(placement: .bottomBar) {
             Button("Close", systemImage: "xmark") { dismiss() }
                 .tint(.primary)
-                .keyboardShortcut(.cancelAction)
+                .keyboardShortcut(closeShortcut)
         }
     }
 

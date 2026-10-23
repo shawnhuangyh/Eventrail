@@ -31,6 +31,7 @@ struct EventernoteAccountSheet: View {
             .washBackground()
             .navigationTitle("Eventernote Account")
             .navigationBarTitleDisplayMode(.inline)
+            .padNavigationBarOnMac()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

@@ -79,6 +79,7 @@ struct TicketReviewView: View {
             .navigationTitle("Record Tickets")
             .navigationSubtitle(subtitle)
             .navigationBarTitleDisplayMode(.inline)
+            .padNavigationBarOnMac()
             .toolbar {
                 // Plain beside the checkmark's blue, as on the ticket sheet:
                 // the X writes nothing.

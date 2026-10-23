@@ -187,14 +187,9 @@ struct EventsView: View {
                             // Not while picking, which a Mac does out of edit mode.
                             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                 if event.isUpcoming, !isSelecting {
-                                    let isUnread = unread != nil
-                                    Button {
-                                        mark(event, read: isUnread)
-                                    } label: {
-                                        Label(isUnread ? "Read" : "Unread",
-                                              systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                                    RowReadButton(isUnread: unread != nil) {
+                                        mark(event, read: unread != nil)
                                     }
-                                    .tint(Color.brandTint)
                                 }
                             }
                             // Every row, past or ahead: the one-row form of the
@@ -213,12 +208,8 @@ struct EventsView: View {
                             .contextMenuOnMac {
                                 if !isSelecting {
                                     if event.isUpcoming {
-                                        let isUnread = unread != nil
-                                        Button {
-                                            mark(event, read: isUnread)
-                                        } label: {
-                                            Label(isUnread ? "Mark as Read" : "Mark as Unread",
-                                                  systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                                        RowReadButton(isUnread: unread != nil, inMenu: true) {
+                                            mark(event, read: unread != nil)
                                         }
                                         Divider()
                                     }

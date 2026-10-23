@@ -179,6 +179,10 @@ private struct OutsideOpenPresenter: ViewModifier {
                 }
                 .onAppear { opens?.delivered(open) }
                 .rootEnvironment(root)
+                // Again, for the same reason: from the root of a Mac's window
+                // the sheet stood at no depth, tied with the root, and the
+                // next thing opened from outside could take its place.
+                .environment(\.outsideOpenDepth, depth + 1)
             }
             // Outermost, so what this holds and what it presents both stand
             // a sheet deeper than it does.
@@ -235,6 +239,7 @@ private struct OutsidePage<Page: View>: View {
                     }
                 }
                 .venueDestination()
+                .padNavigationBarOnMac()
         }
         .refreshNotices(showing: !path.isEmpty)
         .refreshNoticesInSheet()

@@ -51,7 +51,7 @@ private struct MacLargeTitle<Trailing: View>: ViewModifier {
         content
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(removing: .title)
-            .background(PadNavigationBar())
+            .padNavigationBarOnMac()
             .safeAreaBar(edge: .top, spacing: 0) {
                 HStack(alignment: .center, spacing: 20) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -97,9 +97,14 @@ nonisolated struct MacSheetSize: Sendable {
     /// The most a sheet can take of the window in front, a margin in from
     /// its edges: asked for at a fixed size, a sheet opened in a window
     /// narrower than that ran past both of its sides.
+    ///
+    /// The window in front is the key window — the one the reader clicked
+    /// in, or pressed a key in, to open the sheet — and only failing that
+    /// whichever scene is active.
     @MainActor static var room: CGSize {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        guard let scene = scenes.first(where: { $0.keyWindow?.isKeyWindow == true })
+                ?? scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
         else { return CGSize(width: CGFloat.infinity, height: .infinity) }
         let window = scene.effectiveGeometry.coordinateSpace.bounds.size
         return CGSize(width: max(320, window.width - 48), height: max(320, window.height - 72))
@@ -117,14 +122,30 @@ extension View {
     /// as it stands when the sheet opens.
     func macSheetSize(_ size: MacSheetSize) -> some View {
         #if targetEnvironment(macCatalyst)
-        frame(idealWidth: min(size.width, MacSheetSize.room.width),
-              idealHeight: min(size.height, MacSheetSize.room.height))
-            .presentationSizing(.fitted)
+        modifier(MacSheetFrame(size: size))
         #else
         self
         #endif
     }
 }
+
+#if targetEnvironment(macCatalyst)
+private struct MacSheetFrame: ViewModifier {
+    let size: MacSheetSize
+    /// The window's room as the sheet opened, read once. Read on every
+    /// redraw, it was measured against whichever window was in front by
+    /// then: the focus moved to a larger window and the sheet grew past the
+    /// one it stood in.
+    @State private var room = MacSheetSize.room
+
+    func body(content: Content) -> some View {
+        content
+            .frame(idealWidth: min(size.width, room.width),
+                   idealHeight: min(size.height, room.height))
+            .presentationSizing(.fitted)
+    }
+}
+#endif
 
 extension View {
     /// A linear progress bar as an iPhone and an iPad draw it: a 4-point
@@ -233,6 +254,18 @@ extension Set {
 }
 
 extension View {
+    /// Has the navigation bar of the stack this stands in drawn as an iPad
+    /// draws it (``PadNavigationBar``) — on the root of every stack's first
+    /// screen: a tab's, through ``largeTitleOnMac(_:subtitle:trailing:)``,
+    /// and a sheet's own. Nothing on an iPhone or an iPad.
+    func padNavigationBarOnMac() -> some View {
+        #if targetEnvironment(macCatalyst)
+        background(PadNavigationBar())
+        #else
+        self
+        #endif
+    }
+
     /// Hides a Mac window's own name from its toolbar: every screen draws its
     /// title over its content (``largeTitleOnMac(_:subtitle:trailing:)``), and
     /// a window narrowed past its tab bar wrote "Eventrail" beside its

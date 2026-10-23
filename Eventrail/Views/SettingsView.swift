@@ -40,6 +40,11 @@ struct SettingsView: View {
     @State private var exportFailure: String?
     /// The save panel a Mac exports the backup through — see ``exportRow``.
     @State private var isSavingBackup = false
+    /// Why the save panel could not save the file, until a save succeeds.
+    /// Apart from ``exportFailure``, which only writing the file afresh
+    /// clears: kept there, a save that went through left the row saying the
+    /// backup could not be written.
+    @State private var saveFailure: String?
     /// The welcome, asked for again. Its own state rather than the flag
     /// ``RootView`` watches: replaying it is not un-launching the app, and a
     /// device that has seen it has still seen it.
@@ -109,11 +114,14 @@ struct SettingsView: View {
             .washBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            .padNavigationBarOnMac()
             .presentationDragIndicator(.visible)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", systemImage: "checkmark") { dismiss() }
-                        .keyboardShortcut(.cancelAction)
+                        // Not under the welcome replayed over it, which a key
+                        // it does not take would otherwise fall through to.
+                        .keyboardShortcut(isReplayingWelcome ? nil : .cancelAction)
                 }
             }
             .fullScreenCover(isPresented: $isReplayingWelcome) {
@@ -346,9 +354,13 @@ struct SettingsView: View {
             .fileExporter(isPresented: $isSavingBackup, document: BackupFile(url: exported),
                           contentType: .eventrailBackup,
                           defaultFilename: exported.deletingPathExtension().lastPathComponent) { result in
-                if case .failure(let error) = result,
-                   (error as? CocoaError)?.code != .userCancelled {
-                    exportFailure = error.localizedDescription
+                switch result {
+                case .success:
+                    saveFailure = nil
+                case .failure(let error):
+                    if (error as? CocoaError)?.code != .userCancelled {
+                        saveFailure = error.localizedDescription
+                    }
                 }
             }
         } else if let exported {
@@ -371,7 +383,7 @@ struct SettingsView: View {
     /// A backup that could not be written comes first: while it stands, the
     /// advice to export one is advice the row cannot take.
     private var exportStatus: Text? {
-        if let reason = exportFailure {
+        if let reason = exportFailure ?? saveFailure {
             return Text("The backup could not be written (\(reason)). Tap to try again.")
         }
         // Said under Export because exporting is what keeps them: a backup is
