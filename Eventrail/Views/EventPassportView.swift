@@ -103,7 +103,14 @@ struct EventPassportView: View {
     @State private var openLotteryList: PassportLotteryCard.LotteryList?
     @State private var openTicketList: PassportSpendingCard.TicketList?
     @State private var seatFilter: String?
-    /// Whether every recorded event is open, rather than the top five.
+    /// How the events card cuts the events up — held here for the reason the
+    /// lists are, and so the card drawn as a picture is cut as on screen.
+    /// Deliberately not remembered between visits, for the reason
+    /// ``PassportScope`` is not.
+    @State private var cadence: PassportCadence = .year
+    /// The card open as a picture to share, if one is
+    /// (``PassportShareSheet``).
+    @State private var sharing: PassportCard?
     /// The event whose own sheet is open, if the reader tapped one.
     @State private var openEvent: Event?
     /// What the spending card adds up in, unless the reader picked another on
@@ -315,6 +322,19 @@ struct EventPassportView: View {
             PassportSpendingCard.drawer($0, stats: stats, seatFilter: seatFilter)
         }
         .sheet(item: $reviewing) { TicketReviewView(events: $0.events).macSheetSize(.form) }
+        // A card as a picture, drawn from the card as it stands; drawn again
+        // as anything it is read from moves.
+        .sheet(item: $sharing) { card in
+            PassportShareSheet(
+                card: card, scope: scope,
+                drawing: ShareDrawing(revision: store.revision, placed: placings.count,
+                                      rates: ExchangeRates.shared.rates?.published),
+                map: card == .summary ? PassportMapPicture.Request(region: Self.japan, aspect: Self.mapAspect) : nil
+            ) { picture in
+                sharedCard(card, stats: stats, picture: picture)
+            }
+            .macSheetSize(.form)
+        }
         // An event named on this screen opens the same sheet every list in
         // the app ends in.
         .eventSheet($openEvent)
@@ -422,7 +442,7 @@ struct EventPassportView: View {
             emptyState
         } else {
             summaryCard(stats)
-            PassportEventsCard(stats: stats)
+            PassportEventsCard(stats: stats, cadence: $cadence) { sharing = .events }
             timeCard(stats)
         }
     }
@@ -440,7 +460,7 @@ struct EventPassportView: View {
     private func lotteries(_ stats: PassportStats) -> some View {
         if !stats.topLotteries.isEmpty {
             PassportLotteryCard(stats: stats, limit: Self.cardLimit,
-                                openList: $openLotteryList) { openEvent = $0 }
+                                openList: $openLotteryList, share: { sharing = .lotteries }) { openEvent = $0 }
         }
     }
 
@@ -453,7 +473,8 @@ struct EventPassportView: View {
                 currency: Binding(get: { currency }, set: { spendingCurrency = $0 }),
                 defaultCurrency: defaultCurrency,
                 seatFilter: $seatFilter,
-                openList: $openTicketList
+                openList: $openTicketList,
+                share: { sharing = .spending }
             ) { openEvent = $0 }
         }
     }
@@ -463,6 +484,49 @@ struct EventPassportView: View {
     private func rankings(_ stats: PassportStats) -> some View {
         if !stats.topPerformers.isEmpty { performersCard(stats) }
         if !stats.topVenues.isEmpty { venuesCard(stats) }
+    }
+
+    // MARK: - A card as a picture
+
+    /// `card` as ``PassportShareSheet`` draws it: as it stands on screen,
+    /// read over the same slice, cut the same way and in the same currency,
+    /// with the map as `picture`.
+    @ViewBuilder
+    private func sharedCard(_ card: PassportCard, stats: PassportStats,
+                            picture: PassportMapPicture?) -> some View {
+        switch card {
+        case .summary:
+            summaryCard(stats, asPicture: true, map: picture)
+        case .events:
+            PassportEventsCard(stats: stats, cadence: .constant(cadence)) {}
+        case .time:
+            timeCard(stats)
+        case .performers:
+            performersCard(stats)
+        case .venues:
+            venuesCard(stats)
+        case .lotteries:
+            PassportLotteryCard(stats: stats, limit: Self.cardLimit,
+                                openList: .constant(nil), share: {}) { _ in }
+        case .spending:
+            PassportSpendingCard(
+                stats: stats,
+                currency: .constant(currency),
+                defaultCurrency: defaultCurrency,
+                seatFilter: .constant(seatFilter),
+                openList: .constant(nil),
+                share: {}
+            ) { _ in }
+        }
+    }
+
+    /// What a card drawn as a picture is read from, besides what cannot move
+    /// while the sheet is up: the library, the halls placed on the map and
+    /// the exchange rates.
+    private struct ShareDrawing: Hashable {
+        let revision: Int
+        let placed: Int
+        let rates: Date?
     }
 
     // MARK: - The year the screen is read over
@@ -548,35 +612,22 @@ struct EventPassportView: View {
     /// opens: the picture is the thing, and the figures are what is stamped
     /// under it. The map runs to the panel's own edges rather than sitting
     /// inset inside it, so nothing is drawn around it twice.
-    private func summaryCard(_ stats: PassportStats) -> some View {
+    ///
+    /// Drawn `asPicture`, the map is `map`, a picture of it taken ahead, at
+    /// a phone's proportion — and left out where none could be taken.
+    private func summaryCard(_ stats: PassportStats, asPicture: Bool = false,
+                             map picture: PassportMapPicture? = nil) -> some View {
         let pins = pins(stats)
         return VStack(alignment: .leading, spacing: 0) {
-            map(pins)
-                // Wider over the Duo's first page, in the board's proportion:
-                // square there, the map alone filled the screen's height.
-                // The whole country still fits — with more sea either side.
-                .aspectRatio(showsBook || isTriptych ? 439 / 290 : 1 / 0.98, contentMode: .fit)
-                .overlay(alignment: .bottomTrailing) {
-                    // Both in the one corner, on the map rather than under it:
-                    // they are readings of the map, and the figures below are
-                    // readings of the library. The corner is the right-hand
-                    // one because the left is Apple's — the Maps logo sits
-                    // there and is not ours to cover.
-                    //
-                    // The key to the dots first, then what they add up to:
-                    // how to read the map, and then its reading.
-                    VStack(alignment: .trailing, spacing: 6) {
-                        // Only once the dots differ. "1 → 1" is a key to a
-                        // scale that has one value on it.
-                        if let most = pins.map(\.count).max(), most > 1 {
-                            legend(most: most)
-                        }
-                        if stats.prefectures > 0 {
-                            prefectures(stats)
-                        }
-                    }
-                    .padding(12)
-                }
+            if !asPicture || picture != nil {
+                mapFace(stats, pins: pins, picture: picture)
+                    // Wider over the Duo's first page, in the board's
+                    // proportion: square there, the map alone filled the
+                    // screen's height. The whole country still fits — with
+                    // more sea either side.
+                    .aspectRatio(!asPicture && (showsBook || isTriptych) ? 439 / 290 : Self.mapAspect,
+                                 contentMode: .fit)
+            }
 
             figures(stats)
                 .padding(16)
@@ -585,6 +636,55 @@ struct EventPassportView: View {
         // and the map would otherwise square off its top corners.
         .clipShape(.rect(cornerRadius: 28, style: .continuous))
         .panel(cornerRadius: 28)
+    }
+
+    /// The map's proportion on one page.
+    private static let mapAspect: CGFloat = 1 / 0.98
+
+    /// The map, or its picture, with its readings in the corner and the
+    /// card's Share over it.
+    private func mapFace(_ stats: PassportStats, pins: [Pin], picture: PassportMapPicture?) -> some View {
+        Group {
+            if let picture {
+                Image(uiImage: picture.snapshot.image)
+                    .resizable()
+                    .overlay(alignment: .topLeading) {
+                        ForEach(pins) { pin in
+                            dot(pin).position(picture.snapshot.point(for: pin.coordinate))
+                        }
+                    }
+                    .clipped()
+            } else {
+                map(pins)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // Both in the one corner, on the map rather than under it:
+            // they are readings of the map, and the figures below are
+            // readings of the library. The corner is the right-hand
+            // one because the left is Apple's — the Maps logo sits
+            // there and is not ours to cover.
+            //
+            // The key to the dots first, then what they add up to:
+            // how to read the map, and then its reading.
+            VStack(alignment: .trailing, spacing: 6) {
+                // Only once the dots differ. "1 → 1" is a key to a
+                // scale that has one value on it.
+                if let most = pins.map(\.count).max(), most > 1 {
+                    legend(most: most)
+                }
+                if stats.prefectures > 0 {
+                    prefectures(stats)
+                }
+            }
+            .padding(12)
+        }
+        .overlay(alignment: .topTrailing) {
+            // The card has no header to carry it, and the corner
+            // across from Apple's logo is free.
+            PassportShareButton { sharing = .summary }
+                .padding(12)
+        }
     }
 
     private func prefectures(_ stats: PassportStats) -> some View {
@@ -745,7 +845,9 @@ struct EventPassportView: View {
     private func timeCard(_ stats: PassportStats) -> some View {
         let minutes = Int(stats.totalDuration / 60)
         return VStack(alignment: .leading, spacing: 14) {
-            CardHeader(title: "Time at Events")
+            CardHeader(title: "Time at Events") {
+                PassportShareButton { sharing = .time }
+            }
 
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 unit(minutes / 60, suffix: "h")
@@ -829,6 +931,7 @@ struct EventPassportView: View {
                     if spans.count > 1 {
                         Button { openExtreme = extreme } label: { SeeAllLabel() }
                             .buttonStyle(.plain)
+                            .leftOutOfPassportImage()
                     }
                 }
                 // The row itself is the target, with no chevron on it, the
@@ -845,14 +948,14 @@ struct EventPassportView: View {
     // MARK: - Who, and where
 
     private func performersCard(_ stats: PassportStats) -> some View {
-        rankCard(title: "Top Performers", rows: stats.topPerformers, total: stats.totalEvents,
+        rankCard(.performers, title: "Top Performers", rows: stats.topPerformers, total: stats.totalEvents,
                  tint: .trackAttended, showsShare: true,
                  seeAll: stats.topPerformers.count > Self.cardLimit
                      ? .performers(scope) : nil) { PerformerLink.billed(name: $0.name) }
     }
 
     private func venuesCard(_ stats: PassportStats) -> some View {
-        rankCard(title: "Top Venues", rows: stats.topVenues, total: stats.totalEvents,
+        rankCard(.venues, title: "Top Venues", rows: stats.topVenues, total: stats.totalEvents,
                  tint: .brandTint, showsShare: false,
                  seeAll: stats.topVenues.count > Self.cardLimit
                      ? .venues(scope) : nil) { VenueLink.named($0.name) }
@@ -862,7 +965,7 @@ struct EventPassportView: View {
     /// way into the whole list. Only the tint and what a row pushes differ, and
     /// writing them twice is how the two drift apart.
     private func rankCard<Value: Hashable>(
-        title: LocalizedStringKey, rows: [PassportStats.Ranking], total: Int,
+        _ card: PassportCard, title: LocalizedStringKey, rows: [PassportStats.Ranking], total: Int,
         tint: Color, showsShare: Bool, seeAll: PassportRanking?,
         destination: @escaping (PassportStats.Ranking) -> Value
     ) -> some View {
@@ -870,17 +973,20 @@ struct EventPassportView: View {
         let most = max(1, shown.first?.count ?? 1)
         return VStack(alignment: .leading, spacing: 13) {
             CardHeader(title: title) {
-                if let seeAll {
-                    Button { openRanking = seeAll } label: { SeeAllLabel() }
-                        .buttonStyle(.plain)
+                HStack(spacing: 12) {
+                    if let seeAll {
+                        Button { openRanking = seeAll } label: { SeeAllLabel() }
+                            .buttonStyle(.plain)
+                            .leftOutOfPassportImage()
+                    }
+                    PassportShareButton { sharing = card }
                 }
             }
             ForEach(shown) { row in
-                NavigationLink(value: destination(row)) {
+                PassportRowLink(value: destination(row)) {
                     PassportRankRow(row: row, most: most, total: total,
                                     tint: tint, showsShare: showsShare)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(16)
@@ -1037,11 +1143,13 @@ private struct DurationLabel: View {
 /// The cut is the reader's to choose and is deliberately not remembered
 /// between visits, for the reason ``PassportScope`` is not: a chart opened on
 /// a cut chosen a fortnight ago is a chart that answers a question nobody
-/// asked.
+/// asked. Held by the Passport, so the card drawn as a picture is cut as it
+/// is on screen.
 private struct PassportEventsCard: View {
     let stats: PassportStats
-
-    @State private var cadence: PassportCadence = .year
+    @Binding var cadence: PassportCadence
+    /// Opens the card as a picture (``PassportShareSheet``).
+    let share: () -> Void
 
     /// Which cuts are on offer. A slice inside one year has nothing to say by
     /// year, so the chip is not offered rather than drawn over a single point.
@@ -1059,7 +1167,9 @@ private struct PassportEventsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            CardHeader(title: "Events")
+            CardHeader(title: "Events") {
+                PassportShareButton(action: share)
+            }
 
             Text(stats.totalEvents.formatted())
                 .font(.system(size: 40, weight: .bold))
@@ -1717,6 +1827,23 @@ private struct PassportSheetHeader: View {
     }
 }
 
+/// A ranked row's way to its performer or hall — and in a card drawn as a
+/// picture, the row alone: a link outside a stack draws as one turned off.
+private struct PassportRowLink<Value: Hashable, Label: View>: View {
+    @Environment(\.drawsPassportImage) private var isImage
+    let value: Value
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        if isImage {
+            label
+        } else {
+            NavigationLink(value: value) { label }
+                .buttonStyle(.plain)
+        }
+    }
+}
+
 /// One row of a ranked list: who or where, how many, and how much of the
 /// library that is.
 ///
@@ -1925,6 +2052,8 @@ private struct PassportLotteryCard: View {
     /// which draws it (``drawer(_:stats:)``): the card is made again as the
     /// Duo opens and folds, and an open list held here went with it.
     @Binding var openList: LotteryList?
+    /// Opens the card as a picture (``PassportShareSheet``).
+    let share: () -> Void
     let open: (Event) -> Void
 
     /// What a list of events behind the card holds.
@@ -1943,7 +2072,9 @@ private struct PassportLotteryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            CardHeader(title: "Lottery Entries")
+            CardHeader(title: "Lottery Entries") {
+                PassportShareButton(action: share)
+            }
             headline
             outcomes
             readings
@@ -2181,6 +2312,7 @@ private struct PassportLotteryCard: View {
                 if stats.topLotteries.count > limit {
                     Button { openList = .top } label: { SeeAllLabel() }
                         .buttonStyle(.plain)
+                        .leftOutOfPassportImage()
                 }
             }
             ForEach(rows) { row in
@@ -2423,8 +2555,13 @@ private struct PassportSpendingCard: View {
     /// The list of tickets open over the card, if any — drawn by the Passport
     /// (``drawer(_:stats:seatFilter:)``).
     @Binding var openList: TicketList?
+    /// Opens the card as a picture (``PassportShareSheet``).
+    let share: () -> Void
     /// Opens an event on the screen's own event sheet.
     let open: (Event) -> Void
+
+    /// Whether the card is drawn as a picture to share — see ``chips(_:)``.
+    @Environment(\.drawsPassportImage) private var isImage
 
     /// What a list of tickets behind the card holds, and the order it runs in.
     enum TicketList: Identifiable, Hashable {
@@ -2457,7 +2594,15 @@ private struct PassportSpendingCard: View {
     var body: some View {
         let styles = SeatStyle.styles(for: stats)
         VStack(alignment: .leading, spacing: 14) {
-            CardHeader(title: "Ticket Spending", caption: caption) { currencyMenu }
+            CardHeader(title: "Ticket Spending", caption: caption) {
+                HStack(spacing: 8) {
+                    // Left out of the picture: the figures name their
+                    // currency already.
+                    currencyMenu
+                        .leftOutOfPassportImage()
+                    PassportShareButton(action: share)
+                }
+            }
 
             if !stats.tickets.isEmpty {
                 headline
@@ -2545,11 +2690,7 @@ private struct PassportSpendingCard: View {
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 10, weight: .bold))
             }
-            .foregroundStyle(Color.brandTint)
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .background(Color(.secondarySystemGroupedBackground), in: .capsule)
-            .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+            .passportHeaderCapsule()
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Currency"))
@@ -2693,14 +2834,20 @@ private struct PassportSpendingCard: View {
     /// chips alone where it does not — their dots already tie them to the bar
     /// above — and scrolling sideways where even they do not. Wrapped onto a
     /// second line, as it was, one chip sat alone under the others.
+    ///
+    /// In the card drawn as a picture, the chip that is on and nothing else:
+    /// it says what the two ends are read over, and a row that scrolled
+    /// comes out blank in a picture.
     private func chips(_ styles: SeatStyles) -> some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) {
-                Text("Seat Type")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.trailing, 2)
-                chipRow(styles)
+                seatTypeLabel
+                if isImage {
+                    chip(filter, label: filter.map { styles[$0].label } ?? Text("All"),
+                         color: filter.map { styles[$0].color } ?? .brandTint)
+                } else {
+                    chipRow(styles)
+                }
             }
             HStack(spacing: 6) { chipRow(styles) }
             ScrollView(.horizontal) {
@@ -2709,6 +2856,13 @@ private struct PassportSpendingCard: View {
             .scrollIndicators(.hidden)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var seatTypeLabel: some View {
+        Text("Seat Type")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.trailing, 2)
     }
 
     @ViewBuilder
@@ -2759,6 +2913,7 @@ private struct PassportSpendingCard: View {
                 if tickets.count > 2 {
                     Button { openList = list } label: { SeeAllLabel() }
                         .buttonStyle(.plain)
+                        .leftOutOfPassportImage()
                 }
             }
             Button { open(ticket.event) } label: {
@@ -2784,10 +2939,12 @@ private struct PassportPriceReading: View {
     let paid: String?
     let label: LocalizedStringKey
 
+    /// Without its ⓘ in a card drawn as a picture, where nothing opens.
+    @Environment(\.drawsPassportImage) private var isImage
     @State private var isShowingPaid = false
 
     var body: some View {
-        if let paid {
+        if let paid, !isImage {
             Button { isShowingPaid = true } label: {
                 passportReading(
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -2963,6 +3120,8 @@ private struct PassportTicketTypeRow: View {
 
     /// Whether the range as it was paid is open over the row.
     @State private var isShowingPaidRange = false
+    /// Without its ⓘ in a card drawn as a picture, where nothing opens.
+    @Environment(\.drawsPassportImage) private var isImage
 
     var body: some View {
         // The badge centred on everything it heads — the name, the spread
@@ -2995,7 +3154,7 @@ private struct PassportTicketTypeRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // Always, so the corner is never empty: a class whose tickets
                 // all cost one price shows that price, which is its range.
-                if showsPaid { paidRangeButton } else { Text(verbatim: range) }
+                if showsPaid && !isImage { paidRangeButton } else { Text(verbatim: range) }
             }
             .font(.system(size: 11.5))
             .monospacedDigit()
