@@ -13,6 +13,8 @@ import SwiftUI
 /// long enough to need them.
 struct FavoriteEventsView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     @Query(LibraryEntry.favorites) private var hearted: [LibraryEntry]
 
     @State private var filter: LibraryFilter = .upcoming
@@ -189,8 +191,10 @@ struct FavoriteEventsView: View {
     }
 
     /// Un-hearting rather than removing: an event in the library stays there.
+    /// Only the ones still hearted: a heart taken off on another device while
+    /// they were picked was put back by a toggle.
     private func removeChosen() {
-        let events = chosen
+        let events = chosen.filter(store.isFavorite)
         withAnimation(.snappy) {
             for event in events { store.toggleFavorite(event) }
         }

@@ -38,6 +38,8 @@ struct SettingsView: View {
     /// from `exported` being nil, which is also the moment before a file is on
     /// disk: a failure is said and can be tried again, not left dimmed.
     @State private var exportFailure: String?
+    /// The last write of the backup file set going — see ``prepareExport()``.
+    @State private var lastExportWrite: Task<Result<URL, any Error>, Never>?
     /// The save panel a Mac exports the backup through — see ``exportRow``.
     @State private var isSavingBackup = false
     /// Why the save panel could not save the file, until a save succeeds.
@@ -133,7 +135,7 @@ struct SettingsView: View {
         .refreshNotices()
         .refreshNoticesInSheet()
         .opensFromOutside()
-        .standsAsSettings()
+        .standsAsSettings(covered: isReplayingWelcome)
     }
 
     // MARK: - The shape of the screen
@@ -424,14 +426,27 @@ struct SettingsView: View {
     /// A failure takes the last file away as well: it was written from the
     /// library as it stood before the change that set this going, and sharing
     /// it would pass off an older library as the current one.
+    ///
+    /// Each write waits for the one before it, and one a newer change has
+    /// overtaken says nothing when it is done. Every write is to the same
+    /// file, and the write the change cancelled went on regardless: landing
+    /// after the newer one, it left the older library on disk and named it
+    /// the one to share.
     private func prepareExport() async {
         let written: Result<URL, any Error>
         do {
             let backup = try store.backup()
-            written = await Task.detached { Result { try backup.write() } }.value
+            let previous = lastExportWrite
+            let write = Task.detached { () -> Result<URL, any Error> in
+                _ = await previous?.value
+                return Result { try backup.write() }
+            }
+            lastExportWrite = write
+            written = await write.value
         } catch {
             written = .failure(error)
         }
+        guard !Task.isCancelled else { return }
         switch written {
         case .success(let url):
             exported = url

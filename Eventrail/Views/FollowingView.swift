@@ -13,6 +13,8 @@ import SwiftUI
 /// ``FollowingRead``.
 struct FollowingView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     @Environment(FollowedDates.self) private var followed
     @Environment(VenueRegions.self) private var venues
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?

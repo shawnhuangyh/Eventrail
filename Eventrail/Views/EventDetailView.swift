@@ -352,6 +352,10 @@ struct EventDetailView: View {
             if holds { sheetsHold?.set(holdID, holding: true) }
         }
         .onDisappear { sheetsHold?.set(holdID, holding: false) }
+        // Taken again on coming back with a sheet still up: a cover over
+        // Ticket Details — the document camera — takes this page off screen
+        // beneath it, and the hold went with it while Ticket Details stayed.
+        .onAppear { if holdsSheet { sheetsHold?.set(holdID, holding: true) } }
         #if DEBUG && !targetEnvironment(macCatalyst)
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)

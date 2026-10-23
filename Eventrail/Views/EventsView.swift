@@ -8,6 +8,8 @@ import SwiftUI
 /// ``EventListMenu``.
 struct EventsView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     @State private var filter: LibraryFilter = .upcoming

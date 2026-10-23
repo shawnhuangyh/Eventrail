@@ -69,6 +69,8 @@ struct RootView: View {
     /// back from the background passes through inactive, so the phase before
     /// active is never the background.
     @State private var wasInBackground = false
+    /// The day it is, moved on as it turns — see ``EnvironmentValues/today``.
+    @State private var today = EnvironmentValues.startOfToday
 
     var body: some View {
         TabView(selection: $selection) {
@@ -106,7 +108,9 @@ struct RootView: View {
                 } else {
                     opens.open(.event(event))
                 }
-            } else {
+            } else if url.isFileURL {
+                // Only a file is a backup: any other link reaching the app was
+                // asked "Restore this backup?" about, and failed reading it.
                 openedBackup = url
             }
         }
@@ -155,6 +159,12 @@ struct RootView: View {
             WelcomeView()
                 .rootEnvironment(rootEnvironment)
         }
+        // Midnight, or the clock changed — told once the app is back if it
+        // was away as it happened.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            today = EnvironmentValues.startOfToday
+        }
+        .environment(\.today, today)
         // The store and the rest, the app's tint and its text sizes.
         .rootEnvironment(rootEnvironment)
         // A cold launch is a change of scene phase to nobody: `onChange` only
@@ -421,6 +431,18 @@ extension EnvironmentValues {
     /// The root's environment, for a presenter to hand the sheet it presents
     /// — see ``RootEnvironment``. Nil only in a preview.
     @Entry var rootEnvironment: RootEnvironment?
+
+    /// The start of the day it is, moved on by the root at midnight and at a
+    /// change of clock.
+    ///
+    /// What a screen counting from today declares, whether or not it reads
+    /// it: those screens count from `.now` as they draw, and nothing else
+    /// draws them again as the day turns — a tab left open overnight, as a
+    /// Mac's window is, kept yesterday's memories on the Me tab and
+    /// yesterday's "1 day" on every row of My Events.
+    @Entry var today = startOfToday
+
+    static var startOfToday: Date { Calendar.gregorian().startOfDay(for: .now) }
 }
 
 extension View {

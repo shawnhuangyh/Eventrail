@@ -24,6 +24,8 @@ import SwiftUI
 /// pending is No Result.
 struct LotteriesView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     @State private var half: LotteryHalf = .awaiting
@@ -163,10 +165,10 @@ struct LotteriesView: View {
                                                  set: { if !$0 { held = nil } }),
                             titleVisibility: .visible) {
             Button("Clear Seat and Cost", role: .destructive) {
-                if let held { write(held.record.clearingSeatAndCost, for: row.event) }
+                if let held { write(held.given(over: store.tracking(for: row.event)).clearingSeatAndCost, for: row.event) }
             }
             Button("Keep Them") {
-                if let held { write(held.record, for: row.event) }
+                if let held { write(held.given(over: store.tracking(for: row.event)), for: row.event) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -182,7 +184,7 @@ struct LotteriesView: View {
         let after = before.givingResult(result, toLottery: row.entry.id)
         guard after != before else { return }
         if after.leavesSeatOrCostBehind(since: before) {
-            held = HeldResult(row: row.id, record: after)
+            held = HeldResult(row: row.id, result: result, entry: row.entry.id)
         } else {
             write(after, for: row.event)
         }
@@ -256,10 +258,17 @@ struct LotteriesView: View {
     }
 
     /// A result waiting on whether to clear the seat and cost it leaves
-    /// behind.
+    /// behind — the result, not the record it made: given to the record as it
+    /// stands once answered, so a note or a round synced in while the
+    /// question was up is not written back over.
     private struct HeldResult {
         let row: LotteryRow.ID
-        let record: Tracking
+        let result: LotteryResult
+        let entry: LotteryEntry.ID
+
+        func given(over record: Tracking) -> Tracking {
+            record.givingResult(result, toLottery: entry)
+        }
     }
 }
 
@@ -563,7 +572,7 @@ struct LotteryDayTile: View {
         VStack(spacing: 3) {
             Group {
                 if let day = row.entry.day {
-                    Text(verbatim: day.date().formatted(.dateTime.month(.abbreviated)))
+                    Text(verbatim: day.date().formatted(.gregorian().month(.abbreviated)))
                 } else {
                     // A key of its own: "Day" alone is the Passport's, and reads
                     // differently there.

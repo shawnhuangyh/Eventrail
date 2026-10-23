@@ -35,16 +35,16 @@ final class OutsideOpens {
     /// own, which stands in front as it appears and would otherwise open the
     /// same request again over it.
     @ObservationIgnored fileprivate var claimant: UUID?
-    /// How many Settings sheets the window has up — from the Me tab's gear,
-    /// or from the menu bar (``View/standsAsSettings()``).
-    @ObservationIgnored fileprivate var settingsUp = 0
+    /// The Settings sheets the window has up — from the Me tab's gear, or
+    /// from the menu bar (``View/standsAsSettings(covered:)``).
+    @ObservationIgnored fileprivate var settingsUp: Set<UUID> = []
 
     /// Settings, from the menu bar, over whatever is up — and nothing where
     /// Settings already is. A sheet of the root's own was not presented while
     /// another sheet was up, and the flag it was asked for by stayed set, so
     /// the menu item did nothing again in that window.
     func openSettings() {
-        guard settingsUp == 0 else { return }
+        guard settingsUp.isEmpty else { return }
         open(.settings)
     }
 
@@ -111,20 +111,25 @@ extension View {
 
     /// Counts a Settings sheet as up in its window for as long as it is, so
     /// the menu bar opens no second one over it (``OutsideOpens/openSettings()``).
-    func standsAsSettings() -> some View {
-        modifier(SettingsStanding())
+    ///
+    /// `covered` while it has something over it that takes it off screen —
+    /// the Welcome screen replayed — which it is still up under: let go of
+    /// there, the menu bar's Settings opened a second one over it as soon as
+    /// the cover went.
+    func standsAsSettings(covered: Bool = false) -> some View {
+        modifier(SettingsStanding(covered: covered))
     }
 }
 
 private struct SettingsStanding: ViewModifier {
+    let covered: Bool
     @Environment(OutsideOpens.self) private var opens: OutsideOpens?
+    @State private var id = UUID()
 
     func body(content: Content) -> some View {
         content
-            .onAppear { opens?.settingsUp += 1 }
-            .onDisappear {
-                if let opens { opens.settingsUp = max(0, opens.settingsUp - 1) }
-            }
+            .onAppear { opens?.settingsUp.insert(id) }
+            .onDisappear { if !covered { opens?.settingsUp.remove(id) } }
     }
 }
 

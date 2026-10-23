@@ -59,8 +59,11 @@ struct CachedImage<Content: View, Placeholder: View>: View {
                 image = ImageCache.shared.memoryImage(for: url)
                 shownURL = url
             }
-            // The copy held, stale or not, before anybody is asked.
-            if image == nil, let stored = await ImageCache.shared.storedImage(for: url) {
+            // The copy held, stale or not, before anybody is asked. Nothing is
+            // drawn once the view has moved on to another image: the load for
+            // the one before, landing late, drew the old flyer over the new.
+            if image == nil, let stored = await ImageCache.shared.storedImage(for: url),
+               !Task.isCancelled {
                 image = stored
             }
             // Kept rather than blanked while a new copy of the same image is
@@ -68,7 +71,7 @@ struct CachedImage<Content: View, Placeholder: View>: View {
             // placeholder. Set only when it is a different picture, so an
             // image the host vouched for again is not drawn a second time.
             if let loaded = await ImageCache.shared.image(for: url, checkedSince: checkedSince),
-               loaded !== image {
+               !Task.isCancelled, loaded !== image {
                 image = loaded
             }
         }
