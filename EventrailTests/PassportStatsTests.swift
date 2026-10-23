@@ -197,11 +197,37 @@ struct PassportStatsTests {
         #expect(stats.seatEvents["A席"]?.map(\.outcomes) == [[.lost], [.otherSeat]])
         #expect(stats.seatEvents["一般席"]?.map(\.outcomes) == [[.lost], [.won]])
         #expect(stats.seatEvents["S席"]?.map(\.outcomes) == [[.lost], [.otherSeat], [.won]])
-        // Each class's dots run to the choice that asked for it, the choices
-        // before it as they went: A, asked second, carries S before it.
-        #expect(stats.seatEvents["S席"]?.map(\.choices) == [[[.lost]], [[.otherSeat]], [[.won]]])
-        #expect(stats.seatEvents["A席"]?.map(\.choices) == [[[.lost, .lost]], [[.lost, .otherSeat]]])
+        // A dot a choice, as in every list, to the one won: won lower than
+        // the row's class, that one is other seat.
+        #expect(stats.seatEvents["S席"]?.map(\.choices)
+                == [[[.lost, .lost, .lost]], [[.lost, .lost, .otherSeat]], [[.won]]])
+        #expect(stats.seatEvents["A席"]?.map(\.choices)
+                == [[[.lost, .lost, .lost]], [[.lost, .lost, .otherSeat]]])
         #expect(stats.seatEvents["一般席"]?.map(\.choices) == [[[.lost, .lost, .lost]], [[.lost, .lost, .won]]])
+    }
+
+    /// An S seat lost in the first round, and S then General asked for in
+    /// the second, won in General: both rounds are S's, and the second
+    /// carries its S choice lost before the General won.
+    @Test func aRoundLostBeforeAnotherShowsInTheSeatsList() {
+        let s = LotteryChoice(seatClass: "S席")
+        let secondS = LotteryChoice(seatClass: "S席"), general = LotteryChoice(seatClass: "一般席")
+        let rounds: [Event.ID: [LotteryEntry]] = [
+            "a": [
+                LotteryEntry(round: "最速先行抽選", applications: 2, choices: [s], result: .lost),
+                LotteryEntry(round: "プレイガイド二次先行", applications: 1, choices: [secondS, general],
+                             result: .won(general.id)),
+            ],
+        ]
+        let stats = PassportStats(events: Self.events) {
+            var tracking = Tracking()
+            tracking.lotteries = rounds[$0.id] ?? []
+            return tracking
+        }
+        #expect(stats.lotterySeats[0] == PassportStats.SeatTally(seatClass: "S席", otherSeat: 1, lost: 1))
+        #expect(stats.seatEvents["S席"]?.map(\.choices) == [[[.lost], [.lost, .otherSeat]]])
+        #expect(stats.seatEvents["一般席"]?.map(\.choices) == [[[.lost, .won]]])
+        #expect(stats.topLotteries.map(\.choices) == [[[.lost], [.lost, .won]]])
     }
 
     /// A win took every application over the rounds up to and including the

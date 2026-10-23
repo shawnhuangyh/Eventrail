@@ -1766,7 +1766,7 @@ private struct PassportRankRow: View {
     }
 }
 
-/// One event the reader applied for: how each round went, a dot each in the
+/// One event the reader applied for: how each round went, its dots in the
 /// order the sale ran them, how many times, and how that stands against the
 /// hardest they ever tried for a seat.
 private struct PassportLotteryRow: View {
@@ -1783,7 +1783,7 @@ private struct PassportLotteryRow: View {
                     .font(.system(size: 13.5, weight: .semibold))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                LotteryDots(outcomes: row.outcomes)
+                LotteryDots(rounds: row.rounds)
                 Text(row.entries.formatted())
                     .font(.system(size: 13, weight: .bold))
                     .monospacedDigit()
@@ -1810,7 +1810,8 @@ private struct PassportLotteryRow: View {
 private struct LotteryListRow: Identifiable {
     let event: Event
     let entries: Int
-    let outcomes: [LotteryOutcome]
+    /// Each round's choices, a round apart from the next.
+    let rounds: [[LotteryOutcome]]
 
     var id: Event.ID { event.id }
 
@@ -1818,7 +1819,7 @@ private struct LotteryListRow: Identifiable {
     init(_ lottery: PassportStats.Lottery) {
         event = lottery.event
         entries = lottery.entries
-        outcomes = lottery.choices.joined().map(LotteryOutcome.init)
+        rounds = lottery.choices.map { $0.map(LotteryOutcome.init) }
     }
 
     /// One of the events behind a row of By Round, By Seat or Entries to
@@ -1826,32 +1827,44 @@ private struct LotteryListRow: Identifiable {
     init(_ counted: PassportStats.LotteryEvent) {
         event = counted.event
         entries = counted.entries
-        outcomes = counted.choices.joined().map(LotteryOutcome.init)
+        rounds = counted.choices.map { $0.map(LotteryOutcome.init) }
     }
 }
 
-/// How an event's lotteries went, a dot each in the order the sale ran them,
-/// drawn as `Eventrail v4.dc.html` draws them: filled, in the colours of the
-/// legend over them.
+/// How an event's lotteries went, round by round in the order the sale ran
+/// them, drawn as `Eventrail v4.dc.html` draws its dots: filled, in the
+/// colours of the legend over them.
 ///
 /// A dot is a choice. Under Top Lottery Entries and By Round: each choice
 /// before the one won grey, the one won orange, nothing after it, so a seat
-/// won with the first choice is one orange dot. Under By Seat: every choice
-/// up to the one that asked for that class, the last in the colour of how
-/// it went for the class — orange, or tan where a lower one was won.
+/// won with the first choice is one orange dot. Under By Seat the same,
+/// save that a choice won in a lower class than the row's is tan.
+///
+/// A hairline between one round's dots and the next's: run together, an S
+/// seat lost in one round and S then General asked for in the next read as
+/// one round of three choices, and the round lost looked missing.
 private struct LotteryDots: View {
-    let outcomes: [LotteryOutcome]
+    let rounds: [[LotteryOutcome]]
 
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(outcomes.indices, id: \.self) { index in
-                Circle()
-                    .fill(outcomes[index].color)
-                    .frame(width: 7, height: 7)
+        HStack(spacing: 5) {
+            ForEach(rounds.indices, id: \.self) { round in
+                if round > 0 {
+                    Capsule()
+                        .fill(.tertiary)
+                        .frame(width: 1, height: 10)
+                }
+                HStack(spacing: 3) {
+                    ForEach(rounds[round].indices, id: \.self) { index in
+                        Circle()
+                            .fill(rounds[round][index].color)
+                            .frame(width: 7, height: 7)
+                    }
+                }
             }
         }
         .accessibilityElement()
-        .accessibilityLabel(LotteryOutcome.summary(of: outcomes))
+        .accessibilityLabel(LotteryOutcome.summary(of: Array(rounds.joined())))
     }
 }
 

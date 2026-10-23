@@ -334,7 +334,7 @@ nonisolated struct PassportStats {
     /// newest first, by the round and by the class as written: each with only
     /// the rounds its row counted, so an event whose S seat was won higher
     /// is not among A's — marked choice by choice, by ``choiceMarks(of:)``
-    /// behind a round and ``seatMarks(of:for:outcome:)`` behind a class.
+    /// behind a round and ``seatMarks(of:outcome:)`` behind a class.
     let roundEvents: [String: [LotteryEvent]]
     let seatEvents: [String: [LotteryEvent]]
     /// The events a lottery was won at, by the class the first win got: the
@@ -566,7 +566,7 @@ nonisolated struct PassportStats {
                     bySeat[seatClass, default: (0, [], [])].entries += entry.applications
                     bySeat[seatClass, default: (0, [], [])].outcomes.append(outcome)
                     bySeat[seatClass, default: (0, [], [])].choices.append(
-                        Self.seatMarks(of: entry, for: seatClass, outcome: outcome))
+                        Self.seatMarks(of: entry, outcome: outcome))
                 }
             }
             for (round, row) in byRound {
@@ -686,24 +686,17 @@ nonisolated struct PassportStats {
         }
     }
 
-    /// How one lottery round went for one class of seat, choice by choice:
-    /// every choice up to the one that asked for it — the one won with it,
-    /// where it was, and otherwise the last that named it — so a class asked
-    /// for second carries how the first went before it. The choices before
-    /// it as they went, and its own as By Seat counts it: won, other seat,
-    /// lost or no result.
-    static func seatMarks(of entry: LotteryEntry, for seatClass: String,
-                          outcome: RoundOutcome) -> [RoundOutcome] {
-        let wonID: LotteryChoice.ID? = if case .won(let id) = entry.outcome { id } else { nil }
-        let wonHere = entry.choices.firstIndex { $0.id == wonID && trimmed($0.seatClass) == seatClass }
-        guard let own = wonHere ?? entry.choices.lastIndex(where: { trimmed($0.seatClass) == seatClass })
-        else { return [outcome] }
-        let before = entry.choices.prefix(own).map { choice -> RoundOutcome in
-            if choice.id == wonID { return .won }
-            if case .pending = entry.outcome { return .noResult }
-            return .lost
-        }
-        return before + [outcome]
+    /// How one lottery round went for one class of seat, choice by choice as
+    /// ``choiceMarks(of:)`` marks it, so a dot is one choice in every list —
+    /// save that a round won in a lower class than this one (`outcome`
+    /// other seat) has its win marked other seat. Drawn only up to the
+    /// choice that asked for the class, as it once was, a round of S and
+    /// General won in General was one dot in S's list, and a round lost
+    /// before it read as that round's own S choice.
+    static func seatMarks(of entry: LotteryEntry, outcome: RoundOutcome) -> [RoundOutcome] {
+        let marks = choiceMarks(of: entry)
+        guard outcome == .otherSeat else { return marks }
+        return marks.dropLast() + [.otherSeat]
     }
 
     /// Whether the choice a round was won with stands above `asked`, another
