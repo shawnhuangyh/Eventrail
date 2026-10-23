@@ -179,8 +179,7 @@ private struct EntityMaking {
     let readings: [String: [String]]
 
     init(store: EventStore) {
-        display = UserDefaults.standard.string(forKey: TimeDisplay.storageKey)
-            .flatMap(TimeDisplay.init(rawValue:)) ?? .venue
+        display = .stored
         readings = Dictionary(
             store.followedProfiles.map { ($0.name, PerformerEntity.soundings(of: $0.reading)) },
             uniquingKeysWith: { first, _ in first })

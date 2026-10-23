@@ -8,6 +8,8 @@ import SwiftUI
 /// ``EventListMenu``.
 struct EventsView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     @State private var filter: LibraryFilter = .upcoming
@@ -25,49 +27,63 @@ struct EventsView: View {
     @State private var reviewing: TicketReviewList?
     @AppStorage(TicketReviewView.reviewedKey) private var ticketsReviewed: Double = 0
 
-    private var library: [Event] { store.events(of: kept, where: \.inLibrary) }
+    /// What the list shows, worked out once a drawing and handed down: the
+    /// library, its half grouped, and how many there are — each a property
+    /// of its own once, read several times a redraw, and every read went over
+    /// the whole library again.
+    private struct Shown {
+        let library: [Event]
+        let groups: [EventGroup]
+        let count: Int
+        /// Selecting reaches what the filter is showing and no further —
+        /// "Upcoming" on screen must not quietly take the past with it.
+        let ids: Set<Event.ID>
 
-    private var groups: [EventGroup] {
-        EventGroup.groups(of: library, filter: filter, grouping: grouping)
-    }
-
-    private var eventCount: Int {
-        filter.rows(of: library).count
-    }
-
-    /// Selecting reaches what the filter is showing and no further — "Upcoming"
-    /// on screen must not quietly take the past with it.
-    private var shownIDs: Set<Event.ID> {
-        Set(groups.flatMap { $0.events.map(\.id) })
+        init(library: [Event], filter: LibraryFilter, grouping: Grouping) {
+            self.library = library
+            groups = EventGroup.groups(of: library, filter: filter, grouping: grouping)
+            count = filter.rows(of: library).count
+            ids = Set(groups.flatMap { $0.events.map(\.id) })
+        }
     }
 
     private var chosen: [Event] {
         selection.compactMap { store.event(id: $0) }
     }
 
+    /// The events still ahead that clash with another of their day — they
+    /// overlap, or a journey a sheet has asked Maps about takes longer than
+    /// the time between them. Nothing is asked of Maps here: a row marks what
+    /// the event's sheet found. See ``SameDay``.
+    private func clashes(in library: [Event]) -> [Event.ID: SameDay.Clash] {
+        guard filter == .upcoming else { return [:] }
+        let travelTimes = TravelTimes.shared
+        return SameDay.clashes(in: library.filter(\.isUpcoming)) { travelTimes.travel(for: $0)?.seconds }
+    }
+
     /// The past events that have arrived with no ticket since the reader last
     /// went through them — what the row at the head of Past offers.
-    private var awaitingTickets: [Event] {
+    private func awaitingTickets(in library: [Event]) -> [Event] {
         store.awaitingTickets(library, since: Date(timeIntervalSinceReferenceDate: ticketsReviewed))
     }
 
     var body: some View {
+        let shown = Shown(library: store.events(of: kept, where: \.inLibrary), filter: filter, grouping: grouping)
+        let subtitle = subtitle(count: shown.count)
         NavigationStack {
-            list
+            list(shown)
             .washBackground()
             .navigationTitle("My Events")
             .navigationSubtitle(subtitle)
-            // Selecting takes the bottom of the screen over, the way it does
-            // everywhere else on iOS: the tab bar stands down so the actions for
-            // what is selected can stand where the thumb already is.
-            .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
+            .largeTitleOnMac(Text("My Events"), subtitle: subtitle)
+            .pickingRows(isSelecting, selection: $selection, closing: $openEvent)
             .toolbar {
                 PencilToolbar(isSelecting: $isSelecting, title: "Select Events",
-                              canSelect: eventCount > 0)
+                              canSelect: shown.count > 0)
                 if isSelecting {
                     SelectionToolbar(
-                        isEverythingSelected: selection == shownIDs,
-                        selectAll: { selection = selection == shownIDs ? [] : shownIDs },
+                        isEverythingSelected: selection == shown.ids,
+                        selectAll: { selection = selection == shown.ids ? [] : shown.ids },
                         removeTitle: "Remove",
                         canRemove: !selection.isEmpty,
                         confirmation: RemovalConfirmation(
@@ -90,17 +106,9 @@ struct EventsView: View {
             // Beside the list on an open iPhone Duo.
             .eventPane($openEvent)
             .venueDestination()
-            .sheet(item: $reviewing) { TicketReviewView(events: $0.events) }
-            // Nothing is left selected behind a filter that no longer shows it,
-            // and nothing survives leaving the mode that picked it.
+            .sheet(item: $reviewing) { TicketReviewView(events: $0.events).macSheetSize(.form) }
+            // Nothing is left selected behind a filter that no longer shows it.
             .onChange(of: filter) { selection.removeAll() }
-            .onChange(of: isSelecting) {
-                selection.removeAll()
-                // Picking takes the screen over, beside the fold too: the event
-                // open beside the list goes, rather than keep its own buttons in
-                // the bar beside the picking's, or stay up once picked and removed.
-                if isSelecting { openEvent = nil }
-            }
             // Read again as the sheet closes, against the copy the sheet has
             // just read: the row was marked as it stood when tapped, and a
             // page that had changed since would otherwise come back Updated
@@ -115,8 +123,10 @@ struct EventsView: View {
         }
     }
 
-    private var list: some View {
-        List(selection: $selection) {
+    private func list(_ shown: Shown) -> some View {
+        let clashes = clashes(in: shown.library)
+        let groups = shown.groups
+        return List(selection: $selection.listSelection()) {
             // A section of its own with no gap after it, as Following's chips
             // have: the gap a month opens with is for the month before it.
             // Held still while picking, for the reason the capsule is put away.
@@ -129,7 +139,7 @@ struct EventsView: View {
                 // import's history arrives with no tickets, and only a ticket
                 // says the reader went.
                 if filter == .past, !isSelecting {
-                    let awaiting = awaitingTickets
+                    let awaiting = awaitingTickets(in: shown.library)
                     if !awaiting.isEmpty {
                         TicketReviewPrompt(count: awaiting.count) {
                             reviewing = TicketReviewList(events: awaiting)
@@ -155,7 +165,7 @@ struct EventsView: View {
                         // Following: a past one is history rather than news, and
                         // its record has been pruned with the event anyway.
                         let unread = event.isUpcoming ? store.unread(event) : nil
-                        LibraryRow(event: event, unread: unread) {
+                        LibraryRow(event: event, unread: unread, clash: clashes[event.id]) {
                             if event.isUpcoming { mark(event, read: true) }
                             openEvent = event
                         }
@@ -164,21 +174,18 @@ struct EventsView: View {
                             // take the tap, and only the strip the List draws
                             // its mark in would pick the row.
                             .allowsHitTesting(!isSelecting)
-                            .listRowInsets(GroupHeader.rowInsets)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                            .pickedByClickOnMac(isSelecting, isPicked: selection.contains(event.id)) {
+                                selection.toggle(event.id)
+                            }
+                            .groupedEventRow()
                             // Toward the tag, as on Following: a swipe from the
                             // leading edge reads the row, or unreads it.
+                            // Not while picking, which a Mac does out of edit mode.
                             .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                if event.isUpcoming {
-                                    let isUnread = unread != nil
-                                    Button {
-                                        mark(event, read: isUnread)
-                                    } label: {
-                                        Label(isUnread ? "Read" : "Unread",
-                                              systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                                if event.isUpcoming, !isSelecting {
+                                    RowReadButton(isUnread: unread != nil) {
+                                        mark(event, read: unread != nil)
                                     }
-                                    .tint(Color.brandTint)
                                 }
                             }
                             // Every row, past or ahead: the one-row form of the
@@ -187,8 +194,25 @@ struct EventsView: View {
                             // with it. No destructive role: that sends the row
                             // off the screen before the answer is in.
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button("Remove", systemImage: "trash") { swipedAway = event.id }
-                                    .tint(.red)
+                                if !isSelecting {
+                                    Button("Remove", systemImage: "trash") { swipedAway = event.id }
+                                        .tint(.red)
+                                }
+                            }
+                            // Both swipes again, from a right-click on a Mac. In
+                            // a menu the destructive role only reddens the item.
+                            .contextMenuOnMac {
+                                if !isSelecting {
+                                    if event.isUpcoming {
+                                        RowReadButton(isUnread: unread != nil, inMenu: true) {
+                                            mark(event, read: unread != nil)
+                                        }
+                                        Divider()
+                                    }
+                                    Button("Remove Event", systemImage: "trash", role: .destructive) {
+                                        swipedAway = event.id
+                                    }
+                                }
                             }
                             .confirmingRemoval(isPresented: Binding(
                                 get: { swipedAway == event.id },
@@ -214,19 +238,19 @@ struct EventsView: View {
             if !isSelecting, !groups.isEmpty { EventListMenu(grouping: $grouping) }
         }
         .monthSections()
-        .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
+        .pickingEditMode(isSelecting)
     }
 
     /// The subtitle carries the count that matters at the moment: how many are
     /// about to be acted on, rather than how many there are. Both halves mark
     /// as well as remove — Upcoming as read, Past as attended.
-    private var subtitle: Text {
+    private func subtitle(count: Int) -> Text {
         if isSelecting {
             selection.isEmpty
                 ? Text("Select events to mark or remove")
                 : Text("^[\(selection.count) event](inflect: true) selected")
         } else {
-            Text("^[\(eventCount) event](inflect: true)")
+            Text("^[\(count) event](inflect: true)")
         }
     }
 

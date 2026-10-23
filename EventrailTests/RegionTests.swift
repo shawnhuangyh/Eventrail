@@ -31,4 +31,24 @@ struct RegionTests {
     func leavesAnythingElseUnplaced(address: String) {
         #expect(Region.containing(address: address) == nil)
     }
+
+    /// A postal code at the head — however it is spaced and dashed, and as
+    /// a build that left one there kept it — is not where the address is.
+    @Test(arguments: [
+        "〒100-0005 東京都千代田区丸の内",
+        "〒 100-0005 東京都千代田区丸の内",
+        "〒100－0005東京都千代田区丸の内",
+        "100-0005 東京都千代田区丸の内",
+    ])
+    func readsPastAPostalCodeAtTheHead(address: String) {
+        #expect(Region.containing(address: address) == .kanto)
+    }
+
+    /// Only a postal code: the figures an address abroad opens with stay.
+    @Test func dropsAPostalCodeAndNothingElse() {
+        #expect(Region.droppingPostalCode("〒 100-0005 東京都千代田区") == "東京都千代田区")
+        #expect(Region.droppingPostalCode("1600 Amphitheatre Parkway, Mountain View")
+                == "1600 Amphitheatre Parkway, Mountain View")
+        #expect(Region.droppingPostalCode("台北市信義區忠孝東路四段515號") == "台北市信義區忠孝東路四段515號")
+    }
 }

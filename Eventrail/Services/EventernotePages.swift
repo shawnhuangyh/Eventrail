@@ -156,16 +156,19 @@ nonisolated enum EventernotePages {
                                    page: page, pageSize: pageSize)
         }
 
-        var rows = HTMLCursor(list)
         var profiles: [PerformerProfile] = []
         var printed = 0
-        while rows.advance(past: #"<a href="/actors/"#) {
+        // Each row read inside its own bounds: a row printing no count read
+        // on to the next one's, and two names were stored as one performer.
+        for slice in HTMLCursor(list).slices(startingAt: #"<a href="/actors/"#) {
             printed += 1
-            guard let path = rows.take(upTo: "\""), let id = Int(path.split(separator: "/").last ?? "")
+            var row = HTMLCursor(slice)
+            row.advance(past: #"<a href="/actors/"#)
+            guard let path = row.take(upTo: "\""), let id = Int(path.split(separator: "/").last ?? "")
             else { break }
-            guard rows.advance(past: ">") else { break }
-            let billed = (rows.take(upTo: "<span") ?? "").htmlText
-            let count = rows.text(after: ">", upTo: "</span>").flatMap(number(in:))
+            guard row.advance(past: ">") else { break }
+            let billed = (row.take(upTo: "<span") ?? row.rest).htmlText
+            let count = row.text(after: ">", upTo: "</span>").flatMap(number(in:))
             let (name, reading) = splitReading(billed)
             guard !name.isEmpty else { continue }
             profiles.append(PerformerProfile(id: id, name: name, reading: reading,
@@ -314,9 +317,12 @@ nonisolated enum EventernotePages {
         // avatar and no favourites is still an account worth linking.
         let bio = cursor.text(after: #"<p class="text">"#, upTo: "</p>")
 
+        // Only inside the score table: without it, the search ran on to any
+        // link to an events page and read a year in its text as the count.
         var counts = HTMLCursor(html)
-        counts.advance(past: #"<div class="gb_score_table">"#)
-        let eventCount = counts.text(after: #"/events">"#, upTo: "</a>").flatMap(number(in:))
+        let eventCount = counts.advance(past: #"<div class="gb_score_table">"#)
+            ? counts.text(after: #"/events">"#, upTo: "</a>").flatMap(number(in:))
+            : nil
 
         return EventernoteProfile(
             handle: handle, name: name, bio: bio, eventCount: eventCount,
@@ -375,8 +381,16 @@ nonisolated enum EventernotePages {
 
     static func event(in html: String, id: String) -> Event? {
         var cursor = HTMLCursor(html)
-        cursor.advance(past: #"<div class="gb_title_cover""#)
-        let image = cursor.text(after: "background-image:url(", upTo: ")").flatMap(URL.init(string:))
+        // The flyer, read off the cover's own tag and nowhere past it: a cover
+        // drawn without one would have sent the search on to a later element's
+        // background, past the title — read as missing, and the whole page as
+        // unreadable.
+        let image = cursor.advance(past: #"<div class="gb_title_cover""#)
+            ? cursor.take(upTo: ">").flatMap { tag in
+                var style = HTMLCursor(tag)
+                return style.text(after: "background-image:url(", upTo: ")").flatMap(URL.init(string:))
+            }
+            : nil
         guard let title = cursor.text(after: #"<h1 class="gb_subtitle gb_curl_effect">"#, upTo: "</h1>"),
               let printedDay = section("開催日時", in: html)?.htmlText,
               let day = day(in: printedDay)
@@ -497,8 +511,20 @@ nonisolated enum EventernotePages {
         else { return nil }
 
         guard let printed = cursor.text(after: #"<span class="s color2">"#, upTo: "</span>"),
-              printed.hasSuffix("日前"), let days = number(in: printed)
+              let count = number(in: printed)
         else { return (handle, nil) }
+        // An edit inside the day is printed in hours or minutes: read as the
+        // day it fell on, rather than as no date — which a read of the whole
+        // page writes over the date the copy held.
+        let within: TimeInterval? = if printed.hasSuffix("時間前") { 60 * 60 }
+            else if printed.hasSuffix("分前") { 60 }
+            else if printed.hasSuffix("秒前") { 1 }
+            else { nil }
+        if let within {
+            return (handle, Event.siteDay(of: Date.now.addingTimeInterval(-TimeInterval(count) * within)))
+        }
+        guard printed.hasSuffix("日前") else { return (handle, nil) }
+        let days = count
         return (handle, Event.siteCalendar.date(byAdding: .day, value: -days, to: Event.siteDay(of: .now)))
     }
 
@@ -515,12 +541,14 @@ nonisolated enum EventernotePages {
     /// ``venueDetail(in:)`` because the calendar mirror geocodes this and the
     /// capacity printed beside it would only confuse the search.
     static func venueAddress(in html: String) -> String? {
-        let address = section("所在地", in: html)?.htmlText
-            // The postal code adds a line's worth of digits and no information
-            // the address below it does not already carry.
-            .drop { $0 == "〒" || $0.isNumber || $0 == "-" }
-            .trimmingCharacters(in: .whitespaces)
-        return (address?.isEmpty ?? true) ? nil : address
+        guard let printed = section("所在地", in: html)?.htmlText else { return nil }
+        // The postal code adds a line's worth of digits and no information
+        // the address below it does not already carry. Only the postal code,
+        // though: dropping every leading figure took the street number off
+        // 1600 Main St, and stopped at the space in 〒 100-0005, leaving a
+        // hall in Tokyo read as abroad, with no prefecture at its head.
+        let address = Region.droppingPostalCode(printed)
+        return address.isEmpty ? nil : address
     }
 
     // MARK: - A venue's own page

@@ -843,7 +843,10 @@ nonisolated struct PassportStats {
     /// typed as 17:30 under an 18:00 start becomes an event of twenty-three
     /// and a half hours, at the top of Longest and in every total.
     private static func span(of event: Event) -> Span? {
-        guard let start = event.startsAt, let end = event.endsAt, end > start else { return nil }
+        // Put in order here too: a copy stored before the page reader did
+        // it holds the morning's end as the morning before its start.
+        let times = Event.inOrder(event.doorsOpen, event.startsAt, event.endsAt)
+        guard let start = times.starts, let end = times.ends, end > start else { return nil }
         let duration = end.timeIntervalSince(start)
         guard duration <= longestEvent else { return nil }
         return Span(event: event, duration: duration)

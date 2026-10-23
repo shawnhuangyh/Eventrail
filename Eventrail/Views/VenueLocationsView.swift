@@ -41,6 +41,7 @@ struct VenueLocationsView: View {
                     Toggle(isOn: $store.preciseVenuesEnabled) {
                         SettingRowLabel("scope", "Refine with OpenStreetMap")
                     }
+                    .settingSwitch()
                     .settingRowPadding()
 
                     SettingRowDivider()
@@ -48,6 +49,7 @@ struct VenueLocationsView: View {
                     Toggle(isOn: $refreshIncludesMaps) {
                         SettingRowLabel("map", "Refresh All Venues")
                     }
+                    .settingSwitch()
                     .settingRowPadding()
                     .disabled(store.isRefreshingVenues)
 

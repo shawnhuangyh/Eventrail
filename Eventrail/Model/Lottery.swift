@@ -445,18 +445,6 @@ nonisolated extension LotteryEntry {
         return entries
     }
 
-    /// Whether this build reads back exactly what the column holds: nothing
-    /// it cannot decode, and no key or value it would drop in writing the
-    /// list out again. Empty is understood.
-    ///
-    /// What ``LibraryEntry/tracking`` asks before writing the column over —
-    /// a list a later build wrote, read here with its new parts left out,
-    /// must not be written back without them because the note beside it
-    /// was edited.
-    static func understands(column text: String) -> Bool {
-        text.isEmpty || entries(inColumn: text).map(columnText(of:)) == text
-    }
-
     /// One entry as its own row holds it (``LibraryLottery``): JSON, its keys
     /// sorted, so an unchanged entry is the same text and not a change to send.
     static func rowText(of entry: LotteryEntry) -> String {
@@ -475,14 +463,6 @@ nonisolated extension LotteryEntry {
         let entry = try? JSONDecoder().decode(LotteryEntry.self, from: Data(text.utf8))
         reads.setObject(ColumnRead(entries: entry.map { [$0] }), forKey: key)
         return entry
-    }
-
-    /// Whether this build reads back exactly what a row holds — what a row is
-    /// asked before it is written over, as a column is (``understands(column:)``):
-    /// an entry a later build wrote, read here with its new parts left out,
-    /// is written again only where the reader changed that entry.
-    static func understands(row text: String) -> Bool {
-        text.isEmpty || entry(inRow: text).map(rowText(of:)) == text
     }
 
     /// `NSCache` is safe to use from any thread, and lets go of what it holds

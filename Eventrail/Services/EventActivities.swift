@@ -28,6 +28,9 @@ import UIKit
 /// — for a door time or a seat written since, and for the island's outline,
 /// which only takes one colour. There is no server to push updates from, and
 /// none is wanted.
+///
+/// **The Mac has none**: ActivityKit is not on Mac Catalyst, so there this is
+/// never enabled, the sheet offers nothing, and every call asks nothing.
 @MainActor @Observable
 final class EventActivities {
     static let shared = EventActivities()
@@ -59,7 +62,9 @@ final class EventActivities {
     private weak var store: EventStore?
     /// The refresh at the next change of stage, while the app is running.
     private var wake: Task<Void, Never>?
+    #if !targetEnvironment(macCatalyst)
     private var watched: Set<Activity<EventActivityAttributes>.ID> = []
+    #endif
     /// Events whose activity is being asked for — its flyer fetched, the
     /// request not yet made — so a second tap asks nothing and a refresh in
     /// between leaves the flyer alone.
@@ -71,6 +76,9 @@ final class EventActivities {
     private var pendingRefresh: Task<Void, Never>?
 
     private init() {
+        #if targetEnvironment(macCatalyst)
+        isEnabled = false
+        #else
         let authorization = ActivityAuthorizationInfo()
         isEnabled = authorization.areActivitiesEnabled
         Task {
@@ -81,6 +89,7 @@ final class EventActivities {
         }
         for activity in Activity<EventActivityAttributes>.activities { watch(activity) }
         read()
+        #endif
     }
 
     /// Whether the sheet offers one for `event`: kept, held a ticket for, with
@@ -119,21 +128,25 @@ final class EventActivities {
         guard let state = state(for: event, seat: "", at: now) else { return nil }
         let earliest = earliestStart(of: state)
         guard now < earliest else { return nil }
-        return calendar.isDate(earliest, inSameDayAs: now) ? .tooEarly(earliest: earliest) : .beforeItsDay
+        return calendar.asGregorian.isDate(earliest, inSameDayAs: now) ? .tooEarly(earliest: earliest) : .beforeItsDay
     }
 
     /// Starts the event's activity, at once. Asks nothing where it already
     /// has one, and refuses where, started now, it would end before the event
     /// did — see ``refusal(for:at:in:)``.
     func start(for event: Event, tracking: Tracking) async throws {
+        #if !targetEnvironment(macCatalyst)
         guard !Self.live.contains(where: { $0.attributes.eventID == event.id }) else { return }
         if let refusal = Self.refusal(for: event) { throw refusal }
         let now = Date.now
         guard let state = Self.state(for: event, seat: tracking.seat, at: now),
               starting.insert(event.id).inserted else { return }
         defer { starting.remove(event.id) }
-        // Before the request, so the first time it is drawn has the flyer.
-        await Self.keepPoster(for: event)
+        // Before the request, so the first time it is drawn has the flyer —
+        // but not for long: a tap on a slow connection waited out the whole
+        // download before anything happened. Left without it, the activity's
+        // next refresh fetches it (``catchUp()``).
+        await Self.keepPoster(for: event, waitingAtMost: .seconds(2))
         let attributes = EventActivityAttributes(
             eventID: event.id, title: event.title, venue: event.venue,
             link: event.sourceURL, opens: now)
@@ -143,10 +156,12 @@ final class EventActivities {
             pushType: nil)
         read()
         scheduleWake()
+        #endif
     }
 
     /// Ends the event's activity, or calls off a scheduled one.
     func stop(for event: Event) async {
+        #if !targetEnvironment(macCatalyst)
         for activity in Activity<EventActivityAttributes>.activities
         where activity.attributes.eventID == event.id {
             await activity.end(nil, dismissalPolicy: .immediate)
@@ -154,6 +169,7 @@ final class EventActivities {
         dropPosters()
         read()
         scheduleWake()
+        #endif
     }
 
     /// Brings what is up into line with the library a second from now, where
@@ -201,6 +217,7 @@ final class EventActivities {
     }
 
     private func catchUp() async {
+        #if !targetEnvironment(macCatalyst)
         let store = self.store
         let now = Date.now
         for activity in Self.live {
@@ -227,9 +244,12 @@ final class EventActivities {
             }
         }
         dropPosters()
+        #endif
     }
 
     // MARK: - Keeping track
+
+    #if !targetEnvironment(macCatalyst)
 
     /// The activities still to come or still on — what a refresh looks after.
     private static var live: [Activity<EventActivityAttributes>] {
@@ -258,10 +278,14 @@ final class EventActivities {
         }
         if statuses != self.statuses { self.statuses = statuses }
     }
+    #else
+    private func read() {}
+    #endif
 
     /// Asks to run again at the next change of stage: in this process while
     /// it lasts, and as a background refresh for when it does not.
     private func scheduleWake() {
+        #if !targetEnvironment(macCatalyst)
         wake?.cancel()
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.refreshTask)
         let next = Self.live.compactMap(\.content.state.nextChange).min()
@@ -275,6 +299,7 @@ final class EventActivities {
         request.earliestBeginDate = next
         // Refused in the Simulator, which runs no background refresh.
         try? BGTaskScheduler.shared.submit(request)
+        #endif
     }
 
     // MARK: - What an activity says
@@ -289,24 +314,35 @@ final class EventActivities {
         let ends = times.ends.flatMap { $0 > starts ? $0 : nil }
         let doors = times.doors.flatMap { $0 < starts ? $0 : nil }
         let runsTo = ends ?? starts.addingTimeInterval(Event.assumedLength)
-        let display = UserDefaults.standard.string(forKey: TimeDisplay.storageKey)
-            .flatMap(TimeDisplay.init(rawValue:)) ?? .venue
         return .init(stage: .at(now, doors: doors, starts: starts, runsTo: runsTo),
                      doors: doors, starts: starts, ends: ends, runsTo: runsTo,
-                     timeZone: event.shown(on: display).timeZone, seat: seat)
+                     timeZone: event.shown(on: .stored).timeZone, seat: seat)
     }
 
     // MARK: - The flyer
 
+    #if !targetEnvironment(macCatalyst)
     /// Leaves the event's flyer where the extension can read it, sized for the
     /// largest place the activity draws it (36 × 50 points, at 3×). The
     /// extension cannot download anything as it draws, and a picture larger
     /// than the presentation can stop the system starting the activity at all.
-    private static func keepPoster(for event: Event) async {
+    ///
+    /// Waiting on the host no longer than `limit`, where one is given.
+    private static func keepPoster(for event: Event, waitingAtMost limit: Duration? = nil) async {
         guard let url = event.imageURL,
               let file = EventActivityAttributes.posterFile(for: event.id) else { return }
         var image = await ImageCache.shared.storedImage(for: url)
-        if image == nil { image = await ImageCache.shared.image(for: url) }
+        if image == nil, let limit {
+            image = await withTaskGroup(of: UIImage?.self) { group in
+                group.addTask { await ImageCache.shared.image(for: url) }
+                group.addTask { try? await Task.sleep(for: limit); return nil }
+                let first = await group.next() ?? nil
+                group.cancelAll()
+                return first
+            }
+        } else if image == nil {
+            image = await ImageCache.shared.image(for: url)
+        }
         guard let image, let data = downsized(image).jpegData(compressionQuality: 0.8) else { return }
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
@@ -346,4 +382,5 @@ final class EventActivities {
             if !kept.contains(id), !starting.contains(id) { try? FileManager.default.removeItem(at: file) }
         }
     }
+    #endif
 }

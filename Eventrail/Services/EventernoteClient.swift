@@ -6,7 +6,9 @@ import Foundation
 /// can load and imports the fields they render. Every request is a GET: nothing
 /// the reader records in this app is ever written back to Eventernote, and no
 /// account is involved. Requests stay off the main actor — a listing is roughly
-/// 50KB of markup to walk.
+/// 50KB of markup to walk — so each is `@concurrent`: a plain `nonisolated
+/// async` function runs on its caller's actor under approachable concurrency,
+/// and the screens and stores that ask are on the main one.
 nonisolated struct EventernoteClient: Sendable {
     static let site = URL(string: "https://www.eventernote.com")!
     static let shared = EventernoteClient()
@@ -65,7 +67,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// The order is always asked for by name, newest first included, rather
     /// than left to the site's default: the Search tab's own narrowing leans on
     /// the listing being in date order.
-    func searchEvents(keyword: String, areaID: Int? = nil, order: SearchOrder = .newestFirst,
+    @concurrent func searchEvents(keyword: String, areaID: Int? = nil, order: SearchOrder = .newestFirst,
                       page: Int = 1) async throws -> EventernotePage<Event> {
         var query = ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)",
                      "sort": "event_date", "order": order.order]
@@ -74,7 +76,7 @@ nonisolated struct EventernoteClient: Sendable {
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
-    func searchPerformers(keyword: String, page: Int = 1) async throws -> EventernotePage<PerformerProfile> {
+    @concurrent func searchPerformers(keyword: String, page: Int = 1) async throws -> EventernotePage<PerformerProfile> {
         let html = try await html(
             at: "/actors/search",
             query: ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)"]
@@ -88,7 +90,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// page is to search for the name. Only an exact match is taken: the search
     /// matches on the kana reading too, so the next-best row is a different
     /// person rather than a near miss of the same one.
-    func performer(named name: String) async throws -> PerformerProfile? {
+    @concurrent func performer(named name: String) async throws -> PerformerProfile? {
         try await searchPerformers(keyword: name).items.first { $0.name == name }
     }
 
@@ -97,7 +99,7 @@ nonisolated struct EventernoteClient: Sendable {
     ///
     /// The slug is already escaped exactly as Eventernote escaped it, so the URL
     /// is built by hand rather than re-encoded.
-    func events(forPerformer performer: PerformerProfile, page: Int = 1) async throws -> EventernotePage<Event> {
+    @concurrent func events(forPerformer performer: PerformerProfile, page: Int = 1) async throws -> EventernotePage<Event> {
         let path = "/actors/\(performer.slug)/\(performer.id)/events"
         let html = try await html(at: path, query: ["limit": "\(Self.pageSize)", "page": "\(page)"],
                                   isPreEncoded: true)
@@ -119,7 +121,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// the Search tab's results are narrowed. `start_time` is one of the
     /// orders its menu offers, and puts the events with no start published
     /// first.
-    func events(on day: Date, areaID: Int? = nil, page: Int = 1) async throws -> EventernotePage<Event> {
+    @concurrent func events(on day: Date, areaID: Int? = nil, page: Int = 1) async throws -> EventernotePage<Event> {
         var query = Self.dayQuery(day, areaID: areaID)
         query["limit"] = "\(Self.pageSize)"
         query["page"] = "\(page)"
@@ -131,7 +133,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// its 新着 tab. In the order they were added rather than by date, so a
     /// date already past is among them wherever somebody filed one late. The
     /// tab takes no `area_id` either.
-    func newestEvents() async throws -> EventernotePage<Event> {
+    @concurrent func newestEvents() async throws -> EventernotePage<Event> {
         let html = try await html(at: Self.newestPath, query: Self.newestQuery)
         return try EventernotePages.events(in: html, page: 1, pageSize: Self.newestCount)
     }
@@ -179,7 +181,7 @@ nonisolated struct EventernoteClient: Sendable {
 
     /// Reads one member's public page, which is what confirms a handle exists
     /// before the app records it.
-    func profile(forUser handle: String) async throws -> EventernoteProfile {
+    @concurrent func profile(forUser handle: String) async throws -> EventernoteProfile {
         let html = try await html(at: "/users/\(handle)", query: [:])
         guard let profile = EventernotePages.profile(in: html, handle: handle) else {
             throw Failure.unreadable
@@ -192,7 +194,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// The listing is the same `gb_listevent` block the search results use, so
     /// the rows carry the same fields and the same `isDetailed == false`. It
     /// runs newest first and mixes dates still to come in with the past.
-    func events(forUser handle: String, page: Int = 1) async throws -> EventernotePage<Event> {
+    @concurrent func events(forUser handle: String, page: Int = 1) async throws -> EventernotePage<Event> {
         let html = try await html(
             at: "/users/\(handle)/events",
             query: ["limit": "\(Self.importPageSize)", "page": "\(page)"]
@@ -203,22 +205,56 @@ nonisolated struct EventernoteClient: Sendable {
     // MARK: - One event
 
     /// Imports an event's own page, and the venue's page behind it for the
-    /// address and capacity the detail sheet prints.
-    func detail(for event: Event) async throws -> Event {
+    /// address and capacity the detail sheet prints — read once a run where a
+    /// run hands in its `halls`.
+    @concurrent func detail(for event: Event, halls: HallPages? = nil) async throws -> Event {
         let page = try await html(at: "/events/\(event.id)", query: [:])
         guard var imported = EventernotePages.event(in: page, id: event.id) else {
             throw Failure.unreadable
         }
 
         // A venue page that will not load is not worth failing the import over:
-        // the event itself has already been read.
-        if let placeID = imported.placeID,
-           let venue = try? await html(at: "/places/\(placeID)", query: [:]) {
-            imported.venueDetail = EventernotePages.venueDetail(in: venue)
-            imported.venueAddress = EventernotePages.venueAddress(in: venue)
+        // the event itself has already been read. A refusal is, though: the
+        // next request would be refused too, and a run going on past it went on
+        // asking a site that had said to stop (``Failure/isRateLimited``).
+        if let placeID = imported.placeID {
+            do {
+                let read = { @Sendable in
+                    let venue = try await html(at: "/places/\(placeID)", query: [:])
+                    return HallPage(detail: EventernotePages.venueDetail(in: venue),
+                                    address: EventernotePages.venueAddress(in: venue))
+                }
+                let hall = if let halls { try await halls.page(placeID, read: read) } else { try await read() }
+                imported.venueDetail = hall.detail
+                imported.venueAddress = hall.address
+            } catch let failure as Failure where failure.isRateLimited {
+                throw failure
+            } catch {}
         }
         imported.readAt = .now
         return event.merging(imported)
+    }
+
+    /// What an event's read takes from its hall's page.
+    struct HallPage: Sendable {
+        let detail: String?
+        let address: String?
+    }
+
+    /// The hall pages one run of reads has asked for, by place id — so a run
+    /// over a library's events, a few dozen halls between nine hundred of
+    /// them, reads each hall's page once rather than once an event: the run
+    /// of requests the site stops answering. A page asked for while another
+    /// read of it is on its way waits for that one.
+    actor HallPages {
+        private var pages: [Int: Task<HallPage, any Error>] = [:]
+
+        func page(_ id: Int, read: @escaping @Sendable () async throws -> HallPage) async throws -> HallPage {
+            if let asked = pages[id] { return try await asked.value }
+            let asking = Task { try await read() }
+            pages[id] = asking
+            return try await asking.value
+        }
     }
 
     // MARK: - One venue
@@ -233,7 +269,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// A name the site files no hall under, or a hall whose page prints no
     /// address, is nil — an answer, and a different thing from the request
     /// failing.
-    func address(forVenue venue: String) async throws -> String? {
+    @concurrent func address(forVenue venue: String) async throws -> String? {
         guard let match = try await self.venue(named: venue) else { return nil }
         return EventernotePages.venueAddress(in: try await html(at: "/places/\(match.id)", query: [:]))
     }
@@ -244,7 +280,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// same reason: the search matches on part of a name, so the next-best row
     /// is a different hall in a different town. A name the site files no hall
     /// under is nil — an answer, and a different thing from the request failing.
-    func venue(named venue: String) async throws -> PlaceListing? {
+    @concurrent func venue(named venue: String) async throws -> PlaceListing? {
         let name = venue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return nil }
 
@@ -255,7 +291,7 @@ nonisolated struct EventernoteClient: Sendable {
 
     /// One hall's own page: where it is, how many it holds, and the walk from
     /// the station.
-    func venue(id: Int) async throws -> VenueProfile {
+    @concurrent func venue(id: Int) async throws -> VenueProfile {
         let page = try await html(at: "/places/\(id)", query: [:])
         guard let venue = EventernotePages.venue(in: page, id: id) else {
             throw Failure.unreadable
@@ -271,7 +307,7 @@ nonisolated struct EventernoteClient: Sendable {
     /// more than "372件" about the rest of them. This is the listing behind
     /// that link, which pages and prints its total the way every other listing
     /// on the site does.
-    func events(atVenue id: Int, page: Int = 1) async throws -> EventernotePage<Event> {
+    @concurrent func events(atVenue id: Int, page: Int = 1) async throws -> EventernotePage<Event> {
         let html = try await html(at: "/places/\(id)/events",
                                   query: ["limit": "\(Self.pageSize)", "page": "\(page)"])
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)

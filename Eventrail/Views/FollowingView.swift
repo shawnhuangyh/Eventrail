@@ -13,6 +13,8 @@ import SwiftUI
 /// ``FollowingRead``.
 struct FollowingView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     @Environment(FollowedDates.self) private var followed
     @Environment(VenueRegions.self) private var venues
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
@@ -65,7 +67,6 @@ struct FollowingView: View {
     /// to be able to name what they are counting out of.
     private var published: [Event] { followed.events(for: shown) }
 
-    private var events: [Event] { narrowed(published) }
 
     /// Holds a list to the chosen window and areas, then to the unread ones if
     /// that is asked for. An untouched filter narrows nothing, so this is the
@@ -83,26 +84,38 @@ struct FollowingView: View {
         return events.filter { filter.matches($0, in: venues.region(of: $0)) }
     }
 
-    /// Broken into months the same way the library's own list is — ``events``
-    /// is already date-ordered, which is all ``EventGroup/byMonth(_:)`` asks of
-    /// its caller.
-    private var groups: [EventGroup] {
-        EventGroup.byMonth(events)
+    /// What the tab shows, worked out once a drawing and handed down: each of
+    /// these was a property of its own, read ten times a redraw, and every
+    /// read went over every followed date again.
+    private struct Listing {
+        /// Every date of everyone followed — what the subtitle counts.
+        let everyone: [Event]
+        /// Everything published for whoever is on screen, before the filter.
+        let published: [Event]
+        /// What the list shows: `published` held to the filter.
+        let events: [Event]
+        /// Broken into months the same way the library's own list is —
+        /// `events` is already date-ordered, which is all
+        /// ``EventGroup/byMonth(_:)`` asks of its caller.
+        let groups: [EventGroup]
+        /// Selecting reaches what is on screen and no further, as it does in
+        /// My Events.
+        let ids: Set<Event.ID>
     }
 
-    /// Selecting reaches what is on screen and no further, as it does in My
-    /// Events.
-    private var shownIDs: Set<Event.ID> { Set(events.map(\.id)) }
-
-    private var chosen: [Event] { events.filter { selection.contains($0.id) } }
-
-    private var unreadCount: Int {
-        followed.events(for: performers).count(where: store.isUnread)
+    private var listing: Listing {
+        let everyone = followed.events(for: performers)
+        let published = shown == performers ? everyone : followed.events(for: shown)
+        let events = narrowed(published)
+        return Listing(everyone: everyone, published: published, events: events,
+                       groups: EventGroup.byMonth(events), ids: Set(events.map(\.id)))
     }
 
     var body: some View {
+        let listing = self.listing
+        let subtitle = subtitle(listing)
         NavigationStack(path: $path) {
-            List(selection: $selection) {
+            List(selection: $selection.listSelection()) {
                 if performers.isEmpty {
                     nobodyFollowed.bareRow()
                 } else {
@@ -120,13 +133,13 @@ struct FollowingView: View {
                     // stays up and the failure goes under it.
                     if let failure = followed.failure, !holdsAnything {
                         SearchFailure(message: failure) { await reload() }.bareRow()
-                    } else if groups.isEmpty {
+                    } else if listing.groups.isEmpty {
                         Group {
                             if followed.isLoading {
                                 SearchProgress()
-                            } else if filter.isNarrowing, filtered(published).isEmpty {
+                            } else if filter.isNarrowing, filtered(listing.published).isEmpty {
                                 nothingMatches
-                            } else if unreadOnly, !published.isEmpty {
+                            } else if unreadOnly, !listing.published.isEmpty {
                                 allRead
                             } else {
                                 noDatesPublished
@@ -135,7 +148,7 @@ struct FollowingView: View {
                         .bareRow()
                         failureNote
                     } else {
-                        months
+                        months(listing.groups)
                         if followed.isLoading { SearchProgress(compact: true).bareRow() }
                         failureNote
                         footnote
@@ -159,17 +172,16 @@ struct FollowingView: View {
             // its field: the tab's own content stops short of the bar, so the
             // capsule rests just above it, and the dates scroll clear of it.
             .safeAreaInset(edge: .bottom) {
-                if !performers.isEmpty, !isSelecting { filterCapsule }
+                if !performers.isEmpty, !isSelecting { filterCapsule(listing.published) }
             }
             .monthSections()
-            .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
+            .pickingEditMode(isSelecting)
             .washBackground()
             .navigationTitle("Following")
             .navigationSubtitle(subtitle)
-            // Selecting takes the bottom of the screen over, as it does in My
-            // Events: the tab bar stands down for the actions on what is picked.
-            .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
-            .toolbar { toolbar }
+            .largeTitleOnMac(Text("Following"), subtitle: subtitle)
+            .pickingRows(isSelecting, selection: $selection, closing: $openEvent)
+            .toolbar { toolbar(listing) }
             .venueDestination()
             .eventPane($openEvent)
             // The tab's own load places a ration of halls, which a list held
@@ -200,15 +212,8 @@ struct FollowingView: View {
             // Turning the filter off lets go of what it was keeping, and
             // turning it back on starts from what is unread now.
             .onChange(of: unreadOnly) { readWhileFiltering.removeAll() }
-            .onChange(of: isSelecting) {
-                selection.removeAll()
-                // Picking takes the screen over, beside the fold too: the event
-                // open beside the list goes, rather than keep its own buttons in
-                // the bar beside the picking's, or stay up once picked and removed.
-                if isSelecting { openEvent = nil }
-            }
             // Nothing stays picked behind a filter that no longer shows it.
-            .onChange(of: shownIDs) { _, shown in selection.formIntersection(shown) }
+            .onChange(of: listing.ids) { _, shown in selection.formIntersection(shown) }
             .environment(\.imagesCheckedSince, imagesCheckedSince)
         }
     }
@@ -217,7 +222,7 @@ struct FollowingView: View {
     /// While the filter is narrowing, how much of it is on screen — a count
     /// that dropped without saying what it dropped out of would read as dates
     /// having gone missing.
-    private var subtitle: Text {
+    private func subtitle(_ listing: Listing) -> Text {
         guard !performers.isEmpty else { return Text("Nobody followed yet") }
         if isSelecting {
             return selection.isEmpty
@@ -226,19 +231,19 @@ struct FollowingView: View {
         }
         let people = Text("^[\(performers.count) performer](inflect: true)")
         guard filter.isNarrowing || unreadOnly else {
-            let dates = Text("^[\(followed.events(for: performers).count) event](inflect: true)")
-            let unread = unreadCount
+            let dates = Text("^[\(listing.everyone.count) event](inflect: true)")
+            let unread = listing.everyone.count(where: store.isUnread)
             guard unread > 0 else { return Text("\(people) · \(dates)") }
             return Text("\(people) · \(dates) · \(unread) unread")
         }
-        let shown = Text("\(events.count) of \(Text("^[\(published.count) event](inflect: true)"))")
+        let shown = Text("\(listing.events.count) of \(Text("^[\(listing.published.count) event](inflect: true)"))")
         return Text("\(people) · \(shown)")
     }
 
     // MARK: - The bar
 
     @ToolbarContentBuilder
-    private var toolbar: some ToolbarContent {
+    private func toolbar(_ listing: Listing) -> some ToolbarContent {
         if !performers.isEmpty {
             if isSelecting {
                 ToolbarItem(placement: .primaryAction) {
@@ -247,12 +252,12 @@ struct FollowingView: View {
                 // Where Mail keeps it: the pick-everything control opposite
                 // the way out.
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(selection == shownIDs ? "Deselect All" : "Select All") {
-                        selection = selection == shownIDs ? [] : shownIDs
+                    Button(selection == listing.ids ? "Deselect All" : "Select All") {
+                        selection = selection == listing.ids ? [] : listing.ids
                     }
                 }
                 ToolbarItemGroup(placement: .bottomBar) {
-                    markButton
+                    markButton(picked: listing.events.filter { selection.contains($0.id) })
                     Spacer()
                 }
             } else {
@@ -262,14 +267,13 @@ struct FollowingView: View {
                 ToolbarSpacer(.fixed, placement: .primaryAction)
                 ToolbarItem(placement: .primaryAction) {
                     Button("Select Events", systemImage: "pencil") { isSelecting = true }
-                        .disabled(events.isEmpty)
+                        .disabled(listing.events.isEmpty)
                 }
             }
         }
     }
 
-    private var markButton: MarkReadButton {
-        let picked = chosen
+    private func markButton(picked: [Event]) -> MarkReadButton {
         let marksRead = picked.isEmpty || picked.contains(where: store.isUnread)
         return MarkReadButton(marksRead: marksRead, isEnabled: !picked.isEmpty) {
             mark(picked, read: marksRead)
@@ -293,8 +297,12 @@ struct FollowingView: View {
     /// The capsule over the tab bar — see ``ListMenu`` — holding the filter,
     /// without the order the Search tab's holds: the dates here run one way,
     /// soonest first. Its face says what the list is held to.
-    private var filterCapsule: some View {
-        ListMenu(describes: "Filter", value: filterSummary) {
+    private func filterCapsule(_ published: [Event]) -> some View {
+        // How the dates inside the window break down by area, with the halls
+        // nothing has placed counted under nil — what each area in the menu
+        // would leave.
+        let tally = venues.tally(published.filter { filter.window.contains($0) })
+        return ListMenu(describes: "Filter", value: filterSummary) {
             // In each submenu the choice that holds nothing back stands above
             // a divider and the ones that do below it, as on the Search tab.
             Section("Filter") {
@@ -340,16 +348,7 @@ struct FollowingView: View {
                 }
             }
         } face: {
-            HStack(spacing: 8) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .secondary)
-                filterSummary
-                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .primary)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
+            FilterMenuFace(summary: filterSummary, isNarrowing: filter.isNarrowing)
         }
     }
 
@@ -363,12 +362,6 @@ struct FollowingView: View {
         return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
     }
 
-    /// How the dates inside the window break down by area, with the halls
-    /// nothing has placed counted under nil — what each area in the menu
-    /// would leave.
-    private var tally: [Region?: Int] {
-        venues.tally(published.filter { filter.window.contains($0) })
-    }
 
     /// One area, picked or let go of beside the others.
     private func picking(_ region: Region) -> Binding<Bool> {
@@ -520,7 +513,7 @@ struct FollowingView: View {
     /// Sectioned, and so pinned the way the library tab's own months are: a
     /// long list of published dates is read by month, so the month being read
     /// stays on screen while it is being read.
-    @ViewBuilder private var months: some View {
+    @ViewBuilder private func months(_ groups: [EventGroup]) -> some View {
         ForEach(groups) { group in
             Section {
                 ForEach(group.events) { event in
@@ -534,19 +527,23 @@ struct FollowingView: View {
                         // In edit mode the row belongs to the selection, not to
                         // the sheet or to the controls drawn on it.
                         .allowsHitTesting(!isSelecting)
-                        .listRowInsets(GroupHeader.rowInsets)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
+                        .pickedByClickOnMac(isSelecting, isPicked: selection.contains(event.id)) {
+                            selection.toggle(event.id)
+                        }
+                        .groupedEventRow()
                         // Toward the dot, as in Mail: a swipe from the leading
                         // edge reads the row, or unreads it.
+                        // Not while picking, which a Mac does out of edit mode.
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                mark([event], read: isUnread)
-                            } label: {
-                                Label(isUnread ? "Read" : "Unread",
-                                      systemImage: isUnread ? "envelope.open" : "envelope.badge")
+                            if !isSelecting {
+                                RowReadButton(isUnread: isUnread) { mark([event], read: isUnread) }
                             }
-                            .tint(Color.brandTint)
+                        }
+                        // The swipe again, from a right-click on a Mac.
+                        .contextMenuOnMac {
+                            if !isSelecting {
+                                RowReadButton(isUnread: isUnread, inMenu: true) { mark([event], read: isUnread) }
+                            }
                         }
                 }
             } header: {

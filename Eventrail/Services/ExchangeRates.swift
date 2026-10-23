@@ -33,6 +33,13 @@ final class ExchangeRates {
     private(set) var isReading = false
 
     @ObservationIgnored private var running: Task<Void, Never>?
+    /// When the last read failed, so the next is held off for ``patience``:
+    /// offline, every screen that converts asked again as it opened, each
+    /// waiting out the request's timeout.
+    @ObservationIgnored private var failedAt: Date?
+
+    /// How long a failed read holds off the next.
+    static let patience: TimeInterval = 5 * 60
     @ObservationIgnored private let file: URL?
 
     /// Twelve hours: rates are published once a working day, so a copy is
@@ -65,6 +72,7 @@ final class ExchangeRates {
     func refreshIfStale() async {
         if let rates, Date.now.timeIntervalSince(rates.readAt) < Self.window { return }
         if let running { return await running.value }
+        if let failedAt, Date.now.timeIntervalSince(failedAt) < Self.patience { return }
         let task = Task { await read() }
         running = task
         await task.value
@@ -77,11 +85,13 @@ final class ExchangeRates {
         do {
             let rates = try await Self.fetch()
             self.rates = rates
+            failedAt = nil
             if let file {
                 let data = try JSONEncoder().encode(rates)
                 Task.detached(priority: .utility) { try? data.write(to: file, options: .atomic) }
             }
         } catch {
+            failedAt = .now
             Self.log.error("Exchange rates could not be read: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -96,19 +106,8 @@ final class ExchangeRates {
         let rate: Double
     }
 
-    enum Failure: Error {
-        case http(Int)
-        case unreadable
-    }
-
     @concurrent nonisolated private static func fetch() async throws -> CurrencyRates {
-        var request = URLRequest(url: endpoint, timeoutInterval: 20)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-            throw Failure.http(status)
-        }
-        let rows = try JSONDecoder().decode([Row].self, from: data)
+        let rows = try await ServiceRequest.json([Row].self, from: endpoint, timeout: 20)
         let days = DateFormatter()
         days.locale = Locale(identifier: "en_US_POSIX")
         days.timeZone = TimeZone(identifier: "UTC")
@@ -119,7 +118,7 @@ final class ExchangeRates {
             rates[row.quote] = row.rate
             if let day = days.date(from: row.date) { published = max(published, day) }
         }
-        guard !rates.isEmpty else { throw Failure.unreadable }
+        guard !rates.isEmpty else { throw ServiceRequest.Failure(host: endpoint.host(), status: nil) }
         return CurrencyRates(base: "EUR", rates: rates, published: published, readAt: .now)
     }
 }

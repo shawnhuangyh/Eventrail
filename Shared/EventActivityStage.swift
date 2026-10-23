@@ -28,6 +28,25 @@ nonisolated enum EventActivityStage: String, Codable, Hashable, Sendable {
     /// does on the event's sheet.
     static let soonBeforeStart: TimeInterval = 5 * 60
 
+    /// How long a performance runs when Eventernote has published a start but
+    /// no end — one figure for the app (`Event.assumedLength`), the widgets'
+    /// copy and the watch, so none of them puts an event over at another time.
+    static let assumedLength: TimeInterval = 3 * 60 * 60
+
+    /// What the event is doing at this stage, in the Live Activity's words —
+    /// its headline, and the watch's. `countdown` draws the timer to a moment,
+    /// each from its own now.
+    func headline(doors: Date?, starts: Date, countdown: (Date) -> Text) -> Text {
+        switch self {
+        case .beforeDoors: Text("Doors in \(countdown(doors ?? starts))")
+        case .beforeShow: Text("Starts in \(countdown(starts))")
+        case .doorsOpen: Text("Doors open")
+        case .startingSoon: Text("Starting in \(countdown(starts))")
+        case .onNow: Text("On now")
+        case .wrapped: Text("That's a wrap")
+        }
+    }
+
     /// Where an event with these times stands at `now`.
     static func at(_ now: Date, doors: Date?, starts: Date, runsTo: Date) -> Self {
         if now >= runsTo { return .wrapped }

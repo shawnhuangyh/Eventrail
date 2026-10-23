@@ -107,6 +107,8 @@ struct LotteryEntryView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Back", systemImage: "chevron.left") { isConfirmingDiscard = true }
                         .tint(.primary)
+                        // Escape asks too, as the sheet's own X does.
+                        .keyboardShortcut(.cancelAction)
                         .confirmationDialog(isNew ? Text("Discard this entry?") : Text("Discard your changes?"),
                                             isPresented: $isConfirmingDiscard,
                                             titleVisibility: .visible) {

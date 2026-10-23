@@ -84,7 +84,9 @@ struct EventDetailView: View {
 
     /// Why the Live Activity could not be started, while that is being said.
     @State private var liveActivityFailure: String?
-    #if DEBUG
+    /// Whether the page is laid out in two columns — see ``leastWideWidth``.
+    @State private var isWide = false
+    #if DEBUG && !targetEnvironment(macCatalyst)
     /// The Live Activity bench is up — see ``LiveActivityTestView``.
     @State private var isTestingLiveActivity = false
     #endif
@@ -100,6 +102,8 @@ struct EventDetailView: View {
     @State private var flyerSaveFailure: PhotoSaveFailure?
     /// Whether ``TicketStubView`` is up over this sheet.
     @State private var isMakingStub = false
+    /// Another event of the same day, opened from the Same Day card.
+    @State private var openedSameDay: Event?
 
     /// What ``flyerFile`` is written from: the flyer, the title it is named
     /// for, and the last refresh by hand it has to be as fresh as.
@@ -201,10 +205,15 @@ struct EventDetailView: View {
 
     /// The map's Try Again: the page again first where it has not been read,
     /// since the address it brings is what the hall is looked up by.
+    ///
+    /// Asked again only where the page left the question as it was: an
+    /// address it brought is a new question, already being asked, and
+    /// raising the attempt as well asked Maps twice.
     private func retryVenueLookup() async {
         venueLookup = nil
+        let asked = venueKey
         if !event.isDetailed { await readPage(byHand: true) }
-        venueAttempts += 1
+        if venueKey == asked { venueAttempts += 1 }
     }
 
     /// Opens Maps on the hall this event is at — see ``VenueDirections``.
@@ -222,8 +231,10 @@ struct EventDetailView: View {
     /// Beside the list, in the list's own stack: the page, and its actions in
     /// the list's bar — on the Duo, the top of the system's rail, where the
     /// design draws them — under a close button in a capsule of its own, as
-    /// the sheet's heads the rail (``closeItem``). Closed, the half is empty
-    /// until another row is chosen.
+    /// the sheet's heads the rail (``closeItem``). The actions are a capsule
+    /// of their own too, apart from the list's buttons after them: run
+    /// together, the list's pencil joined the event's capsule as one of its
+    /// actions. Closed, the half is empty until another row is chosen.
     ///
     /// Tucked away out of sight — the screen gone whole while this holds a
     /// sheet up, see ``View/eventPane(_:)`` — it is handed no close button,
@@ -238,6 +249,7 @@ struct EventDetailView: View {
                     }
                     ToolbarSpacer(.fixed, placement: .primaryAction)
                     ToolbarItemGroup(placement: .primaryAction) { actions }
+                    ToolbarSpacer(.fixed, placement: .primaryAction)
                 }
             }
             // Beneath any sheet over the list: an event opened over it from
@@ -255,6 +267,8 @@ struct EventDetailView: View {
             detail
                 .toolbar(.hidden, for: .navigationBar)
                 .toolbar { actionBar }
+                // For the pages pushed on it, which have a bar.
+                .padNavigationBarOnMac()
                 // Inside the stack at the root, so the notice stands above the
                 // action bar rather than over it — the bar is part of the
                 // root's safe area, and nothing here has to know its height.
@@ -279,24 +293,26 @@ struct EventDetailView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     header
-                    timelineCard
-                    // Only for an event the reader keeps. Tracking answers
-                    // questions about an event they mean to be at — the ticket,
-                    // the seat, what it cost — so on an event that is not in
-                    // the library there is nothing for it to be about, and a
-                    // date opened from Following or Search shows the facts
-                    // alone until it is added. A removal keeps whatever was
-                    // written, so re-adding brings the tiles back as they were.
-                    if store.isInLibrary(event) { ticketTiles }
-                    summaryCard
-                    if !event.performers.isEmpty { performersCard }
-                    venueCard
-                    linksCard
-                    if let importFailure {
-                        RefreshFailureNote(message: importFailure)
-                            .padding(.horizontal, 16)
+                    if isWide {
+                        // The cards' own margins meet between the columns,
+                        // twice as wide as a margin; drawn together, the gap
+                        // is the one between two cards in a column.
+                        HStack(alignment: .top, spacing: -22) {
+                            VStack(spacing: 14) { eventCards }
+                            VStack(spacing: 14) {
+                                venueCard
+                                if !event.performers.isEmpty { performersCard }
+                                linksCard
+                                provenanceLines
+                            }
+                        }
+                    } else {
+                        eventCards
+                        if !event.performers.isEmpty { performersCard }
+                        venueCard
+                        linksCard
+                        provenanceLines
                     }
-                    footnote
                 }
                 // As wide as the sheet and no wider. A card's layout can come
                 // out a hair over the width it was offered — the timeline card
@@ -312,6 +328,9 @@ struct EventDetailView: View {
             // No pull: a pull down from the top of a sheet is how it is put
             // away. The page is read again from Refresh in the menu instead —
             // see ``RefreshMenuItem``.
+            .onGeometryChange(for: Bool.self) { proxy in
+                isMac && proxy.size.width >= Self.leastWideWidth
+            } action: { isWide = $0 }
 
             if floatsCloseButton {
                 closeButton
@@ -322,15 +341,22 @@ struct EventDetailView: View {
         .washBackground()
         .sheet(isPresented: $isEditingTicket, onDismiss: releaseHold) {
             TicketDetailsView(event: event, tracking: store.tracking(for: event))
+                .macSheetSize(.form)
         }
         .sheet(isPresented: $isMakingStub, onDismiss: releaseHold) {
             TicketStubView(event: event)
+                .macSheetSize(.form)
         }
+        .eventSheet($openedSameDay, onDismiss: releaseHold)
         .onChange(of: holdsSheet) { _, holds in
             if holds { sheetsHold?.set(holdID, holding: true) }
         }
         .onDisappear { sheetsHold?.set(holdID, holding: false) }
-        #if DEBUG
+        // Taken again on coming back with a sheet still up: a cover over
+        // Ticket Details — the document camera — takes this page off screen
+        // beneath it, and the hold went with it while Ticket Details stayed.
+        .onAppear { if holdsSheet { sheetsHold?.set(holdID, holding: true) } }
+        #if DEBUG && !targetEnvironment(macCatalyst)
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)
         }
@@ -383,6 +409,48 @@ struct EventDetailView: View {
             venueLookup = (key, found)
         }
     }
+
+    /// What the event is, and what the reader made of it: its hours, the
+    /// other events of its day, the ticket and the overview — the page's
+    /// first column where it has two (``isWide``).
+    @ViewBuilder
+    private var eventCards: some View {
+        timelineCard
+        // Beside the hours, since that is what it is about. Only
+        // where the reader keeps another event that day.
+        let sameDay = sameDay
+        if !sameDay.isEmpty {
+            SameDayCard(event: event, pairs: sameDay, lookup: mapLookup, clock: clock) {
+                openedSameDay = $0
+            }
+        }
+        // Only for an event the reader keeps. Tracking answers
+        // questions about an event they mean to be at — the ticket,
+        // the seat, what it cost — so on an event that is not in
+        // the library there is nothing for it to be about, and a
+        // date opened from Following or Search shows the facts
+        // alone until it is added. A removal keeps whatever was
+        // written, so re-adding brings the tiles back as they were.
+        if store.isInLibrary(event) { ticketTiles }
+        summaryCard
+    }
+
+    /// Why the page could not be read, where it could not, and where its
+    /// facts came from — the foot of the page, or of its second column.
+    @ViewBuilder
+    private var provenanceLines: some View {
+        if let importFailure {
+            RefreshFailureNote(message: importFailure)
+                .padding(.horizontal, 16)
+        }
+        footnote
+    }
+
+    /// How wide the page has to be to be laid out in two columns, as the Mac
+    /// design draws an event beside its list: the hall, its performers and
+    /// the links beside the rest. Only on a Mac, whose window leaves that
+    /// much beside a list; an iPad's half never does.
+    nonisolated static let leastWideWidth: CGFloat = 760
 
     /// Imports the event's own page for the times, billing, description and
     /// head count a search row does not carry — and reads it again when the
@@ -543,9 +611,10 @@ struct EventDetailView: View {
 
     /// Whether this page has a sheet of its own up that a change of the
     /// screen's layout would take away with it — Ticket Details, which writes
-    /// nothing until its checkmark, and the ticket stub. Said to the screen
+    /// nothing until its checkmark, the ticket stub, and another event of the
+    /// day opened from the Same Day card. Said to the screen
     /// (``EventSheetsHold``), which holds the page where it is meanwhile.
-    private var holdsSheet: Bool { isEditingTicket || isMakingStub }
+    private var holdsSheet: Bool { isEditingTicket || isMakingStub || openedSameDay != nil }
 
     /// Lets the screen move this page again, once the last of its sheets has
     /// gone — gone, not going: let go of as it began to go, the screen put
@@ -579,19 +648,33 @@ struct EventDetailView: View {
     ///
     /// The label survives as the accessibility one. A close button with no
     /// name is a button VoiceOver can only call "x mark".
+    ///
+    /// Escape presses it too, as it does every sheet's way out: a sheet on a
+    /// Mac cannot be pulled down (``closeShortcut``).
     private var closeButton: some View {
-        Button {
-            dismiss()
-        } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.secondary)
-                .frame(width: 36, height: 36)
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .glassCircle(interactive: true)
-        .accessibilityLabel("Close")
+        CloseButton(shortcut: closeShortcut) { dismiss() }
+    }
+
+    /// Escape, on the way out — but not while this page has a sheet of its
+    /// own up (``holdsSheet``). A key the sheet in front does not take falls
+    /// through to the one under it: with a round's page pushed in Ticket
+    /// Details, which keeps no Escape of its own while it has nothing to
+    /// lose, Escape put away this page and Ticket Details with it, and every
+    /// answer changed there.
+    private var closeShortcut: KeyboardShortcut? {
+        holdsSheet ? nil : .cancelAction
+    }
+
+    // MARK: - The same day
+
+    /// The other events the reader keeps on this one's day, each paired with
+    /// it — see ``SameDay``. Kept or not, this one is checked against the
+    /// library, so a date opened from Following or Search says what it would
+    /// clash with before it is added. Only while it is still ahead: a clash on
+    /// a day gone by is nothing to act on.
+    private var sameDay: [SameDay] {
+        guard event.isUpcoming else { return [] }
+        return SameDay.pairs(of: event, among: store.upcoming(onDayOf: event))
     }
 
     // MARK: - The event's clock
@@ -646,10 +729,15 @@ struct EventDetailView: View {
                     // as the dot before it is.
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         clockOffset
-                        clockSwitch
+                        if offersClockSwitch {
+                            clockSwitch
+                        }
                     }
                     .alignmentGuide(.firstTextBaseline) { $0[.firstTextBaseline] + 3 }
                 }
+                // The hall's clock usually arrives a second after the sheet
+                // opens, and the switch goes then if it is this device's.
+                .animation(.snappy, value: offersClockSwitch)
                 if let detail = detail(for: progress, at: now) {
                     detail
                         .scalingFont(size: 13, weight: .medium)
@@ -845,6 +933,8 @@ struct EventDetailView: View {
     /// A capsule of its own rather than a segmented picker, as the design
     /// draws it: the system's control is too tall and too wide to sit beside
     /// the headline. VoiceOver is handed the picker it stands for.
+    ///
+    /// Only where ``offersClockSwitch`` says there are two clocks.
     private var clockSwitch: some View {
         HStack(spacing: 2) {
             ForEach(TimeDisplay.allCases) { option in
@@ -880,6 +970,19 @@ struct EventDetailView: View {
                 }
             }
         }
+    }
+
+    /// Whether the switch has two clocks to choose between: not where the
+    /// hall keeps this device's own time zone, since both would print the
+    /// same times. Compared by zone, not by offset, on Shawn's word — so a
+    /// reader in Seoul still has the switch on a Tokyo date.
+    ///
+    /// Kept where the hall's clock is not known (``venueZone`` nil): whether
+    /// the two are one is not known either, and the switch is then all that
+    /// says the times are the hall's.
+    private var offersClockSwitch: Bool {
+        guard let venueZone else { return true }
+        return venueZone.identifier != TimeZone.current.identifier
     }
 
     /// Which clock this sheet's times are on, where the app has established it
@@ -962,27 +1065,16 @@ struct EventDetailView: View {
 
     private func stopBar(_ filled: Double, tint: Color) -> some View {
         ProgressView(value: min(max(filled, 0), 1))
-            .progressViewStyle(.linear)
+            .linearProgressAsOnPad()
             .tint(tint)
             .frame(minWidth: 20, idealWidth: 20, maxWidth: .infinity)
             .alignmentGuide(.timeMiddle) { $0[VerticalAlignment.center] }
             .accessibilityHidden(true)
     }
 
-    /// A time as the reader's locale writes it, with the AM or PM a
-    /// twelve-hour clock carries set small beside the digits.
+    /// A time on the clock this sheet prints on — see ``SwiftUI/Text/clock(_:in:size:)``.
     private func clock(_ instant: Date?, size: CGFloat) -> Text {
-        guard let instant else { return Text(verbatim: "—") }
-        var style = Date.FormatStyle(date: .omitted, time: .shortened)
-        style.timeZone = shown.timeZone
-        var time = instant.formatted(style.attributedStyle)
-        let periods = time.runs[\.dateField].compactMap { field, range in
-            field == .amPM ? range : nil
-        }
-        for range in periods {
-            time[range].font = .system(size: size * 0.6, weight: .bold)
-        }
-        return Text(time)
+        .clock(instant, in: shown.timeZone, size: size)
     }
 
     /// How long the show runs, from its start to its published end.
@@ -1231,6 +1323,7 @@ struct EventDetailView: View {
         ToolbarItem(placement: .bottomBar) {
             Button("Close", systemImage: "xmark") { dismiss() }
                 .tint(.primary)
+                .keyboardShortcut(closeShortcut)
         }
     }
 
@@ -1263,20 +1356,18 @@ struct EventDetailView: View {
             .tint(liveActivity == .running ? .trackAttended : .brandTint)
         }
 
-        if !keepsBarShort {
-            ShareLink(item: event.sourceURL)
-                .tint(.brandTint)
-        }
+        ShareLink(item: event.sourceURL)
+            .tint(.brandTint)
 
         moreMenu
             .tint(.brandTint)
     }
 
-    /// Whether the bar keeps to the heart of it — keeping the event, and the
-    /// menu — leaving the clock and Share to the menu, which carries both
-    /// again. Beside a list, where the close button heads the list's bar and
-    /// the list's own buttons follow: on the Duo's rail Following's filter
-    /// and pencil were folded into a second ⋯ to make room for them.
+    /// Whether the bar keeps to keeping the event, Share and the menu, leaving
+    /// the clock to the menu, which carries it again. Beside a list, where the
+    /// close button heads the list's bar and the list's own buttons follow:
+    /// on the Duo's rail, with the clock and Share both in the bar, Following's
+    /// filter and pencil were folded into a second ⋯ to make room for them.
     private var keepsBarShort: Bool {
         closeBeside != nil
     }
@@ -1318,16 +1409,13 @@ struct EventDetailView: View {
 
             // Anything that changes the reader's Eventernote account happens
             // on the official site, where they authenticate directly.
-            Link(destination: event.sourceURL) {
-                Label("Open in Eventernote", systemImage: "safari")
-            }
             // In a Task of its own: the menu does not wait for the read, and
             // the notice says how it went.
-            RefreshMenuItem(isRefreshing: isImporting) {
+            EventernotePageItems(page: event.sourceURL, isRefreshing: isImporting) {
                 Task { await refreshPage() }
             }
 
-            #if DEBUG
+            #if DEBUG && !targetEnvironment(macCatalyst)
             Divider()
             Button {
                 isTestingLiveActivity = true

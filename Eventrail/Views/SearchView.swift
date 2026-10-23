@@ -21,6 +21,10 @@ struct SearchView: View {
     @State private var events = Feed<Event>()
     @State private var performers = Feed<PerformerProfile>()
     @State private var openEvent: Event?
+    /// What is pushed over the results — one of the site's lists, a
+    /// performer, a hall — so a search handed in from outside the app can go
+    /// back to them (``takeRequest()``).
+    @State private var path = NavigationPath()
     /// What event results are narrowed to. Kept across searches, as a search
     /// form keeps its fields, until the reader clears it.
     @State private var filter = SearchFilter()
@@ -58,7 +62,7 @@ struct SearchView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 if term.isEmpty {
                     startingPoints
@@ -81,6 +85,7 @@ struct SearchView: View {
             .safeAreaBar(edge: .top) { BesideFoldScopes(scope: $scope) }
             .washBackground()
             .navigationTitle("Search")
+            .largeTitleOnMac(Text("Search"))
             .searchable(text: $query, prompt: Text("Search Eventernote events"))
             .searchPresentationToolbarBehavior(searchToolbarBehavior)
             .modifier(SearchScopes(scope: $scope))
@@ -104,6 +109,9 @@ struct SearchView: View {
     private func takeRequest() {
         guard let handed = request.wrappedValue else { return }
         request.wrappedValue = nil
+        // Back to the results: a page left pushed over them stood in front of
+        // the search it was handed, which showed only once it was backed out of.
+        path = NavigationPath()
         scope = .events
         query = handed
         store.remember(search: term)
@@ -324,24 +332,7 @@ struct SearchView: View {
                 }
             }
         } face: {
-            HStack(spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "line.3.horizontal.decrease")
-                        .foregroundStyle(filter.isNarrowing ? Color.brandTint : .secondary)
-                    filter.summary
-                        .foregroundStyle(filter.isNarrowing ? Color.brandTint : .primary)
-                        .lineLimit(1)
-                }
-                Circle()
-                    .fill(.tertiary)
-                    .frame(width: 3, height: 3)
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.up.arrow.down")
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .foregroundStyle(.secondary)
-            }
+            FilterMenuFace(summary: filter.summary, isNarrowing: filter.isNarrowing, sorts: true)
         }
     }
 

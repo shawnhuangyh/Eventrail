@@ -109,10 +109,29 @@ enum Region: String, CaseIterable, Identifiable, Hashable {
     /// other than an address — belongs to no area rather than to a guessed one.
     /// `nonisolated` for the reason ``prefectures`` is: ``JapanAddresses``
     /// asks it from off the main actor.
+    ///
+    /// Past a postal code at its head (``droppingPostalCode(_:)``): an address
+    /// kept by a build that left one there — after 〒 and a space — is read as
+    /// the hall's prefecture, not as an address abroad.
     nonisolated static func containing(address: String) -> Region? {
-        let address = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let address = droppingPostalCode(address)
         return allCases.first { region in
             region.prefectures.contains { address.hasPrefix($0) }
         }
+    }
+
+    /// `address` without the Japanese postal code at its head, trimmed — three
+    /// figures and four, after a 〒 or none, a space or a dash of any width
+    /// between — and nothing else: not the figures an address abroad opens
+    /// with, as 1600 Main St does.
+    nonisolated static func droppingPostalCode(_ address: String) -> String {
+        var address = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Only an address opening with 〒 or a figure is searched: this is
+        // asked of every date on Following each time the area filter counts.
+        guard let first = address.first, first == "〒" || first.isNumber else { return address }
+        if let code = address.prefixMatch(of: /〒?\s*[0-9０-９]{3}\s*[-－‐‑–—−ー]?\s*[0-9０-９]{4}(?![0-9０-９])/) {
+            address = String(address[code.range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return address
     }
 }

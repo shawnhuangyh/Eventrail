@@ -380,28 +380,43 @@ final class VenuePlaces {
     /// down as nowhere. Only "no such place" is asked again for that one
     /// (``foundRuleset``): the brackets are tried only once everything before
     /// them has found nothing.
-    private static let ruleset = 13
+    nonisolated static let ruleset = 13
 
-    /// The last ruleset whose answers *inside Japan* still stand.
-    private static let japanRuleset = 8
+    /// The last ruleset whose reading changed an answer *inside Japan*: one
+    /// made under it or any later one still stands there.
+    nonisolated private static let japanRuleset = 8
 
-    /// The last ruleset whose answers that *found* the hall still stand,
-    /// anywhere and by whichever source.
+    /// The ruleset from which an answer that *found* the hall still stands,
+    /// anywhere and by whichever source — made under it or any later one.
     ///
     /// A hall abroad placed by its address alone stands too, though the
     /// brackets might now find its building: an answer due to be asked again
     /// is passed over by everything reading the kept answers — the calendar
     /// mirror, the clocks — until a sheet or a refresh gets to it, and a pin
     /// and a clock gone meanwhile cost more than a building found sooner.
-    private static let foundRuleset = 12
+    nonisolated private static let foundRuleset = 12
 
     /// Whether `answer` was settled under a reading of Maps' answers that
     /// still holds for it: this one, or an older one whose change could not
     /// have moved it.
     private static func stillStands(_ answer: Answer) -> Bool {
-        answer.ruleset == ruleset
-            || (answer.ruleset == japanRuleset && answer.isInJapan)
-            || (answer.ruleset == foundRuleset && answer.wasFound)
+        stillStands(madeUnder: answer.ruleset, found: answer.wasFound, inJapan: answer.isInJapan)
+    }
+
+    /// ``stillStands(_:)`` for an answer made under `made`.
+    ///
+    /// From a ruleset on, never at it alone: compared for equality, every
+    /// raise of ``ruleset`` sent back every hall in Japan placed under the
+    /// one before — the calendar's pins and the Passport's dots gone until a
+    /// sheet or a refresh asked each again — unless the thresholds were moved
+    /// by hand with it. A later build's answer stands too: this one cannot
+    /// know what that reading changed, and asking again would only write the
+    /// older reading over it.
+    nonisolated static func stillStands(madeUnder made: Int?, found: Bool, inJapan: Bool) -> Bool {
+        guard let made else { return false }
+        return made >= ruleset
+            || (made >= japanRuleset && inJapan)
+            || (made >= foundRuleset && found)
     }
 
     /// How long "Maps has never heard of this hall" is believed for.
@@ -523,21 +538,29 @@ final class VenuePlaces {
     /// the sheets have looked up. An event at a hall nobody has opened yet is
     /// simply absent, and its entry carries the hall's name and no map until a
     /// later mirror, after the reader has opened it.
+    ///
+    /// Each hall's placing made once, however many of the events are held
+    /// there: a placing carries a map item, and nine hundred of them made
+    /// for a library's worth of a few dozen halls was most of a Spotlight
+    /// pass.
     func mapItems(for events: [Event]) -> [Event.ID: Placing] {
         let cache = cache
-        var read: [String] = []
+        var byHall: [String: Placing?] = [:]
         let placed: [Event.ID: Placing] = events.reduce(into: [:]) { placed, event in
-            // Read under the same rule a sheet reads it under, so an answer
-            // settled by a reading since found wrong is not still being
-            // written into the reader's calendar.
-            guard let venue = Venue(event),
-                  let answer = cache[venue.key], !Self.isWorthAskingAgain(answer),
-                  let placing = answer.placing
-            else { return }
-            placed[event.id] = placing
-            read.append(venue.key)
+            guard let venue = Venue(event) else { return }
+            let placing: Placing?
+            if let made = byHall[venue.key] {
+                placing = made
+            } else {
+                // Read under the same rule a sheet reads it under, so an
+                // answer settled by a reading since found wrong is not still
+                // being written into the reader's calendar.
+                placing = cache[venue.key].flatMap { Self.isWorthAskingAgain($0) ? nil : $0.placing }
+                byHall[venue.key] = .some(placing)
+            }
+            if let placing { placed[event.id] = placing }
         }
-        note(read)
+        note(byHall.compactMap { $0.value == nil ? nil : $0.key })
         return placed
     }
 
@@ -742,12 +765,15 @@ final class VenuePlaces {
             }
             return answer.placing.map(Lookup.placed) ?? .unplaced
         } catch is Deferred {
-            // Only OpenStreetMap could place it, and it may not be asked.
-            return .unplaced
+            // Only OpenStreetMap could place it, and it may not be asked —
+            // which leaves a pin held for it, due to be asked again, standing.
+            return known?.placing.map(Lookup.placed) ?? .unplaced
         } catch {
-            // Not written down, so the next screen to ask tries again.
+            // Not written down, so the next screen to ask tries again. A pin
+            // held for it meanwhile is still the hall's: shown rather than
+            // "couldn't load the venue's location".
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
-            return .failed
+            return known?.placing.map(Lookup.placed) ?? .failed
         }
     }
 
@@ -802,7 +828,20 @@ final class VenuePlaces {
     /// still holds: the building it found is kept rather than asked for
     /// again, and a building it did not have is not asked for again either.
     /// Without this, every refresh would ask about every building afresh.
+    ///
+    /// And Maps' own placing — the building, held against the published
+    /// address — is never written over by a lesser answer while it stands, as
+    /// the calendar mirror holds (``CalendarSync``): a phone on the mainland
+    /// provider, which cannot ask Maps about a hall in Japan, refreshed every
+    /// hall Maps had placed back to the register's block, or to nothing where
+    /// the register graded the address below its bar.
     private static func carrying(_ fresh: Answer, from known: Answer?) -> Answer {
+        if let known, known.source == Source.maps.rawValue, known.wasFound, stillStands(known),
+           fresh.source != Source.maps.rawValue {
+            var kept = known
+            kept.asked = fresh.asked
+            return kept
+        }
         guard fresh.source == Source.register.rawValue, let known, stillStands(known)
         else { return fresh }
         if known.source == Source.openStreetMap.rawValue {
@@ -952,6 +991,12 @@ final class VenuePlaces {
             } catch is Deferred {
                 // Left for a sheet or a refresh — see ``Deferred``.
             } catch {
+                // OpenStreetMap turning away the search for a hall abroad ends
+                // what the run asks of it, as a refusal while narrowing does:
+                // counted only as a failure, the next hall Maps placed reset
+                // the count, and the run went on asking a service that had
+                // said no.
+                if VenueBuildings.turnedAway(error) { narrowing = false }
                 // The hall keeps whatever answer it had; only a run of these
                 // ends the refresh.
                 failures += 1

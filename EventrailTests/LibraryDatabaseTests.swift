@@ -440,6 +440,32 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// Taking one round out leaves the rounds after it as they were — not
+    /// moved up a place and written again, where a result given to one of
+    /// them on another device meanwhile could lose to the copy written here.
+    @Test func aRoundTakenOutLeavesTheRestUnwritten() throws {
+        let (database, context) = try database()
+        let rounds = [LotteryEntry(round: "最速先行抽選", applications: 2),
+                      LotteryEntry(round: "プレイガイド先行", applications: 1),
+                      LotteryEntry(round: "一般発売")]
+        try writeLotteries(rounds, for: "1", entry: nil, dated: earlier, in: context)
+        let rest = Array(rounds.dropFirst())
+        try writeLotteries(rest, for: "1", entry: nil, dated: later, in: context)
+
+        let rows = try #require(try lotteryRows("1", in: context))
+        #expect(rows[rounds[0].id.uuidString]?.isRemoved == true)
+        #expect(rest.map { rows[$0.id.uuidString]?.modified } == [earlier.toTheMillisecond, earlier.toTheMillisecond])
+        #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.id) == rest.map(\.id))
+
+        // A round added later goes after them, and moves none of them either.
+        let added = LotteryEntry(round: "見切れ席")
+        try writeLotteries(rest + [added], for: "1", entry: nil, dated: .now, in: context)
+        #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.id) == (rest + [added]).map(\.id))
+        let after = try #require(try lotteryRows("1", in: context))
+        #expect(rest.map { after[$0.id.uuidString]?.modified } == [earlier.toTheMillisecond, earlier.toTheMillisecond])
+        withExtendedLifetime(database) {}
+    }
+
     /// The same round changed on two devices is settled as a record is: the
     /// one written last stands, and only one row is left.
     @Test func oneRoundChangedOnTwoDevicesKeepsTheLaterOne() throws {
@@ -487,7 +513,7 @@ struct LibraryDatabaseTests {
         context.insert(row)
         row.entry = later
         row.modified = earlier
-        #expect(!LotteryEntry.understands(row: later))
+        #expect(!readsBackWhole(later))
 
         var list = try tracking("1", entry: nil, in: context).lotteries
         #expect(list.map(\.applications) == [3])
@@ -498,8 +524,95 @@ struct LibraryDatabaseTests {
         list = try tracking("1", entry: nil, in: context).lotteries
         list[0].result = .won(nil)
         try writeLotteries(list, for: "1", entry: nil, dated: .now, in: context)
-        #expect(LotteryEntry.understands(row: row.entry))
+        #expect(readsBackWhole(row.entry))
         #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.isWon) == [true, false])
+        withExtendedLifetime(database) {}
+    }
+
+    /// Whether this build reads back exactly what a row holds.
+    private func readsBackWhole(_ text: String) -> Bool {
+        LotteryEntry.entry(inRow: text).map(LotteryEntry.rowText(of:)) == text
+    }
+
+    /// A round written in a form this build cannot read at all — a results
+    /// day as a later build might write one.
+    private let unreadableRound =
+        #"{"applications":2,"day":"2026-10-12T09:00","id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","result":"pending","round":"最速先行抽選"}"#
+
+    private func unreadableRow(in context: ModelContext) -> LibraryLottery {
+        let row = LibraryLottery(eventID: "1", entryID: "5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22")
+        context.insert(row)
+        row.entry = unreadableRound
+        row.modified = earlier
+        return row
+    }
+
+    /// A round this build cannot read is in no list it reads, and a round
+    /// added or changed beside it does not take it out: on the device that
+    /// wrote it, it is the reader's. Emptying the whole record does.
+    @Test func aRoundThisBuildCannotReadOutlivesAnEditBesideIt() throws {
+        let (database, context) = try database()
+        let row = unreadableRow(in: context)
+        #expect(row.holdsUnreadableRound)
+
+        var list = try tracking("1", entry: nil, in: context).lotteries
+        #expect(list.isEmpty)
+        list.append(LotteryEntry(round: "プレイガイド先行"))
+        try writeLotteries(list, for: "1", entry: nil, dated: .now, in: context)
+        try writeLotteries([], for: "1", entry: nil, dated: .now, in: context)
+        #expect(!row.isRemoved)
+        #expect(row.entry == unreadableRound)
+
+        var rows = LibraryDatabase.lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))
+        LibraryDatabase.writeLotteries([], for: "1", rows: &rows, entry: nil, dated: .now, clearing: true, in: context)
+        #expect(row.isRemoved)
+        withExtendedLifetime(database) {}
+    }
+
+    /// The store's own archive merged back — what the old iCloud zone, a
+    /// reopened file and a restore all do for the events they say nothing
+    /// new about — writes nothing: not the rounds' dates, and not a round
+    /// this build cannot read.
+    @Test func theStoreMergedBackOntoItselfWritesNothing() throws {
+        let (database, context) = try database()
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.give(LibraryEntry.Answers(inLibrary: true, tracking: Tracking(note: "front row")),
+                   dated: [.inLibrary: earlier, .tracking: earlier])
+        entry.modified = earlier
+        let first = LotteryEntry(round: "最速先行抽選", applications: 2)
+        let second = LotteryEntry(round: "プレイガイド先行")
+        try writeLotteries([first], for: "1", entry: entry, dated: earlier, in: context)
+        try writeLotteries([first, second], for: "1", entry: entry, dated: later, in: context)
+        let unreadable = unreadableRow(in: context)
+        try context.save()
+
+        let held = try LibraryDatabase.archive(in: context)
+        #expect(try !LibraryDatabase.apply(held.merging(LibraryArchive()), to: context))
+        #expect(!context.hasChanges)
+        let firstRow = try #require(try lotteryRows("1", in: context)?[first.id.uuidString])
+        #expect(firstRow.modified.toTheMillisecond == earlier.toTheMillisecond)
+        #expect(!unreadable.isRemoved)
+        withExtendedLifetime(database) {}
+    }
+
+    /// A restore raises an event this device holds nothing for as of now,
+    /// and its rounds with it — a round taken out here comes back.
+    @Test func aRestoreBringsBackARoundTakenOutHere() throws {
+        let (database, context) = try database()
+        let round = LotteryEntry(round: "最速先行抽選", applications: 2)
+        try writeLotteries([round], for: "1", entry: nil, dated: earlier, in: context)
+        try writeLotteries([], for: "1", entry: nil, dated: earlier, in: context)
+        try context.save()
+        var backup = LibraryArchive()
+        backup.membership["1"] = Stamped(true, at: earlier)
+        backup.tracking["1"] = Stamped(Tracking(lotteries: [round]), at: earlier)
+
+        let restored = try LibraryDatabase.archive(in: context).restoring(backup)
+        #expect(try LibraryDatabase.apply(restored, to: context))
+        let row = try #require(try lotteryRows("1", in: context)?[round.id.uuidString])
+        #expect(!row.isRemoved)
+        #expect(row.modified > later)
         withExtendedLifetime(database) {}
     }
 
@@ -756,6 +869,22 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// A removal an older build left, with nothing else said of the event,
+    /// needs no entry — and makes none, so it is not found unanswered and
+    /// taken in again on every open and every import.
+    @Test func aBareRemovalAnOlderBuildLeftIsNotTakenInOverAndOver() throws {
+        let (database, context) = try database()
+        let membership = LibraryMembership(eventID: "1")
+        context.insert(membership)
+        membership.inLibrary = false
+        membership.changed = earlier
+        try context.save()
+
+        #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
+        #expect(try entries("1", in: context).isEmpty)
+        withExtendedLifetime(database) {}
+    }
+
     @Test func aReadAnOlderBuildKeptOnTheRowBecomesAMark() throws {
         let (database, context) = try database()
         let row = LibraryEvent(eventID: "3")
@@ -789,6 +918,20 @@ struct LibraryDatabaseTests {
 
     @Test func deletingTheZoneFromICloudIsItsOwnStatus() {
         #expect(LibraryDatabase.status(for: CKError(.userDeletedZone)) == .cloudDataDeleted)
+    }
+
+    /// A partial failure says what went wrong inside it: iCloud full, as a
+    /// batch of exports says it, and not the records only turned away with it.
+    @Test func aPartialFailureIsReadByWhatFailedInsideIt() {
+        let full = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [
+            CKRecord.ID(recordName: "a"): CKError(.batchRequestFailed),
+            CKRecord.ID(recordName: "b"): CKError(.quotaExceeded),
+        ]])
+        #expect(LibraryDatabase.status(for: full) == .iCloudFull)
+        let offline = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [
+            CKRecord.ID(recordName: "a"): CKError(.networkUnavailable),
+        ]])
+        #expect(LibraryDatabase.status(for: offline) == .offline)
     }
 
     /// The deletion usually arrives as one record's answer inside a partial

@@ -362,14 +362,7 @@ struct EventMoment {
     var tint: Color { stage.tint }
 
     var headline: Text {
-        switch stage {
-        case .beforeDoors: Text("Doors in \(countdown(to: state.doors ?? state.starts))")
-        case .beforeShow: Text("Starts in \(countdown(to: state.starts))")
-        case .doorsOpen: Text("Doors open")
-        case .startingSoon: Text("Starting in \(countdown(to: state.starts))")
-        case .onNow: Text("On now")
-        case .wrapped: Text("That's a wrap")
-        }
+        stage.headline(doors: state.doors, starts: state.starts) { countdown(to: $0) }
     }
 
     /// The line under the headline: what comes next, and when.
@@ -821,20 +814,10 @@ struct EventMoment {
         return instant.formatted(style)
     }
 
-    /// A time with the AM or PM a twelve-hour clock carries set small beside
-    /// the digits, as the event's sheet sets it.
+    /// A time on the activity's clock, as the event's sheet sets it — see
+    /// `Text.clock(_:in:size:)`.
     private func clock(_ instant: Date?, size: CGFloat) -> Text {
-        guard let instant else { return Text(verbatim: "—") }
-        var style = Date.FormatStyle(date: .omitted, time: .shortened)
-        style.timeZone = state.timeZone
-        var time = instant.formatted(style.attributedStyle)
-        let periods = time.runs[\.dateField].compactMap { field, range in
-            field == .amPM ? range : nil
-        }
-        for range in periods {
-            time[range].font = .system(size: size * 0.6, weight: .bold)
-        }
-        return Text(time)
+        .clock(instant, in: state.timeZone, size: size)
     }
 }
 

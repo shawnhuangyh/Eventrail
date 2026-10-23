@@ -197,8 +197,20 @@ private struct EventPanePresenter: ViewModifier {
         .background {
             if isSplit { WashBackground() }
         }
+        // A hairline between a Mac's list and its event, as the Mac design
+        // draws one. An iPad's halves meet at their own margins.
+        .overlay(alignment: .topLeading) {
+            if isMac, isSplit, let fold {
+                Rectangle()
+                    .fill(.separator)
+                    .frame(width: 0.5)
+                    .offset(x: fold.frame.minX)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
         .environment(\.washCanvas, isSplit ? canvas : nil)
-        .readingFold(into: $fold)
+        .readingFold(into: $fold, parting: .list)
         .readingDuoOpening(into: $isOpening, fold: fold)
         .onAppear { isShown = true }
         .onDisappear {
@@ -305,6 +317,9 @@ private struct EventPanePresenter: ViewModifier {
             } description: {
                 Text("Choose an event to see it here.")
             }
+            // In the middle of the half: on a Mac it takes only its own size,
+            // and the half places what it holds at its top-leading corner.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

@@ -28,6 +28,16 @@ struct HTMLCursorTests {
         #expect(rows == ["<li>a</li>", "<li>b</li>", "<li>c</li>"])
     }
 
+    /// Matched byte for byte in place: a marker in Japanese after Japanese
+    /// text, and the text between read back whole.
+    @Test func findsAMarkerAfterTextInAnyScript() {
+        var cursor = HTMLCursor(#"<p>水瀬いのり</p><h2 class="gb_subtitle">開催日時</h2><p>2027-05-09</p>"#)
+        #expect(cursor.take(upTo: "</p>") == "<p>水瀬いのり")
+        #expect(cursor.text(after: #"<h2 class="gb_subtitle">開催日時</h2>"#, upTo: "</p>") == "2027-05-09")
+        #expect(HTMLCursor.find("いの", in: "水瀬いのり"[...]).map { "水瀬いのり"[$0] } == "いの")
+        #expect(HTMLCursor.find("ゆい", in: "水瀬いのり"[...]) == nil)
+    }
+
     @Test func slicesAreEmptyWithoutTheMarker() {
         #expect(HTMLCursor("<ul></ul>").slices(startingAt: "<li>").isEmpty)
     }

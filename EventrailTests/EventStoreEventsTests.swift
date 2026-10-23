@@ -33,6 +33,23 @@ struct EventStoreEventsTests {
         #expect(Set(store.events(of: rows, where: \.inLibrary).map(\.title)) == ["After", "Beside"])
     }
 
+    /// A ticket saved from a sheet holding an older read of the page leaves
+    /// the newer read standing: the sheet's copy is folded under the row, not
+    /// over it.
+    @Test func anOlderReadHandedInDoesNotPutTheOlderTimesBack() {
+        let store = store()
+        var newer = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 19), isDetailed: true, detailFormat: 3)
+        newer.readAt = Fixtures.date(2027, 5, 2)
+        var older = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18), isDetailed: true, detailFormat: 3)
+        older.readAt = Fixtures.date(2027, 5, 1)
+        store.toggleLibraryMembership(newer)
+
+        store.setTracking(Tracking(note: "front row"), for: older)
+        #expect(store.event(id: "1")?.startsAt == Fixtures.date(2027, 5, 9, 19))
+        #expect(store.event(id: "1")?.readAt == Fixtures.date(2027, 5, 2))
+        #expect(store.tracking(for: newer).note == "front row")
+    }
+
     /// The library the calendar, the watch and the reminders read is the same
     /// kept copies a screen's list is, and follows a write at once.
     @Test func theUpcomingFollowAWriteAtOnce() {
@@ -239,6 +256,35 @@ struct EventStoreEventsTests {
         #expect(try context.fetchCount(FetchDescriptor<FollowingReadMark>()) == 1)
     }
 
+    /// What a row says of itself is kept between asks, and follows its mark
+    /// and its copy as either moves.
+    @Test func aRowsUnreadStateFollowsItsMarkAndItsCopy() {
+        let store = store()
+        let event = Fixtures.event(id: "1", date: Fixtures.day(fromToday: 7))
+        #expect(store.unread(event) == .new)
+        #expect(store.unread(event) == .new)
+        store.markRead([event], read: true)
+        #expect(store.unread(event) == nil)
+        let renamed = Fixtures.event(id: "1", title: "Renamed", date: Fixtures.day(fromToday: 7))
+        #expect(store.unread(renamed) == .updated)
+        #expect(store.unread(event) == nil)
+        store.markRead([event], read: false)
+        #expect(store.unread(event) == .new)
+    }
+
+    /// The events kept on one event's day, from the library as it stands
+    /// after each write.
+    @Test func theSameDayIsReadFromTheLibraryAsItStands() {
+        let store = store()
+        let one = Fixtures.event(id: "1", date: Fixtures.day(fromToday: 7))
+        let other = Fixtures.event(id: "2", date: Fixtures.day(fromToday: 7))
+        let later = Fixtures.event(id: "3", date: Fixtures.day(fromToday: 8))
+        for event in [one, other, later] { store.toggleLibraryMembership(event) }
+        #expect(Set(store.upcoming(onDayOf: one).map(\.id)) == ["1", "2"])
+        store.remove([other])
+        #expect(store.upcoming(onDayOf: one).map(\.id) == ["1"])
+    }
+
     /// Taken out, an event keeps its facts: a row emptied on one device lands
     /// empty on every other, and an entry arriving there has nothing to show.
     @Test func anEventTakenOutKeepsItsFacts() throws {
@@ -372,5 +418,55 @@ struct EventStoreEventsTests {
         for id in ["1", "2", "3"] { store.toggleLibraryMembership(Fixtures.event(id: id)) }
         let rows = try kept(in: store)
         #expect(store.events(of: rows, where: \.inLibrary) == store.events(of: rows, where: \.inLibrary))
+    }
+
+    /// Spotlight follows the writes that can move what it holds — public
+    /// facts only — so a note, a lottery or a heart leaves the count alone,
+    /// and an event added or a performer followed moves it.
+    @Test func onlyAWriteToWhatAnyoneSeesMovesTheFactsRevision() {
+        let store = store()
+        let event = Fixtures.event(id: "1")
+        var seen = store.factsRevision
+        store.toggleLibraryMembership(event)
+        #expect(store.factsRevision > seen)
+        // As the pause after an edit does: what a save sees is what changed
+        // since the last write to the store.
+        store.saveNow()
+
+        seen = store.factsRevision
+        store.setTracking(Tracking(note: "front row"), for: event)
+        store.saveNow()
+        store.setTracking(Tracking(lotteries: [LotteryEntry(round: "最速先行抽選")], note: "front row"), for: event)
+        store.saveNow()
+        store.toggleFavorite(event)
+        store.saveNow()
+        #expect(store.factsRevision == seen)
+
+        store.toggleFollow(PerformerProfile(id: 1, name: "Someone", reading: nil, fanCount: nil, slug: "someone"))
+        #expect(store.factsRevision > seen)
+    }
+
+    /// A round a later build wrote, which this one cannot read, stays through
+    /// a round added beside it, and goes with the rest of the record when the
+    /// event is taken out — as it does with Delete All.
+    @Test func aRoundThisBuildCannotReadGoesOnlyWithTheWholeRecord() throws {
+        let database = LibraryDatabase(at: .memory, syncing: false)
+        let context = database.context
+        let entry = LibraryEntry(eventID: "1")
+        context.insert(entry)
+        entry.give(LibraryEntry.Answers(inLibrary: true), dated: [.inLibrary: .now])
+        let row = LibraryLottery(eventID: "1", entryID: "5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22")
+        context.insert(row)
+        row.entry = #"{"applications":2,"day":"2026-10-12T09:00","id":"5A0B8C1E-7C11-4B7B-9D51-2F0E3C8A1B22","result":"pending","round":"最速先行抽選"}"#
+        try context.save()
+        let store = EventStore(database: database, libraryFile: nil, calendar: nil, venues: nil, pageReads: nil)
+        let event = Fixtures.event(id: "1")
+
+        store.setTracking(Tracking(lotteries: [LotteryEntry(round: "プレイガイド先行")]), for: event)
+        store.setTracking(Tracking(), for: event)
+        #expect(!row.isRemoved)
+
+        store.remove([event])
+        #expect(row.isRemoved)
     }
 }

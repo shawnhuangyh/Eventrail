@@ -162,6 +162,17 @@ struct LotteryListTests {
         #expect(groups.last?.rows.map(\.event.id) == ["gone"])
     }
 
+    /// Latest first by event date, the rounds of one event still go by their
+    /// results day — the latest first, a round with no day after them all.
+    @Test func latestFirstByEventKeepsARoundWithNoDayLast() {
+        let undated = LotteryRow(event: Self.later, entry: LotteryEntry(round: "最速先行抽選"))
+        let dated = LotteryRow(event: Self.later, entry: LotteryEntry(round: "プレイガイド先行", day: Self.day(-5)))
+        let earlierDay = LotteryRow(event: Self.later, entry: LotteryEntry(round: "最速先行抽選", day: Self.day(-9)))
+        let other = LotteryRow(event: Self.soon, entry: LotteryEntry(round: "最速先行抽選"))
+        let sorted = [undated, other, earlierDay, dated].sorted(by: LotteryRow.latestFirst(by: .eventDate))
+        #expect(sorted.map(\.id) == [dated.id, earlierDay.id, undated.id, other.id])
+    }
+
     @Test func decidedReadsBackFromNowWhileItShowsThePast() {
         let lost = withPast.groups(in: .decided, by: .resultsDay, showingPast: true)
             .first { $0.kind == .notWon }?.rows.map(\.entry.day)

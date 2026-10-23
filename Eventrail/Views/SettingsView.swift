@@ -31,12 +31,22 @@ struct SettingsView: View {
     @State private var isConfirmingDeleteAll = false
     @State private var isConfirmingClearCache = false
     @State private var isChoosingBackup = false
-    /// The backup file waiting for the share sheet, rewritten on every change.
+    /// The backup file waiting for the share sheet — or a Mac's save panel —
+    /// rewritten on every change.
     @State private var exported: URL?
     /// Why the last attempt to write it failed, until one succeeds. Kept apart
     /// from `exported` being nil, which is also the moment before a file is on
     /// disk: a failure is said and can be tried again, not left dimmed.
     @State private var exportFailure: String?
+    /// The last write of the backup file set going — see ``prepareExport()``.
+    @State private var lastExportWrite: Task<Result<URL, any Error>, Never>?
+    /// The save panel a Mac exports the backup through — see ``exportRow``.
+    @State private var isSavingBackup = false
+    /// Why the save panel could not save the file, until a save succeeds.
+    /// Apart from ``exportFailure``, which only writing the file afresh
+    /// clears: kept there, a save that went through left the row saying the
+    /// backup could not be written.
+    @State private var saveFailure: String?
     /// The welcome, asked for again. Its own state rather than the flag
     /// ``RootView`` watches: replaying it is not un-launching the app, and a
     /// device that has seen it has still seen it.
@@ -106,10 +116,14 @@ struct SettingsView: View {
             .washBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            .padNavigationBarOnMac()
             .presentationDragIndicator(.visible)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", systemImage: "checkmark") { dismiss() }
+                        // Not under the welcome replayed over it, which a key
+                        // it does not take would otherwise fall through to.
+                        .keyboardShortcut(isReplayingWelcome ? nil : .cancelAction)
                 }
             }
             .fullScreenCover(isPresented: $isReplayingWelcome) {
@@ -121,6 +135,7 @@ struct SettingsView: View {
         .refreshNotices()
         .refreshNoticesInSheet()
         .opensFromOutside()
+        .standsAsSettings(covered: isReplayingWelcome)
     }
 
     // MARK: - The shape of the screen
@@ -209,6 +224,7 @@ struct SettingsView: View {
             SettingRowLabel("icloud", "iCloud Sync",
                      status: syncStatus, needsAttention: syncNeedsAttention)
         }
+        .settingSwitch()
         .settingRowPadding()
     }
 
@@ -255,6 +271,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .settingSwitch()
         .settingRowPadding()
     }
 
@@ -307,6 +324,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .settingSwitch()
         .settingRowPadding()
         .task { await reminders.refreshAuthorization() }
     }
@@ -326,7 +344,28 @@ struct SettingsView: View {
         let row = SettingRowLabel("square.and.arrow.up", "Export Backup",
                                   status: exportStatus, needsAttention: true)
             .settingRowPadding()
-        if let exported {
+        if let exported, isMac {
+            // A Mac's share menu offers nowhere to save a file, so there the
+            // backup goes out through the save panel.
+            Button {
+                isSavingBackup = true
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+            .fileExporter(isPresented: $isSavingBackup, document: BackupFile(url: exported),
+                          contentType: .eventrailBackup,
+                          defaultFilename: exported.deletingPathExtension().lastPathComponent) { result in
+                switch result {
+                case .success:
+                    saveFailure = nil
+                case .failure(let error):
+                    if (error as? CocoaError)?.code != .userCancelled {
+                        saveFailure = error.localizedDescription
+                    }
+                }
+            }
+        } else if let exported {
             ShareLink(item: exported) { row }
                 .buttonStyle(.plain)
         } else if exportFailure != nil {
@@ -346,7 +385,7 @@ struct SettingsView: View {
     /// A backup that could not be written comes first: while it stands, the
     /// advice to export one is advice the row cannot take.
     private var exportStatus: Text? {
-        if let reason = exportFailure {
+        if let reason = exportFailure ?? saveFailure {
             return Text("The backup could not be written (\(reason)). Tap to try again.")
         }
         // Said under Export because exporting is what keeps them: a backup is
@@ -387,14 +426,27 @@ struct SettingsView: View {
     /// A failure takes the last file away as well: it was written from the
     /// library as it stood before the change that set this going, and sharing
     /// it would pass off an older library as the current one.
+    ///
+    /// Each write waits for the one before it, and one a newer change has
+    /// overtaken says nothing when it is done. Every write is to the same
+    /// file, and the write the change cancelled went on regardless: landing
+    /// after the newer one, it left the older library on disk and named it
+    /// the one to share.
     private func prepareExport() async {
         let written: Result<URL, any Error>
         do {
             let backup = try store.backup()
-            written = await Task.detached { Result { try backup.write() } }.value
+            let previous = lastExportWrite
+            let write = Task.detached { () -> Result<URL, any Error> in
+                _ = await previous?.value
+                return Result { try backup.write() }
+            }
+            lastExportWrite = write
+            written = await write.value
         } catch {
             written = .failure(error)
         }
+        guard !Task.isCancelled else { return }
         switch written {
         case .success(let url):
             exported = url

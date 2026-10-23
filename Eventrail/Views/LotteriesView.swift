@@ -24,6 +24,8 @@ import SwiftUI
 /// pending is No Result.
 struct LotteriesView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
 
     @State private var half: LotteryHalf = .awaiting
@@ -95,9 +97,11 @@ struct LotteriesView: View {
         .washBackground()
         .navigationTitle("Lotteries")
         .navigationSubtitle(subtitle(list))
+        .largeTitleOnMac(Text("Lotteries"), subtitle: subtitle(list))
         .eventPane($openEvent)
         .sheet(item: $editing) { row in
             TicketDetailsView(event: row.event, tracking: store.tracking(for: row.event), opening: row.entry)
+                .macSheetSize(.form)
         }
     }
 
@@ -161,10 +165,10 @@ struct LotteriesView: View {
                                                  set: { if !$0 { held = nil } }),
                             titleVisibility: .visible) {
             Button("Clear Seat and Cost", role: .destructive) {
-                if let held { write(held.record.clearingSeatAndCost, for: row.event) }
+                if let held { write(held.given(over: store.tracking(for: row.event)).clearingSeatAndCost, for: row.event) }
             }
             Button("Keep Them") {
-                if let held { write(held.record, for: row.event) }
+                if let held { write(held.given(over: store.tracking(for: row.event)), for: row.event) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -180,7 +184,7 @@ struct LotteriesView: View {
         let after = before.givingResult(result, toLottery: row.entry.id)
         guard after != before else { return }
         if after.leavesSeatOrCostBehind(since: before) {
-            held = HeldResult(row: row.id, record: after)
+            held = HeldResult(row: row.id, result: result, entry: row.entry.id)
         } else {
             write(after, for: row.event)
         }
@@ -254,10 +258,17 @@ struct LotteriesView: View {
     }
 
     /// A result waiting on whether to clear the seat and cost it leaves
-    /// behind.
+    /// behind — the result, not the record it made: given to the record as it
+    /// stands once answered, so a note or a round synced in while the
+    /// question was up is not written back over.
     private struct HeldResult {
         let row: LotteryRow.ID
-        let record: Tracking
+        let result: LotteryResult
+        let entry: LotteryEntry.ID
+
+        func given(over record: Tracking) -> Tracking {
+            record.givingResult(result, toLottery: entry)
+        }
     }
 }
 
@@ -312,8 +323,9 @@ private struct LotteryListMenu: View {
 /// The card opens the event; the tile's menu sits over it rather than inside
 /// it, a sibling of the card's button laid over the spot the tile holds, so a
 /// tap on the tile opens its menu and not the event (``FavoriteEventRow``'s
-/// heart, for the same reason). A round of an event that is over has no
-/// menu: its tile is drawn in the card, and a tap anywhere opens the event.
+/// heart, for the same reason). On a Mac a right-click anywhere on the card
+/// opens the same menu. A round of an event that is over has no menu: its
+/// tile is drawn in the card, and a tap anywhere opens the event.
 struct LotteryRoundCard: View {
     /// Which clock the event's day is printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
@@ -413,6 +425,11 @@ struct LotteryRoundCard: View {
             }
         }
         .panel(cornerRadius: 24)
+        // The tile's menu again, from a right-click anywhere on the card on a
+        // Mac, where a mouse cannot swipe a result in.
+        .contextMenuOnMac {
+            if !row.isOver { resultChoices }
+        }
     }
 
     /// One reading in the card's foot: what it is, small and in capitals,
@@ -474,34 +491,8 @@ struct LotteryRoundCard: View {
     /// results day is still to come only Pending can be picked, and it says
     /// when that day is.
     private var resultMenu: some View {
-        let drawable = entry.canBeDrawn()
-        return Menu {
-            Section("Result") {
-                Toggle(isOn: given(.pending)) {
-                    Text("Pending")
-                    if !drawable { LotteryText.day(of: entry, isEventAhead: true) }
-                }
-                if entry.choices.isEmpty {
-                    Toggle(isOn: given(.won(nil))) { Text("Won") }
-                        .disabled(!drawable)
-                }
-                ForEach(Array(entry.choices.enumerated()), id: \.element.id) { index, choice in
-                    Toggle(isOn: given(.won(choice.id))) {
-                        if entry.choices.count > 1 {
-                            Text("Won \(LotteryChoice.ordinal(index)) Choice")
-                        } else {
-                            Text("Won")
-                        }
-                        LotteryText.won(choice)
-                    }
-                    .disabled(!drawable)
-                }
-                Toggle(isOn: given(.lost)) { Text("Lost") }
-                    .disabled(!drawable)
-            }
-            Section {
-                Button("Edit Entry", systemImage: "square.and.pencil", action: edit)
-            }
+        Menu {
+            resultChoices
         } label: {
             LotteryDayTile(row: row, showsResult: true)
         }
@@ -510,6 +501,38 @@ struct LotteryRoundCard: View {
         .accessibilityLabel(Text("Result"))
         .accessibilityValue(LotteryText.result(entry.outcome, firstCome: false))
         .sensoryFeedback(.selection, trigger: entry.outcome)
+    }
+
+    /// What the tile's menu holds — and the card's right-click on a Mac.
+    @ViewBuilder
+    private var resultChoices: some View {
+        let drawable = entry.canBeDrawn()
+        Section("Result") {
+            Toggle(isOn: given(.pending)) {
+                Text("Pending")
+                if !drawable { LotteryText.day(of: entry, isEventAhead: true) }
+            }
+            if entry.choices.isEmpty {
+                Toggle(isOn: given(.won(nil))) { Text("Won") }
+                    .disabled(!drawable)
+            }
+            ForEach(Array(entry.choices.enumerated()), id: \.element.id) { index, choice in
+                Toggle(isOn: given(.won(choice.id))) {
+                    if entry.choices.count > 1 {
+                        Text("Won \(LotteryChoice.ordinal(index)) Choice")
+                    } else {
+                        Text("Won")
+                    }
+                    LotteryText.won(choice)
+                }
+                .disabled(!drawable)
+            }
+            Toggle(isOn: given(.lost)) { Text("Lost") }
+                .disabled(!drawable)
+        }
+        Section {
+            Button("Edit Entry", systemImage: "square.and.pencil", action: edit)
+        }
     }
 
     /// On where it is the round's result, and a tap on it gives it.
@@ -549,7 +572,7 @@ struct LotteryDayTile: View {
         VStack(spacing: 3) {
             Group {
                 if let day = row.entry.day {
-                    Text(verbatim: day.date().formatted(.dateTime.month(.abbreviated)))
+                    Text(verbatim: day.date().formatted(.gregorian().month(.abbreviated)))
                 } else {
                     // A key of its own: "Day" alone is the Passport's, and reads
                     // differently there.

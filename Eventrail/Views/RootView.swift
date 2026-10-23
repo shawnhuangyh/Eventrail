@@ -1,7 +1,9 @@
 import CoreSpotlight
 import SwiftData
 import SwiftUI
+#if canImport(Playgrounds)
 import Playgrounds
+#endif
 
 enum AppTab: Hashable {
     case events, following, search, me
@@ -32,8 +34,9 @@ struct RootView: View {
     @State private var openedBackup: URL?
     /// An event opened from outside the app — its Live Activity, tapped, or
     /// another device's sheet, handed off — or a lottery round, from its
-    /// results-day reminder (``LotteryReminders``): opened over whatever sheet
-    /// is up — see ``OutsideOpens``.
+    /// results-day reminder (``LotteryReminders``), or Settings, from the menu
+    /// bar (``AppCommands``): opened over whatever sheet is up — see
+    /// ``OutsideOpens``.
     @State private var opens = OutsideOpens()
     /// The event in the frontmost sheet, offered to the reader's other
     /// devices — see ``EventHandoff``.
@@ -60,6 +63,14 @@ struct RootView: View {
     /// changes — see ``WatchLink`` and ``WidgetLink`` — and to print a Live
     /// Activity on the new clock.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+    /// Whether this window has been in the background since it was last
+    /// active — when it always catches up (``catchUp()``). Read off the phase
+    /// it went through rather than the one it comes back from: a scene coming
+    /// back from the background passes through inactive, so the phase before
+    /// active is never the background.
+    @State private var wasInBackground = false
+    /// The day it is, moved on as it turns — see ``EnvironmentValues/today``.
+    @State private var today = EnvironmentValues.startOfToday
 
     var body: some View {
         TabView(selection: $selection) {
@@ -70,6 +81,7 @@ struct RootView: View {
             Tab("Following", systemImage: "person.2", value: AppTab.following) {
                 FollowingView().refreshNotices()
             }
+            .badge(unreadFollowing)
 
             Tab("Me", systemImage: "person.crop.circle", value: AppTab.me) {
                 MeView().refreshNotices()
@@ -96,7 +108,9 @@ struct RootView: View {
                 } else {
                     opens.open(.event(event))
                 }
-            } else {
+            } else if url.isFileURL {
+                // Only a file is a backup: any other link reaching the app was
+                // asked "Restore this backup?" about, and failed reading it.
                 openedBackup = url
             }
         }
@@ -126,6 +140,12 @@ struct RootView: View {
         // Inside the environment lines below, for the store; over the tabs,
         // which stand a sheet deeper for it.
         .opensFromOutside()
+        .hidesWindowTitleOnMac()
+        // Not while the first launch's welcome is up: nothing can be opened
+        // over it, and Settings asked for meanwhile opened by itself the
+        // moment the reader finished it.
+        .focusedSceneValue(\.appTab, isWelcoming ? nil : $selection)
+        .focusedSceneValue(\.outsideOpens, isWelcoming ? nil : opens)
         // Asked about first: tapping a file is not by itself a request to fold
         // its contents into the library.
         //
@@ -137,18 +157,16 @@ struct RootView: View {
         // everything: the first launch has no tab worth showing yet.
         .fullScreenCover(isPresented: $isWelcoming) {
             WelcomeView()
+                .rootEnvironment(rootEnvironment)
         }
-        .library(store)
-        .environment(followed)
-        .environment(venues)
-        .environment(notices)
-        .environment(opens)
-        .environment(handoff)
-        .tint(.brandTint)
-        // The reader's text size is followed up to xxxLarge and no further —
-        // see ``SwiftUI/View/scalingFont(size:weight:design:)``. Past it, the
-        // accessibility sizes would have rows laid out side by side stack.
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        // Midnight, or the clock changed — told once the app is back if it
+        // was away as it happened.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            today = EnvironmentValues.startOfToday
+        }
+        .environment(\.today, today)
+        // The store and the rest, the app's tint and its text sizes.
+        .rootEnvironment(rootEnvironment)
         // A cold launch is a change of scene phase to nobody: `onChange` only
         // hears the ones after the first. Without this the calendar would only
         // ever catch up after an edit or a trip to the background, so a library
@@ -166,13 +184,14 @@ struct RootView: View {
             WidgetLink.shared.takeAnswers(into: store)
             WidgetLink.shared.send(from: store)
         }
-        // Spotlight's copy follows every write the same way, and the
-        // Following dates by itself — see ``SpotlightIndex``.
+        // Spotlight's copy follows the writes that can move what it holds —
+        // public facts only, so not a note or a read — and the Following
+        // dates by itself. See ``SpotlightIndex``.
         .task { SpotlightIndex.shared.update(from: store, followed: followed) }
+        .onChange(of: store.factsRevision) { SpotlightIndex.shared.update(from: store, followed: followed) }
         .onChange(of: store.revision) {
             WatchLink.shared.send(from: store)
             WidgetLink.shared.send(from: store)
-            SpotlightIndex.shared.update(from: store, followed: followed)
             reminders.schedule(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
@@ -190,25 +209,70 @@ struct RootView: View {
         // short, so the last one is flushed here rather than lost. Coming back
         // is the moment to pick up whatever another device wrote meanwhile.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
+            switch phase {
+            case .active:
                 // A reminder tapped, or an intent run, while this window was
                 // on its way in.
                 openReminder()
                 takeIntentOpen()
-                Task { await store.syncNow() }
-                Task { await EventActivities.shared.refresh(from: store) }
-                // An event whose day ended while the app was away leaves the
-                // watch's list too.
-                WatchLink.shared.send(from: store)
-                // A Won or Lost tapped on the Lotteries widget while away.
-                WidgetLink.shared.takeAnswers(into: store)
-                WidgetLink.shared.send(from: store)
-                // Notifications may have been turned on or off in Settings.
-                reminders.schedule(from: store)
-            } else {
+                if wasInBackground || Self.owesCatchUp { catchUp() }
+                wasInBackground = false
+            case .background:
+                wasInBackground = true
+                store.saveNow()
+            default:
                 store.saveNow()
             }
         }
+    }
+
+    /// When the app last caught up on coming back (``catchUp()``) — once for
+    /// the process, whose store every window shares.
+    private static var caughtUp: Date?
+
+    /// How long a window that only lost the focus is back before the app
+    /// catches up again.
+    private static let catchUpPatience: TimeInterval = 5 * 60
+
+    /// Whether coming back from a window that only lost the focus is owed a
+    /// catch-up. From the background it always is. A window only loses the
+    /// focus on a Mac at every switch to another app or to another of its
+    /// windows, and on an iPhone at a glance at Notification Center — and
+    /// each was a pass over the whole calendar and Spotlight's copy, the
+    /// latter on the main actor.
+    private static var owesCatchUp: Bool {
+        caughtUp.map { Date.now.timeIntervalSince($0) >= catchUpPatience } ?? true
+    }
+
+    /// What coming back to the app catches up on.
+    private func catchUp() {
+        Self.caughtUp = .now
+        Task { await store.syncNow() }
+        Task { await EventActivities.shared.refresh(from: store) }
+        // An event whose day ended while the app was away leaves the
+        // watch's list too.
+        WatchLink.shared.send(from: store)
+        // A Won or Lost tapped on the Lotteries widget while away.
+        WidgetLink.shared.takeAnswers(into: store)
+        WidgetLink.shared.send(from: store)
+        // The flyers cached since the last pass, which no write marks.
+        SpotlightIndex.shared.update(from: store, followed: followed)
+        // Notifications may have been turned on or off in Settings.
+        reminders.schedule(from: store)
+    }
+
+    /// What every screen is handed through the environment, and every sheet
+    /// presented from here again — see ``RootEnvironment``.
+    private var rootEnvironment: RootEnvironment {
+        RootEnvironment(store: store, followed: followed, venues: venues,
+                        notices: notices, opens: opens, handoff: handoff)
+    }
+
+    /// How many Following dates the reader has not looked at — the count the
+    /// tab's own subtitle gives, carried on its item in the tab bar too, so
+    /// it is seen from every tab. None leaves the item without a badge.
+    private var unreadFollowing: Int {
+        followed.events(for: store.followedProfiles).count(where: store.isUnread)
     }
 
     /// Opens the round a results-day reminder was tapped for, in this window
@@ -326,8 +390,8 @@ final class Launch {
         let venues = VenueRegions()
         followed.hallZone = { event in
             if venues.region(of: event) != nil { return Event.publishedZone }
-            if let kept = store.event(id: event.id), kept.timeZone != Event.publishedZone {
-                return kept.timeZone
+            if let kept = store.keptTimeZone(of: event.id), kept != Event.publishedZone {
+                return kept
             }
             if let zone = venues.timeZone(of: event) { return zone }
             return VenuePlaces.shared.timeZone(ofHallNamed: event.venue)
@@ -338,7 +402,77 @@ final class Launch {
     }
 }
 
+/// What the root hands every screen through the environment: the library and
+/// its rows, the dates and the halls read from Eventernote, and the objects
+/// the root keeps for refresh notices, opens from outside and Handoff.
+///
+/// One value, so a sheet presented from the root can be handed it again
+/// (``SwiftUI/View/rootEnvironment(_:)``). **On a Mac a sheet presented from
+/// the root of a window takes its environment from the window rather than
+/// from the view it is attached to**, so it opened without any of this: the
+/// Settings sheet opened from the menu bar crashed reading the store, and so
+/// would the Welcome screen and anything opened from outside the app. Handed
+/// again on every platform, where it changes nothing.
+struct RootEnvironment: Equatable {
+    let store: EventStore
+    let followed: FollowedDates
+    let venues: VenueRegions
+    let notices: RefreshNotices
+    let opens: OutsideOpens
+    let handoff: EventHandoff
+
+    static func == (lhs: RootEnvironment, rhs: RootEnvironment) -> Bool {
+        lhs.store === rhs.store && lhs.followed === rhs.followed && lhs.venues === rhs.venues
+            && lhs.notices === rhs.notices && lhs.opens === rhs.opens && lhs.handoff === rhs.handoff
+    }
+}
+
+extension EnvironmentValues {
+    /// The root's environment, for a presenter to hand the sheet it presents
+    /// — see ``RootEnvironment``. Nil only in a preview.
+    @Entry var rootEnvironment: RootEnvironment?
+
+    /// The start of the day it is, moved on by the root at midnight and at a
+    /// change of clock.
+    ///
+    /// What a screen counting from today declares, whether or not it reads
+    /// it: those screens count from `.now` as they draw, and nothing else
+    /// draws them again as the day turns — a tab left open overnight, as a
+    /// Mac's window is, kept yesterday's memories on the Me tab and
+    /// yesterday's "1 day" on every row of My Events.
+    @Entry var today = startOfToday
+
+    static var startOfToday: Date { Calendar.gregorian().startOfDay(for: .now) }
+}
+
 extension View {
+    /// Everything the root hands down (``RootEnvironment``) — at the root, and
+    /// again on a sheet presented from it. Nil, in a preview, hands nothing
+    /// but the tint and the text sizes.
+    ///
+    /// With the app's tint and its text sizes, which a sheet presented from
+    /// the root of a Mac's window lost with the rest: the reader's text size
+    /// is followed up to xxxLarge and no further — see
+    /// ``SwiftUI/View/scalingFont(size:weight:design:)`` — since past it, the
+    /// accessibility sizes would have rows laid out side by side stack.
+    @ViewBuilder
+    func rootEnvironment(_ root: RootEnvironment?) -> some View {
+        if let root {
+            library(root.store)
+                .environment(root.followed)
+                .environment(root.venues)
+                .environment(root.notices)
+                .environment(root.opens)
+                .environment(root.handoff)
+                .environment(\.rootEnvironment, root)
+                .tint(.brandTint)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        } else {
+            tint(.brandTint)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        }
+    }
+
     /// The store, and the rows it writes for the screens to query — for the
     /// root of the app and for a preview.
     ///
@@ -350,6 +484,8 @@ extension View {
     }
 }
 
+#if canImport(Playgrounds)
 #Playground {
     _ = EventGroup.groups(of: PreviewData.events, filter: .upcoming, grouping: .date).map(\.label)
 }
+#endif

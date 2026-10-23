@@ -1,6 +1,5 @@
 import ImageIO
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// An event's flyer, cropped to whatever shape it is drawn in — or the
 /// design's empty tile while it loads, and where the event has none.
@@ -40,7 +39,13 @@ actor FlyerCache {
     /// list's 28-point circle, at 2×, with room to spare.
     private nonisolated static let side = 120
 
-    private var memory: [WatchEvent.ID: CGImage] = [:]
+    /// Each flyer drawn since launch, with when it was fetched — kept no
+    /// longer than one on disk is.
+    private var memory: [WatchEvent.ID: (image: CGImage, fetched: Date)] = [:]
+    /// A fetch under way, which a second view asking for the same flyer — a
+    /// card and the Countdown page appearing together — waits for rather
+    /// than fetching it again.
+    private var asking: [WatchEvent.ID: Task<CGImage?, Never>] = [:]
 
     private nonisolated static var folder: URL {
         URL.cachesDirectory.appending(path: "Flyers", directoryHint: .isDirectory)
@@ -52,22 +57,33 @@ actor FlyerCache {
 
     func image(for event: WatchEvent) async -> CGImage? {
         guard let url = event.flyer else { return nil }
-        if let image = memory[event.id] { return image }
-        let file = Self.file(for: event.id)
+        let id = event.id
+        if let held = memory[id], -held.fetched.timeIntervalSinceNow < Self.window { return held.image }
+        if let asked = asking[id] { return await asked.value }
+        let asked = Task { await read(id, from: url) }
+        asking[id] = asked
+        let image = await asked.value
+        asking[id] = nil
+        return image
+    }
+
+    /// The copy on disk while it is younger than ``window``, and the host's
+    /// otherwise — or the copy on disk where the host does not answer.
+    private func read(_ id: WatchEvent.ID, from url: URL) async -> CGImage? {
+        let file = Self.file(for: id)
         let kept = (try? Data(contentsOf: file)).flatMap(Self.decoded)
-        let age = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
-            .contentModificationDate.map { -$0.timeIntervalSinceNow }
-        if let kept, let age, age < Self.window {
-            memory[event.id] = kept
+        let fetched = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        if let kept, let fetched, -fetched.timeIntervalSinceNow < Self.window {
+            memory[id] = (kept, fetched)
             return kept
         }
         guard let (data, response) = try? await URLSession.shared.data(from: url),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let small = Self.downsized(data), let image = Self.decoded(small)
+              let small = Thumbnail.jpeg(of: data, side: Self.side), let image = Self.decoded(small)
         else { return kept }
         try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
         try? small.write(to: file, options: .atomic)
-        memory[event.id] = image
+        memory[id] = (image, .now)
         return image
     }
 
@@ -83,21 +99,5 @@ actor FlyerCache {
     private nonisolated static func decoded(_ data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
-    }
-
-    private nonisolated static func downsized(_ data: Data) -> Data? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                  kCGImageSourceCreateThumbnailFromImageAlways: true,
-                  kCGImageSourceCreateThumbnailWithTransform: true,
-                  kCGImageSourceThumbnailMaxPixelSize: side,
-              ] as CFDictionary)
-        else { return nil }
-        let out = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil)
-        else { return nil }
-        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return out as Data
     }
 }

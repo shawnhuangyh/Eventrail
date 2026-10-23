@@ -19,6 +19,13 @@ enum TimeDisplay: String, CaseIterable, Identifiable {
     /// every view that prints a day or a time.
     static let storageKey = "timeDisplay"
 
+    /// The clock Settings names, read as `@AppStorage` reads it — for what is
+    /// worked out away from a view: the watch's and the widgets' copies, a
+    /// Live Activity, Spotlight's items.
+    static var stored: TimeDisplay {
+        UserDefaults.standard.string(forKey: storageKey).flatMap(TimeDisplay.init(rawValue:)) ?? .venue
+    }
+
     var id: Self { self }
 
     var label: LocalizedStringKey {

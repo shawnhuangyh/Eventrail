@@ -65,6 +65,19 @@ struct VenueCountriesTests {
         #expect(VenueCountries.isMainlandChina(address))
     }
 
+    /// A mainland city named with its 市 is the mainland, whatever its road is
+    /// called after.
+    @Test(arguments: ["山东省青岛市市南区香港中路76号", "青岛市市南区香港中路", "上海市黄浦区台湾路"])
+    func aRoadNamedForHongKongOrTaiwanIsStillTheMainland(_ address: String) {
+        #expect(VenueCountries.isMainlandChina(address))
+        #expect(VenueCountries.country(of: address) == nil)
+    }
+
+    @Test(arguments: ["SUMMER MATSURI 2026", "Act City Hamamatsu, Shizuoka", "Matsumoto Performing Arts Centre"])
+    func aWordCarryingMatsuIsNotTaiwan(_ text: String) {
+        #expect(VenueCountries.country(of: text) == nil)
+    }
+
     @Test func aTitleNamesTheCityOfAHallWithNoAddress() {
         #expect(VenueCountries.country(of: "林鼓子2026香港粉絲見面會（日場）") == "hk")
         #expect(VenueCountries.country(of: "Roselia ASIA TOUR「Neuweltfahrt」ソウル公演") == "kr")

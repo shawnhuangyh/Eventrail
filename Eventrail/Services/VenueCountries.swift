@@ -20,17 +20,24 @@ nonisolated enum VenueCountries {
     ///
     /// A province or municipality *with its suffix* — 上海市, 广东省 — rather
     /// than the bare name: Taipei's streets are named for mainland cities, and
-    /// 南京東路 or 重慶南路 is an address in Taiwan. And anything naming Hong
-    /// Kong, Macau or Taiwan is none of the mainland whatever else it says.
+    /// 南京東路 or 重慶南路 is an address in Taiwan. Named so, it is the
+    /// mainland whatever road it is on — Qingdao's 香港中路 is no address in
+    /// Hong Kong. Otherwise anything naming Hong Kong, Macau or Taiwan is none
+    /// of the mainland whatever else it says.
     static func isMainlandChina(_ address: String) -> Bool {
         let text = address.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? address
+        if namesMainland(text) { return true }
         guard country(of: text) == nil else { return false }
-        if text.contains("自治区") || text.contains("自治區") { return true }
-        let named = mainlandProvinces.contains { text.contains($0 + "省") }
-            || mainlandCities.contains { text.contains($0 + "市") }
-        if named { return true }
         let lowered = text.lowercased()
         return mainlandRomanized.contains { lowered.contains($0) }
+    }
+
+    /// Whether `text` names a mainland province, autonomous region or city
+    /// with the suffix that makes it one.
+    private static func namesMainland(_ text: String) -> Bool {
+        text.contains("自治区") || text.contains("自治區")
+            || mainlandProvinces.contains { text.contains($0 + "省") }
+            || mainlandCities.contains { text.contains($0 + "市") }
     }
 
     /// The ISO country code of a hall `address` plainly places outside Japan
@@ -42,6 +49,11 @@ nonisolated enum VenueCountries {
     static func country(of address: String) -> String? {
         if address.unicodeScalars.contains(where: { (0xAC00...0xD7A3).contains($0.value) }) {
             return "kr"
+        }
+        // The mainland, named with its 省 or 市, is no other country for a
+        // street called after one (``isMainlandChina(_:)``).
+        if namesMainland(address.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? address) {
+            return nil
         }
         let lowered = address.lowercased()
         for (code, names) in markers where names.contains(where: { lowered.contains($0) }) {
@@ -80,7 +92,9 @@ nonisolated enum VenueCountries {
                 "基隆", "keelung", "新竹市", "新竹縣", "hsinchu", "嘉義", "chiayi", "苗栗", "miaoli",
                 "彰化", "changhua", "南投", "nantou", "雲林", "yunlin", "屏東", "pingtung",
                 "宜蘭", "yilan", "花蓮", "hualien", "台東縣", "臺東縣", "taitung",
-                "澎湖", "penghu", "金門縣", "kinmen", "連江縣", "matsu"]),
+                "澎湖", "penghu", "金門縣", "kinmen", "連江縣", "lienchiang",
+                // Not "matsu" alone, which Matsuri and Hamamatsu carry.
+                "matsu island"]),
         // As Japanese titles write Korea — a title rather than an address is
         // where ``VenuePlaces`` reads these for a hall with no address — and
         // as members write a Korean address in kanji and katakana rather than

@@ -30,10 +30,6 @@ struct EventMoment {
     /// on any day before, and on the day where no start was published.
     let stage: EventActivityStage?
 
-    /// How long an event with no end published is given —
-    /// `Event.assumedLength`.
-    static let assumedLength: TimeInterval = 3 * 60 * 60
-
     init(_ event: WatchEvent, showsLocalTime: Bool, at now: Date) {
         self.event = event
         self.now = now
@@ -62,7 +58,7 @@ struct EventMoment {
         }
         let ends = event.ends.flatMap { $0 > starts ? $0 : nil }
         let doors = event.doors.flatMap { $0 < starts ? $0 : nil }
-        let runsTo = ends ?? starts.addingTimeInterval(Self.assumedLength)
+        let runsTo = ends ?? starts.addingTimeInterval(EventActivityStage.assumedLength)
         self.doors = doors
         self.starts = starts
         self.ends = ends
@@ -134,14 +130,7 @@ struct EventMoment {
     /// before its day.
     var headline: Text? {
         guard let stage, let starts else { return nil }
-        return switch stage {
-        case .beforeDoors: Text("Doors in \(countdown(to: doors ?? starts))")
-        case .beforeShow: Text("Starts in \(countdown(to: starts))")
-        case .doorsOpen: Text("Doors open")
-        case .startingSoon: Text("Starting in \(countdown(to: starts))")
-        case .onNow: Text("On now")
-        case .wrapped: Text("That's a wrap")
-        }
+        return stage.headline(doors: doors, starts: starts) { countdown(to: $0) }
     }
 
     /// The gauge's centre: what it counts to, the count, and the day.
@@ -235,7 +224,12 @@ struct EventMoment {
         }
     }
 
-    private var isInLottery: Bool { (event.lotteryEntries ?? 0) > 0 }
+    /// Applied for, or standing somewhere in a lottery — a round written down
+    /// with no applications counted is still one, and the line under the
+    /// heading says so.
+    private var isInLottery: Bool {
+        (event.lotteryEntries ?? 0) > 0 || event.lottery.flatMap(LotteryStanding.init(rawValue:)) != nil
+    }
 
     /// Where the lotteries stand, and still to be announced in a copy sent
     /// before lotteries had results.
@@ -246,11 +240,13 @@ struct EventMoment {
     /// What it cost, or how many entries went into the lottery.
     var costLine: Text {
         if let cost = event.cost {
-            // Cents only where there are any: ¥8,800, $49.99.
+            // Cents only where there are any: ¥8,800, $49.99 — and as many as
+            // the currency has where there are, as the phone prints it.
             var whole = Decimal(), value = cost
             NSDecimalRound(&whole, &value, 0, .plain)
-            return Text(cost, format: .currency(code: event.currency ?? "JPY")
-                .precision(.fractionLength(whole == cost ? 0 : 2)))
+            return whole == cost
+                ? Text(cost, format: .currency(code: event.currency ?? "JPY").precision(.fractionLength(0)))
+                : Text(cost, format: .currency(code: event.currency ?? "JPY"))
         }
         if let entries = event.lotteryEntries, entries > 0 {
             return Text("^[\(entries) entry](inflect: true)")
@@ -259,12 +255,14 @@ struct EventMoment {
     }
 
     var ticketLine: (text: Text, color: Color) {
+        // A win before the ticket: a win is the ticket, and the phone sends
+        // the ticket as held for one — read first, every win said Purchased.
+        if lotteryStanding == .won { return (Text("Won"), EventActivityStage.doorsOpen.tint) }
         if event.hasTicket { return (Text("Purchased"), EventActivityStage.beforeDoors.tint) }
         switch lotteryStanding {
-        case .won: return (Text("Won"), EventActivityStage.doorsOpen.tint)
         case .pending: return (Text("Results pending"), Self.ahead)
         case .lost: return (Text("Not won"), .white.opacity(0.55))
-        case nil: break
+        case .won, nil: break
         }
         return (Text("Add one on iPhone"), .white.opacity(0.55))
     }

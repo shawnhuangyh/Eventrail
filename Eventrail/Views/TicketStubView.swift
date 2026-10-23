@@ -679,18 +679,7 @@ struct TicketStubView: View {
             Text("Ticket Stub")
                 .font(.system(size: 17, weight: .bold))
             HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
-                        .contentShape(.circle)
-                }
-                .buttonStyle(.plain)
-                .glassCircle(interactive: true)
-                .accessibilityLabel("Close")
+                CloseButton { dismiss() }
                 Spacer()
             }
         }

@@ -12,6 +12,8 @@ import SwiftUI
 /// has no refresh.
 struct OnThisDayView: View {
     @Environment(EventStore.self) private var store
+    /// Declared to be drawn again as the day turns — see ``EnvironmentValues/today``.
+    @Environment(\.today) private var today
     /// Which clock the days and times are printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
     @Query(LibraryEntry.library) private var kept: [LibraryEntry]
@@ -59,8 +61,9 @@ struct OnThisDayView: View {
         .washBackground()
         .navigationTitle("On This Day")
         .navigationSubtitle(subtitle(of: today))
+        .largeTitleOnMac(Text("On This Day"), subtitle: subtitle(of: today))
         .eventPane($openEvent)
-        .sheet(item: $stubEvent) { TicketStubView(event: $0) }
+        .sheet(item: $stubEvent) { TicketStubView(event: $0).macSheetSize(.form) }
     }
 
     /// Today, and how much there is under it.
@@ -392,7 +395,7 @@ extension OnThisDay.Memory {
 
     /// "1 year ago · 2025" — the year as the event's own day names it.
     var whenText: Text {
-        Text("\(agoText) · \(event.localDay.formatted(.dateTime.year()))")
+        Text("\(agoText) · \(event.localDay.formatted(.gregorian().year()))")
     }
 }
 

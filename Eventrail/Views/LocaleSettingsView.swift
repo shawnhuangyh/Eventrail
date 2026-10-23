@@ -110,6 +110,9 @@ struct LocaleSettingsView: View {
                         }
                     }
                 }
+                // The choices in the menu itself, as iOS lists them: left to
+                // the default, a Mac put them in a submenu of their own.
+                .pickerStyle(.inline)
             } label: {
                 SettingRowValue(targetName, accessory: "chevron.up.chevron.down")
                     .fixedSize()

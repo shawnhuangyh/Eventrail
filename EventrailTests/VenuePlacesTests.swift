@@ -66,4 +66,25 @@ struct VenuePlacesTests {
         let zones = VenuePlaces.zonesByName([("Grand Hall", Fixtures.taipei), ("Grand Hall", shanghai)])
         #expect(zones["Grand Hall"]?.secondsFromGMT() == Fixtures.taipei.secondsFromGMT())
     }
+
+    /// A ruleset's thresholds count from it on: a hall in Japan placed under
+    /// any reading since the last that moved one stands, and so does a hall
+    /// found anywhere since the brackets — not only one placed under the very
+    /// ruleset a threshold names.
+    @Test func anAnswerStandsUnderEveryRulesetFromItsThresholdOn() {
+        let current = VenuePlaces.ruleset
+        for made in [8, 9, 11, 12, current] {
+            #expect(VenuePlaces.stillStands(madeUnder: made, found: true, inJapan: true))
+        }
+        for made in [12, current] {
+            #expect(VenuePlaces.stillStands(madeUnder: made, found: true, inJapan: false))
+        }
+        // Abroad before the readings that moved halls abroad: asked again.
+        #expect(!VenuePlaces.stillStands(madeUnder: 11, found: true, inJapan: false))
+        #expect(!VenuePlaces.stillStands(madeUnder: 7, found: true, inJapan: true))
+        // "No such place" stands only under the current reading.
+        #expect(!VenuePlaces.stillStands(madeUnder: current - 1, found: false, inJapan: false))
+        #expect(VenuePlaces.stillStands(madeUnder: current, found: false, inJapan: false))
+        #expect(!VenuePlaces.stillStands(madeUnder: nil, found: true, inJapan: true))
+    }
 }

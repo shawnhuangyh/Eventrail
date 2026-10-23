@@ -2,7 +2,6 @@ import AppIntents
 import CoreSpotlight
 import CryptoKit
 import Foundation
-import ImageIO
 import Observation
 import OSLog
 import UniformTypeIdentifiers
@@ -16,9 +15,11 @@ import UniformTypeIdentifiers
 /// Public facts only, never the reader's record — see ``EventEntity``.
 ///
 /// Written the way ``WidgetLink`` writes the widgets' copy: from ``RootView``,
-/// a second after the library last changed — and here after the Following
-/// dates change too, which no write to the library marks — as the app opens,
-/// and only where an item changed. Every item carries a fingerprint of what
+/// a second after a write that can move what the index holds
+/// (``EventStore/factsRevision``: not a note, a ticket or a read, which are
+/// never in it) — and here after the Following dates change too, which no
+/// write to the library marks — as the app opens and comes back, and only
+/// where an item changed. Every item carries a fingerprint of what
 /// it shows; what was written is kept in a file, and the index's own client
 /// state is a digest of that file. So a launch that finds the index as it
 /// left it writes nothing, and an index the system emptied — or a file the
@@ -94,15 +95,13 @@ final class SpotlightIndex {
         if before != nil, plan.isEmpty { return }
 
         var changed: [SpotlightEntry] = []
-        var thumbnails: [String: Data] = [:]
+        var flyered: [(id: String, flyer: URL)] = []
         var made: Set<String> = []
         for entry in entries where plan.writes.contains(entry.identifier) && made.insert(entry.identifier).inserted {
             changed.append(entry)
-            if let flyer = entry.flyer, flyers.contains(flyer),
-               let bytes = await ImageCache.shared.storedData(for: flyer) {
-                thumbnails[entry.identifier] = await Self.thumbnail(of: bytes)
-            }
+            if let flyer = entry.flyer, flyers.contains(flyer) { flyered.append((entry.identifier, flyer)) }
         }
+        let thumbnails = await Self.thumbnails(of: flyered)
 
         do {
             try await writer.write(changed, thumbnails: thumbnails, deleting: plan.deletes, whole: before == nil,
@@ -172,24 +171,35 @@ final class SpotlightIndex {
             + VenueEntity.all(in: store).map(SpotlightEntry.venue)
     }
 
+    /// The flyers held for these items, made small, a few at a time — one
+    /// after another, a whole index's worth waited on each read and each
+    /// encode in turn.
+    private static func thumbnails(of flyers: [(id: String, flyer: URL)]) async -> [String: Data] {
+        await withTaskGroup(of: (String, Data?).self, returning: [String: Data].self) { group in
+            var made: [String: Data] = [:]
+            var waiting = flyers[...]
+            var running = 0
+            while !waiting.isEmpty || running > 0 {
+                while running < 4, let item = waiting.popFirst() {
+                    group.addTask {
+                        guard let bytes = await ImageCache.shared.storedData(for: item.flyer) else { return (item.id, nil) }
+                        return (item.id, await thumbnail(of: bytes))
+                    }
+                    running += 1
+                }
+                guard let (id, data) = await group.next() else { break }
+                running -= 1
+                made[id] = data
+            }
+            return made
+        }
+    }
+
     /// A flyer small enough to ride in the index: Spotlight draws it at the
     /// size of an app icon.
     @concurrent
     private nonisolated static func thumbnail(of bytes: Data) async -> Data? {
-        guard let source = CGImageSourceCreateWithData(bytes as CFData, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 180,
-        ]
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(output, UTType.jpeg.identifier as CFString, 1, nil)
-        else { return nil }
-        CGImageDestinationAddImage(destination, image,
-                                   [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return output as Data
+        Thumbnail.jpeg(of: bytes, side: 180, quality: 0.7)
     }
 
     // MARK: - What was written

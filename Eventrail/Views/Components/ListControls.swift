@@ -115,6 +115,47 @@ struct SortMenuFace: View {
     }
 }
 
+/// The face of a ``ListMenu`` that narrows its list — Following's, the site's
+/// lists' and Search's alike: the filter's symbol and what it holds the list
+/// to, in the app's tint while it holds anything back, then the menu's
+/// chevron — and between them the sort arrows where the menu orders the list
+/// too (`sorts`, Search's).
+struct FilterMenuFace: View {
+    let summary: Text
+    let isNarrowing: Bool
+    var sorts = false
+
+    var body: some View {
+        HStack(spacing: sorts ? 10 : 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .foregroundStyle(isNarrowing ? Color.brandTint : .secondary)
+                summary
+                    .foregroundStyle(isNarrowing ? Color.brandTint : .primary)
+                    .lineLimit(1)
+            }
+            if sorts {
+                Circle()
+                    .fill(.tertiary)
+                    .frame(width: 3, height: 3)
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.arrow.down")
+                    chevron
+                }
+                .foregroundStyle(.secondary)
+            } else {
+                chevron
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.down")
+            .font(.system(size: 11, weight: .bold))
+    }
+}
+
 /// What the trash asks before it acts, on the screens where it asks anything.
 ///
 /// The sheet hangs off the trash rather than off the screen: iOS points a
@@ -208,6 +249,34 @@ struct MarkReadButton: View {
     }
 }
 
+/// One row's read or unread, on Following and My Events alike: from the
+/// swipe from the leading edge (Read, Unread, in the app's tint) and, on a
+/// Mac, from the right-click menu that stands in for it (`inMenu`: Mark as
+/// Read, Mark as Unread), so the two never drift apart.
+struct RowReadButton: View {
+    /// Whether the row is unread — the button reads it, or unreads it.
+    let isUnread: Bool
+    var inMenu = false
+    /// Marks the row read where it is unread, and unread where it is read.
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: isUnread ? "envelope.open" : "envelope.badge")
+        }
+        .tint(inMenu ? nil : Color.brandTint)
+    }
+
+    private var title: LocalizedStringKey {
+        switch (inMenu, isUnread) {
+        case (false, true): "Read"
+        case (false, false): "Unread"
+        case (true, true): "Mark as Read"
+        case (true, false): "Mark as Unread"
+        }
+    }
+}
+
 /// The bottom-left control while past events are being picked on My Events,
 /// where the Upcoming half keeps ``MarkReadButton``: a ticket held for every
 /// picked event that has none (``EventStore/recordTickets(for:)``), which is
@@ -220,6 +289,25 @@ struct MarkAttendedButton: View {
         Button("Mark as Attended", systemImage: "ticket", action: action)
             .labelStyle(.iconOnly)
             .disabled(!isEnabled)
+    }
+}
+
+extension View {
+    /// What a list does as it starts and stops picking rows. The tab bar
+    /// stands down, the way it does everywhere else on iOS, so the actions
+    /// for what is picked stand where the thumb already is; nothing picked
+    /// survives leaving the mode that picked it; and the event open beside
+    /// the list goes as picking starts, beside the fold too, rather than keep
+    /// its own buttons in the bar beside the picking's, or stay up once
+    /// picked and removed.
+    func pickingRows<ID: Hashable>(
+        _ isSelecting: Bool, selection: Binding<Set<ID>>, closing openEvent: Binding<Event?>? = nil
+    ) -> some View {
+        toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
+            .onChange(of: isSelecting) {
+                selection.wrappedValue.removeAll()
+                if isSelecting { openEvent?.wrappedValue = nil }
+            }
     }
 }
 

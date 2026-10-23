@@ -118,6 +118,35 @@
         }
       }
     },
+    "NSCameraUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail uses the camera when you scan a paper ticket, to fill in its seat and price. The picture is read on your device and isn't kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紙のチケットをスキャンするときに、Eventrailはカメラを使って座席と料金を入力します。画像はデバイス上で読み取られ、保存されません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当你扫描纸质门票时，Eventrail 会使用相机来填写座位和票价。图像只在你的设备上读取，不会被保存。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當你掃描紙本門票時，Eventrail 會使用相機來填寫座位和票價。影像只在你的裝置上讀取，不會被保存。"
+          }
+        }
+      }
+    },
     "NSPhotoLibraryAddUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

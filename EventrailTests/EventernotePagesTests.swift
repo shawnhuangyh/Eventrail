@@ -142,6 +142,22 @@ struct EventernotePagesTests {
         }
     }
 
+    /// A row printing no count is read inside its own bounds, not on into the
+    /// next row's name.
+    @Test func aPerformerRowWithNoCountStaysItsOwn() throws {
+        let html = """
+            <p>2件見つかりました。</p>
+            <div class="gb_listview"><ul>
+            <li><a href="/actors/a/1">山田 (やまだ)</a></li>
+            <li><a href="/actors/b/2">佐藤<span>12</span></a></li>
+            </ul></div>
+            """
+        let page = try EventernotePages.performers(in: html, page: 1, pageSize: 20)
+        #expect(page.items.map(\.id) == [1, 2])
+        #expect(page.items.map(\.name) == ["山田", "佐藤"])
+        #expect(page.items.map(\.fanCount) == [nil, 12])
+    }
+
     @Test func readsPerformerSearch() throws {
         let html = """
             <p>2件見つかりました。</p>
@@ -245,6 +261,28 @@ struct EventernotePagesTests {
         let second = try #require(EventernotePages.event(in: Self.eventPage, id: "300001")?.editedAt)
         #expect(first == second)
         #expect(Event.siteDay(of: first) == first)
+    }
+
+    /// An edit inside the day is printed in hours: dated by the day it fell
+    /// on, rather than read as no date at all.
+    @Test func anEditHoursAgoIsDatedByItsDay() throws {
+        let page = Self.eventPage.replacingOccurrences(of: "3日前", with: "5時間前")
+        let editedAt = try #require(EventernotePages.event(in: page, id: "300001")?.editedAt)
+        #expect(editedAt == Event.siteDay(of: Date.now.addingTimeInterval(-5 * 3600)))
+    }
+
+    /// A cover drawn with no flyer: the search for one stops at the cover,
+    /// rather than running past the title to a later element's background.
+    @Test func aCoverWithNoFlyerLeavesTheTitleReadable() throws {
+        let html = """
+            <div class="gb_title_cover"></div>
+            <h1 class="gb_subtitle gb_curl_effect">Announced</h1>
+            <h2 class="gb_subtitle">開催日時</h2><p>2028-01-02</p>
+            <div class="ad" style="background-image:url(https://example.com/banner.png)"></div>
+            """
+        let event = try #require(EventernotePages.event(in: html, id: "9"))
+        #expect(event.title == "Announced")
+        #expect(event.imageURL == nil)
     }
 
     @Test func anEventPageWithoutSectionsStillReads() throws {

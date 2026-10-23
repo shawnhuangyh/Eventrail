@@ -6,7 +6,7 @@ import WatchConnectivity
 ///
 /// Kept in a file as it arrives, so the app opens on the last copy at once —
 /// with the phone out of reach, or before WatchConnectivity has handed over
-/// anything newer. The copy can be days old: ``events(at:)`` drops an event
+/// anything newer. The copy can be days old: ``moments(at:)`` drops an event
 /// whose day is over without waiting for the phone to say so.
 @MainActor @Observable
 final class WatchLibraryStore: NSObject {
@@ -26,9 +26,13 @@ final class WatchLibraryStore: NSObject {
 
     var showsLocalTime: Bool { library?.showsLocalTime ?? false }
 
-    /// The events still to come at `now`, soonest first.
-    func events(at now: Date) -> [WatchEvent] {
-        (library?.events ?? []).filter { EventMoment($0, showsLocalTime: showsLocalTime, at: now).isListed }
+    /// Where each event still to come stands at `now`, soonest first — each
+    /// worked out once, where the list worked it out to filter by, again for
+    /// the moments it redraws at, and again for each card.
+    func moments(at now: Date) -> [EventMoment] {
+        (library?.events ?? []).lazy
+            .map { EventMoment($0, showsLocalTime: self.showsLocalTime, at: now) }
+            .filter(\.isListed)
     }
 
     func event(id: WatchEvent.ID) -> WatchEvent? {

@@ -52,7 +52,7 @@ nonisolated struct OnThisDayProvider: TimelineProvider {
         let isPreview = context.isPreview
         let placeholder = placeholder(in: context)
         Task {
-            let entry = await Self.timeline(at: .now).entries.first ?? placeholder
+            let entry = await Self.firstEntry(at: .now) ?? placeholder
             completion(isPreview && entry.memory == nil ? placeholder : entry)
         }
     }
@@ -64,6 +64,28 @@ nonisolated struct OnThisDayProvider: TimelineProvider {
     /// Today and tomorrow: an entry as each day starts, and on a day with
     /// several memories one each hour, turning to the next.
     static func timeline(at now: Date) async -> Timeline<OnThisDayEntry> {
+        let plans = plans(at: now)
+        let flyers = await WidgetFlyers.files(for: plans.flatMap(\.memories).map { ($0.id, $0.flyer) })
+        let entries = plans.map {
+            OnThisDayEntry(date: $0.time, day: $0.day, memories: $0.memories, index: $0.index,
+                           next: $0.next, flyers: flyers)
+        }
+        return Timeline(entries: entries, policy: .atEnd)
+    }
+
+    /// The timeline's first entry alone, with only its own memories' flyers
+    /// fetched — what a snapshot draws.
+    static func firstEntry(at now: Date) async -> OnThisDayEntry? {
+        guard let first = plans(at: now).first else { return nil }
+        let flyers = await WidgetFlyers.files(for: first.memories.map { ($0.id, $0.flyer) })
+        return OnThisDayEntry(date: first.time, day: first.day, memories: first.memories, index: first.index,
+                              next: first.next, flyers: flyers)
+    }
+
+    /// The entries of ``timeline(at:)``, before their flyers are fetched.
+    private static func plans(
+        at now: Date
+    ) -> [(time: Date, day: CalendarDay, memories: [WidgetMemory], index: Int, next: CalendarDay?)] {
         let all = (WidgetLibrary.read() ?? .empty).memories
         let calendar = Calendar.gregorian()
         let starts = [now] + calendar.midnights(after: now, count: 2)
@@ -83,12 +105,7 @@ nonisolated struct OnThisDayProvider: TimelineProvider {
                 time = hour
             } while time < end
         }
-        let flyers = await WidgetFlyers.files(for: plans.flatMap(\.memories).map { ($0.id, $0.flyer) })
-        let entries = plans.map {
-            OnThisDayEntry(date: $0.time, day: $0.day, memories: $0.memories, index: $0.index,
-                           next: $0.next, flyers: flyers)
-        }
-        return Timeline(entries: entries, policy: .atEnd)
+        return plans
     }
 
     /// The events gone to on `day`'s date in an earlier year, the most recent
@@ -99,13 +116,28 @@ nonisolated struct OnThisDayProvider: TimelineProvider {
     }
 
     /// The first day after `day`, within the year, that has a memory.
+    ///
+    /// The earliest year of each date anything happened on, gathered in one
+    /// pass, and each day of the year looked up in it — not every memory held
+    /// against each of the year's days, which for a library of nine hundred
+    /// was a third of a million comparisons a day without one.
     static func nextDay(after day: CalendarDay, in all: [WidgetMemory], calendar: Calendar) -> CalendarDay? {
         guard !all.isEmpty else { return nil }
+        var earliest: [Int: Int] = [:]
+        for memory in all {
+            let date = memory.day.month * 100 + memory.day.day
+            earliest[date] = min(earliest[date] ?? .max, memory.day.year)
+        }
         let start = day.date(in: calendar)
         for offset in 1 ... 366 {
             guard let date = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
             let candidate = CalendarDay(date, in: calendar)
-            if all.contains(where: { $0.day.year < candidate.year && $0.day.comesRound(on: candidate) }) {
+            if let year = earliest[candidate.month * 100 + candidate.day], year < candidate.year {
+                return candidate
+            }
+            // A leap day comes round on the 28th in a year without one.
+            if let year = earliest[229], year < candidate.year,
+               CalendarDay(year: year, month: 2, day: 29).comesRound(on: candidate) {
                 return candidate
             }
         }
@@ -175,7 +207,7 @@ struct OnThisDayFace: View {
 
     /// "2024", as the event's own day names its year.
     private func year(_ memory: WidgetMemory) -> String {
-        memory.day.date().formatted(.dateTime.year())
+        memory.day.date().formatted(.gregorian().year())
     }
 
     /// Today — "Oct 14".

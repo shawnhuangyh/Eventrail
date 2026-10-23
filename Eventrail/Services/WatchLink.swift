@@ -43,13 +43,11 @@ final class WatchLink: NSObject {
         pending = Task { [weak self, weak store] in
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled, let self, let store else { return }
-            let display = UserDefaults.standard.string(forKey: TimeDisplay.storageKey)
-                .flatMap(TimeDisplay.init(rawValue:)) ?? .venue
             latest = WatchLibrary(
                 events: store.upcoming.prefix(WatchLibrary.limit).map { event in
                     WatchEvent(event, tracking: store.tracking(for: event))
                 },
-                showsLocalTime: display == .local
+                showsLocalTime: TimeDisplay.stored == .local
             )
             flush()
         }

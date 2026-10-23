@@ -40,7 +40,7 @@ struct TicketReviewView: View {
 
     var body: some View {
         NavigationStack {
-            List(selection: $selection) {
+            List(selection: $selection.listSelection()) {
                 Section {
                     heading
                         .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 16, trailing: 20))
@@ -57,9 +57,10 @@ struct TicketReviewView: View {
                                 EmptyView()
                             }
                             .panel()
-                            .listRowInsets(GroupHeader.rowInsets)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                            .pickedByClickOnMac(true, isPicked: selection.contains(event.id)) {
+                                selection.toggle(event.id)
+                            }
+                            .groupedEventRow()
                         }
                     } header: {
                         GroupHeader(label: Text(group.label), count: group.events.count)
@@ -71,11 +72,12 @@ struct TicketReviewView: View {
             .scrollContentBackground(.hidden)
             .monthSections()
             // Picking is all this list is for, so it is picking from the start.
-            .environment(\.editMode, .constant(.active))
+            .pickingEditMode(true)
             .washBackground()
             .navigationTitle("Record Tickets")
             .navigationSubtitle(subtitle)
             .navigationBarTitleDisplayMode(.inline)
+            .padNavigationBarOnMac()
             .toolbar {
                 // Plain beside the checkmark's blue, as on the ticket sheet:
                 // the X writes nothing.
@@ -84,6 +86,7 @@ struct TicketReviewView: View {
                         if selection.isEmpty { dismiss() } else { isConfirmingDiscard = true }
                     }
                     .tint(.primary)
+                    .keyboardShortcut(.cancelAction)
                     .confirmationDialog("Discard your changes?", isPresented: $isConfirmingDiscard,
                                         titleVisibility: .visible) {
                         Button("Discard Changes", role: .destructive) { dismiss() }

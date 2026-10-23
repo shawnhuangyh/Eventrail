@@ -218,12 +218,24 @@ final class FollowedDates {
         isLoading = false
         dates = [:]
         readAt = [:]
+        readOnClock = [:]
         failure = nil
         generation += 1
+        let writing = pendingSave
         pendingSave?.cancel()
         pendingSave = nil
         guard persists else { return }
-        try? FileManager.default.removeItem(at: Self.cacheURL)
+        let url = Self.cacheURL
+        try? FileManager.default.removeItem(at: url)
+        // A write already under way goes on past the cancel, and landed after
+        // the removal: the next launch read the cleared dates back as fresh.
+        // So the file is taken away again once that write is down.
+        if let writing {
+            Task {
+                await writing.value
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
     }
 
     /// What a screen's read of these performers is identified by: who they
@@ -261,24 +273,48 @@ final class FollowedDates {
     /// not known — see ``hallZone``. What is shown and judged; the cache keeps
     /// the row as the listing printed it, so the next read replaces like with
     /// like.
-    private func onHallClock(_ event: Event) -> Event {
-        hallZone(event).map(event.published(in:)) ?? event
+    ///
+    /// Kept for each row with the row and the clock it was read on, and read
+    /// again only where either has moved: every screen showing the dates asks
+    /// for every row on every redraw, and the re-reading builds calendars. And
+    /// the clock is asked once, said with the row — ``isOver(_:)`` and
+    /// ``overAt(_:)`` asked it again for each.
+    private func onHallClock(_ listed: Event) -> OnClock {
+        let zone = hallZone(listed)
+        if let kept = readOnClock[listed.id], kept.zone == zone, kept.listed == listed {
+            return OnClock(event: kept.event, isClockKnown: zone != nil)
+        }
+        let event = zone.map(listed.published(in:)) ?? listed
+        readOnClock[listed.id] = (listed, zone, event)
+        return OnClock(event: event, isClockKnown: zone != nil)
     }
+
+    /// A row as ``onHallClock(_:)`` reads it.
+    private struct OnClock {
+        let event: Event
+        /// Whether its hall's clock is known, rather than the row read on
+        /// Tokyo's because nothing says otherwise.
+        let isClockKnown: Bool
+    }
+
+    /// What ``onHallClock(_:)`` last read each row as — see there.
+    @ObservationIgnored private var readOnClock: [Event.ID: (listed: Event, zone: TimeZone?, event: Event)] = [:]
 
     /// Whether a date is over: on a row whose hall's clock is known, its day
     /// gone or its published end gone by. A row on an assumed clock waits for
     /// its day to be over everywhere, since read on Tokyo time its end — and
     /// its day's — could be hours out either way: a Los Angeles event would
     /// go the morning it opens.
-    private func isOver(_ event: Event) -> Bool {
-        guard hallZone(event) != nil else { return !event.isUpcomingAnywhere }
-        return !event.isUpcoming || event.hasEnded
+    private func isOver(_ row: OnClock) -> Bool {
+        guard row.isClockKnown else { return !row.event.isUpcomingAnywhere }
+        return !row.event.isUpcoming || row.event.hasEnded
     }
 
     /// The moment ``isOver(_:)`` turns true for a row already re-read on its
     /// hall's clock.
-    private func overAt(_ event: Event) -> Date? {
-        guard hallZone(event) != nil else { return event.dayEndsEverywhere }
+    private func overAt(_ row: OnClock) -> Date? {
+        let event = row.event
+        guard row.isClockKnown else { return event.dayEndsEverywhere }
         let ends = Event.inOrder(event.doorsOpen, event.startsAt, event.endsAt).ends
         return [event.dayEnds, ends].compactMap(\.self).min()
     }
@@ -293,7 +329,7 @@ final class FollowedDates {
     /// Wakes at the soonest of `events` to go over, unless a wake is already
     /// set for sooner. One set too soon — its row unfollowed meanwhile — only
     /// redraws early and sets the next.
-    private func tick(atSoonestEndOf events: [Event]) {
+    private func tick(atSoonestEndOf events: [OnClock]) {
         let now = Date.now
         guard let soonest = events.compactMap(overAt).filter({ $0 > now }).min() else { return }
         if let pendingTick, pendingTick.at > now, pendingTick.at <= soonest { return }
@@ -319,6 +355,7 @@ final class FollowedDates {
 
     private func read(_ performers: [PerformerProfile]) async -> Outcome? {
         var landed = 0
+        var missing: [String] = []
         // A run the cache was cleared under writes nothing more, and leaves
         // the state alone for whichever run replaced it.
         let generation = generation
@@ -359,8 +396,10 @@ final class FollowedDates {
                     return Outcome(asked: performers.count, read: landed, failure: failure)
                 }
                 // Named, because "could not be reached" about a list of four
-                // people does not say which four are missing.
-                failure = "\(performer.name): \(error.localizedDescription)"
+                // people does not say which four are missing — every one of
+                // them, not only the last to fail.
+                missing.append(performer.name)
+                failure = "\(missing.formatted(.list(type: .and))): \(error.localizedDescription)"
             }
         }
         return Outcome(asked: performers.count, read: landed, failure: failure)
@@ -403,7 +442,7 @@ final class FollowedDates {
     /// event once however many of them share the bill.
     func events(for performers: [PerformerProfile]) -> [Event] {
         _ = clockTick
-        var merged: [Event] = []
+        var merged: [OnClock] = []
         var known: Set<Event.ID> = []
         for performer in performers {
             // An event whose published end has gone by is over, though its day
@@ -413,20 +452,20 @@ final class FollowedDates {
             // so it goes at the tab's next redraw rather than its next read —
             // and ``tick(atSoonestEndOf:)`` makes one at the moment it ends.
             for listed in dates[performer.id] ?? [] {
-                let event = onHallClock(listed)
-                guard !isOver(event), known.insert(event.id).inserted else { continue }
-                merged.append(event)
+                let row = onHallClock(listed)
+                guard !isOver(row), known.insert(listed.id).inserted else { continue }
+                merged.append(row)
             }
         }
         tick(atSoonestEndOf: merged)
-        return merged.sorted { $0.sortDate < $1.sortDate }
+        return merged.map(\.event).sorted { $0.sortDate < $1.sortDate }
     }
 
     /// A date read for anyone followed, by its id, on its hall's clock — what
     /// a Following date found in Spotlight, or picked in Shortcuts, opens.
     func event(id: Event.ID) -> Event? {
         for listing in dates.values {
-            if let listed = listing.first(where: { $0.id == id }) { return onHallClock(listed) }
+            if let listed = listing.first(where: { $0.id == id }) { return onHallClock(listed).event }
         }
         return nil
     }

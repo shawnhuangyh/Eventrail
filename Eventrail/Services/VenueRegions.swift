@@ -182,6 +182,15 @@ final class VenueRegions {
                 Self.log.info("venue \(venue, privacy: .public) → \(region?.rawValue ?? "nowhere the site names", privacy: .public)")
             } catch is CancellationError {
                 return
+            } catch EventernoteClient.Failure.http(404) {
+                // The search names the hall and its page is gone — merged or
+                // taken down. Written down as the site having nothing, asked
+                // again in a month like one it files no hall under: left
+                // unwritten, every run asked it first and stopped there, and
+                // no hall behind it was ever placed.
+                answers[venue] = Answer(region: nil, address: "", asked: .now)
+                save()
+                Self.log.error("venue \(venue, privacy: .public) → its page is gone")
             } catch {
                 // Offline, or asked too often. Nothing is written down, so the
                 // next run asks again — and nothing more is asked of the site
@@ -262,7 +271,10 @@ final class VenueRegions {
     private func pending(in events: [Event]) -> [String] {
         var seen: Set<String> = []
         return events.compactMap { event in
-            guard region(of: event) == nil else { return nil }
+            // Not a stream or a room nobody named (``Event/isAtHall``): its
+            // page publishes no address, and asking cost two requests of the
+            // run's ration, again every month.
+            guard event.isAtHall, region(of: event) == nil else { return nil }
             let key = Self.key(event)
             guard !key.isEmpty, seen.insert(key).inserted else { return nil }
             guard let answer = answers[key] else { return key }

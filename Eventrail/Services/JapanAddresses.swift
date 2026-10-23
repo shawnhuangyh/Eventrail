@@ -44,11 +44,6 @@ nonisolated struct JapanAddresses: Sendable {
         let coordinate: CLLocationCoordinate2D
     }
 
-    enum Failure: Error {
-        case http(Int)
-        case unreadable
-    }
-
     private static let endpoint =
         URL(string: "https://msearch.gsi.go.jp/address-search/AddressSearch")!
 
@@ -156,21 +151,9 @@ nonisolated struct JapanAddresses: Sendable {
 
     /// One question put to the register, exactly as asked.
     private func asking(_ address: String) async throws -> Place? {
-        var components = URLComponents(url: Self.endpoint, resolvingAgainstBaseURL: false)
-        components?.setQuery(Self.parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
-            + [URLQueryItem(name: "q", value: address)])
-        guard let url = components?.url else { throw Failure.unreadable }
-
-        var request = URLRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        let (data, response) = try await session.data(for: request)
-        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-            throw Failure.http(status)
-        }
-        guard let rows = try? JSONDecoder().decode([Row].self, from: data) else {
-            throw Failure.unreadable
-        }
+        let query = Self.parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
+            + [URLQueryItem(name: "q", value: address)]
+        let rows = try await ServiceRequest.json([Row].self, from: Self.endpoint, query: query, session: session)
         return Self.place(in: rows)
     }
 

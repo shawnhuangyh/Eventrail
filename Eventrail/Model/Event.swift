@@ -214,8 +214,9 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
 
     /// How long a performance runs when Eventernote has published a start but
     /// no end. Gives the calendar entry a length and the sheet's timeline
-    /// somewhere to run to; no screen prints an end time made from it.
-    static let assumedLength: TimeInterval = 3 * 60 * 60
+    /// somewhere to run to; no screen prints an end time made from it. The
+    /// watch reads the same figure (``EventActivityStage/assumedLength``).
+    static let assumedLength = EventActivityStage.assumedLength
 
     /// Doors, start and end, each moved to the next day wherever it is earlier
     /// than the one before it — how an event that runs past midnight has to be
@@ -437,13 +438,19 @@ nonisolated extension Event {
             endsAt: page(imported.endsAt, endsAt),
             timeZone: imported.timeZone,
             listedAttendees: page(imported.listedAttendees, listedAttendees),
-            performers: imported.performers.isEmpty && !isWholePage ? performers : imported.performers,
+            // A list row bills its names alone, where the page links each to
+            // the performer's profile, and shows the flyer as its own list
+            // does: over a copy read from the page, the page's stand, or every
+            // refresh of the account wrote the row twice, and an event past
+            // its day — never read again — lost every link for good.
+            performers: isWholePage || (!isDetailed && !imported.performers.isEmpty) || performers.isEmpty
+                ? imported.performers : performers,
             summary: page(imported.summary, summary),
             relatedLinks: page(imported.relatedLinks, relatedLinks),
             hashtags: page(imported.hashtags, hashtags),
             editedBy: page(imported.editedBy, editedBy),
             editedAt: page(imported.editedAt, editedAt),
-            imageURL: page(imported.imageURL, imageURL),
+            imageURL: isWholePage || !isDetailed ? page(imported.imageURL, imageURL) : imageURL ?? imported.imageURL,
             sourceURL: imported.sourceURL,
             isDetailed: imported.isDetailed || isDetailed,
             detailFormat: imported.detailFormat ?? detailFormat,

@@ -1,4 +1,7 @@
+import AVFoundation
+import PhotosUI
 import SwiftUI
+import VisionKit
 
 /// The reader's own record for one event — the seat, what it cost, a note and
 /// the rounds of the sale they tried for — asked on a sheet of its own over
@@ -26,6 +29,7 @@ import SwiftUI
 struct TicketDetailsView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     /// What a cost typed on a ticket with none starts in, and what the hint
     /// under the field converts into — see ``Currencies/storageKey``.
     @AppStorage(Currencies.storageKey) private var defaultCurrency = Currencies.yen
@@ -46,6 +50,17 @@ struct TicketDetailsView: View {
     @State private var isConfirmingDiscard = false
     @State private var isConfirmingAnotherEntry = false
     @State private var isConfirmingClear = false
+    /// Scanning the ticket: the picker or the camera up — or the camera not
+    /// allowed — the picture picked, the reading under way, and what it found,
+    /// asked about before anything is filled in (``TicketScan``), or that it
+    /// found nothing.
+    @State private var isPickingTicket = false
+    @State private var isShootingTicket = false
+    @State private var isCameraRefused = false
+    @State private var ticketPicture: PhotosPickerItem?
+    @State private var isReadingTicket = false
+    @State private var scan: TicketScan?
+    @State private var isScanEmpty = false
 
     let event: Event
 
@@ -141,6 +156,7 @@ struct TicketDetailsView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Ticket Details")
             .navigationBarTitleDisplayMode(.inline)
+            .padNavigationBarOnMac()
             .toolbar {
                 // Plain beside the checkmark's blue: the X writes nothing.
                 ToolbarItem(placement: .cancellationAction) {
@@ -148,6 +164,11 @@ struct TicketDetailsView: View {
                         if hasChanges { isConfirmingDiscard = true } else { dismiss() }
                     }
                     .tint(.primary)
+                    // Not while a round's page is pushed: its copy of the
+                    // entry is not in `hasChanges`, so Escape would throw it
+                    // away unasked. The page takes Escape itself once it has
+                    // something to lose (``LotteryEntryView``).
+                    .keyboardShortcut(path.isEmpty ? .cancelAction : nil)
                     // Asked from the button, so the dialog points at what
                     // opened it.
                     .confirmationDialog("Discard your changes?", isPresented: $isConfirmingDiscard,
@@ -174,6 +195,35 @@ struct TicketDetailsView: View {
             }
             .navigationDestination(for: LotteryEntry.self) { entry in
                 LotteryEntryView(entry: entry, in: $draft)
+            }
+            // Photos' own picker, which runs outside the app: it asks for no
+            // permission and hands over the one picture picked.
+            .photosPicker(isPresented: $isPickingTicket, selection: $ticketPicture,
+                          matching: .images, preferredItemEncoding: .current)
+            .onChange(of: ticketPicture) { _, picture in
+                guard let picture else { return }
+                ticketPicture = nil
+                read(picture)
+            }
+            .fullScreenCover(isPresented: $isShootingTicket) {
+                TicketCamera { pages in
+                    isShootingTicket = false
+                    guard !pages.isEmpty else { return }
+                    isReadingTicket = true
+                    Task { await read(pages) }
+                }
+                .ignoresSafeArea()
+            }
+            .alert("No Seat or Price Found", isPresented: $isScanEmpty) {
+                Button("OK") {}
+            } message: {
+                Text("Try again with a picture that shows the ticket's seat and price clearly.")
+            }
+            .alert("Couldn't Open the Camera", isPresented: $isCameraRefused) {
+                Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Eventrail isn't allowed to use the camera. You can allow it in Settings.")
             }
         }
         // An entry's page asks its own question on the way back, which a
@@ -214,14 +264,14 @@ struct TicketDetailsView: View {
             }
             // Not asked about first, as no swipe to delete on iOS is.
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    withAnimation(.snappy) {
-                        tracking.lotteries.wrappedValue.removeAll { $0.id == entry.id }
-                    }
-                }
+                Button("Delete", systemImage: "trash", role: .destructive) { delete(entry) }
                 // Said outright, as My Events says it: the role alone left the
                 // button in the app's tint rather than the system red.
                 .tint(.red)
+            }
+            // The swipe again, from a right-click on a Mac.
+            .contextMenuOnMac {
+                Button("Delete", systemImage: "trash", role: .destructive) { delete(entry) }
             }
             .formRow()
         }
@@ -276,6 +326,14 @@ struct TicketDetailsView: View {
         path.append(LotteryEntry(applications: 0, choices: [LotteryChoice()]))
     }
 
+    /// Takes an entry out of the sheet's copy — written down only on its
+    /// checkmark, as every other answer here is.
+    private func delete(_ entry: LotteryEntry) {
+        withAnimation(.snappy) {
+            tracking.lotteries.wrappedValue.removeAll { $0.id == entry.id }
+        }
+    }
+
     /// Where the reader sat, as the ticket printed it, with the class of seat
     /// it is beside it — read from the rounds won above rather than asked
     /// here (``Tracking/ticketClass``), the highest where several were won,
@@ -283,6 +341,8 @@ struct TicketDetailsView: View {
     private var seatSection: some View {
         let record = settled
         return TicketForm.section("Seat") {
+            scanButton
+        } content: {
             TicketForm.field(symbol: "sofa") {
                 // A block, a row and a number in three languages worth of
                 // conventions: nothing the keyboard would correct here is a
@@ -309,6 +369,153 @@ struct TicketDetailsView: View {
                     .padding(.horizontal, 4)
             }
         }
+    }
+
+    // MARK: - Scanning the ticket
+
+    /// Reads the seat, its class and the price off a picture of the ticket
+    /// on the device (``TicketScanner``): a screenshot of e+'s スマチケ from
+    /// Photos, or a paper ticket through the document camera, which finds the
+    /// ticket's edges and squares it up. On the Seat section's head, so it is
+    /// there once the seat is asked, as the seat and the cost are. Photos
+    /// alone where there is no camera to scan with — the Simulator, an iPad
+    /// without one.
+    private var scanButton: some View {
+        Group {
+            if VNDocumentCameraViewController.isSupported {
+                Menu {
+                    Button("Choose from Photos", systemImage: "photo.on.rectangle") { isPickingTicket = true }
+                    Button("Scan Paper Ticket", systemImage: "doc.viewfinder", action: openCamera)
+                } label: {
+                    scanLabel
+                }
+                .menuOrder(.fixed)
+            } else {
+                Button { isPickingTicket = true } label: { scanLabel }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isReadingTicket)
+        // Asked from the button, so the dialog points at what opened it.
+        .confirmationDialog(scanTitle,
+                            isPresented: Binding { scan != nil } set: { if !$0 { scan = nil } },
+                            titleVisibility: .visible, presenting: scan) { scan in
+            Button {
+                fill(from: scan)
+            } label: {
+                isForThisEvent(scan) ? Text("Fill In") : Text("Fill In Anyway")
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { scan in
+            Text(verbatim: scanSummary(scan))
+        }
+    }
+
+    private var scanLabel: some View {
+        HStack(spacing: 5) {
+            if isReadingTicket {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Image(systemName: "text.viewfinder")
+            }
+            Text("Scan Ticket")
+        }
+        .scalingFont(size: 14, weight: .semibold)
+        .foregroundStyle(Color.brandTint)
+        .contentShape(.rect)
+    }
+
+    /// The document camera, once the camera is allowed: asked for the first
+    /// time here, and pointed at Settings where it was refused.
+    private func openCamera() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            isShootingTicket = true
+        case .notDetermined:
+            Task {
+                if await AVCaptureDevice.requestAccess(for: .video) { isShootingTicket = true }
+            }
+        default:
+            isCameraRefused = true
+        }
+    }
+
+    /// Reads the picture picked in Photos, as the camera's pages are read.
+    private func read(_ picture: PhotosPickerItem) {
+        isReadingTicket = true
+        Task {
+            let data = try? await picture.loadTransferable(type: Data.self)
+            await read(data.map { [$0] } ?? [])
+        }
+    }
+
+    /// Reads the pictures, and asks about what they say — or says they said
+    /// nothing the sheet asks. The pictures go as soon as they are read.
+    private func read(_ pictures: [Data]) async {
+        isReadingTicket = true
+        defer { isReadingTicket = false }
+        guard let read = try? await TicketScanner.scan(pictures, hall: event.venue), !read.isEmpty else {
+            isScanEmpty = true
+            return
+        }
+        scan = read
+    }
+
+    /// The day the event falls on at its hall, which its ticket prints.
+    private var eventDay: CalendarDay {
+        CalendarDay(event.date, in: .gregorian(in: event.timeZone))
+    }
+
+    /// Whether the ticket is for this event's day, where it prints one. An
+    /// e+ ticket for the first night and one for the second print the same
+    /// title, hall and times, and nothing else tells them apart.
+    private func isForThisEvent(_ scan: TicketScan) -> Bool {
+        scan.day?.isSame(as: eventDay) ?? true
+    }
+
+    private var scanTitle: Text {
+        if let scan, !isForThisEvent(scan) { return Text("This ticket is for another day") }
+        return Text("Fill in from this ticket?")
+    }
+
+    /// The class the scan would write: only where no round that went well
+    /// names one. The rounds say what the ticket is (``Tracking/ticketClass``),
+    /// and the ticket's own class is kept only where they say nothing.
+    private func classToFill(from scan: TicketScan) -> String? {
+        draft.classOfWins == nil ? scan.seatClass : nil
+    }
+
+    /// What would be filled in, a line each, under the day the ticket is for
+    /// where that is not the event's.
+    private func scanSummary(_ scan: TicketScan) -> String {
+        var lines: [String] = []
+        if let day = scan.day, !day.isSame(as: eventDay) {
+            let printed = LotteryText.long(day.calendarDay(orIn: eventDay.year))
+            lines.append(String(localized: "The ticket is dated \(printed), and this event is on \(LotteryText.long(eventDay))."))
+            lines.append("")
+        }
+        if let seat = scan.seat { lines.append(String(localized: "Seat: \(seat)")) }
+        if let seatClass = classToFill(from: scan) {
+            let name = SeatClass(rawValue: seatClass)?.name ?? seatClass
+            lines.append(String(localized: "Seat Type: \(name)"))
+        }
+        if let price = scan.price { lines.append(String(localized: "Cost: \(price.formatted)")) }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Fills in what the scan found, over whatever was written — onto the
+    /// sheet's copy, so the reader sees it in the fields and the checkmark
+    /// still writes it down, or the X throws it away.
+    private func fill(from scan: TicketScan) {
+        var record = draft
+        if let seat = scan.seat { record.seat = seat }
+        if let seatClass = classToFill(from: scan) { record.seatClass = seatClass }
+        if let price = scan.price {
+            record.cost = price.amount
+            record.currency = price.currency
+        }
+        withAnimation(.snappy) { draft = record }
     }
 
     /// What the ticket cost, and in what: the amount typed, the currency's
@@ -862,6 +1069,49 @@ enum TicketForm {
         .buttonStyle(.plain)
         .disabled(!enabled)
         .accessibilityLabel(label)
+    }
+}
+
+// MARK: - The document camera
+
+/// The system's document camera, for a paper ticket: it finds the ticket's
+/// edges and squares it up — which keeps its columns straight for
+/// ``TicketScan`` as a photo held at an angle would not — and hands back each
+/// page taken, read like a picture from Photos and not kept.
+private struct TicketCamera: UIViewControllerRepresentable {
+    /// The pages taken, or none where the reader cancelled.
+    let done: ([Data]) -> Void
+
+    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
+        let camera = VNDocumentCameraViewController()
+        camera.delegate = context.coordinator
+        return camera
+    }
+
+    func updateUIViewController(_ camera: VNDocumentCameraViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(done: done) }
+
+    final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+        let done: ([Data]) -> Void
+
+        init(done: @escaping ([Data]) -> Void) {
+            self.done = done
+        }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController,
+                                          didFinishWith scan: VNDocumentCameraScan) {
+            done((0..<scan.pageCount).compactMap { scan.imageOfPage(at: $0).jpegData(compressionQuality: 0.9) })
+        }
+
+        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
+            done([])
+        }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController,
+                                          didFailWithError error: any Error) {
+            done([])
+        }
     }
 }
 
