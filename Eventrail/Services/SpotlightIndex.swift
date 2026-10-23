@@ -2,7 +2,6 @@ import AppIntents
 import CoreSpotlight
 import CryptoKit
 import Foundation
-import ImageIO
 import Observation
 import OSLog
 import UniformTypeIdentifiers
@@ -178,20 +177,7 @@ final class SpotlightIndex {
     /// size of an app icon.
     @concurrent
     private nonisolated static func thumbnail(of bytes: Data) async -> Data? {
-        guard let source = CGImageSourceCreateWithData(bytes as CFData, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 180,
-        ]
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(output, UTType.jpeg.identifier as CFString, 1, nil)
-        else { return nil }
-        CGImageDestinationAddImage(destination, image,
-                                   [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return output as Data
+        Thumbnail.jpeg(of: bytes, side: 180, quality: 0.7)
     }
 
     // MARK: - What was written

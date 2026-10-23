@@ -1,6 +1,4 @@
-import ImageIO
 import SwiftUI
-import UniformTypeIdentifiers
 import WidgetKit
 
 // MARK: - The wash
@@ -318,7 +316,7 @@ nonisolated enum WidgetFlyers {
         let request = URLRequest(url: url, timeoutInterval: 10)
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let small = downsized(data)
+              let small = Thumbnail.jpeg(of: data, side: side)
         else { return modified == nil ? nil : file }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try? small.write(to: file, options: .atomic)
@@ -337,22 +335,6 @@ nonisolated enum WidgetFlyers {
                 try? FileManager.default.removeItem(at: file)
             }
         }
-    }
-
-    private static func downsized(_ data: Data) -> Data? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                  kCGImageSourceCreateThumbnailFromImageAlways: true,
-                  kCGImageSourceCreateThumbnailWithTransform: true,
-                  kCGImageSourceThumbnailMaxPixelSize: side,
-              ] as CFDictionary)
-        else { return nil }
-        let out = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil)
-        else { return nil }
-        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return out as Data
     }
 }
 

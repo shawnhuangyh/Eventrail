@@ -338,3 +338,22 @@ struct RefreshMenuItem: View {
         .disabled(isRefreshing)
     }
 }
+
+/// The last group of the ⋯ menu on every page read from Eventernote — an
+/// event's sheet, a performer's or a hall's page, the site's own lists: the
+/// page opened where it was read from, and Refresh.
+struct EventernotePageItems: View {
+    /// The page on the site, where there is one to open.
+    let page: URL?
+    let isRefreshing: Bool
+    let refresh: () -> Void
+
+    var body: some View {
+        if let page {
+            Link(destination: page) {
+                Label("Open in Eventernote", systemImage: "safari")
+            }
+        }
+        RefreshMenuItem(isRefreshing: isRefreshing, action: refresh)
+    }
+}

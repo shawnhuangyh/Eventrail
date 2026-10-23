@@ -76,7 +76,7 @@ struct FavoriteEventsView: View {
         .navigationTitle("Favorite Events")
         .navigationSubtitle(subtitle)
         .largeTitleOnMac(Text("Favorite Events"), subtitle: subtitle)
-        .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
+        .pickingRows(isSelecting, selection: $selection, closing: $openEvent)
         .toolbar {
             PencilToolbar(isSelecting: $isSelecting, title: "Select Events",
                           canSelect: !favorites.isEmpty)
@@ -103,13 +103,6 @@ struct FavoriteEventsView: View {
         }
         .eventPane($openEvent)
         .onChange(of: filter) { selection.removeAll() }
-        .onChange(of: isSelecting) {
-            selection.removeAll()
-            // Picking takes the screen over, beside the fold too: the event
-            // open beside the list goes, rather than keep its own buttons in
-            // the bar beside the picking's, or stay up once picked and removed.
-            if isSelecting { openEvent = nil }
-        }
     }
 
     private func section(_ group: EventGroup) -> some View {

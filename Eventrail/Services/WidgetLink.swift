@@ -43,9 +43,7 @@ final class WidgetLink {
         pending = Task { [weak self, weak store] in
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled, let self, let store else { return }
-            let display = UserDefaults.standard.string(forKey: TimeDisplay.storageKey)
-                .flatMap(TimeDisplay.init(rawValue:)) ?? .venue
-            write(WidgetLibrary(store, display: display))
+            write(WidgetLibrary(store, display: .stored))
         }
     }
 

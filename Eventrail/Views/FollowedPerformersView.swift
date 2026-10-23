@@ -59,7 +59,7 @@ struct FollowedPerformersView: View {
         .navigationTitle("Following Performers")
         .navigationSubtitle(subtitle)
         .largeTitleOnMac(Text("Following Performers"), subtitle: subtitle)
-        .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
+        .pickingRows(isSelecting, selection: $selection)
         .toolbar {
             PencilToolbar(isSelecting: $isSelecting, title: "Select Performers",
                           canSelect: !performers.isEmpty)
@@ -81,7 +81,6 @@ struct FollowedPerformersView: View {
                 )
             }
         }
-        .onChange(of: isSelecting) { selection.removeAll() }
     }
 
     private var subtitle: Text {

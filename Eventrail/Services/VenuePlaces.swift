@@ -988,7 +988,7 @@ final class VenuePlaces {
                 // counted only as a failure, the next hall Maps placed reset
                 // the count, and the run went on asking a service that had
                 // said no.
-                if error is VenueBuildings.Failure { narrowing = false }
+                if VenueBuildings.turnedAway(error) { narrowing = false }
                 // The hall keeps whatever answer it had; only a run of these
                 // ends the refresh.
                 failures += 1

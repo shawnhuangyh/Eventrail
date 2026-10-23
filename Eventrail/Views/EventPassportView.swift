@@ -1237,28 +1237,34 @@ private struct PassportExtremesSheet: View {
     let extreme: PassportExtreme
     let spans: [PassportStats.Span]
 
-    /// A row here opens the event it names, exactly as the row on the card
-    /// does — a drawer over a drawer rather than a push, because an event's
-    /// own sheet is what every list in the app opens, and the reader closes it
-    /// back onto the list they tapped it from.
+    var body: some View {
+        // How many were timed, not how many were attended: an event with no
+        // finish published is in neither list, and the count says so.
+        PassportEventDrawer(eyebrow: Text("^[\(spans.count) timed event](inflect: true)"),
+                            title: Text(extreme.title)) { open in
+            PassportRuledRows(items: spans) { open($0.event) } row: { PassportSpanRow(span: $0) }
+        }
+    }
+}
+
+/// A Passport drawer of events — the extremes', the tickets', the
+/// lotteries' — under its header, each row opening the event it names: a
+/// drawer over a drawer rather than a push, because an event's own sheet is
+/// what every list in the app opens, and the reader closes it back onto the
+/// list they tapped it from.
+private struct PassportEventDrawer<Content: View>: View {
+    let eyebrow: Text
+    let title: Text
+    /// The list, handed the way to open one of its events.
+    @ViewBuilder let content: (_ open: @escaping (Event) -> Void) -> Content
+
     @State private var openEvent: Event?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
+            PassportSheetHeader(eyebrow: eyebrow, title: title)
             ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(spans.enumerated()), id: \.element.id) { index, span in
-                        if index > 0 { Divider() }
-                        Button { openEvent = span.event } label: {
-                            PassportSpanRow(span: span)
-                                .padding(.vertical, 12)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+                content { openEvent = $0 }
             }
         }
         .washBackground()
@@ -1266,13 +1272,28 @@ private struct PassportExtremesSheet: View {
         .eventSheet($openEvent)
         .opensFromOutside()
     }
+}
 
-    /// How many were timed, not how many were attended: an event with no
-    /// finish published is in neither list, and the count says so.
-    private var header: some View {
-        PassportSheetHeader(
-            eyebrow: Text("^[\(spans.count) timed event](inflect: true)"),
-            title: extreme.title)
+/// Rows ruled off one under another, each a button — the extremes' drawer's
+/// and the tickets': events with a figure each, not a ranking with a bar.
+private struct PassportRuledRows<Item: Identifiable, Row: View>: View {
+    let items: [Item]
+    let open: (Item) -> Void
+    @ViewBuilder let row: (Item) -> Row
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Divider() }
+                Button { open(item) } label: {
+                    row(item)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 16)
     }
 }
 
@@ -1848,36 +1869,23 @@ private struct PassportLotterySheet: View {
     let eyebrow: Text
     let rows: [LotteryListRow]
 
-    /// A row here opens the event it names, exactly as the row on the card
-    /// does — a drawer over a drawer, the way ``PassportExtremesSheet`` opens
-    /// one, so the reader closes the event back onto the list they tapped it
-    /// from.
-    @State private var openEvent: Event?
-
     var body: some View {
         let most = max(1, rows.map(\.entries).max() ?? 1)
 
-        VStack(alignment: .leading, spacing: 0) {
-            PassportSheetHeader(eyebrow: eyebrow, title: title)
-            ScrollView {
-                VStack(spacing: 13) {
-                    ForEach(rows) { row in
-                        Button { openEvent = row.event } label: {
-                            PassportLotteryRow(row: row, most: most)
-                        }
-                        .buttonStyle(.plain)
+        PassportEventDrawer(eyebrow: eyebrow, title: title) { open in
+            VStack(spacing: 13) {
+                ForEach(rows) { row in
+                    Button { open(row.event) } label: {
+                        PassportLotteryRow(row: row, most: most)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(16)
-                .panel(cornerRadius: 28)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
+            .padding(16)
+            .panel(cornerRadius: 28)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
         }
-        .washBackground()
-        .presentationDetents([.medium, .large])
-        .eventSheet($openEvent)
-        .opensFromOutside()
     }
 }
 
@@ -3229,31 +3237,12 @@ private struct PassportTicketSheet: View {
     /// The class the card was filtered to, named in the eyebrow; nil for all.
     let seatType: Text?
 
-    @State private var openEvent: Event?
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            PassportSheetHeader(eyebrow: eyebrow, title: title)
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(tickets.enumerated()), id: \.element.id) { index, ticket in
-                        if index > 0 { Divider() }
-                        Button { openEvent = ticket.event } label: {
-                            PassportTicketRow(ticket: ticket, currency: currency,
-                                              style: styles[ticket.seatClass])
-                                .padding(.vertical, 12)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
+        PassportEventDrawer(eyebrow: eyebrow, title: title) { open in
+            PassportRuledRows(items: tickets) { open($0.event) } row: { ticket in
+                PassportTicketRow(ticket: ticket, currency: currency, style: styles[ticket.seatClass])
             }
         }
-        .washBackground()
-        .presentationDetents([.medium, .large])
-        .eventSheet($openEvent)
-        .opensFromOutside()
     }
 
     private var eyebrow: Text {

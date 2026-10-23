@@ -30,10 +30,6 @@ struct EventMoment {
     /// on any day before, and on the day where no start was published.
     let stage: EventActivityStage?
 
-    /// How long an event with no end published is given —
-    /// `Event.assumedLength`.
-    static let assumedLength: TimeInterval = 3 * 60 * 60
-
     init(_ event: WatchEvent, showsLocalTime: Bool, at now: Date) {
         self.event = event
         self.now = now
@@ -62,7 +58,7 @@ struct EventMoment {
         }
         let ends = event.ends.flatMap { $0 > starts ? $0 : nil }
         let doors = event.doors.flatMap { $0 < starts ? $0 : nil }
-        let runsTo = ends ?? starts.addingTimeInterval(Self.assumedLength)
+        let runsTo = ends ?? starts.addingTimeInterval(EventActivityStage.assumedLength)
         self.doors = doors
         self.starts = starts
         self.ends = ends
@@ -134,14 +130,7 @@ struct EventMoment {
     /// before its day.
     var headline: Text? {
         guard let stage, let starts else { return nil }
-        return switch stage {
-        case .beforeDoors: Text("Doors in \(countdown(to: doors ?? starts))")
-        case .beforeShow: Text("Starts in \(countdown(to: starts))")
-        case .doorsOpen: Text("Doors open")
-        case .startingSoon: Text("Starting in \(countdown(to: starts))")
-        case .onNow: Text("On now")
-        case .wrapped: Text("That's a wrap")
-        }
+        return stage.headline(doors: doors, starts: starts) { countdown(to: $0) }
     }
 
     /// The gauge's centre: what it counts to, the count, and the day.

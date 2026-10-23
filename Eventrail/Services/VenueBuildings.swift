@@ -36,13 +36,14 @@ nonisolated struct VenueBuildings: Sendable {
         let coordinate: CLLocationCoordinate2D
     }
 
-    enum Failure: Error {
-        case http(Int)
-        case unreadable
-    }
-
     private static let endpoint =
         URL(string: "https://nominatim.openstreetmap.org/search")!
+
+    /// Whether `error` is OpenStreetMap turning a request away, or failing to
+    /// answer one — what ends a refresh's requests to it.
+    static func turnedAway(_ error: any Error) -> Bool {
+        (error as? ServiceRequest.Failure)?.host == endpoint.host()
+    }
 
     /// The policy asks that requests be attributable to the app making them,
     /// with a way to reach whoever made it: the app's own repository, whose
@@ -135,7 +136,6 @@ nonisolated struct VenueBuildings: Sendable {
     /// One search, in `country` where that is known — see
     /// ``VenueCountries/searchScope(for:)``.
     private func rows(for query: String, in country: String?) async throws -> [Row] {
-        var components = URLComponents(url: Self.endpoint, resolvingAgainstBaseURL: false)
         var items = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "format", value: "jsonv2"),
@@ -148,21 +148,8 @@ nonisolated struct VenueBuildings: Sendable {
             URLQueryItem(name: "accept-language", value: "ja")
         ]
         if let country { items += VenueCountries.searchScope(for: country) }
-        components?.setQuery(items)
-        guard let url = components?.url else { throw Failure.unreadable }
-
-        var request = URLRequest(url: url)
-        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        let (data, response) = try await session.data(for: request)
-        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-            throw Failure.http(status)
-        }
-        guard let rows = try? JSONDecoder().decode([Row].self, from: data) else {
-            throw Failure.unreadable
-        }
-        return rows
+        return try await ServiceRequest.json([Row].self, from: Self.endpoint, query: items,
+                                             userAgent: Self.userAgent, session: session)
     }
 
     // MARK: - A hall abroad

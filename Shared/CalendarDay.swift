@@ -61,9 +61,9 @@ nonisolated struct CalendarDay: Hashable, Comparable, Sendable {
     /// was — save a day picked in Heisei, early in 2019, which reads as Reiwa
     /// and cannot be told apart.
     ///
-    /// Read so and not written back: a column holding one is not understood
-    /// (``LotteryEntry/understands(column:)``), so it is rewritten only with
-    /// a change to the list itself.
+    /// Read so and not written back: the old column is never written again,
+    /// and the first change to the list moves it into rows of this build's
+    /// own (``LibraryLottery``).
     private static func gregorianYear(_ year: Int) -> Int {
         switch year {
         case 1 ..< 100: year + 2018

@@ -37,11 +37,8 @@ struct GregorianTests {
         #expect(CalendarDay(text: "2569-10-12") == day)
         #expect(CalendarDay(text: "2026-10-12") == day)
         #expect(try JSONDecoder().decode(CalendarDay.self, from: Data(#""0008-10-12""#.utf8)) == day)
-        // Read so, and not taken as this build's own, so a column holding it
-        // is not written back by a note edited beside it.
         let kept = #"[{"applications":1,"day":"0008-10-12","id":"00000000-0000-4000-8000-000000000002","result":"pending"}]"#
         #expect(LotteryEntry.entries(inColumn: kept)?.first?.day == day)
-        #expect(!LotteryEntry.understands(column: kept))
     }
 
     /// An untimed event written to the calendar as an all-day entry: on a

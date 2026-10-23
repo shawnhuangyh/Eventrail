@@ -35,6 +35,29 @@ struct FlyerThumbnail: View {
     }
 }
 
+/// The way out of a sheet that floats its own over the top of the page, as an
+/// event's sheet and the ticket stub do: a glyph in a glass circle, named
+/// Close for VoiceOver, and pressed by Escape — `shortcut`, nil while a sheet
+/// of its own stands over it, which a key it does not take falls through to.
+struct CloseButton: View {
+    var shortcut: KeyboardShortcut? = .cancelAction
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 36, height: 36)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .glassCircle(interactive: true)
+        .accessibilityLabel("Close")
+        .keyboardShortcut(shortcut)
+    }
+}
+
 /// The single collapsed tracking badge on an event row.
 struct StatusBadge: View {
     let status: TrackingStatus
@@ -718,5 +741,17 @@ struct RefreshFailureNote: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .panel()
+    }
+}
+
+extension View {
+    /// An event's row in a grouped `List` of panels — My Events, Following,
+    /// Record Tickets: set in at ``GroupHeader/rowInsets`` under its month, on
+    /// the wash rather than a cell's background, and with no separator, since
+    /// each row is a panel of its own.
+    func groupedEventRow() -> some View {
+        listRowInsets(GroupHeader.rowInsets)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
     }
 }

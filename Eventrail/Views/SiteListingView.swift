@@ -352,16 +352,7 @@ struct SiteListingView: View {
                 }
             }
         } face: {
-            HStack(spacing: 8) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .secondary)
-                filter.summary
-                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .primary)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
+            FilterMenuFace(summary: filter.summary, isNarrowing: filter.isNarrowing)
         }
     }
 
@@ -372,12 +363,7 @@ struct SiteListingView: View {
     private var menu: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                if let pageURL {
-                    Link(destination: pageURL) {
-                        Label("Open in Eventernote", systemImage: "safari")
-                    }
-                }
-                RefreshMenuItem(isRefreshing: running != nil) {
+                EventernotePageItems(page: pageURL, isRefreshing: running != nil) {
                     imagesCheckedSince = .now
                     Task { await refresh(byHand: true) }
                 }

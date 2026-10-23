@@ -60,9 +60,7 @@ struct TicketReviewView: View {
                             .pickedByClickOnMac(true, isPicked: selection.contains(event.id)) {
                                 selection.toggle(event.id)
                             }
-                            .listRowInsets(GroupHeader.rowInsets)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                            .groupedEventRow()
                         }
                     } header: {
                         GroupHeader(label: Text(group.label), count: group.events.count)

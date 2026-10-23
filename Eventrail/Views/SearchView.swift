@@ -332,24 +332,7 @@ struct SearchView: View {
                 }
             }
         } face: {
-            HStack(spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "line.3.horizontal.decrease")
-                        .foregroundStyle(filter.isNarrowing ? Color.brandTint : .secondary)
-                    filter.summary
-                        .foregroundStyle(filter.isNarrowing ? Color.brandTint : .primary)
-                        .lineLimit(1)
-                }
-                Circle()
-                    .fill(.tertiary)
-                    .frame(width: 3, height: 3)
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.up.arrow.down")
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .foregroundStyle(.secondary)
-            }
+            FilterMenuFace(summary: filter.summary, isNarrowing: filter.isNarrowing, sorts: true)
         }
     }
 

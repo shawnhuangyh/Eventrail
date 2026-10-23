@@ -96,19 +96,8 @@ final class ExchangeRates {
         let rate: Double
     }
 
-    enum Failure: Error {
-        case http(Int)
-        case unreadable
-    }
-
     @concurrent nonisolated private static func fetch() async throws -> CurrencyRates {
-        var request = URLRequest(url: endpoint, timeoutInterval: 20)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-            throw Failure.http(status)
-        }
-        let rows = try JSONDecoder().decode([Row].self, from: data)
+        let rows = try await ServiceRequest.json([Row].self, from: endpoint, timeout: 20)
         let days = DateFormatter()
         days.locale = Locale(identifier: "en_US_POSIX")
         days.timeZone = TimeZone(identifier: "UTC")
@@ -119,7 +108,7 @@ final class ExchangeRates {
             rates[row.quote] = row.rate
             if let day = days.date(from: row.date) { published = max(published, day) }
         }
-        guard !rates.isEmpty else { throw Failure.unreadable }
+        guard !rates.isEmpty else { throw ServiceRequest.Failure(host: endpoint.host(), status: nil) }
         return CurrencyRates(base: "EUR", rates: rates, published: published, readAt: .now)
     }
 }

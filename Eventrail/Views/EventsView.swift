@@ -70,10 +70,7 @@ struct EventsView: View {
             .navigationTitle("My Events")
             .navigationSubtitle(subtitle)
             .largeTitleOnMac(Text("My Events"), subtitle: subtitle)
-            // Selecting takes the bottom of the screen over, the way it does
-            // everywhere else on iOS: the tab bar stands down so the actions for
-            // what is selected can stand where the thumb already is.
-            .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
+            .pickingRows(isSelecting, selection: $selection, closing: $openEvent)
             .toolbar {
                 PencilToolbar(isSelecting: $isSelecting, title: "Select Events",
                               canSelect: eventCount > 0)
@@ -104,16 +101,8 @@ struct EventsView: View {
             .eventPane($openEvent)
             .venueDestination()
             .sheet(item: $reviewing) { TicketReviewView(events: $0.events).macSheetSize(.form) }
-            // Nothing is left selected behind a filter that no longer shows it,
-            // and nothing survives leaving the mode that picked it.
+            // Nothing is left selected behind a filter that no longer shows it.
             .onChange(of: filter) { selection.removeAll() }
-            .onChange(of: isSelecting) {
-                selection.removeAll()
-                // Picking takes the screen over, beside the fold too: the event
-                // open beside the list goes, rather than keep its own buttons in
-                // the bar beside the picking's, or stay up once picked and removed.
-                if isSelecting { openEvent = nil }
-            }
             // Read again as the sheet closes, against the copy the sheet has
             // just read: the row was marked as it stood when tapped, and a
             // page that had changed since would otherwise come back Updated
@@ -181,9 +170,7 @@ struct EventsView: View {
                             .pickedByClickOnMac(isSelecting, isPicked: selection.contains(event.id)) {
                                 selection.toggle(event.id)
                             }
-                            .listRowInsets(GroupHeader.rowInsets)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                            .groupedEventRow()
                             // Toward the tag, as on Following: a swipe from the
                             // leading edge reads the row, or unreads it.
                             // Not while picking, which a Mac does out of edit mode.

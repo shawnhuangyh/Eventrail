@@ -652,19 +652,7 @@ struct EventDetailView: View {
     /// Escape presses it too, as it does every sheet's way out: a sheet on a
     /// Mac cannot be pulled down (``closeShortcut``).
     private var closeButton: some View {
-        Button {
-            dismiss()
-        } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.secondary)
-                .frame(width: 36, height: 36)
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .glassCircle(interactive: true)
-        .accessibilityLabel("Close")
-        .keyboardShortcut(closeShortcut)
+        CloseButton(shortcut: closeShortcut) { dismiss() }
     }
 
     /// Escape, on the way out — but not while this page has a sheet of its
@@ -1084,20 +1072,9 @@ struct EventDetailView: View {
             .accessibilityHidden(true)
     }
 
-    /// A time as the reader's locale writes it, with the AM or PM a
-    /// twelve-hour clock carries set small beside the digits.
+    /// A time on the clock this sheet prints on — see ``SwiftUI/Text/clock(_:in:size:)``.
     private func clock(_ instant: Date?, size: CGFloat) -> Text {
-        guard let instant else { return Text(verbatim: "—") }
-        var style = Date.FormatStyle(date: .omitted, time: .shortened)
-        style.timeZone = shown.timeZone
-        var time = instant.formatted(style.attributedStyle)
-        let periods = time.runs[\.dateField].compactMap { field, range in
-            field == .amPM ? range : nil
-        }
-        for range in periods {
-            time[range].font = .system(size: size * 0.6, weight: .bold)
-        }
-        return Text(time)
+        .clock(instant, in: shown.timeZone, size: size)
     }
 
     /// How long the show runs, from its start to its published end.
@@ -1432,12 +1409,9 @@ struct EventDetailView: View {
 
             // Anything that changes the reader's Eventernote account happens
             // on the official site, where they authenticate directly.
-            Link(destination: event.sourceURL) {
-                Label("Open in Eventernote", systemImage: "safari")
-            }
             // In a Task of its own: the menu does not wait for the read, and
             // the notice says how it went.
-            RefreshMenuItem(isRefreshing: isImporting) {
+            EventernotePageItems(page: event.sourceURL, isRefreshing: isImporting) {
                 Task { await refreshPage() }
             }
 

@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 /// How a venue page was reached, and so how much the app already knows about
@@ -40,10 +39,8 @@ nonisolated extension Event {
 /// and how much of it the reader has been to.
 ///
 /// The same shape as ``PerformerView``, because it is the same listing read the
-/// same way: `/places/{id}/events` runs from the furthest published date
-/// backwards, so every date still to come sits at the front of it and the page
-/// can split the listing in two and still count the upcoming half honestly
-/// while the past half is paging in.
+/// same way (``ListingRead``, ``ListingSections``): `/places/{id}/events` runs
+/// from the furthest published date backwards, as a performer's does.
 ///
 /// The one thing a performer's page has not got is the map. Eventernote
 /// publishes no photograph of a hall either, but it does publish the address —
@@ -51,110 +48,48 @@ nonisolated extension Event {
 /// for a picture of it.
 struct VenueView: View {
     @Environment(EventStore.self) private var store
-    /// The library, which "You attended" is counted over — matched on the name
-    /// the site printed, the one thing every row of a listing publishes about
-    /// a hall, since an event imported from a search row has no place id.
-    @Query(LibraryEntry.library) private var kept: [LibraryEntry]
     @Environment(RefreshNotices.self) private var notices: RefreshNotices?
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
 
     let link: VenueLink
 
-    @State private var lookup: Lookup = .looking
-    @State private var feed = Feed<Event>()
-    /// Whether the listing has been asked for yet. The feed cannot say so
-    /// itself — an untouched feed and one that answered with nothing look the
-    /// same from outside — and the gap between the two is a frame of empty
-    /// sections the reader should never see.
-    @State private var hasReadListing = false
+    @State private var listing: ListingRead<VenueProfile>
     @State private var openEvent: Event?
     /// How the hall's lookup came out, with the question it answered (see
     /// ``mapKey``). Nil until the first comes back.
     @State private var mapLookup: (key: String, answer: VenuePlaces.Lookup)?
     /// Raised by the map's Try Again, which asks the same question again.
     @State private var mapAttempts = 0
-    /// Why the last read did not replace what is on screen, if it did not.
-    @State private var refreshFailure: String?
-    /// The read going on now, so a Refresh can wait for it — see
-    /// ``refresh(byHand:)``. It ends in what its notice would say, and each
-    /// caller decides whether to say it.
-    @State private var running: Task<RefreshNotice?, Never>?
-    /// When what is on screen was read, so coming back to the app can tell
-    /// whether it has gone stale meanwhile.
-    @State private var readAt: Date?
     /// When the page was last refreshed by hand, so the flyers on it are asked
     /// about again with the rows — see ``EnvironmentValues/imagesCheckedSince``.
     @State private var imagesCheckedSince: Date?
 
-    /// Finding the page behind a hall's name fails in two ways that read very
-    /// differently to the reader, so they are kept apart.
-    private enum Lookup {
-        case looking
-        case found(VenueProfile)
-        /// The search ran and Eventernote files no hall under exactly this name.
-        case unlisted
-        case failed(String)
+    init(link: VenueLink) {
+        self.link = link
+        _listing = State(initialValue: ListingRead(
+            cacheKey: link.cacheKey,
+            resolve: { known in try await Self.resolve(link, known: known) },
+            listing: { venue, page in
+                try await EventernoteClient.shared.events(atVenue: venue.id, page: page)
+            }))
     }
 
-    private var profile: VenueProfile? {
-        if case .found(let profile) = lookup { return profile } else { return nil }
-    }
+    private var profile: VenueProfile? { listing.subject }
 
     /// Whose listing this is, for the screens and headings shared with a
     /// performer's page.
     private var subject: ListingSubject { .venue(link.name) }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                header
-                switch lookup {
-                case .looking:
-                    SearchProgress()
-                case .found:
-                    placeCard
-                    tipsCard
-                    listing
-                case .unlisted:
-                    ContentUnavailableView {
-                        Label("Not on Eventernote", systemImage: "mappin.slash")
-                    } description: {
-                        Text("Eventernote publishes no venue page under this name, so there is nothing to list.")
-                    }
-                    .padding(.top, 24)
-                case .failed(let message):
-                    SearchFailure(message: message) { await retry() }
-                }
-            }
-            .padding(.bottom, 32)
+        ListingPage(subject: subject, listing: listing, openEvent: $openEvent,
+                    imagesCheckedSince: imagesCheckedSince) {
+            subtitle
+        } found: {
+            placeCard
+            tipsCard
+            ListingSections(subject: subject, listing: listing, openEvent: $openEvent)
         }
-        .washBackground()
-        // Inside the page, so the notice stands above its bar rather than
-        // over it — see ``refreshNotices(aboveBar:showing:)``.
-        .refreshNotices(aboveBar: true)
-        // An imported name, shown in the language Eventernote published it in.
-        .navigationTitle(Text(verbatim: link.name))
-        .navigationBarTitleDisplayMode(.inline)
         .toolbar { actionBar }
-        // The bar takes the foot of the screen over, as an event's sheet
-        // has it: the tab bar stands down while the page is up.
-        .toolbar(.hidden, for: .tabBar)
-        .eventPane($openEvent)
-        .task { await open() }
-        // A page left open while the reader was away is owed the check it
-        // made as it opened: past the window, it reads again.
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, let readAt,
-                  readAt.timeIntervalSinceNow < -Freshness.window else { return }
-            Task { await refresh(byHand: false) }
-        }
-        .environment(\.imagesCheckedSince, imagesCheckedSince)
-        // Pages the reader scrolls on to are kept too, so the next visit opens
-        // on them rather than on the front alone.
-        .onChange(of: feed.page) {
-            ListingCache.shared.extend(link.cacheKey, as: VenueProfile.self, with: feed)
-        }
         // Asked once the hall's own page has come back, because the address on
         // it is what places a hall — and asked again if either half of the
         // question ever changes.
@@ -166,87 +101,6 @@ struct VenueView: View {
     private struct MapQuestion: Equatable {
         let key: String?
         let attempt: Int
-    }
-
-    // MARK: - Loading
-
-    /// Shows what this device last read of the page, and reads it again only
-    /// when that is stale or there is none — see ``ListingCache``.
-    private func open() async {
-        if let cached = ListingCache.shared.entry(for: link.cacheKey, as: VenueProfile.self) {
-            show(cached)
-            guard !cached.isFresh else { return }
-        }
-        // First visit or a stale copy: the app's own doing, so only a failure
-        // is said.
-        await refresh(byHand: false)
-    }
-
-    /// Reads the page again, whatever is held — what Refresh in its menu asks
-    /// for, and what opening a stale one does by itself.
-    ///
-    /// A Refresh chosen while a read is already going waits for that one and
-    /// ends with it, rather than returning at once with nothing to say — and
-    /// says it as a Refresh would, since the reader asked.
-    private func refresh(byHand: Bool) async {
-        let task: Task<RefreshNotice?, Never>
-        if let running {
-            task = running
-        } else {
-            task = Task { await read() }
-            running = task
-        }
-        let notice = await task.value
-        if running == task { running = nil }
-        if let notice { notices?.report(notice, byHand: byHand) }
-    }
-
-    /// Reads the page and puts what arrived on screen, answering what its
-    /// notice would say — nil for a name the site files nothing under, which
-    /// is said on the page itself.
-    private func read() async -> RefreshNotice? {
-        let known = profile
-        let link = link
-        let read = await ListingCache.read(
-            subject: { try await Self.resolve(link, known: known) },
-            listing: { venue, page in
-                try await EventernoteClient.shared.events(atVenue: venue.id, page: page)
-            })
-        switch read {
-        case .read(let entry):
-            ListingCache.shared.store(entry, for: link.cacheKey)
-            show(entry)
-            refreshFailure = nil
-            return .updated
-        case .unlisted:
-            lookup = .unlisted
-            return nil
-        case .failed(let reason):
-            // What was on screen stays, with the reason under it; only a page
-            // with nothing to fall back on gives the whole screen to the
-            // failure.
-            if hasReadListing { refreshFailure = reason } else { lookup = .failed(reason) }
-            return .failed(reason)
-        }
-    }
-
-    private func retry() async {
-        lookup = .looking
-        await refresh(byHand: true)
-    }
-
-    /// Puts a read — from the cache or just now — on screen, pointed at the
-    /// listing it came from so scrolling pages on from where it stopped.
-    private func show(_ entry: CachedListing<VenueProfile>) {
-        lookup = .found(entry.subject)
-        let id = entry.subject.id
-        feed.restore(entry.items, total: entry.total, pagesRead: entry.pagesRead,
-                     hasMore: entry.hasMore) { page in
-            try await EventernoteClient.shared.events(atVenue: id, page: page)
-        }
-        hasReadListing = true
-        readAt = entry.readAt
-        store.remember(feed.items)
     }
 
     /// Reads the hall's own page: nil where the site files no hall under the
@@ -308,29 +162,9 @@ struct VenueView: View {
 
     // MARK: - Where it is
 
-    private var header: some View {
-        VStack(spacing: 11) {
-            VStack(spacing: 5) {
-                Text(verbatim: link.name)
-                    .scalingFont(size: 27, weight: .bold)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                subtitle
-                    .scalingFont(size: 13.5)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.top, 14)
-        .padding(.bottom, 4)
-    }
-
     @ViewBuilder
     private var subtitle: some View {
-        switch lookup {
+        switch listing.lookup {
         case .looking:
             Text("Looking this venue up on Eventernote…")
         case .unlisted, .failed:
@@ -384,12 +218,9 @@ struct VenueView: View {
 
                     Divider()
 
-                    Link(destination: profile.pageURL) {
-                        Label("Open in Eventernote", systemImage: "safari")
-                    }
-                    RefreshMenuItem(isRefreshing: running != nil) {
+                    EventernotePageItems(page: profile.pageURL, isRefreshing: listing.isRefreshing) {
                         imagesCheckedSince = .now
-                        Task { await refresh(byHand: true) }
+                        Task { await listing.refresh(byHand: true, store: store, notices: notices) }
                     }
                 } label: {
                     Label("More", systemImage: "ellipsis")
@@ -515,201 +346,6 @@ struct VenueView: View {
             .panel(cornerRadius: 28)
             .padding(.horizontal, 18)
         }
-    }
-
-    // MARK: - What is held here
-
-    /// How much of each half a section shows before sending the rest to a
-    /// screen of its own — the same few ``PerformerView`` shows, and for the
-    /// same reason: a hall with twenty years of bookings behind it would
-    /// otherwise bury every card under the sections.
-    private static let sectionLimit = 5
-
-    private var upcoming: [Event] {
-        ListingHalfView.Half.upcoming.rows(of: feed.items)
-    }
-
-    private var past: [Event] {
-        ListingHalfView.Half.past.rows(of: feed.items)
-    }
-
-    /// True once a past event has been read, or the listing has run out —
-    /// either way every upcoming one is in hand.
-    private var hasEveryUpcoming: Bool {
-        !feed.hasMore || feed.items.contains { !$0.isUpcoming }
-    }
-
-    private var hasMoreUpcoming: Bool {
-        upcoming.count > Self.sectionLimit || (!hasEveryUpcoming && !upcoming.isEmpty)
-    }
-
-    private var hasMorePast: Bool {
-        past.count > Self.sectionLimit || feed.hasMore
-    }
-
-    @ViewBuilder
-    private var listing: some View {
-        if feed.isLoading || !hasReadListing {
-            SearchProgress()
-        } else if let failure = feed.failure {
-            SearchFailure(message: failure) { await refresh(byHand: true) }
-        } else if feed.isEmptyResult {
-            ContentUnavailableView {
-                Label("No Events Listed", systemImage: "calendar")
-            } description: {
-                Text("Eventernote lists no events at this venue.")
-            }
-            .padding(.top, 32)
-        } else {
-            statistics
-            section(half: .upcoming, count: hasEveryUpcoming ? upcoming.count : nil,
-                    events: upcoming, hasMore: hasMoreUpcoming)
-            // The count is left off while pages are still coming: a heading
-            // that said "12" beside a listing the reader can keep scrolling
-            // would be counting the reading, not the hall.
-            section(half: .past, count: feed.hasMore ? nil : past.count,
-                    events: past, hasMore: hasMorePast)
-            FeedFooter(feed: feed) { store.remember(feed.items) }
-            if !regulars.isEmpty { regularsCard }
-            if let refreshFailure {
-                RefreshFailureNote(message: refreshFailure)
-                    .padding(.horizontal, 18)
-            }
-            footnote
-        }
-    }
-
-    /// Two counts the app can stand behind and one the site publishes itself.
-    private var statistics: some View {
-        HStack(spacing: 11) {
-            StatTile(tint: .trackInterest,
-                     value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
-                     label: "Upcoming dates")
-            StatTile(tint: .trackAttended,
-                     value: store.events(of: kept, where: \.inLibrary).count {
-                         $0.venue == link.name && store.hasAttended($0)
-                     }.formatted(),
-                     label: "You attended")
-            StatTile(tint: .trackTicket, value: feed.total.formatted(),
-                     label: "Listed events")
-        }
-        .padding(.horizontal, 18)
-    }
-
-    private func section(
-        half: ListingHalfView.Half, count: Int?, events: [Event], hasMore: Bool
-    ) -> some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
-            CardHeader(title: half.title(of: subject), count: count) {
-                if hasMore { seeAll(half) }
-            }
-            .padding(.horizontal, 17)
-            .padding(.top, 16)
-            .padding(.bottom, events.isEmpty ? 0 : 5)
-
-            if events.isEmpty {
-                Text(half.emptyNote)
-                    .scalingFont(size: 12)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 17)
-                    .padding(.top, 8)
-                    .padding(.bottom, 17)
-            } else {
-                ForEach(
-                    Array(events.prefix(Self.sectionLimit).enumerated()), id: \.element.id
-                ) { index, event in
-                    if index > 0 { Divider().opacity(0.45).padding(.leading, 12) }
-                    AppearanceRow(event: event, subject: subject) { openEvent = event }
-                        .task { await store.pageOn(feed, after: event) }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .panel(cornerRadius: 28)
-        .padding(.horizontal, 18)
-    }
-
-    /// The way into the whole of a half the section only samples. The feed is
-    /// handed over rather than a query, so the screen opens on what is already
-    /// read — see ``ListingHalfView``.
-    private func seeAll(_ half: ListingHalfView.Half) -> some View {
-        NavigationLink {
-            ListingHalfView(subject: subject, half: half, feed: feed)
-        } label: {
-            SeeAllLabel()
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Who plays here
-
-    /// The names billed most often at this hall, over the events read so far.
-    ///
-    /// A listing row prints the whole bill, so this needs no extra request —
-    /// but it also only knows the pages in hand, which the card says out loud.
-    /// The same card ``PerformerView`` carries for the people a performer
-    /// shares a bill with, asked of a place instead.
-    private var regulars: [(name: String, appearances: Int)] {
-        var counts: [String: Int] = [:]
-        for event in feed.items {
-            for performer in event.performers {
-                counts[performer.name, default: 0] += 1
-            }
-        }
-        return counts
-            .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
-            .prefix(3)
-            .map { (name: $0.key, appearances: $0.value) }
-    }
-
-    private var regularsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CardHeader(
-                title: "Often on this stage",
-                caption: Text("^[Across the \(feed.items.count) event](inflect: true) read so far.")
-            )
-
-            VStack(spacing: 3) {
-                ForEach(regulars, id: \.name) { performer in
-                    NavigationLink(value: PerformerLink.billed(name: performer.name)) {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(verbatim: performer.name)
-                                    .scalingFont(size: 14, weight: .semibold)
-                                    .lineLimit(1)
-                                Text("^[\(performer.appearances) date](inflect: true) here")
-                                    .scalingFont(size: 11.5)
-                                    .monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Image(systemName: "chevron.right")
-                                .scalingFont(size: 11, weight: .semibold)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 8)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(17)
-        .panel(cornerRadius: 28)
-        .padding(.horizontal, 18)
-    }
-
-    // MARK: - Provenance
-
-    private var footnote: some View {
-        Footnote(Text("Venue details and events come from publicly accessible Eventernote pages. The map is drawn from the published address — nothing is written back."),
-                 updated: readAt)
-            .padding(.horizontal, 26)
-            .padding(.top, 2)
     }
 }
 

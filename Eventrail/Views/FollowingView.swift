@@ -169,9 +169,7 @@ struct FollowingView: View {
             .navigationTitle("Following")
             .navigationSubtitle(subtitle)
             .largeTitleOnMac(Text("Following"), subtitle: subtitle)
-            // Selecting takes the bottom of the screen over, as it does in My
-            // Events: the tab bar stands down for the actions on what is picked.
-            .toolbar(isSelecting ? .hidden : .automatic, for: .tabBar)
+            .pickingRows(isSelecting, selection: $selection, closing: $openEvent)
             .toolbar { toolbar }
             .venueDestination()
             .eventPane($openEvent)
@@ -203,13 +201,6 @@ struct FollowingView: View {
             // Turning the filter off lets go of what it was keeping, and
             // turning it back on starts from what is unread now.
             .onChange(of: unreadOnly) { readWhileFiltering.removeAll() }
-            .onChange(of: isSelecting) {
-                selection.removeAll()
-                // Picking takes the screen over, beside the fold too: the event
-                // open beside the list goes, rather than keep its own buttons in
-                // the bar beside the picking's, or stay up once picked and removed.
-                if isSelecting { openEvent = nil }
-            }
             // Nothing stays picked behind a filter that no longer shows it.
             .onChange(of: shownIDs) { _, shown in selection.formIntersection(shown) }
             .environment(\.imagesCheckedSince, imagesCheckedSince)
@@ -343,16 +334,7 @@ struct FollowingView: View {
                 }
             }
         } face: {
-            HStack(spacing: 8) {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .secondary)
-                filterSummary
-                    .foregroundStyle(filter.isNarrowing ? Color.brandTint : .primary)
-                    .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
+            FilterMenuFace(summary: filterSummary, isNarrowing: filter.isNarrowing)
         }
     }
 
@@ -540,9 +522,7 @@ struct FollowingView: View {
                         .pickedByClickOnMac(isSelecting, isPicked: selection.contains(event.id)) {
                             selection.toggle(event.id)
                         }
-                        .listRowInsets(GroupHeader.rowInsets)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
+                        .groupedEventRow()
                         // Toward the dot, as in Mail: a swipe from the leading
                         // edge reads the row, or unreads it.
                         // Not while picking, which a Mac does out of edit mode.

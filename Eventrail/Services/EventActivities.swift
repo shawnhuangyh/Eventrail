@@ -311,11 +311,9 @@ final class EventActivities {
         let ends = times.ends.flatMap { $0 > starts ? $0 : nil }
         let doors = times.doors.flatMap { $0 < starts ? $0 : nil }
         let runsTo = ends ?? starts.addingTimeInterval(Event.assumedLength)
-        let display = UserDefaults.standard.string(forKey: TimeDisplay.storageKey)
-            .flatMap(TimeDisplay.init(rawValue:)) ?? .venue
         return .init(stage: .at(now, doors: doors, starts: starts, runsTo: runsTo),
                      doors: doors, starts: starts, ends: ends, runsTo: runsTo,
-                     timeZone: event.shown(on: display).timeZone, seat: seat)
+                     timeZone: event.shown(on: .stored).timeZone, seat: seat)
     }
 
     // MARK: - The flyer
