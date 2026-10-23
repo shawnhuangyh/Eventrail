@@ -53,6 +53,31 @@ struct EventTests {
         #expect(merged.detailFormat == 1)
     }
 
+    /// A list row bills names alone and shows a list's flyer: over a copy
+    /// read from the page, which links each name to its performer, the page's
+    /// stand — or every refresh wrote the row twice, and an event past its
+    /// day lost its links for good.
+    @Test func aListingRowLeavesThePagesBillAndFlyer() {
+        let detailed = Fixtures.event(
+            linked: [Performer(name: "A", actorID: 7)],
+            imageURL: URL(string: "https://eventernote.s3.amazonaws.com/images/events/300001.jpg"),
+            isDetailed: true, detailFormat: 1)
+        let row = Fixtures.event(
+            title: "Renamed", performers: ["A"],
+            imageURL: URL(string: "https://eventernote.s3.amazonaws.com/images/events/300001_s.jpg"))
+
+        let merged = detailed.merging(row)
+        #expect(merged.title == "Renamed")
+        #expect(merged.performers == [Performer(name: "A", actorID: 7)])
+        #expect(merged.imageURL == detailed.imageURL)
+
+        // Over another row, the newer row's stand as they always did.
+        let older = Fixtures.event(performers: ["B"], imageURL: URL(string: "https://example.com/old.jpg"))
+        let rows = older.merging(row)
+        #expect(rows.performers.map(\.name) == ["A"])
+        #expect(rows.imageURL == row.imageURL)
+    }
+
     /// The page no longer prints a start time or a 概要: a fresh read of it
     /// says so, where a listing row would have said nothing.
     @Test func aReadOfThePageClearsWhatThePageNoLongerPrints() {

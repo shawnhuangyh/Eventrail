@@ -405,7 +405,7 @@ nonisolated struct LibraryFile: Sendable {
         var contents = Contents(archive: LibraryArchive())
         do {
             let data = try Data(contentsOf: url)
-            if let archive = Self.decode(data) {
+            if let archive = Self.decode(data, writtenAt: Self.modified(url)) {
                 contents.archive = archive
             } else if !setAside() {
                 contents.isBlocked = true
@@ -418,7 +418,9 @@ nonisolated struct LibraryFile: Sendable {
         }
 
         for copy in setAsideCopies() {
-            guard let data = try? Data(contentsOf: copy), let archive = Self.decode(data) else {
+            guard let data = try? Data(contentsOf: copy),
+                  let archive = Self.decode(data, writtenAt: Self.modified(copy))
+            else {
                 contents.unreadable += 1
                 continue
             }
@@ -455,7 +457,9 @@ nonisolated struct LibraryFile: Sendable {
         }
     }
 
-    private static func decode(_ data: Data) -> LibraryArchive? {
+    /// `writtenAt` is when the file was last written, which is what a file
+    /// from before records carried timestamps is dated by.
+    static func decode(_ data: Data, writtenAt: Date?) -> LibraryArchive? {
         if let archive = try? JSONDecoder().decode(LibraryArchive.self, from: data) {
             return archive
         }
@@ -463,9 +467,16 @@ nonisolated struct LibraryFile: Sendable {
         // library that predates syncing, read it and stamp it as it stands.
         if let legacy = try? JSONDecoder().decode(LegacyArchive.self, from: data) {
             log.notice("Migrating a pre-sync library file.")
-            return legacy.migrated()
+            // Dated now only where the system cannot say when it was written:
+            // a part dated `.distantPast` reads as never given.
+            return legacy.migrated(at: writtenAt ?? .now)
         }
         return nil
+    }
+
+    /// When the file at `url` was last written, if the system says.
+    static func modified(_ url: URL) -> Date? {
+        try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     }
 
     private static let setAsidePrefix = "library.unreadable-"
@@ -514,10 +525,12 @@ private nonisolated struct LegacyArchive: Codable {
     var recentSearches: [String] = []
     var lastRefreshed: Date?
 
-    func migrated() -> LibraryArchive {
-        // Everything predates the first sync, so it loses to any later edit on
-        // another device — which is the right way round for a one-device history.
-        let when = Date.now
+    /// Every record dated `when`, the moment the file was last written.
+    /// Everything in it predates the first sync, so it loses to any later
+    /// edit on another device — which is the right way round for a one-device
+    /// history. Stamped as of the moving in, as it once was, it outranked
+    /// every newer answer and every removal synced in since.
+    func migrated(at when: Date) -> LibraryArchive {
         var archive = LibraryArchive()
         archive.events = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         archive.membership = events.reduce(into: [:]) { $0[$1.id] = Stamped(true, at: when) }

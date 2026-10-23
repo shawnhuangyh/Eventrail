@@ -123,7 +123,19 @@ nonisolated struct LotteryRow: Identifiable, Hashable {
     static func latestFirst(by order: LotteryOrder) -> (LotteryRow, LotteryRow) -> Bool {
         switch order {
         case .eventDate:
-            return { byEventDate($1, $0) }
+            // Not ``byEventDate(_:_:)`` turned round whole, which put the
+            // rounds of one event with no day before those with one.
+            return { lhs, rhs in
+                guard lhs.event.sortDate == rhs.event.sortDate, lhs.event.id == rhs.event.id else {
+                    return byEvent(rhs, lhs)
+                }
+                switch (lhs.entry.day, rhs.entry.day) {
+                case let (left?, right?) where left != right: return left > right
+                case (.some, nil): return true
+                case (nil, .some): return false
+                default: return byRound(rhs, lhs)
+                }
+            }
         case .resultsDay:
             return { lhs, rhs in
                 switch (lhs.entry.day, rhs.entry.day) {

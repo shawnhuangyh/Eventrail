@@ -118,16 +118,17 @@ nonisolated struct Tracking: Hashable, Codable {
     /// Every round of the sale the reader tried for — the round, how many
     /// times they applied in it, the day the results come out, the seats
     /// asked for in order of preference and how it went — in the order they
-    /// were added.
+    /// were written, which ``lotteriesInOrder`` reads in the order the sale
+    /// runs.
     ///
     /// A count once, which said how hard the reader tried and nothing about
     /// how it went. A record written then reads back as one entry applied for
     /// that many times (``LotteryEntry/carriedOver(count:)``), so the count is
     /// still what the applications add up to.
     ///
-    /// One answer, settled whole: an entry is not dated on its own, so two
-    /// devices adding different entries between syncs keep the later list,
-    /// as two devices editing the note do.
+    /// In the store each round is a row of its own (``LibraryLottery``), so
+    /// two devices adding different rounds between syncs keep both. In an
+    /// archive the list is still one answer, settled whole and dated as one.
     var lotteries: [LotteryEntry] = []
     var note: String = ""
     /// The ISO 4217 code ``cost`` is in — JPY, TWD, USD — chosen beside it on

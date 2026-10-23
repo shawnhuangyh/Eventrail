@@ -879,9 +879,20 @@ final class EventStore {
 
     /// Writes an event's facts into its row, which is what makes them worth
     /// saving and syncing.
+    ///
+    /// A copy read from the page before the row's own was is folded under
+    /// the row rather than over it: a screen hands in the copy it holds — a
+    /// ticket sheet left open while the page was read again, or another
+    /// device's newer read synced in — and folded over, its older times and
+    /// read went back into the row with every heart or ticket saved from it.
     private func keep(_ event: Event, in row: LibraryEvent) {
         let known = row.facts
-        row.write(known.map { $0.isDetailed ? $0.merging(event) : event.merging($0) } ?? event)
+        row.write(known.map { known in
+            if event.isDetailed, let held = known.readAt, (event.readAt ?? .distantPast) < held {
+                return event.merging(known)
+            }
+            return known.isDetailed ? known.merging(event) : event.merging(known)
+        } ?? event)
         // Before the save that would say so: an import reads the library
         // back (``needsReading``) between taking the events in and saving.
         converted[row.eventID] = nil
@@ -896,11 +907,16 @@ final class EventStore {
     ///
     /// A read that found nothing new leaves the row alone — see
     /// ``Event/isSameRead(as:)`` — and is still written down as a read.
+    ///
+    /// Folded into the row as it stands, not the copy the read began from:
+    /// a placing that put the hall on its own clock while the page was being
+    /// read would otherwise be undone by it, the event back on Tokyo time.
     private func apply(_ imported: Event, asked: Date) {
         pageReads?.record(imported.id, asked: asked)
         if let row = rows[imported.id], let held = row.facts {
-            guard !imported.isSameRead(as: held) else { return }
-            row.write(imported)
+            let read = held.merging(imported)
+            guard !read.isSameRead(as: held) else { return }
+            row.write(read)
             converted[imported.id] = nil
         } else {
             seen[imported.id] = imported

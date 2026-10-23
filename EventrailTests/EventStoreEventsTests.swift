@@ -33,6 +33,23 @@ struct EventStoreEventsTests {
         #expect(Set(store.events(of: rows, where: \.inLibrary).map(\.title)) == ["After", "Beside"])
     }
 
+    /// A ticket saved from a sheet holding an older read of the page leaves
+    /// the newer read standing: the sheet's copy is folded under the row, not
+    /// over it.
+    @Test func anOlderReadHandedInDoesNotPutTheOlderTimesBack() {
+        let store = store()
+        var newer = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 19), isDetailed: true, detailFormat: 3)
+        newer.readAt = Fixtures.date(2027, 5, 2)
+        var older = Fixtures.event(id: "1", startsAt: Fixtures.date(2027, 5, 9, 18), isDetailed: true, detailFormat: 3)
+        older.readAt = Fixtures.date(2027, 5, 1)
+        store.toggleLibraryMembership(newer)
+
+        store.setTracking(Tracking(note: "front row"), for: older)
+        #expect(store.event(id: "1")?.startsAt == Fixtures.date(2027, 5, 9, 19))
+        #expect(store.event(id: "1")?.readAt == Fixtures.date(2027, 5, 2))
+        #expect(store.tracking(for: newer).note == "front row")
+    }
+
     /// The library the calendar, the watch and the reminders read is the same
     /// kept copies a screen's list is, and follows a write at once.
     @Test func theUpcomingFollowAWriteAtOnce() {

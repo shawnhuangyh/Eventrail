@@ -440,6 +440,32 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// Taking one round out leaves the rounds after it as they were — not
+    /// moved up a place and written again, where a result given to one of
+    /// them on another device meanwhile could lose to the copy written here.
+    @Test func aRoundTakenOutLeavesTheRestUnwritten() throws {
+        let (database, context) = try database()
+        let rounds = [LotteryEntry(round: "最速先行抽選", applications: 2),
+                      LotteryEntry(round: "プレイガイド先行", applications: 1),
+                      LotteryEntry(round: "一般発売")]
+        try writeLotteries(rounds, for: "1", entry: nil, dated: earlier, in: context)
+        let rest = Array(rounds.dropFirst())
+        try writeLotteries(rest, for: "1", entry: nil, dated: later, in: context)
+
+        let rows = try #require(try lotteryRows("1", in: context))
+        #expect(rows[rounds[0].id.uuidString]?.isRemoved == true)
+        #expect(rest.map { rows[$0.id.uuidString]?.modified } == [earlier.toTheMillisecond, earlier.toTheMillisecond])
+        #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.id) == rest.map(\.id))
+
+        // A round added later goes after them, and moves none of them either.
+        let added = LotteryEntry(round: "見切れ席")
+        try writeLotteries(rest + [added], for: "1", entry: nil, dated: .now, in: context)
+        #expect(try tracking("1", entry: nil, in: context).lotteries.map(\.id) == (rest + [added]).map(\.id))
+        let after = try #require(try lotteryRows("1", in: context))
+        #expect(rest.map { after[$0.id.uuidString]?.modified } == [earlier.toTheMillisecond, earlier.toTheMillisecond])
+        withExtendedLifetime(database) {}
+    }
+
     /// The same round changed on two devices is settled as a record is: the
     /// one written last stands, and only one row is left.
     @Test func oneRoundChangedOnTwoDevicesKeepsTheLaterOne() throws {
@@ -843,6 +869,22 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// A removal an older build left, with nothing else said of the event,
+    /// needs no entry — and makes none, so it is not found unanswered and
+    /// taken in again on every open and every import.
+    @Test func aBareRemovalAnOlderBuildLeftIsNotTakenInOverAndOver() throws {
+        let (database, context) = try database()
+        let membership = LibraryMembership(eventID: "1")
+        context.insert(membership)
+        membership.inLibrary = false
+        membership.changed = earlier
+        try context.save()
+
+        #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
+        #expect(try entries("1", in: context).isEmpty)
+        withExtendedLifetime(database) {}
+    }
+
     @Test func aReadAnOlderBuildKeptOnTheRowBecomesAMark() throws {
         let (database, context) = try database()
         let row = LibraryEvent(eventID: "3")
@@ -876,6 +918,20 @@ struct LibraryDatabaseTests {
 
     @Test func deletingTheZoneFromICloudIsItsOwnStatus() {
         #expect(LibraryDatabase.status(for: CKError(.userDeletedZone)) == .cloudDataDeleted)
+    }
+
+    /// A partial failure says what went wrong inside it: iCloud full, as a
+    /// batch of exports says it, and not the records only turned away with it.
+    @Test func aPartialFailureIsReadByWhatFailedInsideIt() {
+        let full = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [
+            CKRecord.ID(recordName: "a"): CKError(.batchRequestFailed),
+            CKRecord.ID(recordName: "b"): CKError(.quotaExceeded),
+        ]])
+        #expect(LibraryDatabase.status(for: full) == .iCloudFull)
+        let offline = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [
+            CKRecord.ID(recordName: "a"): CKError(.networkUnavailable),
+        ]])
+        #expect(LibraryDatabase.status(for: offline) == .offline)
     }
 
     /// The deletion usually arrives as one record's answer inside a partial

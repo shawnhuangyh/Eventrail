@@ -452,6 +452,23 @@ struct PassportStatsTests {
         #expect(stats.spans.map(\.event.id) == ["allnight"])
     }
 
+    /// A copy stored before the page reader put the times in order holds the
+    /// morning's end on the day the show began: read as the next morning,
+    /// as everywhere else, rather than left out as untimed.
+    @Test func readsAnAllNighterStoredOutOfOrder() {
+        let events = [
+            Fixtures.event(id: "allnight", date: Fixtures.date(2024, 6, 1),
+                           startsAt: Fixtures.date(2024, 6, 1, 22, 0),
+                           endsAt: Fixtures.date(2024, 6, 1, 5, 0)),
+            Fixtures.event(id: "typo", date: Fixtures.date(2024, 5, 1),
+                           startsAt: Fixtures.date(2024, 5, 1, 18, 0),
+                           endsAt: Fixtures.date(2024, 5, 1, 17, 30)),
+        ]
+        let stats = PassportStats(events: events) { _ in Tracking() }
+        #expect(stats.spans.map(\.event.id) == ["allnight"])
+        #expect(stats.totalDuration == 7 * 3600)
+    }
+
     /// Events of equal length keep one order: by the date, then the id.
     @Test func ordersEventsOfEqualLengthByDate() {
         let events = ["x", "w", "v", "u"].enumerated().map { index, id in

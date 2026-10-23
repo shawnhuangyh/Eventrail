@@ -90,9 +90,12 @@ nonisolated struct LibraryBackup: Sendable {
 
     /// What the file is called when it lands in Files, Mail or anywhere else the
     /// share sheet offers. Dated, because a reader keeping more than one wants
-    /// to know which is which without opening either.
+    /// to know which is which without opening either. The reader's own day:
+    /// ISO 8601 alone counts in GMT, and a backup made in Tokyo before nine
+    /// in the morning was named for the day before.
     var filename: String {
-        let day = created.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+        let day = created.formatted(Date.ISO8601FormatStyle(timeZone: .current)
+            .year().month().day().dateSeparator(.dash))
         return "Eventrail Backup \(day).eventrail"
     }
 
@@ -134,7 +137,7 @@ nonisolated struct LibraryBackup: Sendable {
 
         let data = try Data(contentsOf: url)
         guard data.count > signature.count, data.prefix(signature.count) == signature else {
-            return try rescued(data)
+            return try rescued(data, writtenAt: LibraryFile.modified(url))
         }
         let format = data[data.startIndex + signature.count]
         // A file from a later version holds fields this one has never seen, and
@@ -154,9 +157,10 @@ nonisolated struct LibraryBackup: Sendable {
     /// The one file that is not a backup and is still worth reading: the app's
     /// own `library.json`, lifted off a device or out of a computer's backup of
     /// one. It is the same archive without the container, and refusing it would
-    /// help nobody.
-    private static func rescued(_ data: Data) throws -> LibraryBackup {
-        guard let archive = try? JSONDecoder().decode(LibraryArchive.self, from: data) else {
+    /// help nobody. Read as the app reads its own — one from before records
+    /// carried timestamps included, dated by when it was written.
+    private static func rescued(_ data: Data, writtenAt: Date?) throws -> LibraryBackup {
+        guard let archive = LibraryFile.decode(data, writtenAt: writtenAt) else {
             throw Failure.unreadable
         }
         log.notice("Reading a bare library file as a backup.")

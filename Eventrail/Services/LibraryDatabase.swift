@@ -7,8 +7,8 @@ import SwiftData
 /// Where the reader's library is kept, and how it reaches their other devices.
 ///
 /// A SwiftData store in Application Support, holding one row per record —
-/// ``LibraryEntry``, ``LibraryEvent``, ``FollowingReadMark``,
-/// ``FollowedPerformer`` and ``LibrarySettings``. With iCloud Sync on,
+/// ``LibraryEntry``, ``LibraryEvent``, ``LibraryLottery``,
+/// ``FollowingReadMark``, ``FollowedPerformer`` and ``LibrarySettings``. With iCloud Sync on,
 /// SwiftData mirrors it into the reader's private CloudKit database by itself,
 /// and nothing here second-guesses what it does: a record another device
 /// wrote lands as CloudKit settled it. The rows are cut so that is always the
@@ -329,11 +329,16 @@ final class LibraryDatabase {
             Self.log.error("Library could not be opened with CloudKit: \(error.localizedDescription, privacy: .public)")
             isSyncing = false
             releaseFile()
-            syncStatus = .notConfigured
             if let opened = try? Self.makeContainer(at: location, syncing: false) {
+                // Open without CloudKit: it was CloudKit that refused.
+                syncStatus = .notConfigured
                 replace(with: opened, mirroring: false)
                 isBlocked = false
             } else {
+                // Not open either way, so the file, not iCloud — one locked
+                // before the first unlock, say. Said as not configured, it
+                // would never be asked again this launch once the file opened
+                // (``resumeSyncing()``).
                 block()
             }
         } catch {
@@ -474,7 +479,12 @@ final class LibraryDatabase {
                 }
             case .noAccount:
                 if syncedWith != nil { stopSyncing(.accountChanged) } else { syncStatus = .signedOut }
-            case .restricted, .temporarilyUnavailable, .couldNotDetermine:
+            case .temporarilyUnavailable, .couldNotDetermine:
+                // Asked again, as a check that could not get through is:
+                // left at that, syncing waited for the app to come back.
+                syncStatus = .unavailable
+                retryInAMinute()
+            case .restricted:
                 syncStatus = .unavailable
             @unknown default:
                 syncStatus = .unavailable
@@ -488,6 +498,12 @@ final class LibraryDatabase {
     private func couldNotCheck(_ error: any Error) {
         guard wantsSyncing else { return }
         syncStatus = Self.status(for: error)
+        retryInAMinute()
+    }
+
+    /// Asks about the account again in a minute, unless the store is already
+    /// syncing.
+    private func retryInAMinute() {
         guard !isSyncing else { return }
         retry?.cancel()
         retry = Task { [weak self] in
@@ -568,7 +584,13 @@ final class LibraryDatabase {
         // Usually one record's answer inside a partial failure, not the whole.
         let partial = ckError?.partialErrorsByItemID?.values.compactMap { ($0 as? CKError)?.code } ?? []
         if ckError?.code == .userDeletedZone || partial.contains(.userDeletedZone) { return .cloudDataDeleted }
-        switch ckError?.code {
+        // A partial failure is read by what went wrong inside it — iCloud full
+        // or offline, as a batch of exports says it — rather than said raw.
+        // The records only turned away with the one that failed say nothing.
+        let code = ckError?.code == .partialFailure
+            ? partial.first { $0 != .batchRequestFailed } ?? ckError?.code
+            : ckError?.code
+        switch code {
         case .notAuthenticated: return .signedOut
         case .quotaExceeded: return .iCloudFull
         case .networkUnavailable, .networkFailure: return .offline
@@ -751,7 +773,21 @@ final class LibraryDatabase {
                 changed = true
             }
         } else {
-            for (position, lottery) in lotteries.enumerated() {
+            // A round keeps its place wherever the list still runs past it in
+            // order, and only one out of order — or new — takes the next
+            // after the one before it. Counted afresh from its index, every
+            // round after one taken out moved up a place, and was written
+            // again, though the reader never touched it: a result given to it
+            // on another device meanwhile could lose to the copy written here.
+            var last = -1
+            for lottery in lotteries {
+                let position: Int
+                if let existing = held[lottery.id.uuidString], !existing.isRemoved, existing.position > last {
+                    position = existing.position
+                } else {
+                    position = last + 1
+                }
+                last = position
                 let target = row(for: lottery.id.uuidString)
                 if target.write(lottery, at: position, dated: when) {
                     changed = true
@@ -823,6 +859,12 @@ final class LibraryDatabase {
         var adopted = LibraryArchive()
         for id in Set(legacy.membership.keys).union(legacy.favorites.keys).union(legacy.tracking.keys)
         where !entries.contains(id) {
+            // A removal with nothing else on it needs no entry, and
+            // ``apply(_:to:)`` makes none — so taken in, it was found
+            // unanswered again on every open and every import, for good.
+            guard legacy.membership[id]?.value == true || legacy.favorites[id]?.value == true
+                    || legacy.tracking[id].map({ !$0.value.isEmpty }) == true
+            else { continue }
             adopted.membership[id] = legacy.membership[id]
             adopted.favorites[id] = legacy.favorites[id]
             adopted.tracking[id] = legacy.tracking[id]

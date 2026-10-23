@@ -31,7 +31,10 @@ enum Fixtures {
         endsAt: Date? = nil,
         timeZone: TimeZone = tokyo,
         performers: [String] = [],
+        /// The bill as a page links it, in place of `performers`' bare names.
+        linked: [Performer]? = nil,
         summary: String? = nil,
+        imageURL: URL? = nil,
         isDetailed: Bool = false,
         detailFormat: Int? = nil
     ) -> Event {
@@ -49,9 +52,9 @@ enum Fixtures {
             endsAt: endsAt,
             timeZone: timeZone,
             listedAttendees: nil,
-            performers: performers.map { Performer(name: $0) },
+            performers: linked ?? performers.map { Performer(name: $0) },
             summary: summary,
-            imageURL: nil,
+            imageURL: imageURL,
             sourceURL: URL(string: "https://www.eventernote.com/events/\(id)")!,
             isDetailed: isDetailed,
             detailFormat: detailFormat
