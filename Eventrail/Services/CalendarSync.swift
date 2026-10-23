@@ -273,17 +273,26 @@ actor CalendarSync {
             savedCalendarID = adopted.calendarIdentifier
             kept = adopted
         } else {
-            let calendar = EKCalendar(for: .event, eventStore: store)
-            calendar.title = String(localized: "Eventrail")
-            if let color { calendar.cgColor = color }
-            guard let source = preferredSource() else {
-                throw CalendarSyncError.noCalendarSource
+            // Each account in turn, until one takes it: the one the reader's
+            // new events go to may not let an app add a calendar — Exchange
+            // and some others do not — and tried alone, every mirror failed.
+            var refusal: (any Error)?
+            for source in preferredSources() {
+                let calendar = EKCalendar(for: .event, eventStore: store)
+                calendar.title = String(localized: "Eventrail")
+                if let color { calendar.cgColor = color }
+                calendar.source = source
+                do {
+                    try store.saveCalendar(calendar, commit: true)
+                } catch {
+                    refusal = error
+                    continue
+                }
+                savedCalendarID = calendar.calendarIdentifier
+                // Nothing to tidy behind a calendar that did not exist a moment ago.
+                return calendar
             }
-            calendar.source = source
-            try store.saveCalendar(calendar, commit: true)
-            savedCalendarID = calendar.calendarIdentifier
-            // Nothing to tidy behind a calendar that did not exist a moment ago.
-            return calendar
+            throw refusal ?? CalendarSyncError.noCalendarSource
         }
         discardDuplicates(of: kept)
         return kept
@@ -314,13 +323,16 @@ actor CalendarSync {
         }
     }
 
-    /// Wherever the reader's own new events go, so Eventrail's calendar lands
-    /// beside them and follows them to their other devices.
-    private func preferredSource() -> EKSource? {
-        store.defaultCalendarForNewEvents?.source
-            ?? store.sources.first { $0.sourceType == .calDAV && $0.title == "iCloud" }
-            ?? store.sources.first { $0.sourceType == .local }
-            ?? store.sources.first
+    /// Where the calendar may go, best first: wherever the reader's own new
+    /// events go, so Eventrail's calendar lands beside them and follows them
+    /// to their other devices; then iCloud, then this device alone, then any.
+    private func preferredSources() -> [EKSource] {
+        let candidates = [store.defaultCalendarForNewEvents?.source,
+                          store.sources.first { $0.sourceType == .calDAV && $0.title == "iCloud" },
+                          store.sources.first { $0.sourceType == .local }].compactMap { $0 }
+            + store.sources
+        var seen: Set<String> = []
+        return candidates.filter { seen.insert($0.sourceIdentifier).inserted }
     }
 
     /// The calendar this app made and then lost track of.
@@ -467,10 +479,11 @@ actor CalendarSync {
             entry.timeZone = zone
             changed = true
         }
-        // An alert when the doors open — see ``doorOffset(of:)``.
-        let doors = Self.doorOffset(of: event)
-        if doorOffset(of: entry) != doors {
-            entry.alarms = doors.map { [EKAlarm(relativeOffset: $0)] }
+        // An alert when the doors open — see ``doorOffset(of:)``. Only where
+        // one is owed: where no door time is published, an alert the reader
+        // hung on the entry themselves is theirs, and was taken off it.
+        if let doors = Self.doorOffset(of: event), doorOffset(of: entry) != doors {
+            entry.alarms = [EKAlarm(relativeOffset: doors)]
             changed = true
         }
         // The URL is how the next mirror recognises this entry again, so it is

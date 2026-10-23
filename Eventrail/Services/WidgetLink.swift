@@ -83,7 +83,10 @@ final class WidgetLink {
     /// the round has since come to apply with several, it is left for the
     /// reader to give here.
     func takeAnswers(into store: EventStore) {
-        guard !isMac else { return }
+        // Not while the library is held in memory for a file that will not
+        // open yet: every answer would find no event there, and be thrown
+        // away. Left for the next time the app comes back.
+        guard !isMac, !store.libraryFileIsBlocked else { return }
         let waiting = WidgetAnswer.waiting()
         guard !waiting.isEmpty else { return }
         for (file, answer) in waiting.sorted(by: { $0.answer.given < $1.answer.given }) {

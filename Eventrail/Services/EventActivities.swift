@@ -128,7 +128,7 @@ final class EventActivities {
         guard let state = state(for: event, seat: "", at: now) else { return nil }
         let earliest = earliestStart(of: state)
         guard now < earliest else { return nil }
-        return calendar.isDate(earliest, inSameDayAs: now) ? .tooEarly(earliest: earliest) : .beforeItsDay
+        return calendar.asGregorian.isDate(earliest, inSameDayAs: now) ? .tooEarly(earliest: earliest) : .beforeItsDay
     }
 
     /// Starts the event's activity, at once. Asks nothing where it already

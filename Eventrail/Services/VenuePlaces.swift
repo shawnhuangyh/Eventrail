@@ -757,12 +757,15 @@ final class VenuePlaces {
             }
             return answer.placing.map(Lookup.placed) ?? .unplaced
         } catch is Deferred {
-            // Only OpenStreetMap could place it, and it may not be asked.
-            return .unplaced
+            // Only OpenStreetMap could place it, and it may not be asked —
+            // which leaves a pin held for it, due to be asked again, standing.
+            return known?.placing.map(Lookup.placed) ?? .unplaced
         } catch {
-            // Not written down, so the next screen to ask tries again.
+            // Not written down, so the next screen to ask tries again. A pin
+            // held for it meanwhile is still the hall's: shown rather than
+            // "couldn't load the venue's location".
             Self.log.error("venue \(venue.key, privacy: .public) → search failed: \(error, privacy: .public)")
-            return .failed
+            return known?.placing.map(Lookup.placed) ?? .failed
         }
     }
 
@@ -817,7 +820,20 @@ final class VenuePlaces {
     /// still holds: the building it found is kept rather than asked for
     /// again, and a building it did not have is not asked for again either.
     /// Without this, every refresh would ask about every building afresh.
+    ///
+    /// And Maps' own placing — the building, held against the published
+    /// address — is never written over by a lesser answer while it stands, as
+    /// the calendar mirror holds (``CalendarSync``): a phone on the mainland
+    /// provider, which cannot ask Maps about a hall in Japan, refreshed every
+    /// hall Maps had placed back to the register's block, or to nothing where
+    /// the register graded the address below its bar.
     private static func carrying(_ fresh: Answer, from known: Answer?) -> Answer {
+        if let known, known.source == Source.maps.rawValue, known.wasFound, stillStands(known),
+           fresh.source != Source.maps.rawValue {
+            var kept = known
+            kept.asked = fresh.asked
+            return kept
+        }
         guard fresh.source == Source.register.rawValue, let known, stillStands(known)
         else { return fresh }
         if known.source == Source.openStreetMap.rawValue {
@@ -967,6 +983,12 @@ final class VenuePlaces {
             } catch is Deferred {
                 // Left for a sheet or a refresh — see ``Deferred``.
             } catch {
+                // OpenStreetMap turning away the search for a hall abroad ends
+                // what the run asks of it, as a refusal while narrowing does:
+                // counted only as a failure, the next hall Maps placed reset
+                // the count, and the run went on asking a service that had
+                // said no.
+                if error is VenueBuildings.Failure { narrowing = false }
                 // The hall keeps whatever answer it had; only a run of these
                 // ends the refresh.
                 failures += 1
