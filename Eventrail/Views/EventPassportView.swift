@@ -914,7 +914,7 @@ struct EventPassportView: View {
     /// One end of the library, ruled off from whatever sits above it — the
     /// breakdown for the shortest, the shortest for the longest.
     ///
-    /// The event itself, and a See All to the rest behind it. One row
+    /// The event itself, and a See All to the rest under it. One row
     /// rather than five, because these two sit inside the time card now: the
     /// card is about the total, and ten rows of extremes under it would be the
     /// larger half of a panel that is not about them.
@@ -924,20 +924,15 @@ struct EventPassportView: View {
     ) -> some View {
         if let first = spans.first {
             VStack(alignment: .leading, spacing: 11) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(extreme.title)
-                        .font(.system(size: 15.5, weight: .bold))
-                    Spacer(minLength: 8)
-                    if spans.count > 1 {
-                        Button { openExtreme = extreme } label: { SeeAllLabel() }
-                            .buttonStyle(.plain)
-                            .leftOutOfPassportImage()
-                    }
-                }
+                Text(extreme.title)
+                    .font(.system(size: 15.5, weight: .bold))
                 // The row itself is the target, with no chevron on it, the
                 // way a ranked row is: the whole line is the event.
                 Button { openEvent = first.event } label: { PassportSpanRow(span: first) }
                     .buttonStyle(.plain)
+                if spans.count > 1 {
+                    PassportSeeAll { openExtreme = extreme }
+                }
             }
             .padding(.top, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -973,20 +968,16 @@ struct EventPassportView: View {
         let most = max(1, shown.first?.count ?? 1)
         return VStack(alignment: .leading, spacing: 13) {
             CardHeader(title: title) {
-                HStack(spacing: 12) {
-                    if let seeAll {
-                        Button { openRanking = seeAll } label: { SeeAllLabel() }
-                            .buttonStyle(.plain)
-                            .leftOutOfPassportImage()
-                    }
-                    PassportShareButton { sharing = card }
-                }
+                PassportShareButton { sharing = card }
             }
             ForEach(shown) { row in
                 PassportRowLink(value: destination(row)) {
                     PassportRankRow(row: row, most: most, total: total,
                                     tint: tint, showsShare: showsShare)
                 }
+            }
+            if let seeAll {
+                PassportSeeAll { openRanking = seeAll }
             }
         }
         .padding(16)
@@ -1827,6 +1818,19 @@ private struct PassportSheetHeader: View {
     }
 }
 
+/// A See All, under the rows it opens more of rather than beside a heading,
+/// as Flighty's Show More stands under its list — so a card's header holds
+/// its Share alone. Left out of the card drawn as a picture.
+private struct PassportSeeAll: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) { SeeAllLabel() }
+            .buttonStyle(.plain)
+            .leftOutOfPassportImage()
+    }
+}
+
 /// A ranked row's way to its performer or hall — and in a card drawn as a
 /// picture, the row alone: a link outside a stack draws as one turned off.
 private struct PassportRowLink<Value: Hashable, Label: View>: View {
@@ -2300,27 +2304,22 @@ private struct PassportLotteryCard: View {
         }
     }
 
-    /// The events applied for hardest, and a See All to the rest.
+    /// The events applied for hardest, and a See All to the rest under them.
     private var topEntries: some View {
         let rows = Array(stats.topLotteries.prefix(limit))
         let most = max(1, rows.first?.entries ?? 1)
         return section(spacing: 11) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Top Lottery Entries")
-                    .font(.system(size: 15.5, weight: .bold))
-                Spacer(minLength: 8)
-                if stats.topLotteries.count > limit {
-                    Button { openList = .top } label: { SeeAllLabel() }
-                        .buttonStyle(.plain)
-                        .leftOutOfPassportImage()
-                }
-            }
+            Text("Top Lottery Entries")
+                .font(.system(size: 15.5, weight: .bold))
             ForEach(rows) { row in
                 // A row is the event it names, the way the extremes in the
                 // time card and the ranked cards below are: the whole line is
                 // the target.
                 Button { open(row.event) } label: { PassportLotteryRow(row: LotteryListRow(row), most: most) }
                     .buttonStyle(.plain)
+            }
+            if stats.topLotteries.count > limit {
+                PassportSeeAll { openList = .top }
             }
         }
     }
@@ -2900,27 +2899,22 @@ private struct PassportSpendingCard: View {
     }
 
     /// One end of the filtered tickets, with a See All to the rest of them
-    /// once there are more than the two ends show.
+    /// under it once there are more than the two ends show.
     private func end(
         _ title: LocalizedStringKey, opening list: TicketList, ticket: PassportStats.Ticket,
         of tickets: [PassportStats.Ticket], styles: SeatStyles
     ) -> some View {
         VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title)
-                    .font(.system(size: 15.5, weight: .bold))
-                Spacer(minLength: 8)
-                if tickets.count > 2 {
-                    Button { openList = list } label: { SeeAllLabel() }
-                        .buttonStyle(.plain)
-                        .leftOutOfPassportImage()
-                }
-            }
+            Text(title)
+                .font(.system(size: 15.5, weight: .bold))
             Button { open(ticket.event) } label: {
                 PassportTicketRow(ticket: ticket, currency: stats.currency,
                                   style: styles[ticket.seatClass])
             }
             .buttonStyle(.plain)
+            if tickets.count > 2 {
+                PassportSeeAll { openList = list }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
