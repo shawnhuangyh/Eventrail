@@ -305,6 +305,10 @@ final class EventStore {
     /// the sheet's own read is running — or a return to the foreground in the
     /// middle of one — waits for it rather than asking for the page again.
     private var detailReads: [Event.ID: Task<PageRead, Never>] = [:]
+    /// When this launch last read the account's lists by itself, and the read
+    /// while it runs — see ``refreshAccountIfStale()``.
+    private var accountReadTried: Date?
+    private var accountReadByItself: Task<Void, Never>?
 
     /// The default store opens the reader's own library, synced or not as
     /// they last said. Previews and tests hand in a database held in memory
@@ -1084,6 +1088,9 @@ final class EventStore {
     /// with no account to read, is not a refresh worth a notice.
     @discardableResult
     func refresh() async -> Bool {
+        // A read the app started by itself is let finish first, so an account
+        // linked while it ran is read whole after it rather than not at all.
+        await accountReadByItself?.value
         guard !isRefreshing, eventernoteHandle != nil else { return false }
         isRefreshing = true
         refreshFailure = nil
@@ -1093,16 +1100,20 @@ final class EventStore {
             refreshStage = nil
         }
 
-        let followed = await refreshAccount()
+        let followed = await refreshAccount(restoring: true)
 
         // A history that failed still leaves events worth re-reading, so the
         // second pass runs either way and the first failure is the one reported.
-        var landed = await importHistory()
+        var landed = false
+        if let history = await importHistory(restoring: true), history.read > 0 {
+            importSummary = ImportSummary(read: history.read, added: history.added.count)
+            landed = true
+        }
         if await reimportDetails() { landed = true }
 
-        // The history pass owns the summary, but it only writes one when it read
-        // something. Follows adopted beside a history that reached nothing still
-        // have something to report, so they are folded in either way.
+        // The summary is the history's, written only where it read something.
+        // Follows adopted beside a history that reached nothing still have
+        // something to report, so they are folded in either way.
         if followed > 0 {
             landed = true
             var summary = importSummary ?? ImportSummary(read: 0, added: 0)
@@ -1112,9 +1123,10 @@ final class EventStore {
 
         // The timestamp moves only when something actually arrived, so a run
         // that reached nothing cannot pass itself off as a successful refresh.
-        guard landed else { return true }
-        makeSettingsRow().lastRefreshed = .now
+        // Saved either way, for the history's own stamp.
+        if landed { makeSettingsRow().lastRefreshed = .now }
         save()
+        guard landed else { return true }
         placeArrivedVenues()
         return true
     }
@@ -1231,9 +1243,11 @@ final class EventStore {
     /// library, and failing it over a portrait would be the wrong thing to tell
     /// the reader.
     ///
-    /// Returns how many performers this pass newly followed.
+    /// Returns how many performers this pass newly followed — `restoring`
+    /// the ones the reader unfollowed only where they asked for the read (see
+    /// ``adoptFollows(_:restoring:)``).
     @discardableResult
-    private func refreshAccount() async -> Int {
+    private func refreshAccount(restoring: Bool) async -> Int {
         guard let handle = eventernoteHandle,
               let read = try? await client.profile(forUser: handle)
         else { return 0 }
@@ -1242,7 +1256,7 @@ final class EventStore {
         let changedProfile = profile != settingsRow?.eventernoteProfile
         if changedProfile { makeSettingsRow().eventernoteProfile = profile }
 
-        let follows = adoptFollows(read.favoritePerformers)
+        let follows = adoptFollows(read.favoritePerformers, restoring: restoring)
         if changedProfile || follows.changed { save() }
         return follows.added
     }
@@ -1257,7 +1271,10 @@ final class EventStore {
     ///   back if the account still favourites them, because the account is what
     ///   the reader is asking to be followed when they tap Refresh — and it is
     ///   the only way back for somebody they took out and then wanted again.
-    ///   Unfollowing for good means unfavouriting them on the site too.
+    ///   Unfollowing for good means unfavouriting them on the site too. Only
+    ///   where the reader asked, though (`restoring`): a read the app made by
+    ///   itself (``refreshAccountIfStale()``) leaves them unfollowed, for the
+    ///   reason ``adopt(_:restoring:)`` leaves an event out.
     /// - An import still only ever adds. A performer dropped from the
     ///   favourites on the site is not unfollowed here: that would also reach
     ///   everyone the reader followed in Eventrail alone, since the site never
@@ -1270,8 +1287,8 @@ final class EventStore {
     /// Returns how many this pass followed, and whether anything at all
     /// changed — naming somebody the archive was already following but could not
     /// name is a write with nothing to announce.
-    private func adoptFollows(
-        _ performers: [PerformerProfile]
+    func adoptFollows(
+        _ performers: [PerformerProfile], restoring: Bool
     ) -> (added: Int, changed: Bool) {
         guard !performers.isEmpty else { return (0, false) }
         let now = Date.now
@@ -1279,6 +1296,7 @@ final class EventStore {
         var changed = false
 
         for performer in performers {
+            if !restoring, performerRows[performer.id]?.follow?.value == false { continue }
             let row = makePerformerRow(for: performer.id)
             // Anything but an existing `true` is written: a missing record is
             // the first read of them, and a tombstone is undone by the same act
@@ -1447,14 +1465,17 @@ final class EventStore {
     /// on, because putting the event in the library is the whole of what the
     /// account evidences.
     ///
-    /// Reports whether anything was adopted, so ``refresh()`` knows whether the
-    /// pass is worth stamping.
-    private func importHistory() async -> Bool {
-        guard let handle = eventernoteHandle else { return false }
+    /// Reports how many events it read and which of them it added, so
+    /// ``refresh()`` knows whether the pass is worth stamping — or nil where
+    /// the site could not be reached at all. `restoring` is
+    /// ``adopt(_:restoring:)``'s.
+    private func importHistory(restoring: Bool) async -> (read: Int, added: [Event])? {
+        guard let handle = eventernoteHandle else { return nil }
         refreshStage = .readingHistory(read: 0, total: 0)
 
         var imported: [Event] = []
         var page = 1
+        var reached = false
 
         while true {
             let read: EventernotePage<Event>
@@ -1466,6 +1487,7 @@ final class EventStore {
                     : String(localized: "Eventernote stopped answering partway through. What did arrive was imported.")
                 break
             }
+            reached = true
             imported += read.items
             refreshStage = .readingHistory(read: imported.count, total: max(read.total, imported.count))
             // An empty page ends the run even if the site's own count disagrees,
@@ -1474,20 +1496,22 @@ final class EventStore {
             page += 1
         }
 
-        guard !imported.isEmpty else { return false }
+        // Stamped whenever the site answered, an empty history included:
+        // it is when the account was last read, which is what
+        // ``refreshAccountIfStale()`` goes by, and an account with nothing on
+        // it would otherwise be read again at every chance.
+        guard reached else { return nil }
+        makeSettingsRow().lastImported = .now
         // The site lists the odd event twice, on two adjacent rows of the same
         // page. Adopting it twice is harmless, but counting it twice would
         // overstate what arrived.
         var seen: Set<Event.ID> = []
         let distinct = imported.filter { seen.insert($0.id).inserted }
-
-        makeSettingsRow().lastImported = .now
-        importSummary = ImportSummary(read: distinct.count, added: adopt(distinct))
-        return true
+        return (distinct.count, adopt(distinct, restoring: restoring))
     }
 
     /// Folds an imported history into the archive under the rules above, and
-    /// answers how many events it grew the library by.
+    /// answers the events it grew the library by.
     ///
     /// Nothing but membership and the event's own facts is written. An import
     /// used to fill in the tracking the reader had left blank — how interested
@@ -1495,23 +1519,129 @@ final class EventStore {
     /// putting the event in the library is the whole of what the account
     /// evidences, and the badge is read from that. What the reader wrote
     /// themselves was never an import's to touch and still is not.
+    ///
+    /// A removal is not permanent. The account's history is what the reader is
+    /// asking for when they tap Refresh, so an event they took out comes back
+    /// if Eventernote still lists it (`restoring`) — the same rule the
+    /// favourites follow. Taking one out for good means taking it off the
+    /// account, and an event that was never on it stays gone. A read the app
+    /// made by itself (``refreshAccountIfStale()``) restores nothing: only an
+    /// event this device has no removal of (``departedEvents``) is added. Read
+    /// every few hours, it would otherwise put back within the day every
+    /// event the reader took out of a list the account still carried, on
+    /// every device — the reader not having asked for anything.
     @discardableResult
-    private func adopt(_ imported: [Event]) -> Int {
-        var added = 0
+    func adopt(_ imported: [Event], restoring: Bool) -> [Event] {
+        let departed = restoring ? [] : departedEvents
+        var added: [Event] = []
 
         for event in imported {
-            // A removal is not permanent. The account's history is what the
-            // reader is asking for when they tap Refresh, so an event they took
-            // out comes back if Eventernote still lists it — the same rule the
-            // favourites follow. Taking one out for good means taking it off the
-            // account, and an event that was never on it stays gone.
             keep(event, in: makeRow(for: event.id))
-            if !isInLibrary(event) {
-                edit(event) { $0.inLibrary = true }
-                added += 1
-            }
+            guard !isInLibrary(event), !departed.contains(event.id) else { continue }
+            edit(event) { $0.inLibrary = true }
+            added.append(event)
         }
         return added
+    }
+
+    // MARK: - Reading the account by itself
+
+    /// Reads the linked account's lists again by itself — the events it is
+    /// listed as attending and the performers it favourites — once they were
+    /// last read more than ``Freshness/window`` ago: as the app opens and
+    /// comes back (``RootView``), so what the reader marked on Eventernote
+    /// meanwhile arrives without a trip to the Me card's Refresh.
+    ///
+    /// Lighter than ``refresh()``, which the reader asks for: the account's
+    /// page and its history, and the pages of what arrived — a few, one at a
+    /// time, as an event added from Search has its own read (``placeAdded(_:)``)
+    /// — and not every upcoming event's page again, which each sheet reads
+    /// again as it opens once stale (``isStale(_:)``). Past the few, an event
+    /// that arrived is read as it is opened, or by Refresh.
+    ///
+    /// It only adds — see ``adopt(_:restoring:)`` — and, where this device
+    /// syncs, not before it has heard from iCloud once (``awaitsFirstFetch(syncing:fetched:status:)``):
+    /// a device set up afresh hears of the account before it hears of the
+    /// removals, and every event it then added would be newer than the
+    /// removal on every device. ``RootView`` asks again as iCloud answers. A read
+    /// that did not get through is tried again no sooner than
+    /// ``accountRetryPatience`` on, so a phone offline is not told so on every
+    /// return to the app.
+    ///
+    /// Answers whether it ran.
+    @discardableResult
+    func refreshAccountIfStale() async -> Bool {
+        guard !isRefreshing, eventernoteHandle != nil,
+              Self.owesAccountRead(lastImported: settingsRow?.lastImported, lastTried: accountReadTried,
+                                   waitsOnCloud: Self.awaitsFirstFetch(syncing: iCloudSyncEnabled,
+                                                                       fetched: lastFetched,
+                                                                       status: syncStatus))
+        else { return false }
+        accountReadTried = .now
+        // Before the task starts, so a second ask in the same moment — the
+        // launch and the first return to the app both ask — finds it running.
+        isRefreshing = true
+        refreshFailure = nil
+        // A task of its own, which ``refresh()`` waits on.
+        let read = Task { await readAccountByItself() }
+        accountReadByItself = read
+        await read.value
+        accountReadByItself = nil
+        return true
+    }
+
+    /// Whether the account's lists are owed a read the app makes by itself:
+    /// never read, or read more than ``Freshness/window`` ago — unless one was
+    /// tried less than ``accountRetryPatience`` ago, or this device has yet to
+    /// hear from iCloud.
+    nonisolated static func owesAccountRead(
+        lastImported: Date?, lastTried: Date?, waitsOnCloud: Bool, at now: Date = .now
+    ) -> Bool {
+        guard !waitsOnCloud else { return false }
+        if let lastTried, now.timeIntervalSince(lastTried) < accountRetryPatience { return false }
+        guard let lastImported else { return true }
+        return now.timeIntervalSince(lastImported) >= Freshness.window
+    }
+
+    /// Whether this device is still to hear from iCloud for the first time:
+    /// its switch on and nothing fetched — unless iCloud has said nothing will
+    /// come (``LibraryDatabase/SyncStatus/mayStillImport``). Waiting on a
+    /// device signed out of iCloud, as a simulator is, would wait for good.
+    static func awaitsFirstFetch(syncing: Bool, fetched: Date?, status: LibraryDatabase.SyncStatus?) -> Bool {
+        guard syncing, fetched == nil else { return false }
+        return status?.mayStillImport ?? true
+    }
+
+    /// How long after a read of the account the app made by itself it tries
+    /// again — after one that did not get through, since one that did is not
+    /// owed another for ``Freshness/window``.
+    nonisolated static let accountRetryPatience: TimeInterval = 30 * 60
+
+    /// How many of the events a read by itself brought in have their own page
+    /// read straight away: the ones still to come first, soonest first, then
+    /// the latest gone — a history arriving whole, on a device that never read
+    /// it, is not hundreds of pages read unasked.
+    private static let arrivalPagesRead = 20
+
+    private func readAccountByItself() async {
+        defer {
+            isRefreshing = false
+            refreshStage = nil
+        }
+
+        let followed = await refreshAccount(restoring: false)
+        let history = await importHistory(restoring: false)
+        let added = history?.added ?? []
+        // Said on the Me card only where something arrived: a read that found
+        // the library as it was leaves the card saying when it was refreshed.
+        if !added.isEmpty || followed > 0 {
+            importSummary = ImportSummary(read: history?.read ?? 0, added: added.count, followed: followed)
+        }
+        save()
+
+        let upcoming = added.filter(\.isUpcoming).sorted { $0.date < $1.date }
+        let past = added.filter { !$0.isUpcoming }.sorted { $0.date > $1.date }
+        for event in (upcoming + past).prefix(Self.arrivalPagesRead) { placeAdded(event) }
     }
 
     // MARK: - Syncing

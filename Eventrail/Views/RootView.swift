@@ -172,6 +172,15 @@ struct RootView: View {
         // ever catch up after an edit or a trip to the background, so a library
         // imported on another device could sit unmirrored indefinitely.
         .task { await store.mirrorCalendar() }
+        // What the reader marked on Eventernote since the account was last
+        // read, where that was long enough ago — and again on every return
+        // (``catchUp()``).
+        .task { await readAccountIfStale() }
+        // And as iCloud answers: a device that syncs waits to hear from it
+        // once before reading the account by itself, and at launch the
+        // account has yet to be checked.
+        .onChange(of: store.syncStatus) { Task { await readAccountIfStale() } }
+        .onChange(of: store.lastFetched) { Task { await readAccountIfStale() } }
         // Live Activities can have fallen behind their events while the app
         // was not running — see ``EventActivities``.
         .task { await EventActivities.shared.refresh(from: store) }
@@ -248,6 +257,7 @@ struct RootView: View {
     private func catchUp() {
         Self.caughtUp = .now
         Task { await store.syncNow() }
+        Task { await readAccountIfStale() }
         Task { await EventActivities.shared.refresh(from: store) }
         // An event whose day ended while the app was away leaves the
         // watch's list too.
@@ -259,6 +269,15 @@ struct RootView: View {
         SpotlightIndex.shared.update(from: store, followed: followed)
         // Notifications may have been turned on or off in Settings.
         reminders.schedule(from: store)
+    }
+
+    /// Reads the linked account's lists again where they have gone stale —
+    /// see ``EventStore/refreshAccountIfStale()``. The app's own doing, so
+    /// only a failure is said, as the Welcome screen's first import says only
+    /// one.
+    private func readAccountIfStale() async {
+        guard await store.refreshAccountIfStale() else { return }
+        notices.report(.library(failure: store.refreshFailure), byHand: false)
     }
 
     /// What every screen is handed through the environment, and every sheet
