@@ -333,13 +333,7 @@ final class EventActivities {
               let file = EventActivityAttributes.posterFile(for: event.id) else { return }
         var image = await ImageCache.shared.storedImage(for: url)
         if image == nil, let limit {
-            image = await withTaskGroup(of: UIImage?.self) { group in
-                group.addTask { await ImageCache.shared.image(for: url) }
-                group.addTask { try? await Task.sleep(for: limit); return nil }
-                let first = await group.next() ?? nil
-                group.cancelAll()
-                return first
-            }
+            image = await Self.image(at: url, waitingAtMost: limit)
         } else if image == nil {
             image = await ImageCache.shared.image(for: url)
         }
@@ -347,6 +341,24 @@ final class EventActivities {
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
         try? data.write(to: file, options: .atomic)
+    }
+
+    /// The flyer at `url`, or nil once `limit` has gone by without it — the
+    /// download going on into ``ImageCache`` either way, for the activity's
+    /// next refresh to find. Raced through a continuation rather than a task
+    /// group: a group waits for every child, and the download, joined inside
+    /// the cache, does not stop for being cancelled, so the group waited it
+    /// out whole, limit or none.
+    private static func image(at url: URL, waitingAtMost limit: Duration) async -> UIImage? {
+        let race = PosterRace()
+        return await withCheckedContinuation { continuation in
+            race.waiting = continuation
+            Task { race.finish(await ImageCache.shared.image(for: url)) }
+            Task {
+                try? await Task.sleep(for: limit)
+                race.finish(nil)
+            }
+        }
     }
 
     private static func downsized(_ image: UIImage) -> UIImage {
@@ -384,3 +396,17 @@ final class EventActivities {
     }
     #endif
 }
+
+#if !targetEnvironment(macCatalyst)
+/// Whichever of a flyer's download and the wait for it comes first — see
+/// ``EventActivities/image(at:waitingAtMost:)``.
+private final class PosterRace {
+    var waiting: CheckedContinuation<UIImage?, Never>?
+
+    /// Hands the answer to whoever is waiting, the first time only.
+    func finish(_ image: UIImage?) {
+        waiting?.resume(returning: image)
+        waiting = nil
+    }
+}
+#endif

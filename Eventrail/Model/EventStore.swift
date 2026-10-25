@@ -1249,7 +1249,10 @@ final class EventStore {
     @discardableResult
     private func refreshAccount(restoring: Bool) async -> Int {
         guard let handle = eventernoteHandle,
-              let read = try? await client.profile(forUser: handle)
+              let read = try? await client.profile(forUser: handle),
+              // Let go of, or another linked, while the page was on its way —
+              // see ``importHistory(restoring:)``.
+              eventernoteHandle == handle
         else { return 0 }
 
         let profile = LinkedProfile(name: read.name, avatarURL: read.avatarURL)
@@ -1477,7 +1480,7 @@ final class EventStore {
         var page = 1
         var reached = false
 
-        while true {
+        while eventernoteHandle == handle {
             let read: EventernotePage<Event>
             do {
                 read = try await client.events(forUser: handle, page: page)
@@ -1500,7 +1503,13 @@ final class EventStore {
         // it is when the account was last read, which is what
         // ``refreshAccountIfStale()`` goes by, and an account with nothing on
         // it would otherwise be read again at every chance.
-        guard reached else { return nil }
+        //
+        // Not where the account was let go of, or another linked, while the
+        // pages were on their way: Delete All unlinks it so that nothing
+        // comes straight back, and a read already under way — the app's own,
+        // every few hours — would have put the account's events back after
+        // it, a Refresh every one of them.
+        guard reached, eventernoteHandle == handle else { return nil }
         makeSettingsRow().lastImported = .now
         // The site lists the odd event twice, on two adjacent rows of the same
         // page. Adopting it twice is harmless, but counting it twice would
