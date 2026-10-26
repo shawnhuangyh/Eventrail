@@ -82,6 +82,72 @@ private struct MacLargeTitle<Trailing: View>: ViewModifier {
     }
 }
 
+extension View {
+    /// On a Mac, a band of its own under the bar over a list whose month
+    /// headers stay pinned, in place of the list's own edge there. Nothing on
+    /// an iPhone or an iPad.
+    ///
+    /// The system runs a list's edge on under a pinned header, so that what
+    /// scrolls behind the header blurs as it does under the bar. On a Mac it
+    /// stayed run on once the list had been scrolled back to its head: the
+    /// edge, a frosted band with a hard line under it, ended a header's
+    /// depth below the bar, across the top of Following's chips. So there the
+    /// list's own edge is hidden, and a band is drawn from the top of the
+    /// window to the foot of the bar, ending in a hard line as the edge does.
+    /// Not faded out: a pinned header stands on a backdrop of the Mac's own
+    /// from the foot of the bar down, and between a fade and that backdrop
+    /// the rows showed through. Only once the list has been scrolled in under
+    /// the bar, as the system's own edge shows only over what passes beneath
+    /// it.
+    func bandUnderBarOnMac() -> some View {
+        modifier(MacBarBand())
+    }
+}
+
+private struct MacBarBand: ViewModifier {
+    @Environment(\.displayScale) private var displayScale
+    /// How deep the bar reaches over the list: the window's toolbar and the
+    /// title under it.
+    @State private var barDepth: CGFloat = 0
+    @State private var isUnderBar = false
+
+    func body(content: Content) -> some View {
+        if isMac {
+            content
+                .scrollEdgeEffectHidden(true, for: .top)
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    geometry.contentOffset.y + geometry.contentInsets.top > 0.5
+                } action: { _, isUnder in
+                    isUnderBar = isUnder
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { barDepth = $0 }
+                .overlay(alignment: .top) { band }
+        } else {
+            content
+        }
+    }
+
+    private var band: some View {
+        Rectangle()
+            .fill(.bar)
+            .frame(height: barDepth)
+            // Just under the band, on the line a pinned header's backdrop
+            // draws at its head, so the two fall on one another.
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(.separator)
+                    .frame(height: 1 / displayScale)
+                    .offset(y: 1 / displayScale)
+            }
+            .opacity(isUnderBar ? 1 : 0)
+            .animation(.easeOut(duration: 0.2), value: isUnderBar)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 /// The sizes a sheet opens at on a Mac — see ``SwiftUI/View/macSheetSize(_:)``.
 nonisolated struct MacSheetSize: Sendable {
     var width: CGFloat
