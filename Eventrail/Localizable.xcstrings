@@ -2125,6 +2125,28 @@
         }
       }
     },
+    "Add on Eventernote" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteで参加する"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往 Eventernote 登记"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往 Eventernote 登記"
+          }
+        }
+      }
+    },
     "Add Seat" : {
       "localizations" : {
         "ja" : {
@@ -4969,6 +4991,28 @@
         }
       }
     },
+    "Eventrail never writes to Eventernote. Open each event there and tap 参加する; it leaves this list the next time your account is read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EventrailはEventernoteに書き込みません。各イベントをEventernoteで開いて「参加する」をタップしてください。次にアカウントを読み込んだときにこのリストから外れます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 不会写入 Eventernote。请在 Eventernote 打开各场活动并轻点「参加する」；账号下次读取后，该活动即从本列表移除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 不會寫入 Eventernote。請在 Eventernote 打開各場活動並輕點「参加する」；帳號下次讀取後，該活動即從本列表移除。"
+          }
+        }
+      }
+    },
     "Eventrail reads the same public page anyone visiting your profile would see. It does not sign in, and it never writes anything back to Eventernote. An event you remove here comes back on the next refresh if your account still lists it. An import only ever puts events in your library — what you wrote on one is yours, and nothing here writes over it." : {
       "localizations" : {
         "ja" : {
@@ -5252,6 +5296,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "該備份中的所有內容都已存在於此裝置上。"
+          }
+        }
+      }
+    },
+    "Everything in your library is on your Eventernote account." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリのイベントはすべてEventernoteアカウントにあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库中的活动均已收录于你的 Eventernote 账号。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料庫中的活動均已收錄於你的 Eventernote 帳號。"
           }
         }
       }
@@ -8403,6 +8469,28 @@
         }
       }
     },
+    "Not on Your Account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウントに未登録"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "账号未收录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帳號未收錄"
+          }
+        }
+      }
+    },
     "Not Placed" : {
       "localizations" : {
         "ja" : {
@@ -8604,6 +8692,28 @@
         }
       }
     },
+    "Nothing in the past is missing from Eventernote." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "過去のイベントはすべてEventernoteにあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已结束的活动均已收录于 Eventernote。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已結束的活動均已收錄於 Eventernote。"
+          }
+        }
+      }
+    },
     "Nothing is erased" : {
       "localizations" : {
         "ja" : {
@@ -8688,6 +8798,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未恢復任何內容"
+          }
+        }
+      }
+    },
+    "Nothing still to come is missing from Eventernote." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今後のイベントはすべてEventernoteにあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未举行的活动均已收录于 Eventernote。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未舉行的活動均已收錄於 Eventernote。"
           }
         }
       }

@@ -139,7 +139,7 @@ extension EventStore {
     /// A store holding the preview fixtures in memory, with no file behind it.
     @MainActor static var preview: EventStore {
         EventStore(database: LibraryDatabase(at: .memory, syncing: false), libraryFile: nil,
-                   calendar: nil, venues: nil, pageReads: nil,
+                   calendar: nil, venues: nil, pageReads: nil, accountEvents: nil,
                    library: PreviewData.events, tracking: PreviewData.tracking,
                    follows: PreviewData.performers)
     }
