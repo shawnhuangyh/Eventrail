@@ -5,9 +5,10 @@ import SwiftUI
 /// General is what a reader sets once and lives with — the language and the
 /// currency, light or dark, the two switches that carry the library
 /// somewhere else of theirs (their other devices and their calendar), and
-/// the results-day reminders. Backup
-/// is the copy they keep themselves. Advanced is what most readers never touch: how halls are
-/// placed, on a screen of its own, and the pages kept from Eventernote, which
+/// the reminders — of a results day, and on an iPhone of a Live Activity
+/// ready to start. Backup is the copy they keep themselves. Advanced is what
+/// most readers never touch: how halls are placed, on a screen of its own,
+/// and the pages kept from Eventernote, which
 /// are nobody's record and so stay off the cards holding the reader's own.
 /// About is the app itself. Delete All sits alone under Danger Zone at the
 /// bottom, well away from the Refresh button on the screen behind.
@@ -27,6 +28,7 @@ struct SettingsView: View {
     @Environment(VenueRegions.self) private var venues
     @Environment(\.dismiss) private var dismiss
     private let reminders = LotteryReminders.shared
+    private let activityReminders = ActivityReminders.shared
 
     @State private var isConfirmingDeleteAll = false
     @State private var isConfirmingClearCache = false
@@ -83,6 +85,12 @@ struct SettingsView: View {
                         calendarRow(store: $store)
                         SettingRowDivider()
                         remindersRow
+                        // An iPhone's alone: an iPad and a Mac show no Live
+                        // Activities to be reminded of.
+                        if ActivityReminders.isOffered {
+                            SettingRowDivider()
+                            activityRemindersRow
+                        }
                     }
                     section("Backup") {
                         exportRow
@@ -330,6 +338,42 @@ struct SettingsView: View {
     }
 
     private static let notificationSettings = URL(string: UIApplication.openNotificationSettingsURLString)!
+
+    /// On until the reader turns it off — see ``ActivityReminders``. Asks,
+    /// turned back on with nothing asked yet, as the results-day switch does.
+    private var activityRemindersRow: some View {
+        @Bindable var activityReminders = activityReminders
+        let refusal = activityRemindersRefusal
+        return Toggle(isOn: $activityReminders.isEnabled) {
+            SettingRowLabel("clock.badge", "Live Activity Reminders",
+                            status: refusal?.status, needsAttention: true) {
+                if let refusal {
+                    Link("Open Settings", destination: refusal.mend)
+                        .scalingFont(size: 12.5, weight: .semibold)
+                        .foregroundStyle(Color.brandTint)
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        .settingSwitch()
+        .settingRowPadding()
+    }
+
+    /// Only a refusal the reader can mend, and where: notifications off, on
+    /// the app's notification page, or Live Activities off, on the app's own
+    /// page, where their switch is.
+    private var activityRemindersRefusal: (status: Text, mend: URL)? {
+        guard activityReminders.isEnabled else { return nil }
+        if reminders.authorization == .denied {
+            return (Text("Notifications are off in Settings"), Self.notificationSettings)
+        }
+        if !EventActivities.shared.isEnabled {
+            return (Text("Live Activities are off in Settings"), Self.appSettings)
+        }
+        return nil
+    }
+
+    private static let appSettings = URL(string: UIApplication.openSettingsURLString)!
 
     /// Only a refusal the reader can mend: the switch on and the system
     /// saying no.

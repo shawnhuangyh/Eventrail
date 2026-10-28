@@ -202,11 +202,19 @@ extension LotteryReminders: UNUserNotificationCenterDelegate {
         [.banner, .list, .sound]
     }
 
+    /// The app's one delegate, so a Live Activity reminder tapped is handed
+    /// to ``ActivityReminders`` from here.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        let info = response.notification.request.content.userInfo
+        let request = response.notification.request
+        if request.identifier.hasPrefix(ActivityReminder.prefix) {
+            let event = request.content.userInfo[ActivityReminder.eventKey] as? String
+            await MainActor.run { ActivityReminders.shared.opened = event }
+            return
+        }
+        let info = request.content.userInfo
         guard let event = info[LotteryReminder.eventKey] as? String,
               let entry = (info[LotteryReminder.entryKey] as? String).flatMap(UUID.init(uuidString:))
         else { return }
@@ -225,8 +233,10 @@ nonisolated struct LotteryReminder: Hashable {
     /// The hour it comes at, on the reader's clock.
     static let hour = 20
     /// How many are scheduled at once, the soonest first. iOS keeps an app's
-    /// 64 soonest and drops the rest without a word; the ones past these are
-    /// scheduled as the earlier ones are delivered and the app next opens.
+    /// 64 soonest and drops the rest without a word, and the Live Activity
+    /// reminders take the other few (``ActivityReminder/limit``); the ones
+    /// past these are scheduled as the earlier ones are delivered and the app
+    /// next opens.
     static let limit = 60
 
     /// Shared with the Lotteries widget, which takes back the reminder for a

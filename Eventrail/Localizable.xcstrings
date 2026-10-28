@@ -6933,6 +6933,73 @@
         }
       }
     },
+    "Live Activities are off in Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「設定」でライブアクティビティがオフになっています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在“设置”中关闭实时活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在「設定」中關閉即時動態"
+          }
+        }
+      }
+    },
+    "Live Activity available" : {
+      "comment" : "A notification's title, once an event's Live Activity can be started.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティを開始できます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时活动现已可开启"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即時動態現已可開啟"
+          }
+        }
+      }
+    },
+    "Live Activity Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティの通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时活动提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即時動態提醒"
+          }
+        }
+      }
+    },
     "Local" : {
       "localizations" : {
         "ja" : {
@@ -12801,6 +12868,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "點按記錄是否中選。"
+          }
+        }
+      }
+    },
+    "Tap to start the countdown on your Lock Screen." : {
+      "comment" : "A notification's text, once an event's Live Activity can be started.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップすると、ロック画面でカウントダウンを開始します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点即可在锁定屏幕上开始倒计时。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "輕點即可在鎖定畫面上開始倒數計時。"
           }
         }
       }

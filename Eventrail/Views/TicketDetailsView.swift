@@ -120,6 +120,11 @@ struct TicketDetailsView: View {
         // away with its X undoes: asked there, a day thrown away still asked.
         let days = Dictionary(original.lotteries.map { ($0.id, $0.day) }) { first, _ in first }
         LotteryReminders.shared.askIfNeeded(for: record.lotteries.filter { days[$0.id] != .some($0.day) })
+        // And a ticket now held for an event ahead, the moment to ask whether
+        // the reader wants to hear when its Live Activity can start.
+        if record.hasTicket, !original.hasTicket {
+            ActivityReminders.shared.askIfNeeded(for: event, tracking: record)
+        }
         dismiss()
     }
 

@@ -43,6 +43,9 @@ struct RootView: View {
     @State private var handoff = EventHandoff()
     @Environment(\.openURL) private var openURL
     private let reminders = LotteryReminders.shared
+    /// The reminder that an event's Live Activity can start — see
+    /// ``ActivityReminders``.
+    private let activityReminders = ActivityReminders.shared
     /// What Siri, Shortcuts or a Spotlight result asked for through an
     /// intent — see ``IntentOpens``.
     private let intentOpens = IntentOpens.shared
@@ -73,6 +76,132 @@ struct RootView: View {
     @State private var today = EnvironmentValues.startOfToday
 
     var body: some View {
+        followingTheLibrary(root)
+        // Edits are written after a short pause; leaving the app cuts that
+        // short, so the last one is flushed here rather than lost. Coming back
+        // is the moment to pick up whatever another device wrote meanwhile.
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                // A reminder tapped, or an intent run, while this window was
+                // on its way in.
+                openReminder()
+                openActivityReminder()
+                takeIntentOpen()
+                if wasInBackground || Self.owesCatchUp { catchUp() }
+                wasInBackground = false
+            case .background:
+                wasInBackground = true
+                store.saveNow()
+            default:
+                store.saveNow()
+            }
+        }
+    }
+
+    /// The tabs with the environment every screen reads, and what reaches
+    /// them from outside — split from ``body`` for the compiler's sake, as
+    /// ``tabs`` is.
+    private var root: some View {
+        tabs
+        // Inside the environment lines below, for the store; over the tabs,
+        // which stand a sheet deeper for it.
+        .opensFromOutside()
+        .hidesWindowTitleOnMac()
+        // Not while the first launch's welcome is up: nothing can be opened
+        // over it, and Settings asked for meanwhile opened by itself the
+        // moment the reader finished it.
+        .focusedSceneValue(\.appTab, isWelcoming ? nil : $selection)
+        .focusedSceneValue(\.outsideOpens, isWelcoming ? nil : opens)
+        // Asked about first: tapping a file is not by itself a request to fold
+        // its contents into the library.
+        //
+        // Above the two `.environment` lines on purpose. A modifier written
+        // after them wraps around them, which puts it outside the environment
+        // they set — and this one reads the store out of it.
+        .restoringBackup($openedBackup, asking: true)
+        // Above the `.environment` lines for the same reason, and over
+        // everything: the first launch has no tab worth showing yet.
+        .fullScreenCover(isPresented: $isWelcoming) {
+            WelcomeView()
+                .rootEnvironment(rootEnvironment)
+        }
+        // Midnight, or the clock changed — told once the app is back if it
+        // was away as it happened.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            today = EnvironmentValues.startOfToday
+        }
+        .environment(\.today, today)
+        // The store and the rest, the app's tint and its text sizes.
+        .rootEnvironment(rootEnvironment)
+        // A cold launch is a change of scene phase to nobody: `onChange` only
+        // hears the ones after the first. Without this the calendar would only
+        // ever catch up after an edit or a trip to the background, so a library
+        // imported on another device could sit unmirrored indefinitely.
+        .task { await store.mirrorCalendar() }
+        // What the reader marked on Eventernote since the account was last
+        // read, where that was long enough ago — and again on every return
+        // (``catchUp()``).
+        .task { await readAccountIfStale() }
+        // And as iCloud answers: a device that syncs waits to hear from it
+        // once before reading the account by itself, and at launch the
+        // account has yet to be checked.
+        .onChange(of: store.syncStatus) { Task { await readAccountIfStale() } }
+        .onChange(of: store.lastFetched) { Task { await readAccountIfStale() } }
+    }
+
+    /// The copies the library is kept in step with outside the app — the
+    /// Live Activities, the watch, the widgets, Spotlight and the reminders —
+    /// around everything else, as they were written after it.
+    private func followingTheLibrary(_ content: some View) -> some View {
+        content
+        // Live Activities can have fallen behind their events while the app
+        // was not running — see ``EventActivities``.
+        .task { await EventActivities.shared.refresh(from: store) }
+        // The watch draws the events still to come from a copy sent from here,
+        // so the copy follows every write and the clock it is printed on.
+        .task { WatchLink.shared.send(from: store) }
+        // The widgets draw from a copy left beside them, which follows every
+        // write the same way; a result given from one is written down first.
+        .task {
+            WidgetLink.shared.takeAnswers(into: store)
+            WidgetLink.shared.send(from: store)
+        }
+        // Spotlight's copy follows the writes that can move what it holds —
+        // public facts only, so not a note or a read — and the Following
+        // dates by itself. See ``SpotlightIndex``.
+        .task { SpotlightIndex.shared.update(from: store, followed: followed) }
+        .onChange(of: store.factsRevision) { SpotlightIndex.shared.update(from: store, followed: followed) }
+        .onChange(of: store.revision) {
+            WatchLink.shared.send(from: store)
+            WidgetLink.shared.send(from: store)
+            reminders.schedule(from: store)
+            activityReminders.schedule(from: store)
+            EventActivities.shared.refreshSoon(from: store)
+        }
+        // An activity started from the sheet takes its reminder back, and
+        // Live Activities turned off take them all.
+        .onChange(of: EventActivities.shared.statuses) { activityReminders.schedule(from: store) }
+        .onChange(of: EventActivities.shared.isEnabled) { activityReminders.schedule(from: store) }
+        .onChange(of: timeDisplay) {
+            WatchLink.shared.send(from: store)
+            WidgetLink.shared.send(from: store)
+            SpotlightIndex.shared.update(from: store, followed: followed)
+            EventActivities.shared.refreshSoon(from: store)
+        }
+        // Each results day still waiting is a reminder that evening, and the
+        // ones answered on another device meanwhile are taken back — followed
+        // from here on with every write, as the watch's copy is.
+        .task {
+            reminders.schedule(from: store)
+            activityReminders.schedule(from: store)
+        }
+    }
+
+    /// The four tabs, and what opens over them from outside the app — split
+    /// from ``body``, whose one chain of modifiers ran past what the compiler
+    /// would type-check.
+    private var tabs: some View {
         TabView(selection: $selection) {
             Tab("My Events", systemImage: "calendar", value: AppTab.events) {
                 EventsView().refreshNotices()
@@ -137,102 +266,8 @@ struct RootView: View {
         // The ticket sheet on the round's own page, where its result is
         // written down — or the event, where the round has gone since.
         .onChange(of: reminders.opened, initial: true) { openReminder() }
-        // Inside the environment lines below, for the store; over the tabs,
-        // which stand a sheet deeper for it.
-        .opensFromOutside()
-        .hidesWindowTitleOnMac()
-        // Not while the first launch's welcome is up: nothing can be opened
-        // over it, and Settings asked for meanwhile opened by itself the
-        // moment the reader finished it.
-        .focusedSceneValue(\.appTab, isWelcoming ? nil : $selection)
-        .focusedSceneValue(\.outsideOpens, isWelcoming ? nil : opens)
-        // Asked about first: tapping a file is not by itself a request to fold
-        // its contents into the library.
-        //
-        // Above the two `.environment` lines on purpose. A modifier written
-        // after them wraps around them, which puts it outside the environment
-        // they set — and this one reads the store out of it.
-        .restoringBackup($openedBackup, asking: true)
-        // Above the `.environment` lines for the same reason, and over
-        // everything: the first launch has no tab worth showing yet.
-        .fullScreenCover(isPresented: $isWelcoming) {
-            WelcomeView()
-                .rootEnvironment(rootEnvironment)
-        }
-        // Midnight, or the clock changed — told once the app is back if it
-        // was away as it happened.
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
-            today = EnvironmentValues.startOfToday
-        }
-        .environment(\.today, today)
-        // The store and the rest, the app's tint and its text sizes.
-        .rootEnvironment(rootEnvironment)
-        // A cold launch is a change of scene phase to nobody: `onChange` only
-        // hears the ones after the first. Without this the calendar would only
-        // ever catch up after an edit or a trip to the background, so a library
-        // imported on another device could sit unmirrored indefinitely.
-        .task { await store.mirrorCalendar() }
-        // What the reader marked on Eventernote since the account was last
-        // read, where that was long enough ago — and again on every return
-        // (``catchUp()``).
-        .task { await readAccountIfStale() }
-        // And as iCloud answers: a device that syncs waits to hear from it
-        // once before reading the account by itself, and at launch the
-        // account has yet to be checked.
-        .onChange(of: store.syncStatus) { Task { await readAccountIfStale() } }
-        .onChange(of: store.lastFetched) { Task { await readAccountIfStale() } }
-        // Live Activities can have fallen behind their events while the app
-        // was not running — see ``EventActivities``.
-        .task { await EventActivities.shared.refresh(from: store) }
-        // The watch draws the events still to come from a copy sent from here,
-        // so the copy follows every write and the clock it is printed on.
-        .task { WatchLink.shared.send(from: store) }
-        // The widgets draw from a copy left beside them, which follows every
-        // write the same way; a result given from one is written down first.
-        .task {
-            WidgetLink.shared.takeAnswers(into: store)
-            WidgetLink.shared.send(from: store)
-        }
-        // Spotlight's copy follows the writes that can move what it holds —
-        // public facts only, so not a note or a read — and the Following
-        // dates by itself. See ``SpotlightIndex``.
-        .task { SpotlightIndex.shared.update(from: store, followed: followed) }
-        .onChange(of: store.factsRevision) { SpotlightIndex.shared.update(from: store, followed: followed) }
-        .onChange(of: store.revision) {
-            WatchLink.shared.send(from: store)
-            WidgetLink.shared.send(from: store)
-            reminders.schedule(from: store)
-            EventActivities.shared.refreshSoon(from: store)
-        }
-        .onChange(of: timeDisplay) {
-            WatchLink.shared.send(from: store)
-            WidgetLink.shared.send(from: store)
-            SpotlightIndex.shared.update(from: store, followed: followed)
-            EventActivities.shared.refreshSoon(from: store)
-        }
-        // Each results day still waiting is a reminder that evening, and the
-        // ones answered on another device meanwhile are taken back — followed
-        // from here on with every write, as the watch's copy is.
-        .task { reminders.schedule(from: store) }
-        // Edits are written after a short pause; leaving the app cuts that
-        // short, so the last one is flushed here rather than lost. Coming back
-        // is the moment to pick up whatever another device wrote meanwhile.
-        .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .active:
-                // A reminder tapped, or an intent run, while this window was
-                // on its way in.
-                openReminder()
-                takeIntentOpen()
-                if wasInBackground || Self.owesCatchUp { catchUp() }
-                wasInBackground = false
-            case .background:
-                wasInBackground = true
-                store.saveNow()
-            default:
-                store.saveNow()
-            }
-        }
+        // The event, and its Live Activity started.
+        .onChange(of: activityReminders.opened, initial: true) { openActivityReminder() }
     }
 
     /// When the app last caught up on coming back (``catchUp()``) — once for
@@ -269,6 +304,7 @@ struct RootView: View {
         SpotlightIndex.shared.update(from: store, followed: followed)
         // Notifications may have been turned on or off in Settings.
         reminders.schedule(from: store)
+        activityReminders.schedule(from: store)
     }
 
     /// Reads the linked account's lists again where they have gone stale —
@@ -309,6 +345,20 @@ struct RootView: View {
         } else {
             opens.open(.event(event))
         }
+    }
+
+    /// Opens the event a Live Activity reminder was tapped for and starts its
+    /// activity — in this window, only while it is the one in front, for the
+    /// reason a results-day reminder waits for it (``openReminder()``). Where
+    /// the activity cannot start after all — its times moved since — the
+    /// sheet's own button stands there to try, and says from when.
+    private func openActivityReminder() {
+        guard scenePhase == .active, let id = activityReminders.opened else { return }
+        activityReminders.opened = nil
+        guard let event = store.event(id: id) else { return }
+        opens.open(.event(event))
+        let tracking = store.tracking(for: event)
+        Task { try? await EventActivities.shared.start(for: event, tracking: tracking) }
     }
 
     /// Opens what an intent asked for, in this window — only while it is the
