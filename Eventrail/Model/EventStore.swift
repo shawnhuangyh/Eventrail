@@ -658,6 +658,22 @@ final class EventStore {
         return record
     }
 
+    /// The seat classes the reader has typed rather than chosen — any the
+    /// chips do not offer (``SeatClass``), named on a round or a ticket
+    /// anywhere in the library — the most used first, for a lottery entry's
+    /// page to offer again.
+    func typedSeatClasses() -> [String] {
+        var uses: [String: Int] = [:]
+        for id in Set(entries.keys).union(lotteryRows.keys) {
+            let record = tracking(of: id)
+            let named = Set(record.lotteries.flatMap { $0.choices.map(\.seatClass) } + [record.seatClass])
+            for seatClass in named where !seatClass.isEmpty && SeatClass(rawValue: seatClass) == nil {
+                uses[seatClass, default: 0] += 1
+            }
+        }
+        return uses.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+    }
+
     /// The one badge a row wears, read from where the event stands.
     ///
     /// The ticket decides it (``Tracking/hasTicket``: a lottery won or a

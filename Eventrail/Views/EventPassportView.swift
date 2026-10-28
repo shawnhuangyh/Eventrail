@@ -3005,10 +3005,10 @@ private struct SeatStyle {
     ///
     /// The three classes the ticket sheet offers keep one colour each whatever
     /// the year, so an S seat is the same red on every slice. A class the
-    /// reader typed is named as typed, badged with its first letter, and given
-    /// the next of the spare colours: the spending card's classes in the order
-    /// it lists them first, so its colours do not move for the lottery card's,
-    /// and then the classes only a lottery asked for.
+    /// reader typed is named as typed, badged as ``SeatClass/badge(of:)`` has
+    /// it, and given the next of the spare colours: the spending card's
+    /// classes in the order it lists them first, so its colours do not move
+    /// for the lottery card's, and then the classes only a lottery asked for.
     static func styles(for stats: PassportStats) -> SeatStyles {
         var styles: [String: SeatStyle] = [:]
         var spare = 0
@@ -3021,7 +3021,7 @@ private struct SeatStyle {
             } else {
                 styles[seatClass] = SeatStyle(
                     label: Text(verbatim: seatClass),
-                    badge: Text(verbatim: seatClass.prefix(1).uppercased()),
+                    badge: SeatClass.badge(of: seatClass) ?? Text(verbatim: "?"),
                     color: spareColors[spare % spareColors.count])
                 spare += 1
             }

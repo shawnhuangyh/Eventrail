@@ -2565,6 +2565,28 @@
         }
       }
     },
+    "As the ticket prints it, such as SS席 or 注釈付き指定席." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットの表記どおりに入力してください（例：SS席、注釈付き指定席）。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请按票面写法填写，例如 SS席、注釈付き指定席。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請依票面寫法填寫，例如 SS席、注釈付き指定席。"
+          }
+        }
+      }
+    },
     "At exchange rates of %@" : {
       "localizations" : {
         "ja" : {
@@ -9704,6 +9726,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他票種"
+          }
+        }
+      }
+    },
+    "Other…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他…"
           }
         }
       }

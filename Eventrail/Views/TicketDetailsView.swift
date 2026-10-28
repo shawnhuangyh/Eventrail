@@ -987,24 +987,32 @@ enum TicketForm {
 
     /// A seat class chip's label: its badge, then its name.
     static func seatClassLabel(_ seatClass: SeatClass, isOn: Bool) -> some View {
+        seatClassLabel(badge: seatClass.badge, name: Text(seatClass.label), isOn: isOn)
+    }
+
+    /// The same for a class the reader typed, named as typed.
+    static func seatClassLabel(typed seatClass: String, isOn: Bool) -> some View {
+        seatClassLabel(badge: SeatClass.badge(of: seatClass) ?? Text(verbatim: "?"),
+                       name: Text(verbatim: seatClass), isOn: isOn)
+    }
+
+    private static func seatClassLabel(badge: Text, name: Text, isOn: Bool) -> some View {
         HStack(spacing: 7) {
-            seatClass.badge
+            badge
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(isOn ? Color.brandTint : Color(.systemBackground))
                 .padding(.horizontal, 4)
                 .frame(minWidth: 18, minHeight: 18)
                 .background(isOn ? Color.white : Color.primary, in: .capsule)
-            Text(seatClass.label)
+            name
         }
     }
 
-    /// A seat class's badge on its own, as a chip draws it unchosen — or its
-    /// first letter, for a class the chips do not offer; nothing for none.
+    /// A seat class's badge on its own, as a chip draws it unchosen — see
+    /// ``SeatClass/badge(of:)``; nothing for none.
     @ViewBuilder
     static func seatClassBadge(_ seatClass: String) -> some View {
-        let badge: Text? = SeatClass(rawValue: seatClass)?.badge
-            ?? seatClass.first.map { Text(verbatim: String($0)) }
-        if let badge {
+        if let badge = SeatClass.badge(of: seatClass) {
             badge
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Color(.systemBackground))

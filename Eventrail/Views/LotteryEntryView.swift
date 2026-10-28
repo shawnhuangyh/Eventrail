@@ -19,6 +19,7 @@ import SwiftUI
 /// An entry is taken out by a swipe on its card on the sheet.
 struct LotteryEntryView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(EventStore.self) private var store
     @State private var isPickingDay = false
     /// The day the picker shows, held while it is open — see ``dayPicker``.
     @State private var pickedDay = Date.now
@@ -29,8 +30,20 @@ struct LotteryEntryView: View {
     /// entry opens with none of the result chips on: it is pending until one
     /// is, but nobody said so.
     @State private var isResultGiven: Bool
+    /// The classes the reader has typed before, offered as chips after the
+    /// three — read once, as the page opens (``EventStore/typedSeatClasses()``).
+    @State private var typedClasses: [String] = []
+    /// Whether the field for a class the chips do not offer is up, which
+    /// choice it is for, and what has been typed in it.
+    @State private var isTypingClass = false
+    @State private var typingClassOf: LotteryChoice.ID?
+    @State private var typedClass = ""
     /// The entry as the page opened on it.
     private let opened: LotteryEntry
+
+    /// How many of the classes typed before are offered: the ones a reader
+    /// goes back to, not every one they ever wrote.
+    private static let offeredTypedClasses = 4
     /// The ticket sheet's copy of the record — see ``TicketDetailsView``.
     @Binding private var tracking: Tracking
 
@@ -97,6 +110,21 @@ struct LotteryEntryView: View {
             .padding(.bottom, 40)
         }
         .scrollDismissesKeyboard(.interactively)
+        .onAppear {
+            if typedClasses.isEmpty {
+                typedClasses = Array(store.typedSeatClasses().prefix(Self.offeredTypedClasses))
+            }
+        }
+        .alert("Seat Type", isPresented: $isTypingClass) {
+            TextField("Seat Type", text: $typedClass, prompt: Text(verbatim: "SS席"))
+            Button("Cancel", role: .cancel) {}
+            Button("Done") {
+                let seatClass = SeatClass.typed(typedClass)
+                if let choice = typingClassOf, !seatClass.isEmpty { setClass(seatClass, of: choice) }
+            }
+        } message: {
+            Text("As the ticket prints it, such as SS席 or 注釈付き指定席.")
+        }
         .navigationTitle("Lottery Entry")
         .navigationBarTitleDisplayMode(.inline)
         // The system's own back button, and its swipe from the edge, while
@@ -271,6 +299,11 @@ struct LotteryEntryView: View {
     /// What was applied for, most wanted first: a card each, with the class
     /// as chips and how many as a stepper, and a way to add the next. A
     /// first-come round asks for one seat, with nothing to rank.
+    ///
+    /// The class chips are the three nearly every ticket prints, the ones the
+    /// reader typed before, and Other… for one they have not: SS席, 注釈付き
+    /// 指定席, 立見 — kept as typed (``SeatClass/typed(_:)``), and ranked after
+    /// the three wherever classes are.
     private func choicesSection(_ entry: LotteryEntry) -> some View {
         TicketForm.section(entry.isFirstCome ? "Seat" : "Choices") {
             if !entry.isFirstCome {
@@ -313,13 +346,25 @@ struct LotteryEntryView: View {
                     // A second tap takes the class back, for a lottery that
                     // sold one kind of seat.
                     TicketForm.chip(isOn: isOn) {
-                        change { entry in
-                            guard let at = entry.choices.firstIndex(where: { $0.id == choice.id }) else { return }
-                            entry.choices[at].seatClass = isOn ? "" : seatClass.rawValue
-                        }
+                        setClass(isOn ? "" : seatClass.rawValue, of: choice.id)
                     } label: {
                         TicketForm.seatClassLabel(seatClass, isOn: isOn)
                     }
+                }
+                ForEach(offeredClasses(in: entry), id: \.self) { seatClass in
+                    let isOn = choice.seatClass == seatClass
+                    TicketForm.chip(isOn: isOn) {
+                        setClass(isOn ? "" : seatClass, of: choice.id)
+                    } label: {
+                        TicketForm.seatClassLabel(typed: seatClass, isOn: isOn)
+                    }
+                }
+                TicketForm.chip(isOn: false) {
+                    typingClassOf = choice.id
+                    typedClass = ""
+                    isTypingClass = true
+                } label: {
+                    Text("Other…")
                 }
             }
             .sensoryFeedback(.selection, trigger: choice.seatClass)
@@ -348,6 +393,23 @@ struct LotteryEntryView: View {
         .padding(.leading, 14)
         .padding(.trailing, 12)
         .background(TicketForm.fieldFill, in: .rect(cornerRadius: 16, style: .continuous))
+    }
+
+    /// The classes offered after the three the chips always offer: the ones
+    /// the reader typed before, then any typed on this entry since, so a
+    /// class typed for the first choice is a chip for the second.
+    private func offeredClasses(in entry: LotteryEntry) -> [String] {
+        var seen: Set<String> = []
+        return (typedClasses + entry.choices.map(\.seatClass)).filter {
+            !$0.isEmpty && SeatClass(rawValue: $0) == nil && seen.insert($0).inserted
+        }
+    }
+
+    private func setClass(_ seatClass: String, of choice: LotteryChoice.ID) {
+        change { entry in
+            guard let at = entry.choices.firstIndex(where: { $0.id == choice }) else { return }
+            entry.choices[at].seatClass = seatClass
+        }
     }
 
     /// A choice's rank, Won where it was won with, and the button that takes
