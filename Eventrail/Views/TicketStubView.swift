@@ -525,33 +525,8 @@ enum TicketStubImage {
         return renderer.uiImage
     }
 
-    /// Writes `image` as a PNG named for the event, in a folder of its own in
-    /// the temporary directory — a file the share sheet can compose its own
-    /// preview of, and Photos can be handed as it is.
-    @concurrent
-    nonisolated static func write(_ image: UIImage, named name: String) async throws -> URL {
-        guard let data = image.pngData() else { throw CocoaError(.fileWriteUnknown) }
-        let folder = folder.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let file = folder.appending(path: "\(name).png", directoryHint: .notDirectory)
-        try data.write(to: file, options: .atomic)
-        return file
-    }
-
-    /// Throws away a file ``write(_:named:)`` made, with its folder.
-    nonisolated static func discard(_ file: URL) {
-        try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
-    }
-
-    /// Throws away every file ``write(_:named:)`` has made — what a composer
-    /// closed by the app being quit left behind.
-    nonisolated static func discardAll() {
-        try? FileManager.default.removeItem(at: folder)
-    }
-
-    nonisolated private static var folder: URL {
-        URL.temporaryDirectory.appending(path: "Ticket Stubs", directoryHint: .isDirectory)
-    }
+    /// Where the image is written, as a PNG named for the event.
+    nonisolated static let files = PictureFolder(name: "Ticket Stubs")
 }
 
 // MARK: - The composer
@@ -586,8 +561,6 @@ struct TicketStubView: View {
     @State private var drawn: Drawn?
     /// Counted up as each save lands, for the tap and the word that say so.
     @State private var saves = 0
-    @State private var showsSaved = false
-    @State private var saveFailure: PhotoSaveFailure?
 
     /// What the image is drawn from: when any of it changes, it is drawn again.
     private struct Drawing: Hashable {
@@ -627,21 +600,11 @@ struct TicketStubView: View {
             guard !Task.isCancelled else { return }
             await draw(drawing)
         }
-        .task(id: saves) {
-            guard saves > 0 else { return }
-            showsSaved = true
-            try? await Task.sleep(for: .seconds(1.8))
-            guard !Task.isCancelled else { return }
-            showsSaved = false
-        }
-        .animation(.snappy, value: showsSaved)
-        .sensoryFeedback(.success, trigger: saves)
         .sensoryFeedback(.selection, trigger: options)
-        .photoSaveFailureAlert("Couldn't Save the Image", failure: $saveFailure)
         // Before the first image is written, so only this composer's is kept.
-        .onAppear { TicketStubImage.discardAll() }
+        .onAppear { TicketStubImage.files.discardAll() }
         .onDisappear {
-            if let drawn { TicketStubImage.discard(drawn.file) }
+            if let drawn { TicketStubImage.files.discard(drawn.file) }
         }
         .opensFromOutside()
     }
@@ -662,13 +625,13 @@ struct TicketStubView: View {
     private func draw(_ drawing: Drawing) async {
         let ticket = TicketStub(face: drawing.face, options: drawing.options, flyer: drawing.hasFlyer ? flyer : nil)
         guard let image = TicketStubImage.render(ticket),
-              let file = try? await TicketStubImage.write(image, named: ImageCache.fileName(drawing.face.title))
+              let file = try? await TicketStubImage.files.write(image, named: ImageCache.fileName(drawing.face.title))
         else { return }
         guard !Task.isCancelled else {
-            TicketStubImage.discard(file)
+            TicketStubImage.files.discard(file)
             return
         }
-        if let drawn { TicketStubImage.discard(drawn.file) }
+        if let drawn { TicketStubImage.files.discard(drawn.file) }
         drawn = Drawn(drawing: drawing, file: file)
     }
 
@@ -702,22 +665,7 @@ struct TicketStubView: View {
                 .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .accessibilityElement(children: .combine)
-        .overlay(alignment: .top) {
-            if showsSaved { savedNote }
-        }
-    }
-
-    /// "Saved to Photos", over the top of the preview for a moment.
-    private var savedNote: some View {
-        Label("Saved to Photos", systemImage: "checkmark")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 15)
-            .padding(.vertical, 10)
-            .background(Color(hex: 0x1C1A22).opacity(0.86), in: .capsule)
-            .shadow(color: Color(hex: 0x14121E).opacity(0.2), radius: 10, y: 8)
-            .padding(.top, 4)
-            .transition(.move(edge: .top).combined(with: .opacity))
+        .savedToPhotosNote(saves: saves)
     }
 
     // MARK: Controls
@@ -735,21 +683,7 @@ struct TicketStubView: View {
             HStack(spacing: 6) {
                 optionTiles(face)
             }
-            HStack(spacing: 10) {
-                Button {
-                    Task { await save(file) }
-                } label: {
-                    Label("Save Image", systemImage: "square.and.arrow.down")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.primary)
-                .disabled(file == nil)
-                shareButton(file)
-            }
-            .font(.system(size: 16, weight: .semibold))
-            .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
+            PictureFileButtons(file: file, saves: $saves)
         }
         .padding(18)
         .background {
@@ -808,35 +742,6 @@ struct TicketStubView: View {
         .buttonStyle(.plain)
         .accessibilityRepresentation {
             Toggle(title, isOn: isOn)
-        }
-    }
-
-    /// The share sheet, handed the image file — once it is drawn for what is
-    /// on screen, and greyed until then.
-    @ViewBuilder
-    private func shareButton(_ file: URL?) -> some View {
-        let label = Label("Share", systemImage: "square.and.arrow.up")
-            .frame(maxWidth: .infinity)
-        Group {
-            if let file {
-                ShareLink(item: file) { label }
-            } else {
-                Button {} label: { label }
-                    .disabled(true)
-            }
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(Color.brandTint)
-    }
-
-    /// Adds the image to the reader's photos — see ``PhotoSaving``.
-    private func save(_ file: URL?) async {
-        guard let file else { return }
-        do {
-            try await PhotoSaving.add(file)
-            saves += 1
-        } catch {
-            saveFailure = error
         }
     }
 }

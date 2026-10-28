@@ -277,10 +277,13 @@ extension View {
     /// A `List` of months headed by ``GroupHeader``, spaced by its numbers
     /// alone: the system's own section gap and header and row minimums are
     /// taken away, since left in they differ with what else the list holds.
+    /// On a Mac the band under the bar is the list's own
+    /// (``SwiftUI/View/bandUnderBarOnMac()``), since the headers pin.
     func monthSections() -> some View {
         listSectionSpacing(GroupHeader.sectionSpacing)
             .environment(\.defaultMinListRowHeight, 0)
             .environment(\.defaultMinListHeaderHeight, 0)
+            .bandUnderBarOnMac()
     }
 }
 

@@ -67,6 +67,17 @@ final class LibraryDatabase {
         /// Whether it passes by itself once iCloud can be reached again, so any
         /// setup, import or export that succeeds has shown it over.
         var isPassing: Bool { self == .offline || self == .unavailable }
+
+        /// Whether an import from iCloud may still come while it stands: not
+        /// where iCloud has said none will — no account on the device, none
+        /// set up for this build, the account changed or its data deleted, or
+        /// a failure.
+        var mayStillImport: Bool {
+            switch self {
+            case .synced, .unavailable, .offline, .iCloudFull: true
+            case .notConfigured, .signedOut, .accountChanged, .cloudDataDeleted, .failed: false
+            }
+        }
     }
 
     /// How the last setup, import and export each ended, and so how syncing

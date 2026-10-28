@@ -153,25 +153,25 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eventrail adds an event's flyer, or a ticket stub you make, to your photos when you ask it to save one. It never reads your photos."
+            "value" : "Eventrail adds an event's flyer, a ticket stub you make or a Passport card you share to your photos when you ask it to save one. It never reads your photos."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "保存を選んだときに、Eventrailはイベントのフライヤーや作成したチケットの半券を写真に追加します。写真を読み取ることはありません。"
+            "value" : "保存を選んだときに、Eventrailはイベントのフライヤーや作成したチケットの半券、イベントパスポートのカードを写真に追加します。写真を読み取ることはありません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当你选择存储时，Eventrail 会将活动海报或你制作的票根添加到“照片”。它不会读取你的照片。"
+            "value" : "当你选择存储时，Eventrail 会将活动海报、你制作的票根或活动护照的卡片添加到“照片”。它不会读取你的照片。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "當你選擇儲存時，Eventrail 會將活動海報或你製作的票根加入「照片」。它不會讀取你的照片。"
+            "value" : "當你選擇儲存時，Eventrail 會將活動海報、你製作的票根或活動護照的卡片加入「照片」。它不會讀取你的照片。"
           }
         }
       }

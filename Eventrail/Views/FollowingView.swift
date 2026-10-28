@@ -63,10 +63,9 @@ struct FollowingView: View {
     }
 
     /// Everything published for whoever is on screen, before the filter has
-    /// its say. Kept apart from ``events`` because the counts have
-    /// to be able to name what they are counting out of.
+    /// its say — what the halls are placed over while the list is held to an
+    /// area. A drawing reads it through ``listing`` instead.
     private var published: [Event] { followed.events(for: shown) }
-
 
     /// Holds a list to the chosen window and areas, then to the unread ones if
     /// that is asked for. An untouched filter narrows nothing, so this is the
@@ -361,7 +360,6 @@ struct FollowingView: View {
         guard let first = parts.first else { return Text("All") }
         return parts.dropFirst().reduce(first) { Text("\($0) · \($1)") }
     }
-
 
     /// One area, picked or let go of beside the others.
     private func picking(_ region: Region) -> Binding<Bool> {

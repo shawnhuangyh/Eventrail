@@ -390,7 +390,12 @@ struct MeView: View {
         if let failure = store.refreshFailure {
             return Text(verbatim: failure)
         }
-        if let lastRefreshed = settingsRows.first?.lastRefreshed {
+        // The later of Refresh and the app's own read of the account
+        // (``EventStore/refreshAccountIfStale()``), which moves only the
+        // second: said by Refresh's alone, a library read an hour ago by
+        // itself still said a fortnight.
+        if let row = settingsRows.first,
+           let lastRefreshed = [row.lastRefreshed, row.lastImported].compactMap({ $0 }).max() {
             return Text("Refreshed \(lastRefreshed, format: .relative(presentation: .named))")
         }
         return Text("Never refreshed")
