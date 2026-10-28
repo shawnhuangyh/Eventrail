@@ -2015,6 +2015,28 @@
         }
       }
     },
+    "across ^[%lld year](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld年にわたって"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跨 %lld 个年份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跨 %lld 個年份"
+          }
+        }
+      }
+    },
     "Add %@ Choice" : {
       "localizations" : {
         "ja" : {
@@ -5653,6 +5675,28 @@
         }
       }
     },
+    "First Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初回"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次"
+          }
+        }
+      }
+    },
     "Flyer" : {
       "comment" : "A tile on the ticket stub composer: print the event's flyer across the top of the ticket.",
       "localizations" : {
@@ -7560,6 +7604,28 @@
         }
       }
     },
+    "Most Recent" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近一次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近一次"
+          }
+        }
+      }
+    },
     "My Events" : {
       "localizations" : {
         "ja" : {
@@ -7977,6 +8043,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未發布活動"
+          }
+        }
+      }
+    },
+    "No events you went to." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加したイベントはありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有参加过的活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有參加過的活動。"
           }
         }
       }
@@ -12093,6 +12181,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示計入這裡的活動"
+          }
+        }
+      }
+    },
+    "Shows the events you went to" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加したイベントを表示します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示你参加过的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示你參加過的活動"
           }
         }
       }

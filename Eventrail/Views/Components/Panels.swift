@@ -97,13 +97,16 @@ extension View {
         }
     }
 
-    /// Registers a performer's page on this stack.
+    /// Registers a performer's page on this stack, and the reader's own
+    /// history with a performer or a hall (``AttendedHistoryView``), which
+    /// the performer's page opens.
     ///
     /// Each `NavigationStack` needs its own — a destination is not inherited
     /// across stacks, which is why the event sheet registers one too even
     /// though it was pushed from a screen that already had it.
     func performerDestination() -> some View {
         navigationDestination(for: PerformerLink.self) { PerformerView(link: $0) }
+            .navigationDestination(for: AttendedLink.self) { AttendedHistoryView(link: $0) }
     }
 
     /// Registers a venue's page on this stack, with the performer's — a hall's
