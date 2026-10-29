@@ -14,6 +14,11 @@ struct EventsView: View {
 
     @State private var filter: LibraryFilter = .upcoming
     @State private var grouping: Grouping = .date
+    /// What the search field holds — see ``LibrarySearch``. Not remembered.
+    @State private var query = ""
+    /// Whether the search field is up — by the magnifying glass in the bar,
+    /// or by pulling the list down to it.
+    @State private var isSearching = false
     @State private var openEvent: Event?
 
     /// Picking events to remove. Kept apart from `openEvent`: while this is on,
@@ -38,14 +43,28 @@ struct EventsView: View {
         /// Selecting reaches what the filter is showing and no further —
         /// "Upcoming" on screen must not quietly take the past with it.
         let ids: Set<Event.ID>
+        /// While the library is searched, how many each half finds.
+        let counts: [LibraryFilter: Int]?
 
-        init(library: [Event], filter: LibraryFilter, grouping: Grouping) {
+        /// `library` is the whole of it whatever is searched for: a clash or
+        /// a ticket awaited is the library's, not the search's.
+        init(library: [Event], filter: LibraryFilter, grouping: Grouping,
+             search: LibrarySearch, note: (Event) -> String) {
             self.library = library
-            groups = EventGroup.groups(of: library, filter: filter, grouping: grouping)
-            count = filter.rows(of: library).count
+            let found = search.isEmpty ? library : library.filter { search.matches($0, note: note($0)) }
+            groups = EventGroup.groups(of: found, filter: filter, grouping: grouping)
+            count = filter.rows(of: found).count
             ids = Set(groups.flatMap { $0.events.map(\.id) })
+            if search.isEmpty {
+                counts = nil
+            } else {
+                let upcoming = found.count(where: \.isUpcoming)
+                counts = [.upcoming: upcoming, .past: found.count - upcoming]
+            }
         }
     }
+
+    private var search: LibrarySearch { LibrarySearch(query) }
 
     private var chosen: [Event] {
         selection.compactMap { store.event(id: $0) }
@@ -68,7 +87,8 @@ struct EventsView: View {
     }
 
     var body: some View {
-        let shown = Shown(library: store.events(of: kept, where: \.inLibrary), filter: filter, grouping: grouping)
+        let shown = Shown(library: store.events(of: kept, where: \.inLibrary), filter: filter, grouping: grouping,
+                          search: search) { store.tracking(for: $0).note }
         let subtitle = subtitle(count: shown.count)
         NavigationStack {
             list(shown)
@@ -76,8 +96,21 @@ struct EventsView: View {
             .navigationTitle("My Events")
             .navigationSubtitle(subtitle)
             .largeTitleOnMac(Text("My Events"), subtitle: subtitle)
+            // The reader's own events, read here alone: nothing goes to
+            // Eventernote, which is the Search tab's. Under the title rather
+            // than at the foot, where the capsule and the tab bar are — and
+            // tucked away until asked for, since a field always there took
+            // the large title down to the bar's (iOS 26).
+            .searchable(text: $query, isPresented: $isSearching,
+                        placement: .navigationBarDrawer(displayMode: .automatic),
+                        prompt: Text("Title, performer, venue or note"))
             .pickingRows(isSelecting, selection: $selection, closing: $openEvent)
             .toolbar {
+                if !isSelecting {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Search", systemImage: "magnifyingglass") { isSearching = true }
+                    }
+                }
                 PencilToolbar(isSelecting: $isSelecting, title: "Select Events",
                               canSelect: shown.count > 0)
                 if isSelecting {
@@ -107,8 +140,10 @@ struct EventsView: View {
             .eventPane($openEvent)
             .venueDestination()
             .sheet(item: $reviewing) { TicketReviewView(events: $0.events).macSheetSize(.form) }
-            // Nothing is left selected behind a filter that no longer shows it.
+            // Nothing is left selected behind a filter or a search that no
+            // longer shows it.
             .onChange(of: filter) { selection.removeAll() }
+            .onChange(of: query) { selection.removeAll() }
             // Read again as the sheet closes, against the copy the sheet has
             // just read: the row was marked as it stood when tapped, and a
             // page that had changed since would otherwise come back Updated
@@ -131,14 +166,14 @@ struct EventsView: View {
             // have: the gap a month opens with is for the month before it.
             // Held still while picking, for the reason the capsule is put away.
             Section {
-                LibraryHalfPicker(filter: $filter)
+                LibraryHalfPicker(filter: $filter, counts: shown.counts)
                     .disabled(isSelecting)
                     .padding(.horizontal, 20)
                     .headRow(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
-                // Under the picker, on Past alone and not while picking: an
-                // import's history arrives with no tickets, and only a ticket
-                // says the reader went.
-                if filter == .past, !isSelecting {
+                // Under the picker, on Past alone and not while picking or
+                // searching: an import's history arrives with no tickets, and
+                // only a ticket says the reader went.
+                if filter == .past, !isSelecting, search.isEmpty {
                     let awaiting = awaitingTickets(in: shown.library)
                     if !awaiting.isEmpty {
                         TicketReviewPrompt(count: awaiting.count) {
@@ -302,7 +337,16 @@ struct EventsView: View {
         selection.removeAll()
     }
 
+    @ViewBuilder
     private var emptyState: some View {
+        if !search.isEmpty {
+            ContentUnavailableView.search(text: query.trimmingCharacters(in: .whitespacesAndNewlines))
+        } else {
+            nothingKept
+        }
+    }
+
+    private var nothingKept: some View {
         ContentUnavailableView {
             Label(
                 filter == .upcoming ? "No Upcoming Events" : "No Past Events",

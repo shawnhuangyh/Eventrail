@@ -63,11 +63,18 @@ func menuChoice<Value: Equatable>(_ selection: Binding<Value>,
 /// so that the two cannot drift apart.
 struct LibraryHalfPicker: View {
     @Binding var filter: LibraryFilter
+    /// How many each half holds, said beside its name — while My Events is
+    /// searched, so a match on the other side of the picker is not missed.
+    var counts: [LibraryFilter: Int]?
 
     var body: some View {
         Picker("Events", selection: $filter.animation(.snappy)) {
             ForEach(LibraryFilter.allCases) { option in
-                Text(option.label).tag(option)
+                if let count = counts?[option] {
+                    Text("\(Text(option.label)) \(count)").tag(option)
+                } else {
+                    Text(option.label).tag(option)
+                }
             }
         }
         .pickerStyle(.segmented)

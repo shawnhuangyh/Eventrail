@@ -229,6 +229,28 @@
         }
       }
     },
+    "%@ %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld"
+          }
+        }
+      }
+    },
     "%@ × %lld" : {
       "localizations" : {
         "ja" : {
@@ -13906,6 +13928,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間以現地時間顯示，%@"
+          }
+        }
+      }
+    },
+    "Title, performer, venue or note" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイトル・出演者・会場・メモ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标题、艺人、场馆或备注"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標題、藝人、場館或備註"
           }
         }
       }
