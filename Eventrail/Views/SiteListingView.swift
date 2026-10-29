@@ -5,7 +5,8 @@ import SwiftUI
 /// performers a member follows, is the Following tab; the fourth, the past,
 /// is what Search's own Date filter reads.
 nonisolated enum SiteListing: Hashable, CaseIterable {
-    /// Everything on today's date, on the site's calendar.
+    /// Everything on one date, on the site's calendar — today's, unless the
+    /// reader picks another.
     case today
     /// The hundred events most recently added to the site.
     case justAdded
@@ -75,8 +76,15 @@ struct SiteListingView: View {
     @Binding var filter: SearchFilter
 
     /// The site's day the list is of. Moved on as the app comes back to the
-    /// foreground on another one.
+    /// foreground on another one, unless the reader picked it.
     @State private var day = Event.siteDay(of: .now)
+    /// Whether the reader picked the day rather than leaving it at today's —
+    /// a day picked stays put as the site's midnight passes. Not remembered:
+    /// the list opens on today's.
+    @State private var isPickedDay = false
+    /// Whether the calendar is open over the list, and the day it shows.
+    @State private var isPickingDay = false
+    @State private var shownInPicker = Date.now
     @State private var feed = Feed<Event>()
     /// Whether anything — a kept copy or a read — is on screen yet.
     @State private var hasRead = false
@@ -105,10 +113,12 @@ struct SiteListingView: View {
     }
 
     /// What the copy on screen is filed under in ``ListingCache``: one per
-    /// area for today's, carrying the day it was read for — see ``show(_:)``.
+    /// area for today's, carrying the day it was read for — see ``show(_:)``
+    /// — and one beside it for a day the reader picked, so looking at another
+    /// day does not push today's out.
     private var cacheKey: String {
         switch listing {
-        case .today: "site/today/\(filter.area?.areaID ?? 0)"
+        case .today: "site/\(isPickedDay ? "day" : "today")/\(filter.area?.areaID ?? 0)"
         case .justAdded: "site/new"
         }
     }
@@ -153,8 +163,8 @@ struct SiteListingView: View {
         // Over the tab bar, in the middle, as Following's stands.
         .safeAreaInset(edge: .bottom) { controls }
         .washBackground()
-        .navigationTitle(listing.title)
-        .navigationSubtitle(listing.detail(on: day))
+        .navigationTitle(title)
+        .navigationSubtitle(subtitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { menu }
         .eventPane($openEvent)
@@ -164,7 +174,7 @@ struct SiteListingView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             let today = Event.siteDay(of: .now)
-            if listing == .today, today != day {
+            if listing == .today, !isPickedDay, today != day {
                 day = today
             } else if let readAt, readAt.timeIntervalSinceNow < -Freshness.window {
                 Task { await refresh(byHand: false) }
@@ -176,6 +186,24 @@ struct SiteListingView: View {
             ListingCache.shared.extend(cacheKey, as: Date.self, with: feed)
         }
         .environment(\.imagesCheckedSince, imagesCheckedSince)
+    }
+
+    /// "Today" while the list is today's, and the date the reader picked
+    /// otherwise, its weekday under it — both on the site's calendar.
+    private var title: Text {
+        guard isPickedDay else { return Text(listing.title) }
+        return Text(day.formatted(Self.onSiteClock(.dateTime.year().month(.abbreviated).day())))
+    }
+
+    private var subtitle: Text {
+        guard isPickedDay else { return listing.detail(on: day) }
+        return Text(day.formatted(Self.onSiteClock(.dateTime.weekday(.wide))))
+    }
+
+    private static func onSiteClock(_ style: Date.FormatStyle) -> Date.FormatStyle {
+        var style = style
+        style.timeZone = Event.publishedZone
+        return style
     }
 
     // MARK: - Loading
@@ -358,9 +386,19 @@ struct SiteListingView: View {
 
     /// The page this list was read from, and reading it again — the group a
     /// performer's or a hall's ⋯ menu ends on. In the navigation bar, since
-    /// the foot of the screen is the capsule's and the tab bar's.
+    /// the foot of the screen is the capsule's and the tab bar's. Before it,
+    /// on the dated list, the calendar that picks its day.
     @ToolbarContentBuilder
     private var menu: some ToolbarContent {
+        if listing == .today {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Choose Date", systemImage: "calendar") {
+                    shownInPicker = day
+                    isPickingDay = true
+                }
+                .popover(isPresented: $isPickingDay) { dayPicker }
+            }
+        }
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 EventernotePageItems(page: pageURL, isRefreshing: running != nil) {
@@ -372,6 +410,52 @@ struct SiteListingView: View {
             }
             .menuOrder(.fixed)
         }
+    }
+}
+
+extension SiteListingView {
+    /// A calendar on the site's clock — a day tapped is that day in Japan,
+    /// wherever the reader is — and Today to go back. A day tapped is taken
+    /// at once, as the results day's calendar takes one.
+    private var dayPicker: some View {
+        VStack(spacing: 0) {
+            DatePicker("Date", selection: Binding(
+                get: { shownInPicker },
+                set: { picked in
+                    shownInPicker = picked
+                    choose(picked)
+                }
+            ), displayedComponents: .date)
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            .tint(.brandTint)
+            .environment(\.timeZone, Event.publishedZone)
+
+            HStack {
+                Button("Today") {
+                    choose(.now)
+                    isPickingDay = false
+                }
+                .disabled(!isPickedDay)
+                Spacer()
+                Button("Done", systemImage: "checkmark") { isPickingDay = false }
+                    .labelStyle(.iconOnly)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 4)
+        }
+        .padding(12)
+        .frame(width: 340)
+        .presentationCompactAdaptation(.popover)
+    }
+
+    /// The list moved to the site's day `date` falls on — today's own slot
+    /// again where that is today.
+    private func choose(_ date: Date) {
+        let picked = Event.siteDay(of: date)
+        isPickedDay = picked != Event.siteDay(of: .now)
+        day = picked
     }
 }
 

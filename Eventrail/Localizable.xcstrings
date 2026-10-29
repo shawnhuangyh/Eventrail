@@ -3117,6 +3117,28 @@
         }
       }
     },
+    "Choose Date" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付を選択"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择日期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇日期"
+          }
+        }
+      }
+    },
     "Choose from Photos" : {
       "localizations" : {
         "ja" : {
