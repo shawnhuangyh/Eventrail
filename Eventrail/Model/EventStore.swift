@@ -1019,6 +1019,17 @@ final class EventStore {
         return imported
     }
 
+    /// Reads an event known only by its id — a link pasted into Search — and
+    /// holds on to it as a search result is held, the read written down, so
+    /// its sheet opens on it without asking the site again.
+    func readEvent(id: Event.ID) async throws -> Event {
+        let asked = Date.now
+        let imported = try await client.event(id: id)
+        apply(imported, asked: asked)
+        save()
+        return event(id: id) ?? imported
+    }
+
     /// Whether an event's own page is worth reading again by itself — which is
     /// what an event's sheet asks as it opens.
     ///

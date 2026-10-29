@@ -2,8 +2,9 @@ import SwiftData
 import SwiftUI
 
 /// Searches publicly accessible Eventernote pages — its events, its
-/// performers and its halls — and opens the lists the site keeps of its own.
-/// Nothing tagged here is written back to Eventernote.
+/// performers and its halls — and opens the lists the site keeps of its own,
+/// and the page a link pasted into the field points at. Nothing tagged here is
+/// written back to Eventernote.
 ///
 /// Event results can be narrowed — ahead or past, an area — and run either way
 /// round by date, from the menu in the capsule over the search field; see
@@ -44,6 +45,27 @@ struct SearchView: View {
     /// own filter lasts from one search to the next — see ``SiteListingView``.
     @State private var todayFilter = SearchFilter()
     @State private var justAddedFilter = SearchFilter()
+    /// What the link in the field was read as — see ``readLink(_:)``.
+    @State private var linkRead: LinkRead?
+
+    /// What a link pasted into the field points at, read off the site.
+    private enum LinkTarget {
+        case event(Event)
+        case performer(PerformerProfile)
+        case venue(PlaceListing)
+    }
+
+    /// One link's read, kept with the link it was of, so a read of the last
+    /// link is never shown under the next.
+    private struct LinkRead {
+        enum Outcome {
+            case found(LinkTarget)
+            case failed(String)
+        }
+
+        let link: EventernoteLink
+        let outcome: Outcome
+    }
 
     /// Everything a search is made of: any of it changing starts a new one.
     /// The filter as a whole, not only what the site is asked: what is held
@@ -63,11 +85,17 @@ struct SearchView: View {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// The Eventernote page the field holds a link to, if it does — opened
+    /// rather than searched for (``EventernoteLink``).
+    private var link: EventernoteLink? { EventernoteLink(in: term) }
+
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
                 if term.isEmpty {
                     startingPoints
+                } else if let link {
+                    linkResult(link)
                 } else {
                     results
                 }
@@ -76,7 +104,7 @@ struct SearchView: View {
             // stops short of the field, so the capsule rests just above it,
             // and the rows scroll clear of it rather than under it.
             .safeAreaInset(edge: .bottom) {
-                if scope == .events, !term.isEmpty {
+                if scope == .events, !term.isEmpty, link == nil {
                     controls
                 }
             }
@@ -91,7 +119,7 @@ struct SearchView: View {
             .searchable(text: $query, prompt: Text("Search Eventernote events"))
             .searchPresentationToolbarBehavior(searchToolbarBehavior)
             .modifier(SearchScopes(scope: $scope))
-            .onSubmit(of: .search) { store.remember(search: term) }
+            .onSubmit(of: .search) { if link == nil { store.remember(search: term) } }
             .navigationDestination(for: SiteListing.self) { listing in
                 switch listing {
                 case .today: SiteListingView(listing: listing, filter: $todayFilter)
@@ -108,6 +136,7 @@ struct SearchView: View {
             // Beside the results on an open iPhone Duo.
             .eventPane($openEvent)
             .task(id: Request(term: term, scope: scope, filter: filter, order: order)) { await search() }
+            .task(id: link) { await readLink(link) }
             .onChange(of: request.wrappedValue, initial: true) { takeRequest() }
         }
     }
@@ -122,7 +151,7 @@ struct SearchView: View {
         path = NavigationPath()
         scope = .events
         query = handed
-        store.remember(search: term)
+        if link == nil { store.remember(search: term) }
     }
 
     /// The bar keeps its title while a search is up on an iPad. Left to hide
@@ -143,7 +172,8 @@ struct SearchView: View {
         let order = order
         fruitlessPages = 0
         isSkipping = false
-        guard !term.isEmpty else {
+        // A link is opened rather than searched for — see ``readLink(_:)``.
+        guard !term.isEmpty, EventernoteLink(in: term) == nil else {
             events.clear()
             performers.clear()
             venues.clear()
@@ -183,6 +213,66 @@ struct SearchView: View {
             await venues.load { page in
                 try await EventernoteClient.shared.searchVenues(keyword: term, page: page)
             }
+        }
+    }
+
+    // MARK: - A link
+
+    /// Reads what a link in the field points at — the event's page, the
+    /// performer's, the hall's — for a row to open it by. An event already
+    /// held is shown as held; anything else is asked for, after the pause a
+    /// search takes, since `task(id:)` cancels this as the field changes.
+    private func readLink(_ link: EventernoteLink?) async {
+        guard let link else { return }
+        try? await Task.sleep(for: .milliseconds(350))
+        guard !Task.isCancelled else { return }
+        do {
+            let target = try await target(of: link)
+            guard !Task.isCancelled else { return }
+            linkRead = LinkRead(link: link, outcome: .found(target))
+        } catch {
+            guard !Task.isCancelled else { return }
+            linkRead = LinkRead(link: link, outcome: .failed(error.localizedDescription))
+        }
+    }
+
+    private func target(of link: EventernoteLink) async throws -> LinkTarget {
+        switch link {
+        case .event(let id):
+            if let held = store.event(id: id) { return .event(held) }
+            return .event(try await store.readEvent(id: id))
+        case .performer(let slug, let id):
+            return .performer(try await EventernoteClient.shared.performer(slug: slug, id: id))
+        case .venue(let id):
+            let venue = try await EventernoteClient.shared.venue(id: id)
+            return .venue(PlaceListing(id: venue.id, name: venue.name))
+        }
+    }
+
+    /// The one row a link comes to, as a search would have listed it.
+    @ViewBuilder
+    private func linkResult(_ link: EventernoteLink) -> some View {
+        if let read = linkRead, read.link == link {
+            switch read.outcome {
+            case .failed(let failure):
+                SearchFailure(message: failure) {
+                    linkRead = nil
+                    await readLink(link)
+                }
+            case .found(let target):
+                LazyVStack(alignment: .leading, spacing: 9) {
+                    SectionLabel(label: "From an Eventernote link")
+                    switch target {
+                    case .event(let event): SearchResultRow(event: event) { openEvent = event }
+                    case .performer(let performer): PerformerRow(performer: performer)
+                    case .venue(let place): VenueRow(place: place)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+        } else {
+            SearchProgress()
         }
     }
 

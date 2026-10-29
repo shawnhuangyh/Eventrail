@@ -438,4 +438,22 @@ struct EventernotePagesTests {
     @Test func aPageWithoutTheDirectoryIsNoDirectory() {
         #expect(EventernotePages.performerIndex(in: "<html>maintenance</html>") == nil)
     }
+
+    // MARK: - A performer's own page
+
+    @Test func readsWhoAPerformersPageIsAbout() throws {
+        let html = """
+            <div class="mod_actors_detail">
+              <div class="gb_blur_title" >
+                <div class="overlay"></div>
+                <div class="title"><h1>JO(&amp;TEAM)</h1></div>
+                <div class="title2"><h2>じょー</h2></div>
+              </div>
+            """
+        let performer = try #require(EventernotePages.performer(in: html, id: 95518, slug: "JO%28%26TEAM%29"))
+        #expect(performer.name == "JO(&TEAM)")
+        #expect(performer.reading == "じょー")
+        #expect(performer.slug == "JO%28%26TEAM%29")
+        #expect(EventernotePages.performer(in: "<html>maintenance</html>", id: 1, slug: "x") == nil)
+    }
 }

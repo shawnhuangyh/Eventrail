@@ -374,6 +374,20 @@ nonisolated enum EventernotePages {
         return (String(listed[..<open.lowerBound]), fans)
     }
 
+    // MARK: - A performer's own page
+
+    /// `/actors/{slug}/{id}`: who the page is about, from its heading — the
+    /// name in its `h1`, the reading under it. The page's listing is the
+    /// performer's events page's to read.
+    static func performer(in html: String, id: Int, slug: String) -> PerformerProfile? {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="mod_actors_detail">"#),
+              let name = cursor.text(after: #"<div class="title"><h1>"#, upTo: "</h1>")
+        else { return nil }
+        let reading = cursor.text(after: #"<div class="title2"><h2>"#, upTo: "</h2>")
+        return PerformerProfile(id: id, name: name, reading: reading, fanCount: nil, slug: slug)
+    }
+
     // MARK: - A member's own page
 
     /// Reads `/users/{handle}`.

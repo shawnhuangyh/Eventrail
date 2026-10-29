@@ -106,6 +106,16 @@ nonisolated struct EventernoteClient: Sendable {
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
+    /// A performer's own page, for who it is: their name and its reading,
+    /// as the page heads itself — what a link to it carries none of.
+    @concurrent func performer(slug: String, id: Int) async throws -> PerformerProfile {
+        let html = try await html(at: "/actors/\(slug)/\(id)", query: [:], isPreEncoded: true)
+        guard let performer = EventernotePages.performer(in: html, id: id, slug: slug) else {
+            throw Failure.unreadable
+        }
+        return performer
+    }
+
     // MARK: - The performers' directory
 
     /// The hundred performers with the most fans, the most first — the
@@ -245,8 +255,15 @@ nonisolated struct EventernoteClient: Sendable {
     /// address and capacity the detail sheet prints — read once a run where a
     /// run hands in its `halls`.
     @concurrent func detail(for event: Event, halls: HallPages? = nil) async throws -> Event {
-        let page = try await html(at: "/events/\(event.id)", query: [:])
-        guard var imported = EventernotePages.event(in: page, id: event.id) else {
+        event.merging(try await self.event(id: event.id, halls: halls))
+    }
+
+    /// One event's own page as it reads, and its hall's page behind it, with
+    /// nothing held to fold it into — an event known only by its id, from a
+    /// link pasted into Search (``EventernoteLink``).
+    @concurrent func event(id: Event.ID, halls: HallPages? = nil) async throws -> Event {
+        let page = try await html(at: "/events/\(id)", query: [:])
+        guard var imported = EventernotePages.event(in: page, id: id) else {
             throw Failure.unreadable
         }
 
@@ -269,7 +286,7 @@ nonisolated struct EventernoteClient: Sendable {
             } catch {}
         }
         imported.readAt = .now
-        return event.merging(imported)
+        return imported
     }
 
     /// What an event's read takes from its hall's page.
