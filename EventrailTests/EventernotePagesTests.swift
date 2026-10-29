@@ -439,7 +439,41 @@ struct EventernotePagesTests {
         #expect(EventernotePages.performerIndex(in: "<html>maintenance</html>") == nil)
     }
 
-    // MARK: - A performer's own page
+    // MARK: - The venues' directory and a performer's own page
+
+    @Test func readsThePrefecturesWithTheirCounts() {
+        let html = """
+            <div class="gb_listview">
+            <ul class="clearfix">
+                <li><a href="/places/prefecture/1">北海道 (536)</a></li>
+                <li><a href="/places/prefecture/13">東京都 (6151)</a></li>
+                <li><a href="/places/prefecture/90">海外 (1541)</a></li>
+            </ul>
+            </div>
+            """
+        let prefectures = EventernotePages.prefectures(in: html)
+        #expect(prefectures.map(\.name) == ["北海道", "東京都", "海外"])
+        #expect(prefectures.map(\.count) == [536, 6151, 1541])
+        #expect(prefectures.last?.id == PrefectureListing.abroadID)
+        #expect(EventernotePages.prefectures(in: "<html>maintenance</html>").isEmpty)
+    }
+
+    /// A prefecture's list opens on halls filed with no name; they are passed
+    /// over rather than ending the list.
+    @Test func aHallWithNoNameIsPassedOver() throws {
+        let html = """
+            <h1 class="gb_subtitle">「東京都」のイベント会場一覧</h1>
+            <div class="gb_listview">
+            <ul class="clearfix">
+                  <li><a href="/places/27937"></a></span></li>
+                  <li><a href="/places/5185">#HiveShibuya</a></span></li>
+                  <li><a href="/places/12452">～tamari bar～ SHAKE</a></span></li>
+            </ul>
+            </div>
+            """
+        let page = try EventernotePages.places(in: html, page: 1, pageSize: .max)
+        #expect(page.items.map(\.id) == [5185, 12452])
+    }
 
     @Test func readsWhoAPerformersPageIsAbout() throws {
         let html = """

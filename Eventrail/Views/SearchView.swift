@@ -132,6 +132,12 @@ struct SearchView: View {
                 case .initial(let initial): PerformerInitialView(initial: initial)
                 }
             }
+            .navigationDestination(for: VenueDirectory.self) { directory in
+                switch directory {
+                case .browse: VenueDirectoryView()
+                case .prefecture(let prefecture): VenuePrefectureView(prefecture: prefecture)
+                }
+            }
             .venueDestination()
             // Beside the results on an open iPhone Duo.
             .eventPane($openEvent)
@@ -588,9 +594,9 @@ struct SearchView: View {
     }
 
     /// The lists the site keeps of its own — what is on today, what was added
-    /// last, and its directory of performers. Above the recent searches, so
-    /// they stay where they are however many of those there are. Nothing is
-    /// read until one is opened.
+    /// last, and its directories of performers and of halls. Above the recent
+    /// searches, so they stay where they are however many of those there are.
+    /// Nothing is read until one is opened.
     private var siteListings: some View {
         VStack(spacing: 9) {
             ForEach(SiteListing.allCases, id: \.self) { listing in
@@ -604,6 +610,12 @@ struct SearchView: View {
             NavigationLink(value: PerformerDirectory.browse) {
                 StartingPointRow(symbol: "music.mic", title: Text("Performers"),
                                  detail: Text("Popular, new and by kana"))
+            }
+            .buttonStyle(.plain)
+            .panel()
+            NavigationLink(value: VenueDirectory.browse) {
+                StartingPointRow(symbol: "building.2", title: Text("Venues"),
+                                 detail: Text("By prefecture"))
             }
             .buttonStyle(.plain)
             .panel()
@@ -715,32 +727,6 @@ struct SearchAreaMenu: View {
             Label("Area", systemImage: "map")
             Text(area?.label ?? "Anywhere")
         }
-    }
-}
-
-/// A hall the venue search found. Opening one reads its own page.
-private struct VenueRow: View {
-    let place: PlaceListing
-
-    var body: some View {
-        NavigationLink(value: VenueLink.place(place)) {
-            HStack(spacing: 13) {
-                Image(systemName: "mappin.and.ellipse")
-                    .scalingFont(size: 13, weight: .semibold)
-                    .foregroundStyle(Color.brandTint)
-                    .frame(width: 18)
-                Text(place.name)
-                    .scalingFont(size: 14.5, weight: .semibold)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .scalingFont(size: 11, weight: .semibold)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(13)
-        }
-        .buttonStyle(.plain)
-        .panel()
     }
 }
 

@@ -375,6 +375,31 @@ nonisolated struct EventernoteClient: Sendable {
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
+    // MARK: - The venues' directory
+
+    /// Every prefecture with how many halls the site files under it, and 海外
+    /// — the site's own directory of venues.
+    @concurrent func prefectures() async throws -> [PrefectureListing] {
+        let html = try await html(at: Self.venueDirectoryPath, query: [:])
+        let prefectures = EventernotePages.prefectures(in: html)
+        guard !prefectures.isEmpty else { throw Failure.unreadable }
+        return prefectures
+    }
+
+    /// Every hall the site files under one prefecture, in its order. One page
+    /// however many, as a kana of the performers' directory is: 東京都 is six
+    /// thousand halls, half a megabyte — so only read when the reader opens it.
+    @concurrent func venues(inPrefecture id: Int) async throws -> [PlaceListing] {
+        let html = try await html(at: Self.prefecturePath(id), query: [:])
+        return try EventernotePages.places(in: html, page: 1, pageSize: .max).items
+    }
+
+    static var venueDirectoryURL: URL? { url(at: venueDirectoryPath, query: [:]) }
+    static func venuesURL(inPrefecture id: Int) -> URL? { url(at: prefecturePath(id), query: [:]) }
+
+    private static let venueDirectoryPath = "/places"
+    private static func prefecturePath(_ id: Int) -> String { "/places/prefecture/\(id)" }
+
     // MARK: - Fetching
 
     /// The address of one of the site's pages — what is asked for, and what a

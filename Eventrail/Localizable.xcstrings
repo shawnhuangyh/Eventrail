@@ -847,6 +847,28 @@
         }
       }
     },
+    "%@, ^[%lld venue](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@、会場%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 个场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 個場館"
+          }
+        }
+      }
+    },
     "%lld events" : {
       "localizations" : {
         "ja" : {
@@ -2958,6 +2980,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按假名"
+          }
+        }
+      }
+    },
+    "By prefecture" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "都道府県別"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按都道府县浏览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按都道府縣瀏覽"
           }
         }
       }
@@ -5450,6 +5494,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eventernote 上的全部藝人，依讀音的首個假名分類。"
+          }
+        }
+      }
+    },
+    "Every venue on Eventernote in %@, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、%@の会場すべてです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上，位于%@的全部场馆。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上，位於%@的全部場館。"
+          }
+        }
+      }
+    },
+    "Every venue on Eventernote, filed by the prefecture it is in." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteの会場すべてを、所在する都道府県で分けています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部场馆，按所在都道府县分类。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部場館，依所在都道府縣分類。"
           }
         }
       }

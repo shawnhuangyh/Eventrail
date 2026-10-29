@@ -498,6 +498,33 @@ struct PerformerRow: View {
     }
 }
 
+/// A hall out of one of the site's lists — the venue search, a prefecture of
+/// its directory. Opening one reads its own page.
+struct VenueRow: View {
+    let place: PlaceListing
+
+    var body: some View {
+        NavigationLink(value: VenueLink.place(place)) {
+            HStack(spacing: 13) {
+                Image(systemName: "mappin.and.ellipse")
+                    .scalingFont(size: 13, weight: .semibold)
+                    .foregroundStyle(Color.brandTint)
+                    .frame(width: 18)
+                Text(place.name)
+                    .scalingFont(size: 14.5, weight: .semibold)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .scalingFont(size: 11, weight: .semibold)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(13)
+        }
+        .buttonStyle(.plain)
+        .panel()
+    }
+}
+
 /// One followed performer: who they are, what they have coming, and the mark
 /// that stops following them.
 ///

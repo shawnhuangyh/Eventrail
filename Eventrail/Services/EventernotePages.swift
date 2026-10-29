@@ -56,7 +56,7 @@ nonisolated struct EventernoteProfile: Hashable, Sendable {
 ///
 /// Name and id and nothing else: the search rows publish no address, which is
 /// why placing a venue takes the hall's own page as well.
-nonisolated struct PlaceListing: Identifiable, Hashable, Sendable {
+nonisolated struct PlaceListing: Identifiable, Hashable, Codable, Sendable {
     let id: Int
     let name: String
 }
@@ -66,6 +66,18 @@ nonisolated struct PlaceListing: Identifiable, Hashable, Sendable {
 nonisolated struct KanaInitial: Hashable, Codable, Sendable {
     let kana: String
     let count: Int
+}
+
+/// One prefecture the site files halls under, as its directory of venues
+/// (`/places`) lists it: 東京都, its number on the site, and how many halls.
+/// The site's 海外 is one of them, numbered 90.
+nonisolated struct PrefectureListing: Identifiable, Hashable, Codable, Sendable {
+    let id: Int
+    let name: String
+    let count: Int
+
+    /// The site's number for the halls abroad.
+    static let abroadID = 90
 }
 
 /// The site's performer directory, `/actors`: the performers most recently
@@ -306,9 +318,10 @@ nonisolated enum EventernotePages {
         var rows = HTMLCursor(list)
         var places: [PlaceListing] = []
         while rows.advance(past: #"<a href="/places/"#) {
-            guard let path = rows.take(upTo: "\""), let id = Int(path),
-                  let name = rows.text(after: ">", upTo: "</a>")
-            else { break }
+            guard let path = rows.take(upTo: "\""), let id = Int(path) else { break }
+            // A hall filed with no name — a prefecture's list opens on two —
+            // is passed over rather than ending the list there.
+            guard let name = rows.text(after: ">", upTo: "</a>") else { continue }
             places.append(PlaceListing(id: id, name: name))
         }
         return places
@@ -326,6 +339,28 @@ nonisolated enum EventernotePages {
                                page: page, pageSize: pageSize)
     }
 
+    // MARK: - The venues' directory
+
+    /// `/places`: every prefecture — 北海道 (536) — with how many halls the
+    /// site files under it, in the site's order, 海外 last.
+    static func prefectures(in html: String) -> [PrefectureListing] {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="gb_listview">"#), let list = cursor.take(upTo: "</ul>") else {
+            return []
+        }
+        var rows = HTMLCursor(list)
+        var prefectures: [PrefectureListing] = []
+        while rows.advance(past: #"<a href="/places/prefecture/"#) {
+            guard let path = rows.take(upTo: "\""), let id = Int(path),
+                  let listed = rows.text(after: ">", upTo: "</a>")
+            else { break }
+            let (name, count) = splitCount(listed)
+            guard !name.isEmpty, let count else { continue }
+            prefectures.append(PrefectureListing(id: id, name: name, count: count))
+        }
+        return prefectures
+    }
+
     // MARK: - The performers' directory
 
     /// `/actors`: the performers most recently added — 楠ゆい(READY TO KISS) (0),
@@ -341,7 +376,7 @@ nonisolated enum EventernotePages {
                 guard let path = row.take(upTo: "\""), let id = Int(path.split(separator: "/").last ?? ""),
                       let listed = row.text(after: ">", upTo: "</a>")
                 else { continue }
-                let (name, fans) = splitFanCount(listed)
+                let (name, fans) = splitCount(listed)
                 guard !name.isEmpty else { continue }
                 newest.append(PerformerProfile(id: id, name: name, reading: nil, fanCount: fans,
                                                slug: String(path.split(separator: "/").dropLast().joined(separator: "/"))))
@@ -363,15 +398,15 @@ nonisolated enum EventernotePages {
         return PerformerIndex(newest: newest, initials: initials)
     }
 
-    /// "楠ゆい(READY TO KISS) (0)" — a name, and the fan count the directory
-    /// sets after it in parentheses of its own.
-    private static func splitFanCount(_ listed: String) -> (name: String, fans: Int?) {
+    /// "楠ゆい(READY TO KISS) (0)", "東京都 (6151)" — a name, and the count
+    /// a directory sets after it in parentheses of its own.
+    private static func splitCount(_ listed: String) -> (name: String, count: Int?) {
         guard listed.hasSuffix(")"), let open = listed.range(of: " (", options: .backwards) else {
             return (listed, nil)
         }
-        let count = listed[open.upperBound ..< listed.index(before: listed.endIndex)]
-        guard let fans = Int(count) else { return (listed, nil) }
-        return (String(listed[..<open.lowerBound]), fans)
+        let figure = listed[open.upperBound ..< listed.index(before: listed.endIndex)]
+        guard let count = Int(figure) else { return (listed, nil) }
+        return (String(listed[..<open.lowerBound]), count)
     }
 
     // MARK: - A performer's own page

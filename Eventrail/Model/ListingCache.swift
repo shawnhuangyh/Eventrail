@@ -25,13 +25,18 @@ nonisolated struct CachedListing<Subject: Codable & Sendable>: Codable, Sendable
     var isFresh: Bool { readAt.timeIntervalSinceNow > -ListingCache.freshness }
 }
 
-/// One of the site's lists of performers as this device last read it — the
-/// ranking, the directory's own page, or one kana of it (see
-/// ``PerformerDirectoryView``). Kept beside the listings, by the same rules.
+/// One page of the site's directories as this device last read it: of
+/// performers — the ranking, the directory's own page, one kana of it (see
+/// ``PerformerDirectoryView``) — or of halls — its prefectures, or one of them
+/// (``VenueDirectoryView``). Kept beside the listings, by the same rules.
 nonisolated struct CachedDirectory: Codable, Sendable {
     var performers: [PerformerProfile] = []
     /// The kana the directory files readings under, on its own page alone.
     var initials: [KanaInitial] = []
+    var places: [PlaceListing] = []
+    /// The prefectures the venues' directory files halls under, on its own
+    /// page alone.
+    var prefectures: [PrefectureListing] = []
     var readAt = Date.now
 
     var isFresh: Bool { readAt.timeIntervalSinceNow > -ListingCache.freshness }
@@ -94,7 +99,8 @@ final class ListingCache {
         try? JSONEncoder().encode(entry).write(to: url, options: .atomic)
     }
 
-    /// A list of performers as this device last read it — see ``CachedDirectory``.
+    /// A page of the site's directories as this device last read it — see
+    /// ``CachedDirectory``.
     func directory(for key: String) -> CachedDirectory? {
         guard let data = try? Data(contentsOf: url(for: key)) else { return nil }
         return try? JSONDecoder().decode(CachedDirectory.self, from: data)
