@@ -289,6 +289,14 @@ nonisolated struct EventernoteClient: Sendable {
         return EventernotePages.places(in: results).first { $0.name == name }
     }
 
+    /// The halls the site files under names matching `keyword`, a page at a
+    /// time — Search's Venues. Name and id alone: the search prints no address.
+    @concurrent func searchVenues(keyword: String, page: Int = 1) async throws -> EventernotePage<PlaceListing> {
+        let html = try await html(at: "/places/search",
+                                  query: ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)"])
+        return try EventernotePages.places(in: html, page: page, pageSize: Self.pageSize)
+    }
+
     /// One hall's own page: where it is, how many it holds, and the walk from
     /// the station.
     @concurrent func venue(id: Int) async throws -> VenueProfile {

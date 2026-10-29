@@ -368,4 +368,33 @@ struct EventernotePagesTests {
     @Test func aPageWithoutAProfileIsNotAProfile() {
         #expect(EventernotePages.profile(in: "<html></html>", handle: "x") == nil)
     }
+
+    // MARK: - Search's venues
+
+    @Test func readsAPageOfVenueSearchWithItsCount() throws {
+        let html = """
+            <p class="t2">1523件見つかりました。<span class="pager"></span></p>
+            <div class="gb_listview">
+            <div class="gb_pager"><table><tr><td><span>1</span></td></tr></table></div>
+            <ul class="clearfix">
+            <li><a href="/places/949">飯能市市民会館 小ホール</a></span></li>
+            <li><a href="/places/2090">飯能市市民会館 大ホール</a></span></li>
+            </ul></div>
+            """
+        let page = try EventernotePages.places(in: html, page: 2, pageSize: 30)
+        #expect(page.items.map(\.id) == [949, 2090])
+        #expect(page.items.first?.name == "飯能市市民会館 小ホール")
+        #expect(page.total == 1523)
+        #expect(page.hasMore)
+    }
+
+    /// A venue search the site found nothing for is an answer; a page that is
+    /// not the site's own is not.
+    @Test func anEmptyVenueSearchIsEmptyAndAForeignPageIsUnreadable() throws {
+        let empty = #"<p class="t2">0件見つかりました。</p><ul class="gb_foot_menu"></ul>"#
+        #expect(try EventernotePages.places(in: empty, page: 1, pageSize: 30).items.isEmpty)
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.places(in: "<html>maintenance</html>", page: 1, pageSize: 30)
+        }
+    }
 }

@@ -59,9 +59,9 @@ enum Grouping: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// Which of Eventernote's two searches the Search tab is running.
+/// Which of Eventernote's three searches the Search tab is running.
 enum SearchScope: String, CaseIterable, Identifiable, Hashable {
-    case events, performers
+    case events, performers, venues
 
     var id: Self { self }
 
@@ -69,6 +69,7 @@ enum SearchScope: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .events: "Events"
         case .performers: "Performers"
+        case .venues: "Venues"
         }
     }
 }

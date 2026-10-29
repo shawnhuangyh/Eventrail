@@ -56,7 +56,7 @@ nonisolated struct EventernoteProfile: Hashable, Sendable {
 ///
 /// Name and id and nothing else: the search rows publish no address, which is
 /// why placing a venue takes the hall's own page as well.
-nonisolated struct PlaceListing: Hashable, Sendable {
+nonisolated struct PlaceListing: Identifiable, Hashable, Sendable {
     let id: Int
     let name: String
 }
@@ -298,6 +298,18 @@ nonisolated enum EventernotePages {
             places.append(PlaceListing(id: id, name: name))
         }
         return places
+    }
+
+    /// The venue search, a page of it with the count it printed — what
+    /// Search's Venues lists. The rows read as ``places(in:)`` reads them.
+    ///
+    /// Throws, as every listing does, where the rows are missing from a page
+    /// that is not the site's own empty search — see ``confirmsNoRows(_:)``.
+    static func places(in html: String, page: Int, pageSize: Int) throws -> EventernotePage<PlaceListing> {
+        let places = places(in: html)
+        if places.isEmpty { try confirmsNoRows(html) }
+        return EventernotePage(items: places, total: totalCount(in: html) ?? places.count,
+                               page: page, pageSize: pageSize)
     }
 
     // MARK: - A member's own page

@@ -1,8 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// Searches publicly accessible Eventernote pages. Nothing tagged here is
-/// written back to Eventernote.
+/// Searches publicly accessible Eventernote pages — its events, its
+/// performers and its halls — and opens the lists the site keeps of its own.
+/// Nothing tagged here is written back to Eventernote.
 ///
 /// Event results can be narrowed — ahead or past, an area — and run either way
 /// round by date, from the menu in the capsule over the search field; see
@@ -20,6 +21,7 @@ struct SearchView: View {
     @State private var scope: SearchScope = .events
     @State private var events = Feed<Event>()
     @State private var performers = Feed<PerformerProfile>()
+    @State private var venues = Feed<PlaceListing>()
     @State private var openEvent: Event?
     /// What is pushed over the results — one of the site's lists, a
     /// performer, a hall — so a search handed in from outside the app can go
@@ -78,8 +80,8 @@ struct SearchView: View {
                     controls
                 }
             }
-            // Beside an open iPhone Duo's fold, events or performers is
-            // chosen here rather than in the system's bar — see
+            // Beside an open iPhone Duo's fold, events, performers or venues
+            // is chosen here rather than in the system's bar — see
             // ``SearchScopes``. Inside the search field's reach, so it hears
             // whether the search is up.
             .safeAreaBar(edge: .top) { BesideFoldScopes(scope: $scope) }
@@ -138,6 +140,7 @@ struct SearchView: View {
         guard !term.isEmpty else {
             events.clear()
             performers.clear()
+            venues.clear()
             return
         }
         try? await Task.sleep(for: .milliseconds(350))
@@ -170,6 +173,10 @@ struct SearchView: View {
             await performers.load { page in
                 try await EventernoteClient.shared.searchPerformers(keyword: term, page: page)
             }
+        case .venues:
+            await venues.load { page in
+                try await EventernoteClient.shared.searchVenues(keyword: term, page: page)
+            }
         }
     }
 
@@ -180,6 +187,7 @@ struct SearchView: View {
         switch scope {
         case .events: eventResults
         case .performers: performerResults
+        case .venues: venueResults
         }
     }
 
@@ -398,6 +406,37 @@ struct SearchView: View {
         }
     }
 
+    /// The halls the site files under the term, a page at a time — each one's
+    /// own page a tap away, where its address, its map and what is on there
+    /// are read.
+    @ViewBuilder
+    private var venueResults: some View {
+        if venues.isLoading {
+            SearchProgress()
+        } else if let failure = venues.failure {
+            SearchFailure(message: failure) { await search() }
+        } else if venues.isEmptyResult {
+            ContentUnavailableView.search(text: term)
+                .padding(.top, 48)
+        } else {
+            LazyVStack(alignment: .leading, spacing: 9) {
+                SectionLabel(label: "^[\(venues.total) venue](inflect: true) on Eventernote")
+
+                ForEach(venues.items) { place in
+                    VenueRow(place: place)
+                        .task {
+                            guard venues.isNearEnd(place) else { return }
+                            await venues.loadMore()
+                        }
+                }
+
+                FeedFooter(feed: venues)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
     // MARK: - Before a search
 
     private var recentSearches: [String] { settingsRows.first?.recentSearches ?? [] }
@@ -610,6 +649,32 @@ private struct PerformerRow: View {
     }
 }
 
+/// A hall the venue search found. Opening one reads its own page.
+private struct VenueRow: View {
+    let place: PlaceListing
+
+    var body: some View {
+        NavigationLink(value: VenueLink.place(place)) {
+            HStack(spacing: 13) {
+                Image(systemName: "mappin.and.ellipse")
+                    .scalingFont(size: 13, weight: .semibold)
+                    .foregroundStyle(Color.brandTint)
+                    .frame(width: 18)
+                Text(place.name)
+                    .scalingFont(size: 14.5, weight: .semibold)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .scalingFont(size: 11, weight: .semibold)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(13)
+        }
+        .buttonStyle(.plain)
+        .panel()
+    }
+}
+
 /// The wait while Eventernote answers.
 struct SearchProgress: View {
     var compact = false
@@ -683,9 +748,9 @@ struct SearchFailure: View {
         .library(EventStore.preview)
 }
 
-/// Events or performers: the system's scope bar under the search field — or,
-/// beside an open iPhone Duo's fold, the same choice over the results
-/// (``BesideFoldScopes``).
+/// Events, performers or venues: the system's scope bar under the search
+/// field — or, beside an open iPhone Duo's fold, the same choice over the
+/// results (``BesideFoldScopes``).
 ///
 /// The system centres its scope bar across the whole screen, where it ran
 /// over the event open beside the results, and nothing moves it. So there
@@ -708,8 +773,8 @@ private struct SearchScopes: ViewModifier {
     }
 }
 
-/// Events or performers over the results beside an open iPhone Duo's fold,
-/// shown while the search is up, as the system's scope bar would be. A view
+/// Events, performers or venues over the results beside an open iPhone Duo's
+/// fold, shown while the search is up, as the system's scope bar would be. A view
 /// of its own so it can ask whether it is: only what the search field is
 /// attached to is told.
 private struct BesideFoldScopes: View {

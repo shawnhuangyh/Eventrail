@@ -1661,6 +1661,28 @@
         }
       }
     },
+    "^[%lld venue](inflect: true) on Eventernote" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteで会場%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上有 %lld 个场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上有 %lld 個場館"
+          }
+        }
+      }
+    },
     "^[%lld year](inflect: true) ago" : {
       "comment" : "On This Day: how long ago an event the reader went to was, such as 1 year ago.",
       "localizations" : {
