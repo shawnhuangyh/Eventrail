@@ -451,6 +451,53 @@ struct CompactEventRow<Control: View>: View {
     }
 }
 
+/// A performer out of one of the site's lists — the search, the ranking, the
+/// directory. Opening one lists everything they are billed on.
+struct PerformerRow: View {
+    let performer: PerformerProfile
+    /// Where the ranking places them, ahead of the name.
+    var rank: Int?
+
+    var body: some View {
+        NavigationLink(value: PerformerLink.profile(performer)) {
+            HStack(spacing: 13) {
+                if let rank {
+                    Text(rank, format: .number)
+                        .scalingFont(size: 13, weight: .bold)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 26, alignment: .trailing)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(performer.name)
+                        .scalingFont(size: 14.5, weight: .semibold)
+                        .lineLimit(1)
+                    if let reading = performer.reading {
+                        Text(reading)
+                            .scalingFont(size: 12)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let fans = performer.fanCount {
+                    Text("^[\(fans) fan](inflect: true)")
+                        .scalingFont(size: 11.5, weight: .medium)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+                Image(systemName: "chevron.right")
+                    .scalingFont(size: 11, weight: .semibold)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(13)
+        }
+        .buttonStyle(.plain)
+        .panel()
+    }
+}
+
 /// One followed performer: who they are, what they have coming, and the mark
 /// that stops following them.
 ///

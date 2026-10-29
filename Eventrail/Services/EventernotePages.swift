@@ -61,6 +61,20 @@ nonisolated struct PlaceListing: Identifiable, Hashable, Sendable {
     let name: String
 }
 
+/// One kana a performer's reading can start with, as the site's directory
+/// lists it: 「あ」 and how many it files there.
+nonisolated struct KanaInitial: Hashable, Codable, Sendable {
+    let kana: String
+    let count: Int
+}
+
+/// The site's performer directory, `/actors`: the performers most recently
+/// added, and the kana their readings start with.
+nonisolated struct PerformerIndex: Codable, Sendable {
+    var newest: [PerformerProfile]
+    var initials: [KanaInitial]
+}
+
 /// One hall's own page: what Eventernote publishes about the place itself,
 /// rather than about anything held there.
 ///
@@ -310,6 +324,54 @@ nonisolated enum EventernotePages {
         if places.isEmpty { try confirmsNoRows(html) }
         return EventernotePage(items: places, total: totalCount(in: html) ?? places.count,
                                page: page, pageSize: pageSize)
+    }
+
+    // MARK: - The performers' directory
+
+    /// `/actors`: the performers most recently added — 楠ゆい(READY TO KISS) (0),
+    /// the fan count in the last parentheses — and every kana with how many
+    /// readings start with it. Nil where the page carries neither.
+    static func performerIndex(in html: String) -> PerformerIndex? {
+        var newest: [PerformerProfile] = []
+        var cursor = HTMLCursor(html)
+        if cursor.advance(past: "新着声優/アーティスト</h2>"), let block = cursor.take(upTo: "</p>") {
+            for slice in HTMLCursor(block).slices(startingAt: #"<a href="/actors/"#) {
+                var row = HTMLCursor(slice)
+                row.advance(past: #"<a href="/actors/"#)
+                guard let path = row.take(upTo: "\""), let id = Int(path.split(separator: "/").last ?? ""),
+                      let listed = row.text(after: ">", upTo: "</a>")
+                else { continue }
+                let (name, fans) = splitFanCount(listed)
+                guard !name.isEmpty else { continue }
+                newest.append(PerformerProfile(id: id, name: name, reading: nil, fanCount: fans,
+                                               slug: String(path.split(separator: "/").dropLast().joined(separator: "/"))))
+            }
+        }
+
+        var initials: [KanaInitial] = []
+        var index = HTMLCursor(html)
+        if index.advance(past: "50音別声優/アーティスト</h2>"), let block = index.take(upTo: "</ul>") {
+            var rows = HTMLCursor(block)
+            while rows.advance(past: #"<a href="/actors/initial/"#) {
+                guard let kana = rows.text(after: "「", upTo: "」"),
+                      let count = rows.text(after: ">", upTo: "</span>").flatMap(number(in:))
+                else { break }
+                initials.append(KanaInitial(kana: kana, count: count))
+            }
+        }
+        guard !newest.isEmpty || !initials.isEmpty else { return nil }
+        return PerformerIndex(newest: newest, initials: initials)
+    }
+
+    /// "楠ゆい(READY TO KISS) (0)" — a name, and the fan count the directory
+    /// sets after it in parentheses of its own.
+    private static func splitFanCount(_ listed: String) -> (name: String, fans: Int?) {
+        guard listed.hasSuffix(")"), let open = listed.range(of: " (", options: .backwards) else {
+            return (listed, nil)
+        }
+        let count = listed[open.upperBound ..< listed.index(before: listed.endIndex)]
+        guard let fans = Int(count) else { return (listed, nil) }
+        return (String(listed[..<open.lowerBound]), fans)
     }
 
     // MARK: - A member's own page

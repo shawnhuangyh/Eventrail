@@ -803,6 +803,28 @@
         }
       }
     },
+    "%@, ^[%lld performer](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@、出演者%lld組"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 位艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 位藝人"
+          }
+        }
+      }
+    },
     "%lld events" : {
       "localizations" : {
         "ja" : {
@@ -2257,6 +2279,28 @@
         }
       }
     },
+    "Added to Eventernote last" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteに最近追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近加入 Eventernote"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近加入 Eventernote"
+          }
+        }
+      }
+    },
     "Address" : {
       "localizations" : {
         "ja" : {
@@ -2870,6 +2914,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "備份已恢復"
+          }
+        }
+      }
+    },
+    "By Kana" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "50音別"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按假名"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按假名"
           }
         }
       }
@@ -4991,6 +5057,28 @@
         }
       }
     },
+    "Eventernote's ranking by fans, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、ファン数のランキングです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上的粉丝数排行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上的粉絲數排行。"
+          }
+        }
+      }
+    },
     "Eventrail" : {
       "localizations" : {
         "ja" : {
@@ -5296,6 +5384,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有活動、收藏和關注的藝人將從你的所有裝置中移除，連同你寫的備註，Eventernote 帳號也會解除連結。你的設定會保留。"
+          }
+        }
+      }
+    },
+    "Every performer on Eventernote whose reading starts with %@, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、読みが「%@」で始まる出演者すべてです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上，读音以「%@」开头的全部艺人。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上，讀音以「%@」開頭的全部藝人。"
+          }
+        }
+      }
+    },
+    "Every performer on Eventernote, filed by the kana their reading starts with." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteの出演者すべてを、読みの最初の文字で分けています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部艺人，按读音的首个假名分类。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部藝人，依讀音的首個假名分類。"
           }
         }
       }
@@ -6933,6 +7065,28 @@
         }
       }
     },
+    "List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表"
+          }
+        }
+      }
+    },
     "Listed appearances" : {
       "localizations" : {
         "ja" : {
@@ -7843,6 +7997,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "從未重新整理"
+          }
+        }
+      }
+    },
+    "New" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新"
           }
         }
       }
@@ -10234,6 +10410,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "計劃中"
+          }
+        }
+      }
+    },
+    "Popular" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "热门"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "熱門"
+          }
+        }
+      }
+    },
+    "Popular, new and by kana" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気・新着・50音別"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "热门、最新与按假名浏览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "熱門、最新與按假名瀏覽"
           }
         }
       }
@@ -13049,6 +13269,28 @@
         }
       }
     },
+    "The %lld with the most fans" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファン数の多い%lld組"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粉丝数最多的 %lld 位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粉絲數最多的 %lld 位"
+          }
+        }
+      }
+    },
     "The backup could not be written (%@). Tap to try again." : {
       "localizations" : {
         "ja" : {
@@ -13155,6 +13397,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eventernote 最新新增的 %lld 個活動"
+          }
+        }
+      }
+    },
+    "The performers most recently added to Eventernote, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、最近追加された出演者です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上最近加入的艺人。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上最近加入的藝人。"
           }
         }
       }

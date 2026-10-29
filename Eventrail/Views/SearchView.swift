@@ -98,6 +98,12 @@ struct SearchView: View {
                 case .justAdded: SiteListingView(listing: listing, filter: $justAddedFilter)
                 }
             }
+            .navigationDestination(for: PerformerDirectory.self) { directory in
+                switch directory {
+                case .browse: PerformerDirectoryView()
+                case .initial(let initial): PerformerInitialView(initial: initial)
+                }
+            }
             .venueDestination()
             // Beside the results on an open iPhone Duo.
             .eventPane($openEvent)
@@ -491,39 +497,49 @@ struct SearchView: View {
         .padding(.vertical, 10)
     }
 
-    /// The lists the site keeps of its own — what is on today, and what was
-    /// added last — which are the tabs over its own event search. Above the
-    /// recent searches, so they stay where they are however many of those
-    /// there are. Nothing is read until one is opened.
+    /// The lists the site keeps of its own — what is on today, what was added
+    /// last, and its directory of performers. Above the recent searches, so
+    /// they stay where they are however many of those there are. Nothing is
+    /// read until one is opened.
     private var siteListings: some View {
         VStack(spacing: 9) {
             ForEach(SiteListing.allCases, id: \.self) { listing in
                 NavigationLink(value: listing) {
-                    SiteListingRow(listing: listing)
+                    StartingPointRow(symbol: listing.symbol, title: Text(listing.title),
+                                     detail: listing.detail(on: Event.siteDay(of: .now)))
                 }
                 .buttonStyle(.plain)
                 .panel()
             }
+            NavigationLink(value: PerformerDirectory.browse) {
+                StartingPointRow(symbol: "music.mic", title: Text("Performers"),
+                                 detail: Text("Popular, new and by kana"))
+            }
+            .buttonStyle(.plain)
+            .panel()
         }
     }
 }
 
 /// The way into one of the site's own lists, from the Search tab before
-/// anything is typed: what it is, and — for today's — which day that is on
-/// the site's calendar, which is not the reader's own everywhere.
-private struct SiteListingRow: View {
-    let listing: SiteListing
+/// anything is typed: what it is, and a line about it — for today's, which
+/// day that is on the site's calendar, which is not the reader's own
+/// everywhere.
+private struct StartingPointRow: View {
+    let symbol: String
+    let title: Text
+    let detail: Text
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: listing.symbol)
+            Image(systemName: symbol)
                 .scalingFont(size: 14, weight: .semibold)
                 .foregroundStyle(Color.brandTint)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
-                Text(listing.title)
+                title
                     .scalingFont(size: 14.5, weight: .semibold)
-                listing.detail(on: Event.siteDay(of: .now))
+                detail
                     .scalingFont(size: 12)
                     .foregroundStyle(.secondary)
             }
@@ -609,43 +625,6 @@ struct SearchAreaMenu: View {
             Label("Area", systemImage: "map")
             Text(area?.label ?? "Anywhere")
         }
-    }
-}
-
-/// A performer search result. Opening one lists everything they are billed on.
-private struct PerformerRow: View {
-    let performer: PerformerProfile
-
-    var body: some View {
-        NavigationLink(value: PerformerLink.profile(performer)) {
-            HStack(spacing: 13) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(performer.name)
-                        .scalingFont(size: 14.5, weight: .semibold)
-                        .lineLimit(1)
-                    if let reading = performer.reading {
-                        Text(reading)
-                            .scalingFont(size: 12)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let fans = performer.fanCount {
-                    Text("^[\(fans) fan](inflect: true)")
-                        .scalingFont(size: 11.5, weight: .medium)
-                        .monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-                Image(systemName: "chevron.right")
-                    .scalingFont(size: 11, weight: .semibold)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(13)
-        }
-        .buttonStyle(.plain)
-        .panel()
     }
 }
 

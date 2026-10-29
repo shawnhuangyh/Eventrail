@@ -25,6 +25,18 @@ nonisolated struct CachedListing<Subject: Codable & Sendable>: Codable, Sendable
     var isFresh: Bool { readAt.timeIntervalSinceNow > -ListingCache.freshness }
 }
 
+/// One of the site's lists of performers as this device last read it — the
+/// ranking, the directory's own page, or one kana of it (see
+/// ``PerformerDirectoryView``). Kept beside the listings, by the same rules.
+nonisolated struct CachedDirectory: Codable, Sendable {
+    var performers: [PerformerProfile] = []
+    /// The kana the directory files readings under, on its own page alone.
+    var initials: [KanaInitial] = []
+    var readAt = Date.now
+
+    var isFresh: Bool { readAt.timeIntervalSinceNow > -ListingCache.freshness }
+}
+
 /// What this device last read of each performer's and each hall's page.
 ///
 /// The same arrangement ``FollowedDates`` has for the Following tab and
@@ -80,6 +92,17 @@ final class ListingCache {
         guard entry.readAt >= clearedAt else { return }
         let url = url(for: key)
         try? JSONEncoder().encode(entry).write(to: url, options: .atomic)
+    }
+
+    /// A list of performers as this device last read it — see ``CachedDirectory``.
+    func directory(for key: String) -> CachedDirectory? {
+        guard let data = try? Data(contentsOf: url(for: key)) else { return nil }
+        return try? JSONDecoder().decode(CachedDirectory.self, from: data)
+    }
+
+    func store(_ directory: CachedDirectory, for key: String) {
+        guard directory.readAt >= clearedAt else { return }
+        try? JSONEncoder().encode(directory).write(to: url(for: key), options: .atomic)
     }
 
     /// Writes down the pages the reader has scrolled on to since the last read,

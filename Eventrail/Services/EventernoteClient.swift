@@ -106,6 +106,43 @@ nonisolated struct EventernoteClient: Sendable {
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
+    // MARK: - The performers' directory
+
+    /// The hundred performers with the most fans, the most first — the
+    /// site's ranking, one page printed as its performer search prints rows.
+    @concurrent func popularPerformers() async throws -> [PerformerProfile] {
+        let html = try await html(at: Self.popularPath, query: [:])
+        return try EventernotePages.performers(in: html, page: 1, pageSize: Self.popularCount).items
+    }
+
+    /// The directory's own page: the performers most recently added, and the
+    /// kana their readings start with — see ``EventernotePages/performerIndex(in:)``.
+    @concurrent func performerIndex() async throws -> PerformerIndex {
+        let html = try await html(at: Self.directoryPath, query: [:])
+        guard let index = EventernotePages.performerIndex(in: html) else { throw Failure.unreadable }
+        return index
+    }
+
+    /// Every performer whose reading starts with `kana`, in the order of
+    /// their readings. One page however many: the site ignores paging here,
+    /// and 「あ」 is six thousand rows, a megabyte — so only ever read when the
+    /// reader opens it.
+    @concurrent func performers(underInitial kana: String) async throws -> [PerformerProfile] {
+        let html = try await html(at: Self.initialPath(kana), query: [:])
+        return try EventernotePages.performers(in: html, page: 1, pageSize: .max).items
+    }
+
+    /// How many the ranking lists.
+    static let popularCount = 100
+
+    static var popularPerformersURL: URL? { url(at: popularPath, query: [:]) }
+    static var performerDirectoryURL: URL? { url(at: directoryPath, query: [:]) }
+    static func performersURL(underInitial kana: String) -> URL? { url(at: initialPath(kana), query: [:]) }
+
+    private static let popularPath = "/actors/ranking"
+    private static let directoryPath = "/actors"
+    private static func initialPath(_ kana: String) -> String { "/actors/initial/\(kana)" }
+
     // MARK: - The site's own lists
 
     /// How many rows the site's 新着 tab holds. It has no pages: the hundred

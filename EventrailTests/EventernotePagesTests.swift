@@ -369,7 +369,7 @@ struct EventernotePagesTests {
         #expect(EventernotePages.profile(in: "<html></html>", handle: "x") == nil)
     }
 
-    // MARK: - Search's venues
+    // MARK: - Search's venues and the performers' directory
 
     @Test func readsAPageOfVenueSearchWithItsCount() throws {
         let html = """
@@ -396,5 +396,46 @@ struct EventernotePagesTests {
         #expect(throws: EventernoteClient.Failure.self) {
             try EventernotePages.places(in: "<html>maintenance</html>", page: 1, pageSize: 30)
         }
+    }
+
+    /// The ranking prints its rank ahead of each row and the fan count after
+    /// the name, as the performer search prints rows.
+    @Test func readsTheRanking() throws {
+        let html = """
+            <div class="gb_listview">
+              <p class="t2">2026-10-28 22:42 時点</p>
+            <ul class="clearfix ranking">
+                <li><span class="rank">1.</span><a href="/actors/%CE%BC%E2%80%99s/2809">μ’s <span class="count color1">7766</span></a></li>
+                <li><span class="rank">2.</span><a href="/actors/TrySail/12566">TrySail <span class="count color1">5154</span></a></li>
+            </ul></div>
+            """
+        let page = try EventernotePages.performers(in: html, page: 1, pageSize: 100)
+        #expect(page.items.map(\.name) == ["μ’s", "TrySail"])
+        #expect(page.items.map(\.fanCount) == [7766, 5154])
+        #expect(page.items.first?.slug == "%CE%BC%E2%80%99s")
+    }
+
+    @Test func readsTheDirectorysNewestAndItsKana() throws {
+        let html = """
+            <h2 class="gb_subtitle">新着声優/アーティスト</h2>
+            <p class="t ranking">
+            <a href="/actors/JO%28%26TEAM%29/95518">JO(&amp;TEAM) (0)</a>
+            <a href="/actors/TSUKKI/95521">TSUKKI (3)</a>
+            </p>
+            <h2 class="gb_subtitle">50音別声優/アーティスト</h2>
+            <ul>
+            <li><a href="/actors/initial/%E3%81%82">「あ」<span class="count color1">6662</span></a></li>
+            <li><a href="/actors/initial/%E3%82%93">「ん」<span class="count color1">9</span></a></li>
+            </ul>
+            """
+        let index = try #require(EventernotePages.performerIndex(in: html))
+        #expect(index.newest.map(\.name) == ["JO(&TEAM)", "TSUKKI"])
+        #expect(index.newest.map(\.fanCount) == [0, 3])
+        #expect(index.newest.first?.id == 95518)
+        #expect(index.initials == [KanaInitial(kana: "あ", count: 6662), KanaInitial(kana: "ん", count: 9)])
+    }
+
+    @Test func aPageWithoutTheDirectoryIsNoDirectory() {
+        #expect(EventernotePages.performerIndex(in: "<html>maintenance</html>") == nil)
     }
 }
