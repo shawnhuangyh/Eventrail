@@ -415,6 +415,11 @@ struct EventDetailView: View {
     /// first column where it has two (``isWide``).
     @ViewBuilder
     private var eventCards: some View {
+        // First, where it was opened from a row tagged Updated: what changed
+        // is why the reader is here.
+        if let changes = store.changesRead(in: event) {
+            ListingChangesCard(changes: changes, clock: clock)
+        }
         timelineCard
         // Beside the hours, since that is what it is about. Only
         // where the reader keeps another event that day.

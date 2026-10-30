@@ -31,10 +31,11 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
     var day: Date
 
     /// Why `event` is unread, read against `read` — the mark kept for it, or
-    /// none — or nil where it is read.
-    static func unread(_ event: Event, read: FollowingRead?) -> FollowingUnread? {
+    /// none — or nil where it is read. With `copy`, the copy that mark was
+    /// taken of (``ReadCopies``), an Updated date says what changed.
+    static func unread(_ event: Event, read: FollowingRead?, copy: ListingCopy? = nil) -> FollowingUnread? {
         guard let read, read.fingerprint != nil else { return .new }
-        return read.matches(event) ? nil : .updated
+        return read.matches(event) ? nil : .updated(copy.flatMap { ListingChanges(from: $0, to: event) })
     }
 
     func matches(_ event: Event) -> Bool {
@@ -56,12 +57,19 @@ nonisolated struct FollowingRead: Codable, Hashable, Sendable {
 }
 
 /// Why a Following date is unread, which is what its row's tag says.
-nonisolated enum FollowingUnread: Sendable {
+nonisolated enum FollowingUnread: Hashable, Sendable {
     /// Never looked at — or marked unread again, which throws away the copy
     /// that was read and so leaves nothing to say it changed from.
     case new
-    /// Looked at, and the listing has printed something different since.
-    case updated
+    /// Looked at, and the listing has printed something different since —
+    /// with what, where this device still holds the copy that was looked at
+    /// (``ReadCopies``).
+    case updated(ListingChanges?)
+
+    /// What changed, where it is known.
+    var changes: ListingChanges? {
+        if case .updated(let changes) = self { changes } else { nil }
+    }
 }
 
 nonisolated extension Event {
@@ -87,19 +95,10 @@ nonisolated extension Event {
     /// prints: which morning an after-midnight time falls on is this app's
     /// reading of it (see ``inOrder(_:_:_:)``), and a better reading must not
     /// make an unchanged row read Updated.
-    var listingFingerprint: String {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        let day = calendar.dateComponents([.year, .month, .day], from: date)
-        let printedDay = [day.year, day.month, day.day].map { String($0 ?? 0) }.joined(separator: "-")
-        let times = [doorsOpen, startsAt, endsAt].map { time in
-            time.map { time in
-                let clock = calendar.dateComponents([.hour, .minute], from: time)
-                return "\(clock.hour ?? 0):\(clock.minute ?? 0)"
-            } ?? "-"
-        }
-        return Self.digest([title, venue, printedDay] + times + performers.map(\.name))
-    }
+    ///
+    /// Taken over ``ListingCopy``, which keeps the same fields whole, so the
+    /// two cannot come to disagree about what a change is.
+    var listingFingerprint: String { ListingCopy(self).fingerprint }
 
     /// Every time put back on the event's own day, as every copy was read
     /// before an after-midnight clock was taken to be the next morning. Only
@@ -131,8 +130,175 @@ nonisolated extension Event {
         return Self.digest([title, venue] + times + performers.map(\.name))
     }
 
-    private static func digest(_ fields: [String]) -> String {
+    fileprivate static func digest(_ fields: [String]) -> String {
         let digest = SHA256.hash(data: Data(fields.joined(separator: "\u{1F}").utf8))
         return digest.prefix(12).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// What a listing row prints about an event — the fields
+/// ``Event/listingFingerprint`` is taken over, kept whole rather than hashed,
+/// so a row that comes back changed can say what changed (``ListingChanges``).
+///
+/// The day and times as the page prints them, a written date and clocks with
+/// no zone, for the reason the fingerprint reads them so: the Following tab's
+/// copy of an event abroad is on Tokyo time and the library's on its hall's,
+/// and the two are one copy.
+nonisolated struct ListingCopy: Codable, Hashable, Sendable {
+    /// A time as the page prints it, with no day: which morning a time after
+    /// midnight falls on is this app's reading (``Event/inOrder(_:_:_:)``).
+    struct Clock: Codable, Hashable, Sendable {
+        var hour: Int
+        var minute: Int
+    }
+
+    var title: String
+    var venue: String
+    var day: CalendarDay
+    var doorsOpen: Clock?
+    var startsAt: Clock?
+    var endsAt: Clock?
+    /// The bill's names, in the listing's order.
+    var performers: [String]
+    /// The clock the copy was read on. Not anything the page prints, so not
+    /// in the ``fingerprint``: only for putting what a hall since replaced
+    /// printed back on that hall's clock (``ListingChanges``). Nil in a copy
+    /// kept before it was.
+    var zone: TimeZone?
+
+    init(_ event: Event) {
+        let calendar = Calendar.gregorian(in: event.timeZone)
+        func clock(_ time: Date?) -> Clock? {
+            time.map { time in
+                let parts = calendar.dateComponents([.hour, .minute], from: time)
+                return Clock(hour: parts.hour ?? 0, minute: parts.minute ?? 0)
+            }
+        }
+        title = event.title
+        venue = event.venue
+        day = CalendarDay(event.date, in: calendar)
+        doorsOpen = clock(event.doorsOpen)
+        startsAt = clock(event.startsAt)
+        endsAt = clock(event.endsAt)
+        performers = event.performers.map(\.name)
+        zone = event.timeZone
+    }
+
+    /// Whether the two print the same, whichever clock each was read on.
+    func printsTheSame(as other: ListingCopy) -> Bool {
+        var other = other
+        other.zone = zone
+        return self == other
+    }
+
+    /// See ``Event/listingFingerprint``. Spelled as it always was — the day
+    /// and the clocks unpadded — or every mark already written would stop
+    /// matching its copy, and every date read so far would come back Updated.
+    var fingerprint: String {
+        let printedDay = "\(day.year)-\(day.month)-\(day.day)"
+        let times = [doorsOpen, startsAt, endsAt].map { clock in
+            clock.map { "\($0.hour):\($0.minute)" } ?? "-"
+        }
+        return Event.digest([title, venue, printedDay] + times + performers)
+    }
+}
+
+/// What a listing row prints differently now from the copy the reader read:
+/// what an Updated row prints anew, and its sheet's What Changed card.
+nonisolated struct ListingChanges: Hashable, Sendable {
+    /// One thing the row says differently, in the order ``changes`` lists them.
+    enum Change: Hashable, Sendable {
+        case day
+        case time(Stop)
+        case venue(was: String, now: String)
+        /// Names billed now and not then, and then and not now, each in the
+        /// order its own copy bills them.
+        case performers(added: [String], removed: [String])
+        /// The same names, billed in another order — which the fingerprint
+        /// counts, so an Updated row has to say so.
+        case billingOrder
+        case title(was: String, now: String)
+    }
+
+    /// The times a page prints, in running order.
+    enum Stop: Hashable, Sendable, CaseIterable {
+        case doorsOpen, startsAt, endsAt
+    }
+
+    /// The day first, then the times, the hall and the bill: what decides
+    /// whether the reader can still be there ahead of what only renames it.
+    let changes: [Change]
+    /// The event with the day and times the reader read, on the clock of the
+    /// hall they were read at. Only ever printed — see ``shown(on:)``.
+    private let before: Event
+    private let after: Event
+
+    /// Nil where `read` is the copy `event` prints — which an Updated date
+    /// never is.
+    init?(from read: ListingCopy, to event: Event) {
+        let now = ListingCopy(event)
+        var changes: [Change] = []
+        if read.day != now.day { changes.append(.day) }
+        if read.doorsOpen != now.doorsOpen { changes.append(.time(.doorsOpen)) }
+        if read.startsAt != now.startsAt { changes.append(.time(.startsAt)) }
+        if read.endsAt != now.endsAt { changes.append(.time(.endsAt)) }
+        if read.venue != now.venue { changes.append(.venue(was: read.venue, now: now.venue)) }
+        let added = now.performers.filter { !read.performers.contains($0) }
+        let removed = read.performers.filter { !now.performers.contains($0) }
+        if !added.isEmpty || !removed.isEmpty {
+            changes.append(.performers(added: added, removed: removed))
+        } else if read.performers != now.performers {
+            changes.append(.billingOrder)
+        }
+        if read.title != now.title { changes.append(.title(was: read.title, now: now.title)) }
+        guard !changes.isEmpty else { return nil }
+        self.changes = changes
+
+        // The copy read, put back on its hall's clock as the page would have
+        // printed it: its day's midnight, and each time on that day, read in
+        // running order. The same hall's is the clock the event is on now,
+        // which may know it better than the copy did — a Following row is on
+        // Tokyo time until the hall is placed. A hall since replaced keeps
+        // the clock it was read on, or a Tokyo 18:00 replaced by a Taipei
+        // 19:00 would read 18:00 in Taipei, an hour late on the reader's.
+        let zone = read.venue == now.venue ? event.timeZone : read.zone ?? event.timeZone
+        let calendar = Calendar.gregorian(in: zone)
+        func on(_ clock: ListingCopy.Clock?) -> Date? {
+            clock.flatMap { clock in
+                calendar.date(from: DateComponents(year: read.day.year, month: read.day.month, day: read.day.day,
+                                                   hour: clock.hour, minute: clock.minute))
+            }
+        }
+        var before = event
+        before.timeZone = zone
+        if read.day != now.day || zone != event.timeZone { before.date = read.day.date(in: calendar) }
+        (before.doorsOpen, before.startsAt, before.endsAt) = Event.inOrder(
+            on(read.doorsOpen), on(read.startsAt), on(read.endsAt))
+        self.before = before
+        after = event
+    }
+
+    /// The event as read and as printed now, each on `clock`: for their days
+    /// and times alone, since the one read keeps today's title, hall and bill
+    /// (those are in ``changes``).
+    func shown(on clock: TimeDisplay) -> (was: Event, now: Event) {
+        (before.shown(on: clock), after.shown(on: clock))
+    }
+
+    /// Whether the day, or one of the times, is among ``changes``.
+    func changed(_ change: Change) -> Bool { changes.contains(change) }
+
+    var venueChanged: Bool {
+        changes.contains { if case .venue = $0 { true } else { false } }
+    }
+
+    var titleChanged: Bool {
+        changes.contains { if case .title = $0 { true } else { false } }
+    }
+
+    /// The names billed now and not when it was read.
+    var added: [String] {
+        for case let .performers(added, _) in changes { return added }
+        return []
     }
 }

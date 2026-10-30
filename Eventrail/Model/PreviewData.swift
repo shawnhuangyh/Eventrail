@@ -140,6 +140,7 @@ extension EventStore {
     @MainActor static var preview: EventStore {
         EventStore(database: LibraryDatabase(at: .memory, syncing: false), libraryFile: nil,
                    calendar: nil, venues: nil, pageReads: nil, accountEvents: nil,
+                   readCopies: ReadCopies(persists: false),
                    library: PreviewData.events, tracking: PreviewData.tracking,
                    follows: PreviewData.performers)
     }

@@ -138,6 +138,9 @@ final class EventStore {
     @ObservationIgnored private var libraryByDay: (revision: Int, days: [Date: [Event]])?
     /// What ``unread(_:)`` last answered for each event — see there.
     @ObservationIgnored private var unreadAnswers: [Event.ID: (event: Event, read: FollowingRead?, answer: FollowingUnread?)] = [:]
+    /// The copy each Updated date had been read as, for the dates the reader
+    /// has read again since launch — see ``changesRead(in:)``.
+    private var readBefore: [Event.ID: ListingCopy] = [:]
     private var performerRows: [Int: FollowedPerformer] = [:]
     private var settingsRow: LibrarySettings?
 
@@ -289,6 +292,9 @@ final class EventStore {
     /// What the linked account listed at its last whole read — see
     /// ``AccountEvents``.
     private let accountEvents: AccountEvents?
+    /// The copy of each date the reader read, so an Updated one can say what
+    /// changed — see ``ReadCopies``.
+    private let readCopies: ReadCopies?
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var venuePlacings: Task<Void, Never>?
@@ -325,6 +331,7 @@ final class EventStore {
         venues: VenuePlaces? = .shared,
         pageReads: PageReads? = .shared,
         accountEvents: AccountEvents? = .shared,
+        readCopies: ReadCopies? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
         tracking: [Event.ID: Tracking] = [:],
@@ -339,6 +346,7 @@ final class EventStore {
         self.venues = venues
         self.pageReads = pageReads
         self.accountEvents = accountEvents
+        self.readCopies = readCopies
         self.client = client
 
         iCloudSyncEnabled = syncing
@@ -866,6 +874,9 @@ final class EventStore {
                 mark.read = Stamped(FollowingRead(fingerprint: nil, day: read.value.day), at: now)
             }
         }
+        // And what was read, which no mark speaks for now.
+        readCopies?.clear()
+        readBefore = [:]
         // Everyone followed goes too, as tombstones so the other device's
         // follows do not come back, and with them who they were.
         for row in performerRows.values {
@@ -891,14 +902,38 @@ final class EventStore {
     /// and worked out again only where either has moved: every row of
     /// Following and My Events, and the tab's badge over all of them, ask on
     /// every redraw, and each answer hashes the row.
+    ///
+    /// An Updated date says what changed where this device holds the copy
+    /// that was read (``ReadCopies``) — and a copy found to be the one read
+    /// is held here, so the day the listing changes there is something to
+    /// say it changed from.
     func unread(_ event: Event) -> FollowingUnread? {
         let read = readMarks[event.id]?.read?.value
         if let known = unreadAnswers[event.id], known.read == read, known.event == event {
             return known.answer
         }
-        let answer = FollowingRead.unread(event, read: read)
+        let fingerprint = read?.fingerprint
+        let answer = FollowingRead.unread(
+            event, read: read,
+            copy: fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) })
+        if answer == nil, let fingerprint { readCopies?.keep(event, markedAs: fingerprint) }
         unreadAnswers[event.id] = (event, read, answer)
         return answer
+    }
+
+
+    /// What has changed in `event` since the copy it had been read as before
+    /// the reader read it again — opened, swiped or marked in a batch — for
+    /// its sheet's What Changed card.
+    ///
+    /// Worked out against `event` as it stands, not kept as the row said it:
+    /// the sheet reads its page as it opens, another device's copy lands, a
+    /// hall is placed abroad and the event moves to its clock, and a card
+    /// kept whole went on saying 19:00 under a timeline already saying 20:00.
+    /// The copy is held until the app quits and written nowhere — the mark
+    /// read over it took its place.
+    func changesRead(in event: Event) -> ListingChanges? {
+        readBefore[event.id].flatMap { ListingChanges(from: $0, to: event) }
     }
 
     /// Marks these rows read as the listing prints them now, or unread again.
@@ -912,9 +947,15 @@ final class EventStore {
         let now = Date.now
         var changed = false
         for event in events where isUnread(event) == read {
-            makeMark(for: event.id).read = Stamped(
-                FollowingRead(fingerprint: read ? event.listingFingerprint : nil, day: event.date),
-                at: now)
+            // Taken before the mark moves on from it: the copy an Updated date
+            // was read as (a New one has none).
+            let before = read
+                ? readMarks[event.id]?.read?.value.fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) }
+                : nil
+            if readBefore[event.id] != before { readBefore[event.id] = before }
+            let fingerprint = read ? event.listingFingerprint : nil
+            makeMark(for: event.id).read = Stamped(FollowingRead(fingerprint: fingerprint, day: event.date), at: now)
+            if let fingerprint { readCopies?.keep(event, markedAs: fingerprint) }
             changed = true
         }
         guard changed else { return }

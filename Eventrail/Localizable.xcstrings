@@ -2962,6 +2962,29 @@
         }
       }
     },
+    "Billing order changed" : {
+      "comment" : "The same performers are billed, in another order.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出演順変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "艺人顺序变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "藝人順序變更"
+          }
+        }
+      }
+    },
     "By Kana" : {
       "localizations" : {
         "ja" : {
@@ -3222,6 +3245,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更換帳號"
+          }
+        }
+      }
+    },
+    "changes.venue" : {
+      "comment" : "The hall an event is held at, on the card saying what changed. Not the Venue of the Venue / Local clock switch.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Venue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場館"
           }
         }
       }
@@ -4503,6 +4555,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "結束"
+          }
+        }
+      }
+    },
+    "End %@" : {
+      "comment" : "A followed date's end time, newly printed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終演 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束 %@"
           }
         }
       }
@@ -9463,6 +9538,29 @@
         }
       }
     },
+    "Now %@" : {
+      "comment" : "VoiceOver: what an event's detail says now that it changed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更後：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现为：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現為：%@"
+          }
+        }
+      }
+    },
     "of ^[%lld drawn round](inflect: true)" : {
       "localizations" : {
         "ja" : {
@@ -10432,6 +10530,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "藝人"
+          }
+        }
+      }
+    },
+    "Performers Added" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加された出演者"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增藝人"
+          }
+        }
+      }
+    },
+    "Performers Removed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外れた出演者"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除的艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除的藝人"
           }
         }
       }
@@ -12802,6 +12944,28 @@
         }
       }
     },
+    "Since you last looked" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前回見たときから"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自你上次查看以来"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自你上次查看以來"
+          }
+        }
+      }
+    },
     "Skip for now" : {
       "localizations" : {
         "ja" : {
@@ -14042,6 +14206,29 @@
         }
       }
     },
+    "Title" : {
+      "comment" : "An event's title.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイトル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標題"
+          }
+        }
+      }
+    },
     "Title, performer, venue or note" : {
       "localizations" : {
         "ja" : {
@@ -14944,6 +15131,29 @@
         }
       }
     },
+    "Was %@" : {
+      "comment" : "VoiceOver: what an event's detail said before it changed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更前：%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原为：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原為：%@"
+          }
+        }
+      }
+    },
     "Weekday" : {
       "localizations" : {
         "ja" : {
@@ -15028,6 +15238,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "日本西部"
+          }
+        }
+      }
+    },
+    "What Changed" : {
+      "comment" : "Heading of the card on an event that changed since the reader last looked at it.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更点"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "变更内容"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "變更內容"
           }
         }
       }
