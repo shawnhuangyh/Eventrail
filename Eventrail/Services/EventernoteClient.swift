@@ -106,6 +106,53 @@ nonisolated struct EventernoteClient: Sendable {
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
 
+    /// A performer's own page, for who it is: their name and its reading,
+    /// as the page heads itself — what a link to it carries none of.
+    @concurrent func performer(slug: String, id: Int) async throws -> PerformerProfile {
+        let html = try await html(at: "/actors/\(slug)/\(id)", query: [:], isPreEncoded: true)
+        guard let performer = EventernotePages.performer(in: html, id: id, slug: slug) else {
+            throw Failure.unreadable
+        }
+        return performer
+    }
+
+    // MARK: - The performers' directory
+
+    /// The hundred performers with the most fans, the most first — the
+    /// site's ranking, one page printed as its performer search prints rows.
+    @concurrent func popularPerformers() async throws -> [PerformerProfile] {
+        let html = try await html(at: Self.popularPath, query: [:])
+        return try EventernotePages.performers(in: html, page: 1, pageSize: Self.popularCount).items
+    }
+
+    /// The directory's own page: the performers most recently added, and the
+    /// kana their readings start with — see ``EventernotePages/performerIndex(in:)``.
+    @concurrent func performerIndex() async throws -> PerformerIndex {
+        let html = try await html(at: Self.directoryPath, query: [:])
+        guard let index = EventernotePages.performerIndex(in: html) else { throw Failure.unreadable }
+        return index
+    }
+
+    /// Every performer whose reading starts with `kana`, in the order of
+    /// their readings. One page however many: the site ignores paging here,
+    /// and 「あ」 is six thousand rows, a megabyte — so only ever read when the
+    /// reader opens it.
+    @concurrent func performers(underInitial kana: String) async throws -> [PerformerProfile] {
+        let html = try await html(at: Self.initialPath(kana), query: [:])
+        return try EventernotePages.performers(in: html, page: 1, pageSize: .max).items
+    }
+
+    /// How many the ranking lists.
+    static let popularCount = 100
+
+    static var popularPerformersURL: URL? { url(at: popularPath, query: [:]) }
+    static var performerDirectoryURL: URL? { url(at: directoryPath, query: [:]) }
+    static func performersURL(underInitial kana: String) -> URL? { url(at: initialPath(kana), query: [:]) }
+
+    private static let popularPath = "/actors/ranking"
+    private static let directoryPath = "/actors"
+    private static func initialPath(_ kana: String) -> String { "/actors/initial/\(kana)" }
+
     // MARK: - The site's own lists
 
     /// How many rows the site's 新着 tab holds. It has no pages: the hundred
@@ -208,8 +255,15 @@ nonisolated struct EventernoteClient: Sendable {
     /// address and capacity the detail sheet prints — read once a run where a
     /// run hands in its `halls`.
     @concurrent func detail(for event: Event, halls: HallPages? = nil) async throws -> Event {
-        let page = try await html(at: "/events/\(event.id)", query: [:])
-        guard var imported = EventernotePages.event(in: page, id: event.id) else {
+        event.merging(try await self.event(id: event.id, halls: halls))
+    }
+
+    /// One event's own page as it reads, and its hall's page behind it, with
+    /// nothing held to fold it into — an event known only by its id, from a
+    /// link pasted into Search (``EventernoteLink``).
+    @concurrent func event(id: Event.ID, halls: HallPages? = nil) async throws -> Event {
+        let page = try await html(at: "/events/\(id)", query: [:])
+        guard var imported = EventernotePages.event(in: page, id: id) else {
             throw Failure.unreadable
         }
 
@@ -232,7 +286,7 @@ nonisolated struct EventernoteClient: Sendable {
             } catch {}
         }
         imported.readAt = .now
-        return event.merging(imported)
+        return imported
     }
 
     /// What an event's read takes from its hall's page.
@@ -289,6 +343,14 @@ nonisolated struct EventernoteClient: Sendable {
         return EventernotePages.places(in: results).first { $0.name == name }
     }
 
+    /// The halls the site files under names matching `keyword`, a page at a
+    /// time — Search's Venues. Name and id alone: the search prints no address.
+    @concurrent func searchVenues(keyword: String, page: Int = 1) async throws -> EventernotePage<PlaceListing> {
+        let html = try await html(at: "/places/search",
+                                  query: ["keyword": keyword, "limit": "\(Self.pageSize)", "page": "\(page)"])
+        return try EventernotePages.places(in: html, page: page, pageSize: Self.pageSize)
+    }
+
     /// One hall's own page: where it is, how many it holds, and the walk from
     /// the station.
     @concurrent func venue(id: Int) async throws -> VenueProfile {
@@ -312,6 +374,31 @@ nonisolated struct EventernoteClient: Sendable {
                                   query: ["limit": "\(Self.pageSize)", "page": "\(page)"])
         return try EventernotePages.events(in: html, page: page, pageSize: Self.pageSize)
     }
+
+    // MARK: - The venues' directory
+
+    /// Every prefecture with how many halls the site files under it, and 海外
+    /// — the site's own directory of venues.
+    @concurrent func prefectures() async throws -> [PrefectureListing] {
+        let html = try await html(at: Self.venueDirectoryPath, query: [:])
+        let prefectures = EventernotePages.prefectures(in: html)
+        guard !prefectures.isEmpty else { throw Failure.unreadable }
+        return prefectures
+    }
+
+    /// Every hall the site files under one prefecture, in its order. One page
+    /// however many, as a kana of the performers' directory is: 東京都 is six
+    /// thousand halls, half a megabyte — so only read when the reader opens it.
+    @concurrent func venues(inPrefecture id: Int) async throws -> [PlaceListing] {
+        let html = try await html(at: Self.prefecturePath(id), query: [:])
+        return try EventernotePages.places(in: html, page: 1, pageSize: .max).items
+    }
+
+    static var venueDirectoryURL: URL? { url(at: venueDirectoryPath, query: [:]) }
+    static func venuesURL(inPrefecture id: Int) -> URL? { url(at: prefecturePath(id), query: [:]) }
+
+    private static let venueDirectoryPath = "/places"
+    private static func prefecturePath(_ id: Int) -> String { "/places/prefecture/\(id)" }
 
     // MARK: - Fetching
 

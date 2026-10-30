@@ -468,8 +468,7 @@ struct LotteryRoundCard: View {
             ForEach(entry.choices) { choice in
                 let isWon = entry.outcome == .won(choice.id)
                 HStack(spacing: 2) {
-                    SeatClass(rawValue: choice.seatClass)?.badge
-                        ?? Text(verbatim: choice.seatClass.first.map(String.init) ?? "?")
+                    SeatClass.badge(of: choice.seatClass) ?? Text(verbatim: "?")
                     Text(verbatim: "×\(choice.quantity)")
                 }
                 .font(.system(size: 10.5, weight: .semibold))

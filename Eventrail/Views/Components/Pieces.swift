@@ -352,15 +352,11 @@ struct FlowLayout: Layout {
 /// Shared by the card on the Me tab and the full list behind its See All, so
 /// that the short version and the long one cannot drift apart.
 ///
-/// The heart is a sibling of the row's own button rather than a button inside
-/// its label. Nested, the row's tap target covers it and a tap on the heart
-/// opens the event instead of un-favoriting it. It is the same circular
-/// control the Following tab's rows carry, so the one gesture that takes a row
-/// out of a list looks the same wherever the list is.
+/// The heart is the same circular control the Following tab's rows carry, so
+/// the one gesture that takes a row out of a list looks the same wherever the
+/// list is.
 struct FavoriteEventRow: View {
     @Environment(EventStore.self) private var store
-    /// Which clock the day is printed on — see ``TimeDisplay``.
-    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
 
     /// What stands where these rows would, when there are none.
     ///
@@ -371,16 +367,52 @@ struct FavoriteEventRow: View {
     static let emptyNote: LocalizedStringKey = "Tap the heart on any event to keep it here."
 
     let event: Event
+    var showsDivider = false
+    var isSelecting = false
+    var isSelected = false
+    var open: () -> Void
+
+    var body: some View {
+        CompactEventRow(event: event, showsDivider: showsDivider,
+                        isSelecting: isSelecting, isSelected: isSelected, open: open) {
+            Button {
+                withAnimation(.snappy) { store.toggleFavorite(event) }
+            } label: {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.favorite)
+                    .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .circlePanel()
+            .accessibilityLabel("Remove from favorites")
+        }
+    }
+}
+
+/// A short row inside a card — flyer, title, day and hall — with one round
+/// control beside it: Favorite Events' heart, Not on Your Account's way to
+/// the site.
+///
+/// The control is a sibling of the row's own button rather than a button
+/// inside its label. Nested, the row's tap target covers it and a tap on the
+/// heart opens the event instead of un-favoriting it.
+struct CompactEventRow<Control: View>: View {
+    /// Which clock the day is printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+
+    let event: Event
     /// Drawn above the row rather than below it, so a list ends on a row and
     /// not on a line.
     var showsDivider = false
     /// While the screen is picking rows, the mark stands in front of the flyer
-    /// and the heart stands down: a tap anywhere on the row is the choice, and
-    /// a heart that still un-favorited would be a second, contradictory way to
-    /// take the same event out.
+    /// and the control stands down: a tap anywhere on the row is the choice,
+    /// and a heart that still un-favorited would be a second, contradictory
+    /// way to take the same event out.
     var isSelecting = false
     var isSelected = false
     var open: () -> Void
+    @ViewBuilder var control: Control
 
     var body: some View {
         HStack(spacing: 12) {
@@ -407,19 +439,7 @@ struct FavoriteEventRow: View {
             }
             .buttonStyle(.plain)
 
-            if !isSelecting {
-                Button {
-                    withAnimation(.snappy) { store.toggleFavorite(event) }
-                } label: {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.favorite)
-                        .frame(width: 38, height: 38)
-                }
-                .buttonStyle(.plain)
-                .circlePanel()
-                .accessibilityLabel("Remove from favorites")
-            }
+            if !isSelecting { control }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -428,6 +448,80 @@ struct FavoriteEventRow: View {
         .overlay(alignment: .top) {
             if showsDivider { Divider().padding(.leading, 66) }
         }
+    }
+}
+
+/// A performer out of one of the site's lists — the search, the ranking, the
+/// directory. Opening one lists everything they are billed on.
+struct PerformerRow: View {
+    let performer: PerformerProfile
+    /// Where the ranking places them, ahead of the name.
+    var rank: Int?
+
+    var body: some View {
+        NavigationLink(value: PerformerLink.profile(performer)) {
+            HStack(spacing: 13) {
+                if let rank {
+                    Text(rank, format: .number)
+                        .scalingFont(size: 13, weight: .bold)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 26, alignment: .trailing)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(performer.name)
+                        .scalingFont(size: 14.5, weight: .semibold)
+                        .lineLimit(1)
+                    if let reading = performer.reading {
+                        Text(reading)
+                            .scalingFont(size: 12)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let fans = performer.fanCount {
+                    Text("^[\(fans) fan](inflect: true)")
+                        .scalingFont(size: 11.5, weight: .medium)
+                        .monospacedDigit()
+                        .foregroundStyle(.tertiary)
+                }
+                Image(systemName: "chevron.right")
+                    .scalingFont(size: 11, weight: .semibold)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(13)
+        }
+        .buttonStyle(.plain)
+        .panel()
+    }
+}
+
+/// A hall out of one of the site's lists — the venue search, a prefecture of
+/// its directory. Opening one reads its own page.
+struct VenueRow: View {
+    let place: PlaceListing
+
+    var body: some View {
+        NavigationLink(value: VenueLink.place(place)) {
+            HStack(spacing: 13) {
+                Image(systemName: "mappin.and.ellipse")
+                    .scalingFont(size: 13, weight: .semibold)
+                    .foregroundStyle(Color.brandTint)
+                    .frame(width: 18)
+                Text(place.name)
+                    .scalingFont(size: 14.5, weight: .semibold)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .scalingFont(size: 11, weight: .semibold)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(13)
+        }
+        .buttonStyle(.plain)
+        .panel()
     }
 }
 

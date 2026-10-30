@@ -946,19 +946,23 @@ struct EventPassportView: View {
         rankCard(.performers, title: "Top Performers", rows: stats.topPerformers, total: stats.totalEvents,
                  tint: .trackAttended, showsShare: true,
                  seeAll: stats.topPerformers.count > Self.cardLimit
-                     ? .performers(scope) : nil) { PerformerLink.billed(name: $0.name) }
+                     ? .performers(scope) : nil) { AttendedLink(subject: .performer($0.name), scope: scope) }
     }
 
     private func venuesCard(_ stats: PassportStats) -> some View {
         rankCard(.venues, title: "Top Venues", rows: stats.topVenues, total: stats.totalEvents,
                  tint: .brandTint, showsShare: false,
                  seeAll: stats.topVenues.count > Self.cardLimit
-                     ? .venues(scope) : nil) { VenueLink.named($0.name) }
+                     ? .venues(scope) : nil) { AttendedLink(subject: .venue($0.name), scope: scope) }
     }
 
     /// The two ranked cards are one card: the same rows, the same bar, the same
     /// way into the whole list. Only the tint and what a row pushes differ, and
     /// writing them twice is how the two drift apart.
+    ///
+    /// A row opens what the reader went to there, in this slice
+    /// (``AttendedHistoryView``), the performer's or the hall's own page a row
+    /// further on.
     private func rankCard<Value: Hashable>(
         _ card: PassportCard, title: LocalizedStringKey, rows: [PassportStats.Ranking], total: Int,
         tint: Color, showsShare: Bool, seeAll: PassportRanking?,
@@ -1401,9 +1405,9 @@ private struct PassportRuledRows<Item: Identifiable, Row: View>: View {
 /// The whole of one ranked list, behind a card's See All.
 ///
 /// A drawer like the extremes, and a stack inside it, because a row here still
-/// opens a performer or a hall: the sheet carries its own navigation so the
-/// push lands inside the drawer rather than on a screen the reader can no
-/// longer see behind it.
+/// opens what the reader went to there, and the performer's or the hall's page
+/// from that: the sheet carries its own navigation so the push lands inside
+/// the drawer rather than on a screen the reader can no longer see behind it.
 private struct PassportRankingSheet: View {
     @Environment(EventStore.self) private var store
     /// Set beside the Duo's fold, where the drawer is drawn on the
@@ -1464,17 +1468,12 @@ private struct PassportRankingSheet: View {
                         let label = PassportRankRow(
                             row: row, most: most, total: stats.totalEvents,
                             tint: tint, showsShare: ranking.isPerformers)
-                        // Two links rather than one over an erased value: a
-                        // push is matched to its destination by the *type*
-                        // of what was pushed, and `AnyHashable` matches
-                        // neither.
-                        if ranking.isPerformers {
-                            NavigationLink(value: PerformerLink.billed(name: row.name)) { label }
-                                .buttonStyle(.plain)
-                        } else {
-                            NavigationLink(value: VenueLink.named(row.name)) { label }
-                                .buttonStyle(.plain)
-                        }
+                        // What the reader went to there, as a card's row
+                        // opens it.
+                        NavigationLink(value: AttendedLink(
+                            subject: ranking.isPerformers ? .performer(row.name) : .venue(row.name),
+                            scope: ranking.scope)) { label }
+                            .buttonStyle(.plain)
                     }
                 }
                 .padding(16)
@@ -3006,10 +3005,10 @@ private struct SeatStyle {
     ///
     /// The three classes the ticket sheet offers keep one colour each whatever
     /// the year, so an S seat is the same red on every slice. A class the
-    /// reader typed is named as typed, badged with its first letter, and given
-    /// the next of the spare colours: the spending card's classes in the order
-    /// it lists them first, so its colours do not move for the lottery card's,
-    /// and then the classes only a lottery asked for.
+    /// reader typed is named as typed, badged as ``SeatClass/badge(of:)`` has
+    /// it, and given the next of the spare colours: the spending card's
+    /// classes in the order it lists them first, so its colours do not move
+    /// for the lottery card's, and then the classes only a lottery asked for.
     static func styles(for stats: PassportStats) -> SeatStyles {
         var styles: [String: SeatStyle] = [:]
         var spare = 0
@@ -3022,7 +3021,7 @@ private struct SeatStyle {
             } else {
                 styles[seatClass] = SeatStyle(
                     label: Text(verbatim: seatClass),
-                    badge: Text(verbatim: seatClass.prefix(1).uppercased()),
+                    badge: SeatClass.badge(of: seatClass) ?? Text(verbatim: "?"),
                     color: spareColors[spare % spareColors.count])
                 spare += 1
             }

@@ -57,6 +57,41 @@ nonisolated enum SeatClass: String, CaseIterable, Identifiable {
     static func order(of seatClass: String) -> Int {
         allCases.firstIndex { $0.rawValue == seatClass } ?? allCases.count
     }
+
+    /// A class the reader typed — SS席, 注釈付き指定席, 立見 — as it is kept:
+    /// full-width letters and digits made plain (ＳＳ席 is SS席), the ends
+    /// trimmed, and one of the chips' own, typed by either of its names, kept
+    /// as that one. Nothing else is read into it: a class the chips do not
+    /// offer is the reader's word, and is not folded into a near one.
+    static func typed(_ text: String) -> String {
+        let typed = text.precomposedStringWithCompatibilityMapping
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let listed = allCases.first(where: {
+            $0.rawValue == typed || $0.name.compare(typed, options: .caseInsensitive) == .orderedSame
+        }) {
+            return listed.rawValue
+        }
+        return String(typed.prefix(longestTyped))
+    }
+
+    /// As long as a class is kept: a seat tile and a chip have room for a few
+    /// words, and anything longer is a note.
+    static let longestTyped = 20
+
+    /// What stands for `seatClass` where there is room only for a badge: the
+    /// chips' own letter, else the Latin letters a typed class opens with (SS
+    /// for SS席, VIP), else its first character. Nil for none.
+    static func badge(of seatClass: String) -> Text? {
+        if let listed = SeatClass(rawValue: seatClass) { return listed.badge }
+        return badgeText(of: seatClass).map { Text(verbatim: $0) }
+    }
+
+    /// ``badge(of:)`` for a class the chips do not offer, as its letters.
+    static func badgeText(of seatClass: String) -> String? {
+        let letters = seatClass.prefix { $0.isASCII && $0.isLetter }
+        if !letters.isEmpty { return String(letters.prefix(3)).uppercased() }
+        return seatClass.first.map(String.init)
+    }
 }
 
 /// The reader's private record for one event.

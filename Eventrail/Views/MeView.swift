@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Which of the Me tab's lists has been opened in full.
 enum MeList: Hashable {
-    case onThisDay, lotteries, favorites, following
+    case onThisDay, lotteries, favorites, following, notOnAccount
 }
 
 /// The reader's own library at a glance: what it holds, when it was last
@@ -79,6 +79,7 @@ struct MeView: View {
                 case .lotteries: LotteriesView()
                 case .favorites: FavoriteEventsView()
                 case .following: FollowedPerformersView()
+                case .notOnAccount: NotOnAccountView()
                 }
             }
             .toolbar {
@@ -298,6 +299,11 @@ struct MeView: View {
             if handle == nil {
                 accountRow("Link Eventernote Account") { isLinking = true }
             } else {
+                // Only while there is something on it: an account in step
+                // with the library has nothing to send the reader to.
+                if let missing = store.notOnAccount(library)?.count, missing > 0 {
+                    notOnAccountRow(count: missing)
+                }
                 accountRow("Change Account") { isLinking = true }
                 // The sheet hangs off the row that opens it: iOS points a
                 // confirmation at whatever presented it, and one attached to the
@@ -447,23 +453,46 @@ struct MeView: View {
 
     private func accountRow(_ label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Text(label)
-                    .scalingFont(size: 14, weight: .medium)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .scalingFont(size: 11, weight: .semibold)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 13)
-            .contentShape(.rect)
+            accountRowLabel(Text(label))
         }
         .buttonStyle(.plain)
         .disabled(store.isRefreshing)
         .overlay(alignment: .top) {
             Divider().padding(.leading, 16)
         }
+    }
+
+    /// The library's events the account did not list at its last read — see
+    /// ``NotOnAccountView``. Open while a refresh runs, unlike the rows that
+    /// change the account: it only lists.
+    private func notOnAccountRow(count: Int) -> some View {
+        NavigationLink(value: MeList.notOnAccount) {
+            accountRowLabel(Text("Not on Your Account"), count: count)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            Divider().padding(.leading, 16)
+        }
+    }
+
+    private func accountRowLabel(_ label: Text, count: Int? = nil) -> some View {
+        HStack(spacing: 12) {
+            label
+                .scalingFont(size: 14, weight: .medium)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let count {
+                Text(count, format: .number)
+                    .scalingFont(size: 13)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            Image(systemName: "chevron.right")
+                .scalingFont(size: 11, weight: .semibold)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .contentShape(.rect)
     }
 
     // MARK: - On this day

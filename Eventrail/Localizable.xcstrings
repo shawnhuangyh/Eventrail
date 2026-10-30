@@ -229,6 +229,28 @@
         }
       }
     },
+    "%@ %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ %lld"
+          }
+        }
+      }
+    },
     "%@ × %lld" : {
       "localizations" : {
         "ja" : {
@@ -799,6 +821,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@、%@ 和 %@"
+          }
+        }
+      }
+    },
+    "%@, ^[%lld performer](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@、出演者%lld組"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 位艺人"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 位藝人"
+          }
+        }
+      }
+    },
+    "%@, ^[%lld venue](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@、会場%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 个场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，%lld 個場館"
           }
         }
       }
@@ -1661,6 +1727,28 @@
         }
       }
     },
+    "^[%lld venue](inflect: true) on Eventernote" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteで会場%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上有 %lld 个场馆"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上有 %lld 個場館"
+          }
+        }
+      }
+    },
     "^[%lld year](inflect: true) ago" : {
       "comment" : "On This Day: how long ago an event the reader went to was, such as 1 year ago.",
       "localizations" : {
@@ -2015,6 +2103,28 @@
         }
       }
     },
+    "across ^[%lld year](inflect: true)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld年にわたって"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跨 %lld 个年份"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跨 %lld 個年份"
+          }
+        }
+      }
+    },
     "Add %@ Choice" : {
       "localizations" : {
         "ja" : {
@@ -2125,6 +2235,28 @@
         }
       }
     },
+    "Add on Eventernote" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteで参加する"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往 Eventernote 登记"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往 Eventernote 登記"
+          }
+        }
+      }
+    },
     "Add Seat" : {
       "localizations" : {
         "ja" : {
@@ -2187,6 +2319,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "加入行程"
+          }
+        }
+      }
+    },
+    "Added to Eventernote last" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteに最近追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近加入 Eventernote"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近加入 Eventernote"
           }
         }
       }
@@ -2521,6 +2675,28 @@
         }
       }
     },
+    "As the ticket prints it, such as SS席 or 注釈付き指定席." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットの表記どおりに入力してください（例：SS席、注釈付き指定席）。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请按票面写法填写，例如 SS席、注釈付き指定席。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請依票面寫法填寫，例如 SS席、注釈付き指定席。"
+          }
+        }
+      }
+    },
     "At exchange rates of %@" : {
       "localizations" : {
         "ja" : {
@@ -2786,6 +2962,50 @@
         }
       }
     },
+    "By Kana" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "50音別"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按假名"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按假名"
+          }
+        }
+      }
+    },
+    "By prefecture" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "都道府県別"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按都道府县浏览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按都道府縣瀏覽"
+          }
+        }
+      }
+    },
     "By Round" : {
       "localizations" : {
         "ja" : {
@@ -3047,6 +3267,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇一個活動，它會顯示在這裡。"
+          }
+        }
+      }
+    },
+    "Choose Date" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付を選択"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择日期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇日期"
           }
         }
       }
@@ -4881,6 +5123,28 @@
         }
       }
     },
+    "Eventernote's ranking by fans, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、ファン数のランキングです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上的粉丝数排行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上的粉絲數排行。"
+          }
+        }
+      }
+    },
     "Eventrail" : {
       "localizations" : {
         "ja" : {
@@ -4965,6 +5229,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eventrail 未獲准使用相機。你可以在「設定」中允許。"
+          }
+        }
+      }
+    },
+    "Eventrail never writes to Eventernote. Open each event there and tap 参加する; it leaves this list the next time your account is read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EventrailはEventernoteに書き込みません。各イベントをEventernoteで開いて「参加する」をタップしてください。次にアカウントを読み込んだときにこのリストから外れます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 不会写入 Eventernote。请在 Eventernote 打开各场活动并轻点「参加する」；账号下次读取后，该活动即从本列表移除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventrail 不會寫入 Eventernote。請在 Eventernote 打開各場活動並輕點「参加する」；帳號下次讀取後，該活動即從本列表移除。"
           }
         }
       }
@@ -5168,6 +5454,94 @@
         }
       }
     },
+    "Every performer on Eventernote whose reading starts with %@, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、読みが「%@」で始まる出演者すべてです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上，读音以「%@」开头的全部艺人。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上，讀音以「%@」開頭的全部藝人。"
+          }
+        }
+      }
+    },
+    "Every performer on Eventernote, filed by the kana their reading starts with." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteの出演者すべてを、読みの最初の文字で分けています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部艺人，按读音的首个假名分类。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部藝人，依讀音的首個假名分類。"
+          }
+        }
+      }
+    },
+    "Every venue on Eventernote in %@, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、%@の会場すべてです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上，位于%@的全部场馆。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上，位於%@的全部場館。"
+          }
+        }
+      }
+    },
+    "Every venue on Eventernote, filed by the prefecture it is in." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteの会場すべてを、所在する都道府県で分けています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部场馆，按所在都道府县分类。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernote 上的全部場館，依所在都道府縣分類。"
+          }
+        }
+      }
+    },
     "Everything already imported stays in your library, whichever account you name. Only where Eventrail reads next changes." : {
       "localizations" : {
         "ja" : {
@@ -5252,6 +5626,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "該備份中的所有內容都已存在於此裝置上。"
+          }
+        }
+      }
+    },
+    "Everything in your library is on your Eventernote account." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブラリのイベントはすべてEventernoteアカウントにあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料库中的活动均已收录于你的 Eventernote 账号。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料庫中的活動均已收錄於你的 Eventernote 帳號。"
           }
         }
       }
@@ -5587,6 +5983,28 @@
         }
       }
     },
+    "First Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初回"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次"
+          }
+        }
+      }
+    },
     "Flyer" : {
       "comment" : "A tile on the ticket stub composer: print the event's flyer across the top of the ticket.",
       "localizations" : {
@@ -5782,6 +6200,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "來自備份檔案"
+          }
+        }
+      }
+    },
+    "From an Eventernote link" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eventernoteのリンクから"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 Eventernote 链接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自 Eventernote 連結"
           }
         }
       }
@@ -6757,6 +7197,28 @@
         }
       }
     },
+    "List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表"
+          }
+        }
+      }
+    },
     "Listed appearances" : {
       "localizations" : {
         "ja" : {
@@ -6797,6 +7259,73 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "列出的活動"
+          }
+        }
+      }
+    },
+    "Live Activities are off in Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「設定」でライブアクティビティがオフになっています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在“设置”中关闭实时活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在「設定」中關閉即時動態"
+          }
+        }
+      }
+    },
+    "Live Activity available" : {
+      "comment" : "A notification's title, once an event's Live Activity can be started.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティを開始できます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时活动现已可开启"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即時動態現已可開啟"
+          }
+        }
+      }
+    },
+    "Live Activity Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティの通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时活动提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即時動態提醒"
           }
         }
       }
@@ -7494,6 +8023,28 @@
         }
       }
     },
+    "Most Recent" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近一次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近一次"
+          }
+        }
+      }
+    },
     "My Events" : {
       "localizations" : {
         "ja" : {
@@ -7578,6 +8129,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "從未重新整理"
+          }
+        }
+      }
+    },
+    "New" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新"
           }
         }
       }
@@ -7911,6 +8484,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未發布活動"
+          }
+        }
+      }
+    },
+    "No events you went to." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加したイベントはありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有参加过的活动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有參加過的活動。"
           }
         }
       }
@@ -8403,6 +8998,28 @@
         }
       }
     },
+    "Not on Your Account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウントに未登録"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "账号未收录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帳號未收錄"
+          }
+        }
+      }
+    },
     "Not Placed" : {
       "localizations" : {
         "ja" : {
@@ -8604,6 +9221,28 @@
         }
       }
     },
+    "Nothing in the past is missing from Eventernote." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "過去のイベントはすべてEventernoteにあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已结束的活动均已收录于 Eventernote。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已結束的活動均已收錄於 Eventernote。"
+          }
+        }
+      }
+    },
     "Nothing is erased" : {
       "localizations" : {
         "ja" : {
@@ -8688,6 +9327,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未恢復任何內容"
+          }
+        }
+      }
+    },
+    "Nothing still to come is missing from Eventernote." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今後のイベントはすべてEventernoteにあります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未举行的活动均已收录于 Eventernote。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未舉行的活動均已收錄於 Eventernote。"
           }
         }
       }
@@ -9488,6 +10149,28 @@
         }
       }
     },
+    "Other…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他…"
+          }
+        }
+      }
+    },
     "Out — record it" : {
       "comment" : "In a lottery round's card, under Results: the results day has come and no result is written down.",
       "localizations" : {
@@ -9859,6 +10542,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "計劃中"
+          }
+        }
+      }
+    },
+    "Popular" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "热门"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "熱門"
+          }
+        }
+      }
+    },
+    "Popular, new and by kana" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気・新着・50音別"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "热门、最新与按假名浏览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "熱門、最新與按假名瀏覽"
           }
         }
       }
@@ -11965,6 +12692,28 @@
         }
       }
     },
+    "Shows the events you went to" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加したイベントを表示します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示你参加过的活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示你參加過的活動"
+          }
+        }
+      }
+    },
     "Shows the price as it was paid" : {
       "localizations" : {
         "ja" : {
@@ -12519,6 +13268,29 @@
         }
       }
     },
+    "Tap to start the countdown on your Lock Screen." : {
+      "comment" : "A notification's text, once an event's Live Activity can be started.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップすると、ロック画面でカウントダウンを開始します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点即可在锁定屏幕上开始倒计时。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "輕點即可在鎖定畫面上開始倒數計時。"
+          }
+        }
+      }
+    },
     "That backup is damaged and could not be opened." : {
       "localizations" : {
         "ja" : {
@@ -12629,6 +13401,28 @@
         }
       }
     },
+    "The %lld with the most fans" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファン数の多い%lld組"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粉丝数最多的 %lld 位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粉絲數最多的 %lld 位"
+          }
+        }
+      }
+    },
     "The backup could not be written (%@). Tap to try again." : {
       "localizations" : {
         "ja" : {
@@ -12735,6 +13529,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eventernote 最新新增的 %lld 個活動"
+          }
+        }
+      }
+    },
+    "The performers most recently added to Eventernote, from its public pages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているEventernoteページに掲載された、最近追加された出演者です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开可访问的 Eventernote 页面上最近加入的艺人。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開可存取的 Eventernote 頁面上最近加入的藝人。"
           }
         }
       }
@@ -13222,6 +14038,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間以現地時間顯示，%@"
+          }
+        }
+      }
+    },
+    "Title, performer, venue or note" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイトル・出演者・会場・メモ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标题、艺人、场馆或备注"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標題、藝人、場館或備註"
           }
         }
       }

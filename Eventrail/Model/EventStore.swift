@@ -59,9 +59,9 @@ enum Grouping: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// Which of Eventernote's two searches the Search tab is running.
+/// Which of Eventernote's three searches the Search tab is running.
 enum SearchScope: String, CaseIterable, Identifiable, Hashable {
-    case events, performers
+    case events, performers, venues
 
     var id: Self { self }
 
@@ -69,6 +69,7 @@ enum SearchScope: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .events: "Events"
         case .performers: "Performers"
+        case .venues: "Venues"
         }
     }
 }
@@ -285,6 +286,9 @@ final class EventStore {
     /// Which event pages this device has already read, so a refresh does not
     /// ask for them all again — see ``PageReads``.
     private let pageReads: PageReads?
+    /// What the linked account listed at its last whole read — see
+    /// ``AccountEvents``.
+    private let accountEvents: AccountEvents?
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var venuePlacings: Task<Void, Never>?
@@ -306,9 +310,9 @@ final class EventStore {
     /// middle of one — waits for it rather than asking for the page again.
     private var detailReads: [Event.ID: Task<PageRead, Never>] = [:]
     /// When this launch last read the account's lists by itself, and the read
-    /// while it runs — see ``refreshAccountIfStale()``.
+    /// while it runs — see ``refreshAccountIfStale()`` and ``readAccountNow()``.
     private var accountReadTried: Date?
-    private var accountReadByItself: Task<Void, Never>?
+    private var accountRead: Task<Void, Never>?
 
     /// The default store opens the reader's own library, synced or not as
     /// they last said. Previews and tests hand in a database held in memory
@@ -320,6 +324,7 @@ final class EventStore {
         calendar: CalendarSync? = .shared,
         venues: VenuePlaces? = .shared,
         pageReads: PageReads? = .shared,
+        accountEvents: AccountEvents? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
         tracking: [Event.ID: Tracking] = [:],
@@ -333,6 +338,7 @@ final class EventStore {
         self.calendar = calendar
         self.venues = venues
         self.pageReads = pageReads
+        self.accountEvents = accountEvents
         self.client = client
 
         iCloudSyncEnabled = syncing
@@ -651,6 +657,22 @@ final class EventStore {
         let record = LibraryDatabase.tracking(of: entries[id], rows: lotteryRows[id])
         records[id] = record
         return record
+    }
+
+    /// The seat classes the reader has typed rather than chosen — any the
+    /// chips do not offer (``SeatClass``), named on a round or a ticket
+    /// anywhere in the library — the most used first, for a lottery entry's
+    /// page to offer again.
+    func typedSeatClasses() -> [String] {
+        var uses: [String: Int] = [:]
+        for id in Set(entries.keys).union(lotteryRows.keys) {
+            let record = tracking(of: id)
+            let named = Set(record.lotteries.flatMap { $0.choices.map(\.seatClass) } + [record.seatClass])
+            for seatClass in named where !seatClass.isEmpty && SeatClass(rawValue: seatClass) == nil {
+                uses[seatClass, default: 0] += 1
+            }
+        }
+        return uses.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
     }
 
     /// The one badge a row wears, read from where the event stands.
@@ -997,6 +1019,17 @@ final class EventStore {
         return imported
     }
 
+    /// Reads an event known only by its id — a link pasted into Search — and
+    /// holds on to it as a search result is held, the read written down, so
+    /// its sheet opens on it without asking the site again.
+    func readEvent(id: Event.ID) async throws -> Event {
+        let asked = Date.now
+        let imported = try await client.event(id: id)
+        apply(imported, asked: asked)
+        save()
+        return event(id: id) ?? imported
+    }
+
     /// Whether an event's own page is worth reading again by itself — which is
     /// what an event's sheet asks as it opens.
     ///
@@ -1090,7 +1123,7 @@ final class EventStore {
     func refresh() async -> Bool {
         // A read the app started by itself is let finish first, so an account
         // linked while it ran is read whole after it rather than not at all.
-        await accountReadByItself?.value
+        await accountRead?.value
         guard !isRefreshing, eventernoteHandle != nil else { return false }
         isRefreshing = true
         refreshFailure = nil
@@ -1448,7 +1481,33 @@ final class EventStore {
         settings.lastImported = nil
         importSummary = nil
         refreshFailure = nil
+        accountEvents?.clear()
         save()
+    }
+
+    /// The events among `library` that the linked account did not list when
+    /// this device last read its history whole — what to mark on Eventernote
+    /// for the account to carry them too, since nothing here writes to it. Nil
+    /// where there is no such read to go by: no account linked, or none read
+    /// to its end on this device yet.
+    func notOnAccount(_ library: [Event]) -> [Event]? {
+        guard let handle = eventernoteHandle,
+              let listed = accountEvents?.listing(for: handle)?.events
+        else { return nil }
+        return library.filter { !listed.contains($0.id) }
+    }
+
+    /// Whether this event is kept here and was not on the linked account at
+    /// its last whole read — see ``notOnAccount(_:)``.
+    func isNotOnAccount(_ event: Event) -> Bool {
+        guard isInLibrary(event) else { return false }
+        return notOnAccount([event])?.isEmpty == false
+    }
+
+    /// When the account was last read whole on this device, which is how
+    /// current ``notOnAccount(_:)`` is.
+    var accountListingRead: Date? {
+        eventernoteHandle.flatMap { accountEvents?.listing(for: $0)?.read }
     }
 
     /// Imports every event the linked account is listed as attending.
@@ -1479,6 +1538,9 @@ final class EventStore {
         var imported: [Event] = []
         var page = 1
         var reached = false
+        /// Whether the run reached the history's last page, rather than
+        /// stopping at a page that failed.
+        var whole = false
 
         while eventernoteHandle == handle {
             let read: EventernotePage<Event>
@@ -1495,7 +1557,10 @@ final class EventStore {
             refreshStage = .readingHistory(read: imported.count, total: max(read.total, imported.count))
             // An empty page ends the run even if the site's own count disagrees,
             // so a miscounted total cannot spin this forever.
-            guard read.hasMore, !read.items.isEmpty else { break }
+            guard read.hasMore, !read.items.isEmpty else {
+                whole = true
+                break
+            }
             page += 1
         }
 
@@ -1516,6 +1581,9 @@ final class EventStore {
         // overstate what arrived.
         var seen: Set<Event.ID> = []
         let distinct = imported.filter { seen.insert($0.id).inserted }
+        // Only whole: a history cut short would have Not on Your Account name
+        // what the account does list.
+        if whole { accountEvents?.record(seen, for: handle) }
         return (distinct.count, adopt(distinct, restoring: restoring))
     }
 
@@ -1586,17 +1654,42 @@ final class EventStore {
                                                                        fetched: lastFetched,
                                                                        status: syncStatus))
         else { return false }
+        await readAccount()
+        return true
+    }
+
+    /// The same read, asked for by the reader — Not on Your Account's
+    /// Refresh, once they have marked events on the site — so held to no
+    /// window.
+    ///
+    /// Still the lighter read rather than ``refresh()``, and it still only
+    /// adds: putting back what the reader took out is Refresh's alone. Asked
+    /// while the app's own read is going, it waits for that one and ends with
+    /// it.
+    ///
+    /// Answers whether it ran.
+    @discardableResult
+    func readAccountNow() async -> Bool {
+        if let accountRead {
+            await accountRead.value
+            return true
+        }
+        guard !isRefreshing, eventernoteHandle != nil else { return false }
+        await readAccount()
+        return true
+    }
+
+    private func readAccount() async {
         accountReadTried = .now
         // Before the task starts, so a second ask in the same moment — the
         // launch and the first return to the app both ask — finds it running.
         isRefreshing = true
         refreshFailure = nil
         // A task of its own, which ``refresh()`` waits on.
-        let read = Task { await readAccountByItself() }
-        accountReadByItself = read
+        let read = Task { await readAccountLists() }
+        accountRead = read
         await read.value
-        accountReadByItself = nil
-        return true
+        accountRead = nil
     }
 
     /// Whether the account's lists are owed a read the app makes by itself:
@@ -1632,7 +1725,7 @@ final class EventStore {
     /// it, is not hundreds of pages read unasked.
     private static let arrivalPagesRead = 20
 
-    private func readAccountByItself() async {
+    private func readAccountLists() async {
         defer {
             isRefreshing = false
             refreshStage = nil

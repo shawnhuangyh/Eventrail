@@ -352,25 +352,36 @@ struct ListingSections<Subject: Codable & Sendable>: View {
             StatTile(tint: .trackInterest,
                      value: hasEveryUpcoming ? upcoming.count.formatted() : "—",
                      label: "Upcoming dates")
-            StatTile(tint: .trackAttended,
-                     value: store.events(of: kept, where: \.inLibrary).count {
-                         store.hasAttended($0) && isOfSubject($0)
-                     }.formatted(),
-                     label: "You attended")
+            attendedTile
             StatTile(tint: .trackTicket, value: feed.total.formatted(),
                      label: subject.isVenue ? "Listed events" : "Listed appearances")
         }
         .padding(.horizontal, 18)
     }
 
-    /// Whether a kept event is one of this listing's: a performer billed on
-    /// it, or held at the hall — matched on the name the site printed, the one
-    /// thing every row of a listing publishes, since an event imported from a
-    /// search row has no place id.
-    private func isOfSubject(_ event: Event) -> Bool {
-        switch subject {
-        case .performer(let name): event.performers.contains { $0.name == name }
-        case .venue(let name): event.venue == name
+    /// How many of the library's events the reader went to here — see
+    /// ``ListingSubject/includes(_:)`` — opening what they were
+    /// (``AttendedHistoryView``) where there are any. Not offering this page
+    /// again from there, since it is the page underneath.
+    @ViewBuilder
+    private var attendedTile: some View {
+        let count = store.events(of: kept, where: \.inLibrary).count {
+            store.hasAttended($0) && subject.includes($0)
+        }
+        let tile = StatTile(tint: .trackAttended, value: count.formatted(), label: "You attended")
+        if count > 0 {
+            NavigationLink(value: AttendedLink(subject: subject, offersPage: false)) {
+                tile.overlay(alignment: .topTrailing) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .padding(14)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Shows the events you went to")
+        } else {
+            tile
         }
     }
 

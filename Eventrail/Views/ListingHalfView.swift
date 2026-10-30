@@ -16,6 +16,17 @@ nonisolated enum ListingSubject: Hashable {
         case .performer(let name), .venue(let name): name
         }
     }
+
+    /// Whether an event is one of this listing's: a performer billed on it,
+    /// or held at the hall — matched on the name the site printed, the one
+    /// thing every row of a listing publishes, since an event imported from a
+    /// search row has no place id. The Passport counts by the same names.
+    func includes(_ event: Event) -> Bool {
+        switch self {
+        case .performer(let name): event.performers.contains { $0.name == name }
+        case .venue(let name): event.venue == name
+        }
+    }
 }
 
 /// One half of a listing in full — every upcoming date, or everything already

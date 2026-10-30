@@ -56,9 +56,35 @@ nonisolated struct EventernoteProfile: Hashable, Sendable {
 ///
 /// Name and id and nothing else: the search rows publish no address, which is
 /// why placing a venue takes the hall's own page as well.
-nonisolated struct PlaceListing: Hashable, Sendable {
+nonisolated struct PlaceListing: Identifiable, Hashable, Codable, Sendable {
     let id: Int
     let name: String
+}
+
+/// One kana a performer's reading can start with, as the site's directory
+/// lists it: 「あ」 and how many it files there.
+nonisolated struct KanaInitial: Hashable, Codable, Sendable {
+    let kana: String
+    let count: Int
+}
+
+/// One prefecture the site files halls under, as its directory of venues
+/// (`/places`) lists it: 東京都, its number on the site, and how many halls.
+/// The site's 海外 is one of them, numbered 90.
+nonisolated struct PrefectureListing: Identifiable, Hashable, Codable, Sendable {
+    let id: Int
+    let name: String
+    let count: Int
+
+    /// The site's number for the halls abroad.
+    static let abroadID = 90
+}
+
+/// The site's performer directory, `/actors`: the performers most recently
+/// added, and the kana their readings start with.
+nonisolated struct PerformerIndex: Codable, Sendable {
+    var newest: [PerformerProfile]
+    var initials: [KanaInitial]
 }
 
 /// One hall's own page: what Eventernote publishes about the place itself,
@@ -292,12 +318,109 @@ nonisolated enum EventernotePages {
         var rows = HTMLCursor(list)
         var places: [PlaceListing] = []
         while rows.advance(past: #"<a href="/places/"#) {
-            guard let path = rows.take(upTo: "\""), let id = Int(path),
-                  let name = rows.text(after: ">", upTo: "</a>")
-            else { break }
+            guard let path = rows.take(upTo: "\""), let id = Int(path) else { break }
+            // A hall filed with no name — a prefecture's list opens on two —
+            // is passed over rather than ending the list there.
+            guard let name = rows.text(after: ">", upTo: "</a>") else { continue }
             places.append(PlaceListing(id: id, name: name))
         }
         return places
+    }
+
+    /// The venue search, a page of it with the count it printed — what
+    /// Search's Venues lists. The rows read as ``places(in:)`` reads them.
+    ///
+    /// Throws, as every listing does, where the rows are missing from a page
+    /// that is not the site's own empty search — see ``confirmsNoRows(_:)``.
+    static func places(in html: String, page: Int, pageSize: Int) throws -> EventernotePage<PlaceListing> {
+        let places = places(in: html)
+        if places.isEmpty { try confirmsNoRows(html) }
+        return EventernotePage(items: places, total: totalCount(in: html) ?? places.count,
+                               page: page, pageSize: pageSize)
+    }
+
+    // MARK: - The venues' directory
+
+    /// `/places`: every prefecture — 北海道 (536) — with how many halls the
+    /// site files under it, in the site's order, 海外 last.
+    static func prefectures(in html: String) -> [PrefectureListing] {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="gb_listview">"#), let list = cursor.take(upTo: "</ul>") else {
+            return []
+        }
+        var rows = HTMLCursor(list)
+        var prefectures: [PrefectureListing] = []
+        while rows.advance(past: #"<a href="/places/prefecture/"#) {
+            guard let path = rows.take(upTo: "\""), let id = Int(path),
+                  let listed = rows.text(after: ">", upTo: "</a>")
+            else { break }
+            let (name, count) = splitCount(listed)
+            guard !name.isEmpty, let count else { continue }
+            prefectures.append(PrefectureListing(id: id, name: name, count: count))
+        }
+        return prefectures
+    }
+
+    // MARK: - The performers' directory
+
+    /// `/actors`: the performers most recently added — 楠ゆい(READY TO KISS) (0),
+    /// the fan count in the last parentheses — and every kana with how many
+    /// readings start with it. Nil where the page carries neither.
+    static func performerIndex(in html: String) -> PerformerIndex? {
+        var newest: [PerformerProfile] = []
+        var cursor = HTMLCursor(html)
+        if cursor.advance(past: "新着声優/アーティスト</h2>"), let block = cursor.take(upTo: "</p>") {
+            for slice in HTMLCursor(block).slices(startingAt: #"<a href="/actors/"#) {
+                var row = HTMLCursor(slice)
+                row.advance(past: #"<a href="/actors/"#)
+                guard let path = row.take(upTo: "\""), let id = Int(path.split(separator: "/").last ?? ""),
+                      let listed = row.text(after: ">", upTo: "</a>")
+                else { continue }
+                let (name, fans) = splitCount(listed)
+                guard !name.isEmpty else { continue }
+                newest.append(PerformerProfile(id: id, name: name, reading: nil, fanCount: fans,
+                                               slug: String(path.split(separator: "/").dropLast().joined(separator: "/"))))
+            }
+        }
+
+        var initials: [KanaInitial] = []
+        var index = HTMLCursor(html)
+        if index.advance(past: "50音別声優/アーティスト</h2>"), let block = index.take(upTo: "</ul>") {
+            var rows = HTMLCursor(block)
+            while rows.advance(past: #"<a href="/actors/initial/"#) {
+                guard let kana = rows.text(after: "「", upTo: "」"),
+                      let count = rows.text(after: ">", upTo: "</span>").flatMap(number(in:))
+                else { break }
+                initials.append(KanaInitial(kana: kana, count: count))
+            }
+        }
+        guard !newest.isEmpty || !initials.isEmpty else { return nil }
+        return PerformerIndex(newest: newest, initials: initials)
+    }
+
+    /// "楠ゆい(READY TO KISS) (0)", "東京都 (6151)" — a name, and the count
+    /// a directory sets after it in parentheses of its own.
+    private static func splitCount(_ listed: String) -> (name: String, count: Int?) {
+        guard listed.hasSuffix(")"), let open = listed.range(of: " (", options: .backwards) else {
+            return (listed, nil)
+        }
+        let figure = listed[open.upperBound ..< listed.index(before: listed.endIndex)]
+        guard let count = Int(figure) else { return (listed, nil) }
+        return (String(listed[..<open.lowerBound]), count)
+    }
+
+    // MARK: - A performer's own page
+
+    /// `/actors/{slug}/{id}`: who the page is about, from its heading — the
+    /// name in its `h1`, the reading under it. The page's listing is the
+    /// performer's events page's to read.
+    static func performer(in html: String, id: Int, slug: String) -> PerformerProfile? {
+        var cursor = HTMLCursor(html)
+        guard cursor.advance(past: #"<div class="mod_actors_detail">"#),
+              let name = cursor.text(after: #"<div class="title"><h1>"#, upTo: "</h1>")
+        else { return nil }
+        let reading = cursor.text(after: #"<div class="title2"><h2>"#, upTo: "</h2>")
+        return PerformerProfile(id: id, name: name, reading: reading, fanCount: nil, slug: slug)
     }
 
     // MARK: - A member's own page

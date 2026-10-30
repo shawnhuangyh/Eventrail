@@ -1408,7 +1408,15 @@ struct EventDetailView: View {
             Divider()
 
             // Anything that changes the reader's Eventernote account happens
-            // on the official site, where they authenticate directly.
+            // on the official site, where they authenticate directly — so an
+            // event kept here and missing from the account is sent there
+            // (``EventStore/isNotOnAccount(_:)``), the page Open in
+            // Eventernote opens, named for what the reader goes to do.
+            if store.isNotOnAccount(event) {
+                Link(destination: event.sourceURL) {
+                    Label("Add on Eventernote", systemImage: "arrow.up.forward.app")
+                }
+            }
             // In a Task of its own: the menu does not wait for the read, and
             // the notice says how it went.
             EventernotePageItems(page: event.sourceURL, isRefreshing: isImporting) {

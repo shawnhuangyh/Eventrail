@@ -368,4 +368,126 @@ struct EventernotePagesTests {
     @Test func aPageWithoutAProfileIsNotAProfile() {
         #expect(EventernotePages.profile(in: "<html></html>", handle: "x") == nil)
     }
+
+    // MARK: - Search's venues and the performers' directory
+
+    @Test func readsAPageOfVenueSearchWithItsCount() throws {
+        let html = """
+            <p class="t2">1523件見つかりました。<span class="pager"></span></p>
+            <div class="gb_listview">
+            <div class="gb_pager"><table><tr><td><span>1</span></td></tr></table></div>
+            <ul class="clearfix">
+            <li><a href="/places/949">飯能市市民会館 小ホール</a></span></li>
+            <li><a href="/places/2090">飯能市市民会館 大ホール</a></span></li>
+            </ul></div>
+            """
+        let page = try EventernotePages.places(in: html, page: 2, pageSize: 30)
+        #expect(page.items.map(\.id) == [949, 2090])
+        #expect(page.items.first?.name == "飯能市市民会館 小ホール")
+        #expect(page.total == 1523)
+        #expect(page.hasMore)
+    }
+
+    /// A venue search the site found nothing for is an answer; a page that is
+    /// not the site's own is not.
+    @Test func anEmptyVenueSearchIsEmptyAndAForeignPageIsUnreadable() throws {
+        let empty = #"<p class="t2">0件見つかりました。</p><ul class="gb_foot_menu"></ul>"#
+        #expect(try EventernotePages.places(in: empty, page: 1, pageSize: 30).items.isEmpty)
+        #expect(throws: EventernoteClient.Failure.self) {
+            try EventernotePages.places(in: "<html>maintenance</html>", page: 1, pageSize: 30)
+        }
+    }
+
+    /// The ranking prints its rank ahead of each row and the fan count after
+    /// the name, as the performer search prints rows.
+    @Test func readsTheRanking() throws {
+        let html = """
+            <div class="gb_listview">
+              <p class="t2">2026-10-28 22:42 時点</p>
+            <ul class="clearfix ranking">
+                <li><span class="rank">1.</span><a href="/actors/%CE%BC%E2%80%99s/2809">μ’s <span class="count color1">7766</span></a></li>
+                <li><span class="rank">2.</span><a href="/actors/TrySail/12566">TrySail <span class="count color1">5154</span></a></li>
+            </ul></div>
+            """
+        let page = try EventernotePages.performers(in: html, page: 1, pageSize: 100)
+        #expect(page.items.map(\.name) == ["μ’s", "TrySail"])
+        #expect(page.items.map(\.fanCount) == [7766, 5154])
+        #expect(page.items.first?.slug == "%CE%BC%E2%80%99s")
+    }
+
+    @Test func readsTheDirectorysNewestAndItsKana() throws {
+        let html = """
+            <h2 class="gb_subtitle">新着声優/アーティスト</h2>
+            <p class="t ranking">
+            <a href="/actors/JO%28%26TEAM%29/95518">JO(&amp;TEAM) (0)</a>
+            <a href="/actors/TSUKKI/95521">TSUKKI (3)</a>
+            </p>
+            <h2 class="gb_subtitle">50音別声優/アーティスト</h2>
+            <ul>
+            <li><a href="/actors/initial/%E3%81%82">「あ」<span class="count color1">6662</span></a></li>
+            <li><a href="/actors/initial/%E3%82%93">「ん」<span class="count color1">9</span></a></li>
+            </ul>
+            """
+        let index = try #require(EventernotePages.performerIndex(in: html))
+        #expect(index.newest.map(\.name) == ["JO(&TEAM)", "TSUKKI"])
+        #expect(index.newest.map(\.fanCount) == [0, 3])
+        #expect(index.newest.first?.id == 95518)
+        #expect(index.initials == [KanaInitial(kana: "あ", count: 6662), KanaInitial(kana: "ん", count: 9)])
+    }
+
+    @Test func aPageWithoutTheDirectoryIsNoDirectory() {
+        #expect(EventernotePages.performerIndex(in: "<html>maintenance</html>") == nil)
+    }
+
+    // MARK: - The venues' directory and a performer's own page
+
+    @Test func readsThePrefecturesWithTheirCounts() {
+        let html = """
+            <div class="gb_listview">
+            <ul class="clearfix">
+                <li><a href="/places/prefecture/1">北海道 (536)</a></li>
+                <li><a href="/places/prefecture/13">東京都 (6151)</a></li>
+                <li><a href="/places/prefecture/90">海外 (1541)</a></li>
+            </ul>
+            </div>
+            """
+        let prefectures = EventernotePages.prefectures(in: html)
+        #expect(prefectures.map(\.name) == ["北海道", "東京都", "海外"])
+        #expect(prefectures.map(\.count) == [536, 6151, 1541])
+        #expect(prefectures.last?.id == PrefectureListing.abroadID)
+        #expect(EventernotePages.prefectures(in: "<html>maintenance</html>").isEmpty)
+    }
+
+    /// A prefecture's list opens on halls filed with no name; they are passed
+    /// over rather than ending the list.
+    @Test func aHallWithNoNameIsPassedOver() throws {
+        let html = """
+            <h1 class="gb_subtitle">「東京都」のイベント会場一覧</h1>
+            <div class="gb_listview">
+            <ul class="clearfix">
+                  <li><a href="/places/27937"></a></span></li>
+                  <li><a href="/places/5185">#HiveShibuya</a></span></li>
+                  <li><a href="/places/12452">～tamari bar～ SHAKE</a></span></li>
+            </ul>
+            </div>
+            """
+        let page = try EventernotePages.places(in: html, page: 1, pageSize: .max)
+        #expect(page.items.map(\.id) == [5185, 12452])
+    }
+
+    @Test func readsWhoAPerformersPageIsAbout() throws {
+        let html = """
+            <div class="mod_actors_detail">
+              <div class="gb_blur_title" >
+                <div class="overlay"></div>
+                <div class="title"><h1>JO(&amp;TEAM)</h1></div>
+                <div class="title2"><h2>じょー</h2></div>
+              </div>
+            """
+        let performer = try #require(EventernotePages.performer(in: html, id: 95518, slug: "JO%28%26TEAM%29"))
+        #expect(performer.name == "JO(&TEAM)")
+        #expect(performer.reading == "じょー")
+        #expect(performer.slug == "JO%28%26TEAM%29")
+        #expect(EventernotePages.performer(in: "<html>maintenance</html>", id: 1, slug: "x") == nil)
+    }
 }
