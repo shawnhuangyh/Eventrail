@@ -158,6 +158,25 @@ struct EventReminderTests {
         #expect(ReminderAlert.due(in: [over], tracking: { _ in Tracking(reminders: [stillAhead]) }).isEmpty)
     }
 
+    /// Scheduled, it would come after the event is over, whether or not the app
+    /// is opened again to take it back.
+    @Test func aTimePastAnEventMovedEarlierIsOwedNothing() throws {
+        let moved = event(inDays: 1)
+        let written = reminder(on: event(inDays: 8))
+        #expect(try #require(written.alertDate(in: moved.timeZone)) > .now)
+        #expect(!moved.holds(written))
+        #expect(ReminderAlert(reminder: written, event: moved) == nil)
+        #expect(ReminderAlert.due(in: [moved], tracking: { _ in Tracking(reminders: [written]) }).isEmpty)
+    }
+
+    /// As late as the sheet writes one, and earlier days for what comes ahead.
+    @Test func anEventHoldsWhatFallsByTheEndOfItsDay() {
+        let show = event(inDays: 3)
+        #expect(show.holds(reminder(on: show, at: 23 * 60 + 59)))
+        #expect(show.holds(reminder(on: event(inDays: 1))))
+        #expect(!show.holds(reminder(on: event(inDays: 4), at: 0)))
+    }
+
     @Test func theSoonestAreScheduled() {
         let events = (0..<(ReminderAlert.limit + 5)).map { event("\($0)", inDays: 30 - $0) }
         let due = ReminderAlert.due(in: events, tracking: { Tracking(reminders: [reminder(on: $0)]) })
@@ -555,7 +574,7 @@ struct LibraryPlanItemTests {
         #expect(LibraryDatabase.writePlan([first, second], for: "1", rows: &held, dated: later, in: context))
         #expect(held["1"]?[first.id.uuidString]?.modified == earlier.toTheMillisecond)
         #expect(held["1"]?[second.id.uuidString]?.modified == later.toTheMillisecond)
-        #expect(LibraryDatabase.planItems(QueueTicket.self, in: held["1"]).map(\.number) == [nil, "A-123"])
+        #expect(Set(LibraryDatabase.planItems(QueueTicket.self, in: held["1"])) == [first, second])
         withExtendedLifetime(database) {}
     }
 

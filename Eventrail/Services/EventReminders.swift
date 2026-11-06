@@ -160,11 +160,12 @@ struct ReminderAlert: Hashable {
     nonisolated static let eventKey = "event"
 
     /// The notification owed for `reminder` on `event` at `now`, printed on
-    /// `clock`: nil where it asks for none, its moment has been, or the event's
-    /// day is over, whatever the reminder's own time says (an event moved to an
-    /// earlier day leaves its reminders where they were written).
+    /// `clock`: nil where it asks for none, its moment has been, or it falls
+    /// past the event's day (``Event/holds(_:)``). So nothing comes for an event
+    /// gone by, and nothing is left scheduled to come after an event moved to
+    /// an earlier day is over, with no way for the app to take it back.
     init?(reminder: EventReminder, event: Event, clock: TimeDisplay = .venue, at now: Date = .now) {
-        guard event.dayEnds > now, let date = reminder.alertDate(in: event.timeZone), date > now else { return nil }
+        guard event.holds(reminder), let date = reminder.alertDate(in: event.timeZone), date > now else { return nil }
         eventID = event.id
         reminderID = reminder.id
         eventTitle = event.title
@@ -231,6 +232,13 @@ struct ReminderAlert: Hashable {
 }
 
 extension Event {
+    /// Whether `reminder` falls by the end of this event's day: as late as one
+    /// can be written (``EventReminderView``). An event moved to an earlier day
+    /// leaves its reminders where they were written, and they stay to be read.
+    func holds(_ reminder: EventReminder) -> Bool {
+        reminder.date(in: timeZone) < dayEnds
+    }
+
     /// When `reminder` falls, as it is printed on `clock`: the time alone on
     /// the day the event is printed on, and with its date on any other.
     func printedTime(of reminder: EventReminder, on clock: TimeDisplay) -> String {

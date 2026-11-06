@@ -177,6 +177,9 @@ struct EventReminderView: View {
                 }
             } else if date <= .now {
                 alertNote(Text("That moment has passed, so no notification will come."))
+            } else if !event.holds(draft) {
+                // Where the event has moved to an earlier day since.
+                alertNote(Text("That's after the event, so no notification will come."))
             }
         }
     }

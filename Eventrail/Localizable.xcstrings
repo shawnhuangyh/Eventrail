@@ -14600,6 +14600,29 @@
         }
       }
     },
+    "That's after the event, so no notification will come." : {
+      "comment" : "Under a reminder's alert, where its time is past the event's day because the event has moved to an earlier one.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベントより後の時刻のため、通知は届きません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该时间晚于活动，不会收到通知。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該時間晚於活動，不會收到通知。"
+          }
+        }
+      }
+    },
     "The %lld with the most fans" : {
       "localizations" : {
         "ja" : {

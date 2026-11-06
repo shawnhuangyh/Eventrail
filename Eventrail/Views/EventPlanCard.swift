@@ -185,7 +185,7 @@ struct EventPlanCard: View {
                         .scalingFont(size: 14.5, weight: .semibold)
                         .foregroundStyle(isDimmed ? .secondary : .primary)
                         .multilineTextAlignment(.leading)
-                    if let lead = reminder.lead, isEventAhead, !isOver {
+                    if let lead = reminder.lead, event.holds(reminder), !isOver {
                         Label(ReminderLead.label(of: lead), systemImage: "bell.fill")
                             .labelStyle(.titleAndIcon)
                             .scalingFont(size: 12)
