@@ -182,6 +182,15 @@ final class LibraryDatabase {
     /// user is known to be the one it synced with.
     @ObservationIgnored private var wantsSyncing: Bool
     @ObservationIgnored private var retry: Task<Void, Never>?
+    /// Whether iCloud has said the account changed and no check has had an
+    /// answer since. A store already syncing goes on meanwhile, since the news
+    /// comes without any change of user too and reopening costs a mirror held
+    /// and let go, but it keeps asking until it is told: left at one failed
+    /// check, the old library could go on mirroring under the new account.
+    @ObservationIgnored private var accountCheckOwed = false
+    @ObservationIgnored private var isReadingLegacyZone = false
+    /// When the old zone was last asked — see ``legacyZonePatience``.
+    @ObservationIgnored private var legacyZoneAsked: Date?
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
 
     /// Which iCloud user this device's library syncs with (the container's
@@ -191,6 +200,20 @@ final class LibraryDatabase {
     /// Where this device last read the old sync's zone up to — see
     /// ``LegacyCloudZone``. Cleared with the account, since it belongs to one.
     private static let legacyTokenKey = "iCloudLegacyZoneToken"
+    /// How long a return to the app leaves the old zone unasked: a device still
+    /// on an old build is heard from without a restart, and every return is
+    /// not a request.
+    nonisolated static let legacyZonePatience: TimeInterval = 15 * 60
+
+    nonisolated static func legacyZoneIsDue(asked: Date?, at now: Date) -> Bool {
+        asked.map { now.timeIntervalSince($0) >= legacyZonePatience } ?? true
+    }
+
+    /// Whether a check that could not tell is asked again: where syncing waits
+    /// on it, and where iCloud said the account changed (``accountCheckOwed``).
+    nonisolated static func asksAboutAccountAgain(isSyncing: Bool, owed: Bool) -> Bool {
+        !isSyncing || owed
+    }
     /// ``lastFetched``, per device. Cleared with the account, since it says
     /// when this device last heard from that account's iCloud.
     private static let lastFetchedKey = "iCloudLastFetched"
@@ -257,10 +280,17 @@ final class LibraryDatabase {
     }
 
     /// Asks again whether syncing can start, where the switch is on and the
-    /// last check could not tell — offline, say. Run on coming back to the app.
+    /// last check could not tell — offline, say. Syncing already, asks what is
+    /// still owed: whether the account changed, and what a device still on an
+    /// old build has written. Run on coming back to the app.
     func resumeSyncing() {
-        guard wantsSyncing, !isSyncing, syncStatus != .notConfigured else { return }
-        checkAccount()
+        guard wantsSyncing, syncStatus != .notConfigured else { return }
+        guard isSyncing else {
+            checkAccount()
+            return
+        }
+        if accountCheckOwed { checkAccount() }
+        if Self.legacyZoneIsDue(asked: legacyZoneAsked, at: .now) { readLegacyZone() }
     }
 
     /// Opens the store with CloudKit, now that the account is the one the
@@ -292,7 +322,11 @@ final class LibraryDatabase {
     /// Merges in what the sync before SwiftData left in iCloud, or what a
     /// device still on it has written there since — see ``LegacyCloudZone``.
     private func readLegacyZone() {
+        guard !isReadingLegacyZone else { return }
+        isReadingLegacyZone = true
+        legacyZoneAsked = .now
         Task {
+            defer { isReadingLegacyZone = false }
             let defaults = UserDefaults.standard
             let token = defaults.data(forKey: Self.legacyTokenKey).flatMap {
                 try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
@@ -310,8 +344,10 @@ final class LibraryDatabase {
                         onRemoteChanges?()
                     }
                 }
-                let saved = try NSKeyedArchiver.archivedData(withRootObject: next, requiringSecureCoding: true)
-                defaults.set(saved, forKey: Self.legacyTokenKey)
+                if let next {
+                    let saved = try NSKeyedArchiver.archivedData(withRootObject: next, requiringSecureCoding: true)
+                    defaults.set(saved, forKey: Self.legacyTokenKey)
+                }
             } catch {
                 Self.log.error("The old iCloud zone could not be read: \(error.localizedDescription, privacy: .public)")
             }
@@ -484,12 +520,17 @@ final class LibraryDatabase {
                 }
                 guard wantsSyncing else { return }
                 if let syncedWith, syncedWith != user {
+                    accountCheckOwed = false
                     stopSyncing(.accountChanged)
                 } else {
                     if syncedWith == nil { UserDefaults.standard.set(user, forKey: Self.accountKey) }
+                    // What the check that could not tell said no longer stands.
+                    if accountCheckOwed, isSyncing { syncStatus = nil }
+                    accountCheckOwed = false
                     startSyncing()
                 }
             case .noAccount:
+                accountCheckOwed = false
                 if syncedWith != nil { stopSyncing(.accountChanged) } else { syncStatus = .signedOut }
             case .temporarilyUnavailable, .couldNotDetermine:
                 // Asked again, as a check that could not get through is:
@@ -504,9 +545,11 @@ final class LibraryDatabase {
         }
     }
 
-    /// The account could not be checked. A store already syncing goes on; one
-    /// waiting to start stays unsynced — nothing is sent to a user nobody has
-    /// named — and asks again in a minute, and on coming back to the app.
+    /// The account could not be checked. A store already syncing goes on, and
+    /// asks again only where iCloud said the account changed
+    /// (``accountCheckOwed``); one waiting to start stays unsynced — nothing is
+    /// sent to a user nobody has named. Each asks again in a minute, and on
+    /// coming back to the app.
     private func couldNotCheck(_ error: any Error) {
         guard wantsSyncing else { return }
         syncStatus = Self.status(for: error)
@@ -514,9 +557,9 @@ final class LibraryDatabase {
     }
 
     /// Asks about the account again in a minute, unless the store is already
-    /// syncing.
+    /// syncing with nothing owed (``asksAboutAccountAgain(isSyncing:owed:)``).
     private func retryInAMinute() {
-        guard !isSyncing else { return }
+        guard Self.asksAboutAccountAgain(isSyncing: isSyncing, owed: accountCheckOwed) else { return }
         retry?.cancel()
         retry = Task { [weak self] in
             try? await Task.sleep(for: .seconds(60))
@@ -558,6 +601,7 @@ final class LibraryDatabase {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.wantsSyncing else { return }
+                self.accountCheckOwed = true
                 self.checkAccount()
             }
         })

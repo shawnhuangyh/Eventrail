@@ -52,3 +52,54 @@ struct LegacyCloudZoneTests {
         #expect(LegacyCloudZone.slice(of: record("event.1", payload: Data("not zlib".utf8))) == nil)
     }
 }
+
+/// Asking the old zone and the account again — see ``LegacyCloudZone/Progress``
+/// and ``LibraryDatabase/resumeSyncing()``.
+struct LegacyZoneAskingTests {
+    typealias Progress = LegacyCloudZone.Progress<Int>
+
+    /// Read whole, the token moves on with each batch.
+    @Test func theTokenFollowsAWholeRead() {
+        var progress = Progress(from: nil)
+        progress.read(upTo: 1, failed: false)
+        progress.read(upTo: 2, failed: false)
+        #expect(progress.kept == 2)
+    }
+
+    /// Past a record that failed, it would never be asked for again.
+    @Test func theTokenStaysBeforeARecordThatFailed() {
+        var progress = Progress(from: 1)
+        progress.read(upTo: 2, failed: false)
+        progress.read(upTo: 3, failed: true)
+        // Nor does a whole batch after it carry the token over the gap.
+        progress.read(upTo: 4, failed: false)
+        #expect(progress.kept == 2)
+    }
+
+    /// Nothing read whole from the start leaves nothing to keep, or what was
+    /// held to ask from again.
+    @Test func aFirstBatchThatFailedKeepsWhatWasHeld() {
+        var fresh = Progress(from: nil)
+        fresh.read(upTo: 1, failed: true)
+        #expect(fresh.kept == nil)
+
+        var held = Progress(from: 5)
+        held.read(upTo: 6, failed: true)
+        #expect(held.kept == 5)
+    }
+
+    @Test func theOldZoneIsAskedAtMostSoOften() {
+        let asked = Date(timeIntervalSinceReferenceDate: 1_000_000)
+        #expect(LibraryDatabase.legacyZoneIsDue(asked: nil, at: asked))
+        #expect(!LibraryDatabase.legacyZoneIsDue(asked: asked, at: asked.addingTimeInterval(60)))
+        #expect(LibraryDatabase.legacyZoneIsDue(asked: asked, at: asked.addingTimeInterval(LibraryDatabase.legacyZonePatience)))
+    }
+
+    /// A store syncing with nothing owed has no reason to ask; told the account
+    /// changed, it asks until it has an answer.
+    @Test func aSyncingStoreAsksAgainOnlyWhereTheAccountChanged() {
+        #expect(LibraryDatabase.asksAboutAccountAgain(isSyncing: false, owed: false))
+        #expect(!LibraryDatabase.asksAboutAccountAgain(isSyncing: true, owed: false))
+        #expect(LibraryDatabase.asksAboutAccountAgain(isSyncing: true, owed: true))
+    }
+}
