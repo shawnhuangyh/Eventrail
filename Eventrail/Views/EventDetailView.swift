@@ -1524,9 +1524,10 @@ struct EventDetailView: View {
         }
     }
 
-    /// What the Live Activity is made from here: the seat, and the times.
+    /// What the Live Activity is made from here: the seat and the times, and
+    /// what it stands on (``EventActivities/goesOn(inLibrary:tracking:)``).
     private var liveActivityKey: String {
-        [tracking.seat, "\(store.isInLibrary(event))",
+        [tracking.seat, "\(store.isInLibrary(event))", "\(tracking.hasTicket)",
          event.doorsOpen?.description, event.startsAt?.description, event.endsAt?.description]
             .map { $0 ?? "" }
             .joined(separator: "|")
