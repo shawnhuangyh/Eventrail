@@ -221,6 +221,31 @@ struct EventReminderTests {
         #expect(links.map(\.lastPathComponent) == ["a", "b"])
     }
 
+    /// Two tickets of one queue differ only towards the end, and a button
+    /// has to show that part or the reader cannot tell which they are picking.
+    @Test func severalLinksAreToldApartOnTheirButtons() {
+        func labels(_ links: String...) -> [String] {
+            QueueTicket.labels(tellingApart: links.map { URL(string: $0)! })
+        }
+        #expect(labels("https://q.example.jp/t/8f3a21?from=qr", "https://q.example.jp/t/77c0de?from=qr")
+            == ["…8f3a21?from=qr", "…77c0de?from=qr"])
+        #expect(labels("https://q.example.jp/?t=abc", "https://q.example.jp/?t=def") == ["…abc", "…def"])
+        #expect(labels("https://q.example.jp/a", "https://q.example.jp/a?x=1") == ["…a", "…a?x=1"])
+        // A third that parts sooner moves where the others are cut.
+        #expect(labels("https://q.example.jp/t/1", "https://q.example.jp/t/2", "https://q.example.jp/u/3")
+            == ["…t/1", "…t/2", "…u/3"])
+
+        // Another host is part of what tells them apart.
+        #expect(labels("https://a.example.jp/t/1", "https://b.example.jp/t/1")
+            == ["a.example.jp/t/1", "b.example.jp/t/1"])
+        // Nothing left to show after the shared part: whole, without the scheme.
+        #expect(labels("https://q.example.jp", "https://q.example.jp/x") == ["q.example.jp", "q.example.jp/x"])
+        #expect(labels("https://q.example.jp/", "https://q.example.jp/x") == ["q.example.jp/", "q.example.jp/x"])
+        // Only the scheme differs, so it stays.
+        #expect(labels("http://q.example.jp/a", "https://q.example.jp/a")
+            == ["http://q.example.jp/a", "https://q.example.jp/a"])
+    }
+
     // MARK: - The record
 
     /// A record from before them, as a backup or a file holds it.

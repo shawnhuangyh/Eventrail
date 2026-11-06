@@ -220,6 +220,27 @@ nonisolated struct QueueTicket: PlanItem, Hashable, Sendable {
         return codes.compactMap(link(inCode:)).filter { seen.insert($0).inserted }
     }
 
+    /// What tells `links` apart on a button, in their order. Two tickets of one
+    /// queue differ only towards the end, which a long link on a button is cut
+    /// off before, so where they share a host each is what follows the part
+    /// they all open with; otherwise each is the link without its scheme, or
+    /// with it where only the scheme differs.
+    static func labels(tellingApart links: [URL]) -> [String] {
+        let bare = links.map { link in
+            let text = link.absoluteString
+            return text.range(of: "://").map { String(text[$0.upperBound...]) } ?? text
+        }
+        guard Set(bare).count == links.count else { return links.map(\.absoluteString) }
+        guard Set(links.map { $0.host()?.lowercased() }).count == 1, let first = bare.first else { return bare }
+
+        let shared = bare.dropFirst().reduce(first) { $0.commonPrefix(with: $1) }
+        // Back to a separator, so that nothing is cut in the middle of a word.
+        guard let separator = shared.lastIndex(where: { "/?&=#".contains($0) }) else { return bare }
+        let dropped = shared.distance(from: shared.startIndex, to: separator) + 1
+        let rests = bare.map { $0.dropFirst(dropped) }
+        return rests.contains(where: \.isEmpty) ? bare : rests.map { "…\($0)" }
+    }
+
     /// As an event's rows hand them over: the first added first.
     static func inOrder(_ tickets: [QueueTicket]) -> [QueueTicket] {
         tickets.sorted { ($0.added, $0.id.uuidString) < ($1.added, $1.id.uuidString) }

@@ -209,12 +209,12 @@ struct EventPlanCard: View {
         .confirmationDialog(found.count > 1 ? Text("Which code is your queue ticket?") : Text("Add this queue ticket?"),
                             isPresented: Binding { !found.isEmpty } set: { if !$0 { found = [] } },
                             titleVisibility: .visible) {
-            ForEach(found, id: \.self) { link in
+            ForEach(Array(zip(found, QueueTicket.labels(tellingApart: found))), id: \.0) { link, label in
                 Button {
                     store.addQueueTicket(link, to: event)
                 } label: {
                     if found.count > 1 {
-                        Text(verbatim: link.host() ?? link.absoluteString)
+                        Text(verbatim: label)
                     } else {
                         Text("Add Queue Ticket")
                     }
@@ -222,9 +222,9 @@ struct EventPlanCard: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            if found.count == 1, let link = found.first {
-                Text(verbatim: link.absoluteString)
-            }
+            // Each whole, whichever is picked: a code is whatever was printed,
+            // and this is where the reader sees where it goes.
+            Text(verbatim: found.map(\.absoluteString).joined(separator: "\n"))
         }
     }
 
