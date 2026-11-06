@@ -7,6 +7,10 @@ import SwiftUI
 /// the record as it was, asking first where that throws something away. The
 /// time is asked on the hall's clock whatever Settings prints on, since that is
 /// the clock the promoter's notice prints it on.
+///
+/// On an event gone by it asks only what it was and when: that is a record, and
+/// no notification will come, so none is offered. What an alert was set to
+/// before the event ended stays as it was.
 struct EventReminderView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -55,7 +59,7 @@ struct EventReminderView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     nameSection
                     timeSection
-                    alertSection
+                    if event.isUpcoming { alertSection }
                     if !isNew { deleteButton }
                 }
                 .padding(.horizontal, 16)

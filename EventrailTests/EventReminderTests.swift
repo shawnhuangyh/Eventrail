@@ -56,15 +56,39 @@ struct EventReminderTests {
 
     @Test func aNewReminderOpensOnTheEventsDay() {
         let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
-        let sale = EventReminder(kind: .goodsSale, for: show)
+        let now = Fixtures.date(2026, 9, 1, 10)
+        let sale = EventReminder(kind: .goodsSale, for: show, at: now)
         #expect(sale.day == notice)
         #expect(sale.minute == 12 * 60)
         #expect(sale.lead == ReminderKind.goodsSale.defaultLead)
         #expect(sale.title == "物販開始")
 
-        let typed = EventReminder(kind: nil, for: show)
+        let typed = EventReminder(kind: nil, for: show, at: now)
         #expect(typed.title.isEmpty)
         #expect(typed.day == notice)
+    }
+
+    /// Written down afterwards: on the event's day, which is as late as the
+    /// sheet's picker goes, whatever the kind, and asking for no notification.
+    @Test func aReminderOnAnEventGoneByIsARecord() {
+        let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
+        let afterwards = Fixtures.date(2026, 12, 1, 10)
+        for kind in ReminderKind.allCases {
+            let written = EventReminder(kind: kind, for: show, at: afterwards)
+            #expect(written.day == notice)
+            #expect(written.lead == nil)
+        }
+        let typed = EventReminder(kind: nil, for: show, at: afterwards)
+        #expect(typed.day == notice)
+        #expect(typed.lead == nil)
+    }
+
+    /// The line every list draws: the event's day being over at the hall.
+    @Test func anEventIsARecordOnlyOnceItsDayIsOver() {
+        let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
+        let lastMoment = show.dayEnds.addingTimeInterval(-1)
+        #expect(EventReminder(kind: .goodsSale, for: show, at: lastMoment).lead == ReminderKind.goodsSale.defaultLead)
+        #expect(EventReminder(kind: .goodsSale, for: show, at: show.dayEnds).lead == nil)
     }
 
     /// What is done from home is not on the event's day.
@@ -121,6 +145,17 @@ struct EventReminderTests {
         #expect(ReminderAlert(reminder: written, event: show, at: alert.addingTimeInterval(-1)) != nil)
         // Its moment has gone though the time itself is still ahead.
         #expect(ReminderAlert(reminder: written, event: show, at: alert.addingTimeInterval(1)) == nil)
+    }
+
+    /// Nothing comes for an event gone by, not even for a time still ahead on
+    /// it, which is what an event moved to an earlier day leaves behind.
+    @Test func anEventGoneByIsOwedNothing() throws {
+        let over = event(inDays: -2)
+        let stillAhead = reminder(on: event(inDays: 3))
+        #expect(try #require(stillAhead.alertDate(in: over.timeZone)) > .now)
+
+        #expect(ReminderAlert(reminder: stillAhead, event: over) == nil)
+        #expect(ReminderAlert.due(in: [over], tracking: { _ in Tracking(reminders: [stillAhead]) }).isEmpty)
     }
 
     @Test func theSoonestAreScheduled() {

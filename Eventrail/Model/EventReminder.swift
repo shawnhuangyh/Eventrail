@@ -71,14 +71,16 @@ nonisolated struct EventReminder: PlanItem, Hashable, Sendable {
 nonisolated extension EventReminder {
     /// A new reminder for `event`, for the reader to set the time of: noon on
     /// the event's own day, or for what is done from home ahead of it, the end
-    /// of today.
+    /// of today. Once the event's day is over it is a record: on that day, with
+    /// no notification, since none would come.
     init(kind: ReminderKind?, for event: Event, at now: Date = .now) {
         let calendar = Calendar.gregorian(in: event.timeZone)
-        let isAhead = kind.map(ReminderKind.tickets.contains) ?? false
+        let isOver = event.dayEnds <= now
+        let isAhead = !isOver && (kind.map(ReminderKind.tickets.contains) ?? false)
         self.init(title: kind?.rawValue ?? "",
                   day: CalendarDay(isAhead ? now : event.date, in: calendar),
                   minute: kind == .applicationDeadline || kind == .paymentDeadline ? 23 * 60 + 59 : 12 * 60,
-                  lead: kind?.defaultLead ?? 60)
+                  lead: isOver ? nil : kind?.defaultLead ?? 60)
     }
 }
 

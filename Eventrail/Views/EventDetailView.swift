@@ -448,12 +448,11 @@ struct EventDetailView: View {
         // written, so re-adding brings the tiles back as they were.
         if store.isInLibrary(event) {
             ticketTiles
-            // What to be there for and what is in hand: over once the event is.
-            if event.isUpcoming {
-                EventPlanCard(event: event, clock: clock, editing: $editingReminder,
-                              isPicking: $isPickingQueueTicket, isScanning: $isScanningQueueTicket,
-                              releaseHold: releaseHold)
-            }
+            // What to be there for and what is in hand, and on an event gone
+            // by, what is written down afterwards.
+            EventPlanCard(event: event, clock: clock, editing: $editingReminder,
+                          isPicking: $isPickingQueueTicket, isScanning: $isScanningQueueTicket,
+                          releaseHold: releaseHold)
         }
         summaryCard
     }

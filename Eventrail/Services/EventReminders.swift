@@ -78,7 +78,7 @@ final class EventReminders {
     /// Asks the system for the right to notify, where nobody has answered yet
     /// and `reminder` has a notification to come.
     func askIfNeeded(for reminder: EventReminder, at event: Event) {
-        guard isEnabled, let date = reminder.alertDate(in: event.timeZone), date > .now else { return }
+        guard isEnabled, ReminderAlert(reminder: reminder, event: event) != nil else { return }
         Task {
             guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
             await requestAuthorization()
@@ -160,9 +160,11 @@ struct ReminderAlert: Hashable {
     nonisolated static let eventKey = "event"
 
     /// The notification owed for `reminder` on `event` at `now`, printed on
-    /// `clock`: nil where it asks for none, or its moment has been.
+    /// `clock`: nil where it asks for none, its moment has been, or the event's
+    /// day is over, whatever the reminder's own time says (an event moved to an
+    /// earlier day leaves its reminders where they were written).
     init?(reminder: EventReminder, event: Event, clock: TimeDisplay = .venue, at now: Date = .now) {
-        guard let date = reminder.alertDate(in: event.timeZone), date > now else { return nil }
+        guard event.dayEnds > now, let date = reminder.alertDate(in: event.timeZone), date > now else { return nil }
         eventID = event.id
         reminderID = reminder.id
         eventTitle = event.title

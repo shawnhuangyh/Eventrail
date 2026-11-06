@@ -6,9 +6,10 @@ import Vision
 import VisionKit
 #endif
 
-/// What the reader has planned around a kept event still to come, on its
-/// sheet: the times they want to hear about (``EventReminder``) and the queue
-/// tickets they took (``QueueTicket``).
+/// What the reader has planned around a kept event, on its sheet: the times
+/// they want to hear about (``EventReminder``) and the queue tickets they took
+/// (``QueueTicket``). On an event gone by it stays, for what is written down
+/// afterwards, and nothing on it comes as a notification.
 ///
 /// The sheets it opens are held by ``EventDetailView`` through these bindings,
 /// since nothing may move the page while one is up (``EventSheetsHold``).
@@ -153,7 +154,11 @@ struct EventPlanCard: View {
     /// The name and its alert, with the time at the trailing edge where a
     /// column of them reads as the day's running order.
     private func row(_ reminder: EventReminder, at now: Date) -> some View {
+        let isEventAhead = event.dayEnds > now
         let isOver = reminder.date(in: event.timeZone) <= now
+        // Dimmed against the times still to come; once the event is over there
+        // are none, and the rows are a record to read.
+        let isDimmed = isEventAhead && isOver
         return Button {
             editing = reminder
         } label: {
@@ -161,9 +166,9 @@ struct EventPlanCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(verbatim: ReminderKind.label(of: reminder.title))
                         .scalingFont(size: 14.5, weight: .semibold)
-                        .foregroundStyle(isOver ? .secondary : .primary)
+                        .foregroundStyle(isDimmed ? .secondary : .primary)
                         .multilineTextAlignment(.leading)
-                    if let lead = reminder.lead, !isOver {
+                    if let lead = reminder.lead, isEventAhead, !isOver {
                         Label(ReminderLead.label(of: lead), systemImage: "bell.fill")
                             .labelStyle(.titleAndIcon)
                             .scalingFont(size: 12)
@@ -174,7 +179,7 @@ struct EventPlanCard: View {
                 Text(verbatim: event.printedTime(of: reminder, on: clock))
                     .scalingFont(size: 15, weight: .bold)
                     .monospacedDigit()
-                    .foregroundStyle(isOver ? .secondary : .primary)
+                    .foregroundStyle(isDimmed ? .secondary : .primary)
                 Image(systemName: "chevron.right")
                     .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
