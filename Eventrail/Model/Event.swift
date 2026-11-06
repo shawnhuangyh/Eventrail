@@ -182,6 +182,18 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
         calendar.date(byAdding: .day, value: 1, to: date) ?? date
     }
 
+    /// Whether the watch lists it at `now`: until its day is over, and for as
+    /// long as the show runs past that. The line the watch draws on the copy it
+    /// is sent (`EventMoment.isListed`), so a copy left out here would be gone
+    /// from the wrist in the middle of an overnight show.
+    func isOnTheWatch(at now: Date = .now) -> Bool {
+        if dayEnds > now { return true }
+        let times = Event.inOrder(doorsOpen, startsAt, endsAt)
+        guard let starts = times.starts else { return false }
+        let ends = times.ends.flatMap { $0 > starts ? $0 : nil }
+        return (ends ?? starts.addingTimeInterval(Event.assumedLength)) > now
+    }
+
     /// When ``isUpcomingAnywhere`` turns false: the end of its day twelve
     /// hours behind Greenwich.
     ///

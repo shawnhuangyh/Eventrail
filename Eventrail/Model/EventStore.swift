@@ -632,10 +632,15 @@ final class EventStore {
         events(of: entries.values, where: \.inLibrary)
     }
 
-    /// The library's events still to come, soonest first — what the watch is
-    /// sent (``WatchLink``).
+    /// The library's events still to come, soonest first.
     var upcoming: [Event] {
         library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+    }
+
+    /// What the watch is sent (``WatchLink``): those still to come, and a show
+    /// still running past the end of its day.
+    var onTheWatch: [Event] {
+        library.filter { $0.isOnTheWatch() }.sorted { $0.sortDate < $1.sortDate }
     }
 
     /// The library's events on the day `event`'s hall prints it on
