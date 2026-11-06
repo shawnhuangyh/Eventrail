@@ -203,22 +203,46 @@ extension LotteryReminders: UNUserNotificationCenterDelegate {
     }
 
     /// The app's one delegate, so a Live Activity reminder tapped is handed
-    /// to ``ActivityReminders`` from here.
+    /// to ``ActivityReminders`` from here, and an event's own to
+    /// ``EventReminders``.
+    ///
+    /// **The completion handler, called on the main thread, and not this
+    /// method's `async` form**: where a tap brings the app back, the system's
+    /// handler updates its snapshot, which UIKit asserts is on the main thread,
+    /// and the `async` form calls it wherever the task ended. Every such tap
+    /// killed the app.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
         let request = response.notification.request
-        if request.identifier.hasPrefix(ActivityReminder.prefix) {
-            let event = request.content.userInfo[ActivityReminder.eventKey] as? String
-            await MainActor.run { ActivityReminders.shared.opened = event }
-            return
-        }
+        #if DEBUG
+        let identifier = TestNotification.routed(request.identifier)
+        #else
+        let identifier = request.identifier
+        #endif
         let info = request.content.userInfo
-        guard let event = info[LotteryReminder.eventKey] as? String,
-              let entry = (info[LotteryReminder.entryKey] as? String).flatMap(UUID.init(uuidString:))
-        else { return }
-        await MainActor.run { self.opened = Opened(eventID: event, entryID: entry) }
+        let take: @MainActor @Sendable () -> Void
+        if identifier.hasPrefix(ActivityReminder.prefix) {
+            let event = info[ActivityReminder.eventKey] as? String
+            take = { ActivityReminders.shared.opened = event }
+        } else if identifier.hasPrefix(ReminderAlert.prefix) {
+            let event = info[ReminderAlert.eventKey] as? String
+            take = { EventReminders.shared.opened = event }
+        } else if let event = info[LotteryReminder.eventKey] as? String,
+                  let entry = (info[LotteryReminder.entryKey] as? String).flatMap(UUID.init(uuidString:)) {
+            take = { self.opened = Opened(eventID: event, entryID: entry) }
+        } else {
+            take = {}
+        }
+        // Not Sendable as UserNotifications declares it, and called only on the
+        // main thread here, as it has to be.
+        nonisolated(unsafe) let done = completionHandler
+        Task { @MainActor in
+            take()
+            done()
+        }
     }
 }
 
@@ -234,10 +258,11 @@ nonisolated struct LotteryReminder: Hashable {
     static let hour = 20
     /// How many are scheduled at once, the soonest first. iOS keeps an app's
     /// 64 soonest and drops the rest without a word, and the Live Activity
-    /// reminders take the other few (``ActivityReminder/limit``); the ones
-    /// past these are scheduled as the earlier ones are delivered and the app
-    /// next opens.
-    static let limit = 60
+    /// reminders and an event's own take the others
+    /// (``ActivityReminder/limit``, ``ReminderAlert/limit``); the ones past
+    /// these are scheduled as the earlier ones are delivered and the app next
+    /// opens.
+    static let limit = 40
 
     /// Shared with the Lotteries widget, which takes back the reminder for a
     /// round it was given a result from — see ``ResultsReminderID``.

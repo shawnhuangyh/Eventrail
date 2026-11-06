@@ -46,6 +46,8 @@ struct RootView: View {
     /// The reminder that an event's Live Activity can start — see
     /// ``ActivityReminders``.
     private let activityReminders = ActivityReminders.shared
+    /// The times the reader wrote down for an event — see ``EventReminders``.
+    private let eventReminders = EventReminders.shared
     /// What Siri, Shortcuts or a Spotlight result asked for through an
     /// intent — see ``IntentOpens``.
     private let intentOpens = IntentOpens.shared
@@ -87,6 +89,7 @@ struct RootView: View {
                 // on its way in.
                 openReminder()
                 openActivityReminder()
+                openEventReminder()
                 takeIntentOpen()
                 if wasInBackground || Self.owesCatchUp { catchUp() }
                 wasInBackground = false
@@ -177,6 +180,7 @@ struct RootView: View {
             WidgetLink.shared.send(from: store)
             reminders.schedule(from: store)
             activityReminders.schedule(from: store)
+            eventReminders.schedule(from: store)
             EventActivities.shared.refreshSoon(from: store)
         }
         // An activity started from the sheet takes its reminder back, and
@@ -188,6 +192,8 @@ struct RootView: View {
             WidgetLink.shared.send(from: store)
             SpotlightIndex.shared.update(from: store, followed: followed)
             EventActivities.shared.refreshSoon(from: store)
+            // Its words print the time, on Settings' clock.
+            eventReminders.schedule(from: store)
         }
         // Each results day still waiting is a reminder that evening, and the
         // ones answered on another device meanwhile are taken back — followed
@@ -195,6 +201,7 @@ struct RootView: View {
         .task {
             reminders.schedule(from: store)
             activityReminders.schedule(from: store)
+            eventReminders.schedule(from: store)
         }
     }
 
@@ -268,6 +275,8 @@ struct RootView: View {
         .onChange(of: reminders.opened, initial: true) { openReminder() }
         // The event, and its Live Activity started.
         .onChange(of: activityReminders.opened, initial: true) { openActivityReminder() }
+        // The event, where its queue tickets are.
+        .onChange(of: eventReminders.opened, initial: true) { openEventReminder() }
     }
 
     /// When the app last caught up on coming back (``catchUp()``) — once for
@@ -305,6 +314,7 @@ struct RootView: View {
         // Notifications may have been turned on or off in Settings.
         reminders.schedule(from: store)
         activityReminders.schedule(from: store)
+        eventReminders.schedule(from: store)
     }
 
     /// Reads the linked account's lists again where they have gone stale —
@@ -359,6 +369,16 @@ struct RootView: View {
         opens.open(.event(event))
         let tracking = store.tracking(for: event)
         Task { try? await EventActivities.shared.start(for: event, tracking: tracking) }
+    }
+
+
+    /// Opens the event a reminder of its own was tapped for — in this window,
+    /// only while it is the one in front, for the reason a results-day
+    /// reminder waits for it (``openReminder()``).
+    private func openEventReminder() {
+        guard scenePhase == .active, let id = eventReminders.opened else { return }
+        eventReminders.opened = nil
+        if let event = store.event(id: id) { opens.open(.event(event)) }
     }
 
     /// Opens what an intent asked for, in this window — only while it is the

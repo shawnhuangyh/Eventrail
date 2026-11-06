@@ -231,6 +231,42 @@ final class LibraryLottery {
     }
 }
 
+/// One thing the reader added to an event's plan: a time to be reminded of
+/// (``EventReminder``) or a queue ticket's link (``QueueTicket``).
+///
+/// A row of its own for the reason a lottery round is (``LibraryLottery``):
+/// in one column, two devices adding one each between syncs kept only the
+/// last. One table for both, told apart by ``kind``, so what a later build
+/// adds to the plan needs no record type of its own — and is never taken for
+/// a removal here, since this build writes only the kinds it knows.
+///
+/// Taken out is ``isRemoved`` rather than a deleted row, so it reaches every
+/// device.
+@Model
+final class LibraryPlanItem {
+    /// Which of two rows for one item is kept, where they tie.
+    var uid: UUID = UUID()
+    /// Eventernote's id for the event it is about.
+    var eventID: String = ""
+    /// The item's own id, as text.
+    var itemID: String = ""
+    /// ``PlanItem/rowKind``: what ``text`` holds.
+    var kind: String = ""
+    /// The item as JSON, its keys sorted, so an unchanged item is the same
+    /// text and not a change to send. Emptied as it is taken out.
+    var text: String = ""
+    var isRemoved: Bool = false
+    /// When it was last written, to the millisecond — which of two rows for
+    /// one item is kept.
+    var modified: Date = Date.distantPast
+
+    init(eventID: String, itemID: String, kind: String) {
+        self.eventID = eventID
+        self.itemID = itemID
+        self.kind = kind
+    }
+}
+
 /// Whether one event was in the library, as the builds between
 /// ``LibraryEvent``'s own column and ``LibraryEntry`` kept it. Read once, by
 /// ``LibraryDatabase/adoptLegacyRecords(in:)``, and never written again.
@@ -390,6 +426,9 @@ extension LibraryEvent {
             for (field, date) in trackingEdits {
                 if let field = Tracking.Field(rawValue: field) { edits[field] = date }
             }
+            // Those builds had no plan, so they say nothing of one.
+            edits[.reminders] = Tracking.unsaid
+            edits[.queueTickets] = Tracking.unsaid
             var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
                                   cost: cost.map { Decimal($0) },
                                   lotteries: LotteryEntry.carriedOver(count: lotteryEntries),
@@ -622,6 +661,47 @@ extension LibraryEntry {
     }
 }
 
+extension LibraryPlanItem {
+    /// The item this row holds, where it holds one of that kind this build
+    /// can read and it has not been taken out.
+    func item<Item: PlanItem>(as type: Item.Type) -> Item? {
+        guard !isRemoved, kind == Item.rowKind, !text.isEmpty else { return nil }
+        return try? JSONDecoder().decode(Item.self, from: Data(text.utf8))
+    }
+
+    /// Writes `item` — nil takes it out — dated `when`, touching only what
+    /// moves. Answers whether anything did.
+    ///
+    /// An item this build cannot read back whole is written over only where
+    /// the reader changed it: its decoded form is what is compared, so what a
+    /// later build added to it stays until then.
+    @discardableResult
+    func write<Item: PlanItem>(_ item: Item?, dated when: Date) -> Bool {
+        guard let item else {
+            guard !isRemoved else { return false }
+            update(\.isRemoved, to: true)
+            update(\.text, to: "")
+            update(\.modified, to: when.toTheMillisecond)
+            return true
+        }
+        guard self.item(as: Item.self) != item else { return false }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        update(\.isRemoved, to: false)
+        update(\.kind, to: Item.rowKind)
+        update(\.text, to: (try? encoder.encode(item)).map { String(decoding: $0, as: UTF8.self) } ?? "")
+        update(\.modified, to: when.toTheMillisecond)
+        return true
+    }
+
+    /// The row written last, and the lower `uid` on a tie.
+    static func isPreferred(_ row: LibraryPlanItem, over other: LibraryPlanItem) -> Bool {
+        let written = row.modified.toTheMillisecond, otherWritten = other.modified.toTheMillisecond
+        if written != otherWritten { return written > otherWritten }
+        return row.uid.uuidString < other.uid.uuidString
+    }
+}
+
 extension LibraryLottery {
     /// The round this row holds, or nil where it was taken out — or holds
     /// none this build can read.
@@ -812,3 +892,4 @@ extension FollowedPerformer: ChangeAvoidingModel {}
 extension LibrarySettings: ChangeAvoidingModel {}
 extension FollowingReadMark: ChangeAvoidingModel {}
 extension LibraryLottery: ChangeAvoidingModel {}
+extension LibraryPlanItem: ChangeAvoidingModel {}

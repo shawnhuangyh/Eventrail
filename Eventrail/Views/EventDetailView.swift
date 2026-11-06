@@ -90,6 +90,10 @@ struct EventDetailView: View {
     /// The Live Activity bench is up — see ``LiveActivityTestView``.
     @State private var isTestingLiveActivity = false
     #endif
+    #if DEBUG
+    /// The notification bench is up — see ``NotificationTestView``.
+    @State private var isTestingNotifications = false
+    #endif
 
     /// The flyer as a file Quick Look and the share sheet can be handed —
     /// see ``ImageCache/file(for:named:checkedSince:)``. Nil until it is
@@ -104,6 +108,11 @@ struct EventDetailView: View {
     @State private var isMakingStub = false
     /// Another event of the same day, opened from the Same Day card.
     @State private var openedSameDay: Event?
+    /// The reminder up over this sheet, and what is reading a queue ticket —
+    /// see ``EventPlanCard``.
+    @State private var editingReminder: EventReminder?
+    @State private var isPickingQueueTicket = false
+    @State private var isScanningQueueTicket = false
 
     /// What ``flyerFile`` is written from: the flyer, the title it is named
     /// for, and the last refresh by hand it has to be as fresh as.
@@ -348,6 +357,11 @@ struct EventDetailView: View {
                 .macSheetSize(.form)
         }
         .eventSheet($openedSameDay, onDismiss: releaseHold)
+        .sheet(item: $editingReminder, onDismiss: releaseHold) { reminder in
+            EventReminderView(event: event, reminder: reminder,
+                              isNew: !tracking.reminders.contains { $0.id == reminder.id })
+                .macSheetSize(.form)
+        }
         .onChange(of: holdsSheet) { _, holds in
             if holds { sheetsHold?.set(holdID, holding: true) }
         }
@@ -359,6 +373,12 @@ struct EventDetailView: View {
         #if DEBUG && !targetEnvironment(macCatalyst)
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)
+        }
+        #endif
+        #if DEBUG
+        .sheet(isPresented: $isTestingNotifications) {
+            NotificationTestView(event: event, tracking: tracking)
+                .macSheetSize(.form)
         }
         #endif
         .task { await importPage() }
@@ -415,6 +435,11 @@ struct EventDetailView: View {
     /// first column where it has two (``isWide``).
     @ViewBuilder
     private var eventCards: some View {
+        // First, where it was opened from a row tagged Updated: what changed
+        // is why the reader is here.
+        if let changes = store.changesRead(in: event) {
+            ListingChangesCard(changes: changes, clock: clock)
+        }
         timelineCard
         // Beside the hours, since that is what it is about. Only
         // where the reader keeps another event that day.
@@ -431,7 +456,14 @@ struct EventDetailView: View {
         // date opened from Following or Search shows the facts
         // alone until it is added. A removal keeps whatever was
         // written, so re-adding brings the tiles back as they were.
-        if store.isInLibrary(event) { ticketTiles }
+        if store.isInLibrary(event) {
+            ticketTiles
+            // What to be there for and what is in hand, and on an event gone
+            // by, what is written down afterwards.
+            EventPlanCard(event: event, clock: clock, editing: $editingReminder,
+                          isPicking: $isPickingQueueTicket, isScanning: $isScanningQueueTicket,
+                          releaseHold: releaseHold)
+        }
         summaryCard
     }
 
@@ -614,7 +646,10 @@ struct EventDetailView: View {
     /// nothing until its checkmark, the ticket stub, and another event of the
     /// day opened from the Same Day card. Said to the screen
     /// (``EventSheetsHold``), which holds the page where it is meanwhile.
-    private var holdsSheet: Bool { isEditingTicket || isMakingStub || openedSameDay != nil }
+    private var holdsSheet: Bool {
+        isEditingTicket || isMakingStub || openedSameDay != nil
+            || editingReminder != nil || isPickingQueueTicket || isScanningQueueTicket
+    }
 
     /// Lets the screen move this page again, once the last of its sheets has
     /// gone — gone, not going: let go of as it began to go, the screen put
@@ -1423,12 +1458,19 @@ struct EventDetailView: View {
                 Task { await refreshPage() }
             }
 
-            #if DEBUG && !targetEnvironment(macCatalyst)
+            #if DEBUG
             Divider()
+            #if !targetEnvironment(macCatalyst)
             Button {
                 isTestingLiveActivity = true
             } label: {
                 Label { Text(verbatim: "Test Live Activity…") } icon: { Image(systemName: "hammer") }
+            }
+            #endif
+            Button {
+                isTestingNotifications = true
+            } label: {
+                Label { Text(verbatim: "Test Notifications…") } icon: { Image(systemName: "hammer") }
             }
             #endif
 
@@ -1482,9 +1524,10 @@ struct EventDetailView: View {
         }
     }
 
-    /// What the Live Activity is made from here: the seat, and the times.
+    /// What the Live Activity is made from here: the seat and the times, and
+    /// what it stands on (``EventActivities/goesOn(inLibrary:tracking:)``).
     private var liveActivityKey: String {
-        [tracking.seat, "\(store.isInLibrary(event))",
+        [tracking.seat, "\(store.isInLibrary(event))", "\(tracking.hasTicket)",
          event.doorsOpen?.description, event.startsAt?.description, event.endsAt?.description]
             .map { $0 ?? "" }
             .joined(separator: "|")

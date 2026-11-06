@@ -152,4 +152,19 @@ struct EventActivityTests {
         #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 12, 30), in: reader) == nil)
         #expect(EventActivities.refusal(for: event(), at: Fixtures.date(2027, 5, 9, 19), in: reader) == nil)
     }
+
+    /// Taken away, here or on another device, the ticket takes it along.
+    @Test func aLiveActivityGoesOnlyWhileItsTicketDoes() {
+        var tracking = Tracking()
+        #expect(!EventActivities.goesOn(inLibrary: true, tracking: tracking))
+
+        tracking.recordTicket()
+        #expect(tracking.hasTicket)
+        #expect(EventActivities.goesOn(inLibrary: true, tracking: tracking))
+        #expect(!EventActivities.goesOn(inLibrary: false, tracking: tracking))
+
+        tracking.lotteries = []
+        #expect(!tracking.hasTicket)
+        #expect(!EventActivities.goesOn(inLibrary: true, tracking: tracking))
+    }
 }

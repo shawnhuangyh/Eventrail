@@ -29,6 +29,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     private let reminders = LotteryReminders.shared
     private let activityReminders = ActivityReminders.shared
+    private let eventReminders = EventReminders.shared
 
     @State private var isConfirmingDeleteAll = false
     @State private var isConfirmingClearCache = false
@@ -85,6 +86,8 @@ struct SettingsView: View {
                         calendarRow(store: $store)
                         SettingRowDivider()
                         remindersRow
+                        SettingRowDivider()
+                        eventRemindersRow
                         // An iPhone's alone: an iPad and a Mac show no Live
                         // Activities to be reminded of.
                         if ActivityReminders.isOffered {
@@ -338,6 +341,27 @@ struct SettingsView: View {
     }
 
     private static let notificationSettings = URL(string: UIApplication.openNotificationSettingsURLString)!
+
+    /// On until the reader turns it off — see ``EventReminders``. Asks,
+    /// turned back on with nothing asked yet, as the results-day switch does.
+    private var eventRemindersRow: some View {
+        @Bindable var eventReminders = eventReminders
+        let isRefused = eventReminders.isEnabled && reminders.authorization == .denied
+        return Toggle(isOn: $eventReminders.isEnabled) {
+            SettingRowLabel("alarm", "Event Reminders",
+                            status: isRefused ? Text("Notifications are off in Settings") : nil,
+                            needsAttention: true) {
+                if isRefused {
+                    Link("Open Settings", destination: Self.notificationSettings)
+                        .scalingFont(size: 12.5, weight: .semibold)
+                        .foregroundStyle(Color.brandTint)
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        .settingSwitch()
+        .settingRowPadding()
+    }
 
     /// On until the reader turns it off — see ``ActivityReminders``. Asks,
     /// turned back on with nothing asked yet, as the results-day switch does.

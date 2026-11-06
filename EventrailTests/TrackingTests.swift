@@ -14,7 +14,8 @@ struct TrackingTests {
         #expect(tracking.seatClass == "")
         #expect(tracking.cost == nil)
         #expect(tracking.currency == "")
-        #expect(tracking.edits.isEmpty)
+        // No dates of its own but for what it says nothing about.
+        #expect(tracking.edits == [.reminders: Tracking.unsaid, .queueTickets: Tracking.unsaid])
     }
 
     // MARK: - A ticket marked bought before entries
@@ -86,9 +87,11 @@ struct TrackingTests {
 
     @Test func decodesAnEmptyRecordAndIgnoresDroppedKeys() throws {
         let json = #"{"interest":"high","attendance":"attended"}"#
-        let tracking = try JSONDecoder().decode(Tracking.self, from: Data(json.utf8))
-        #expect(tracking == Tracking())
+        var tracking = try JSONDecoder().decode(Tracking.self, from: Data(json.utf8))
         #expect(tracking.isEmpty)
+        // The same answers, with no date on any but what it says nothing about.
+        tracking.edits = [:]
+        #expect(tracking == Tracking())
     }
 
     @Test func aStoredZeroLotteryCountReadsAsNothing() throws {

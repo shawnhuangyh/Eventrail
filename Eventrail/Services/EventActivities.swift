@@ -100,6 +100,13 @@ final class EventActivities {
         return now < state.runsTo
     }
 
+    /// Whether an activity already on goes on: what it took to offer one that
+    /// can change under it. The ticket taken away, here or on another device,
+    /// takes the activity with it.
+    nonisolated static func goesOn(inLibrary: Bool, tracking: Tracking) -> Bool {
+        inLibrary && tracking.hasTicket
+    }
+
     /// Why an activity was not started.
     enum Refusal: Error, Equatable {
         /// It could be from a day still to come — the event's own, as a rule.
@@ -223,11 +230,11 @@ final class EventActivities {
         for activity in Self.live {
             var state = activity.content.state
             if let store, let event = store.event(id: activity.attributes.eventID) {
-                guard store.isInLibrary(event) else {
+                let tracking = store.tracking(for: event)
+                guard Self.goesOn(inLibrary: store.isInLibrary(event), tracking: tracking) else {
                     await activity.end(nil, dismissalPolicy: .immediate)
                     continue
                 }
-                let tracking = store.tracking(for: event)
                 if let latest = Self.state(for: event, seat: tracking.seat, at: now) { state = latest }
                 if !Self.hasPoster(for: event.id) { await Self.keepPoster(for: event) }
             }

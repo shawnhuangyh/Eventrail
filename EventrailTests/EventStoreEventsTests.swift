@@ -9,7 +9,7 @@ import Testing
 struct EventStoreEventsTests {
     func store() -> EventStore {
         EventStore(database: LibraryDatabase(at: .memory, syncing: false), libraryFile: nil,
-                   calendar: nil, venues: nil, pageReads: nil)
+                   calendar: nil, venues: nil, pageReads: nil, readCopies: nil)
     }
 
     func kept(in store: EventStore) throws -> [LibraryEntry] {
@@ -266,7 +266,7 @@ struct EventStoreEventsTests {
         store.markRead([event], read: true)
         #expect(store.unread(event) == nil)
         let renamed = Fixtures.event(id: "1", title: "Renamed", date: Fixtures.day(fromToday: 7))
-        #expect(store.unread(renamed) == .updated)
+        #expect(store.unread(renamed) == .updated(nil))
         #expect(store.unread(event) == nil)
         store.markRead([event], read: false)
         #expect(store.unread(event) == .new)

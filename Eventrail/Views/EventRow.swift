@@ -23,6 +23,12 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
     /// A gesture is nothing to VoiceOver or Voice Control, so the row's words
     /// are then one button for them, under the buttons beside it.
     var opens: (() -> Void)?
+    /// What changed since the reader last read the event, on the rows that
+    /// carry an Updated tag: the day, start, hall or title printed in
+    /// ``Color/changedListing`` where it is one of them, and the rest of
+    /// what is new in a line under the date (``ListingChangesLine``). Only as
+    /// it is now — what it was is on the sheet.
+    var changes: ListingChanges?
 
     var body: some View {
         // Centred, not top-aligned: the flyer is a fixed 5:7 block and the text
@@ -36,25 +42,30 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(event.title)
                         .scalingFont(size: 14.5, weight: .semibold)
+                        .foregroundStyle(style(changed: changes?.titleChanged, else: .primary))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                     caption
                         .scalingFont(size: 12)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(style(changed: changes?.venueChanged, else: .secondary))
                         .lineLimit(1)
                     HStack(spacing: 7) {
                         Text(event.shown(on: timeDisplay).dayLine)
                             .scalingFont(size: 12, weight: .semibold)
                             .monospacedDigit()
+                            .foregroundStyle(style(changed: changes?.changed(.day), else: .primary))
                         Circle()
                             .fill(.tertiary)
                             .frame(width: 3, height: 3)
+                        // The start: a row prints no other time, and a clash
+                        // mark after it keeps its own red.
                         detail
                             .scalingFont(size: 12, weight: .medium)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(style(changed: changes?.changed(.time(.startsAt)), else: .secondary))
                     }
                     .padding(.top, 1)
+                    if let changes { ListingChangesLine(changes: changes) }
                 }
                 .modifier(OpensEvent(open: opens))
             }
@@ -64,17 +75,22 @@ struct EventRowContent<Billing: View, Trailing: View>: View {
         }
         .padding(12)
     }
+
+    /// ``Color/changedListing`` where the field changed, else its usual style.
+    private func style(changed: Bool?, else usual: HierarchicalShapeStyle) -> AnyShapeStyle {
+        changed == true ? AnyShapeStyle(Color.changedListing) : AnyShapeStyle(usual)
+    }
 }
 
 extension EventRowContent {
     /// The venue under the title, which is what places a row in every list that
     /// is not already about one place.
     init(
-        event: Event, detail: Text, opens: (() -> Void)? = nil,
+        event: Event, detail: Text, changes: ListingChanges? = nil, opens: (() -> Void)? = nil,
         @ViewBuilder billing: () -> Billing, @ViewBuilder trailing: () -> Trailing
     ) {
         self.init(event: event, detail: detail, caption: Text(event.venue),
-                  billing: billing, trailing: trailing, opens: opens)
+                  billing: billing, trailing: trailing, opens: opens, changes: changes)
     }
 }
 
@@ -151,7 +167,7 @@ struct LibraryRow: View {
 
     var body: some View {
         Button(action: open) {
-            EventRowContent(event: event, detail: detail) {
+            EventRowContent(event: event, detail: detail, changes: unread?.changes) {
                 // Above the title, where Following carries it after the names:
                 // a library row has no billing line to put it on the end of.
                 if let unread { UnreadTag(unread: unread) }

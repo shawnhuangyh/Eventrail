@@ -37,8 +37,9 @@ final class LibraryDatabase {
 
     /// ``LibraryMembership`` is in it only so what the builds before
     /// ``LibraryEntry`` wrote can be read once and taken in.
-    static let schema = Schema([LibraryEntry.self, LibraryEvent.self, LibraryLottery.self, FollowingReadMark.self,
-                                FollowedPerformer.self, LibrarySettings.self, LibraryMembership.self])
+    static let schema = Schema([LibraryEntry.self, LibraryEvent.self, LibraryLottery.self, LibraryPlanItem.self,
+                                FollowingReadMark.self, FollowedPerformer.self, LibrarySettings.self,
+                                LibraryMembership.self])
 
     /// How syncing stands, in terms the Settings row can state plainly.
     enum SyncStatus: Equatable, Sendable {
@@ -181,6 +182,15 @@ final class LibraryDatabase {
     /// user is known to be the one it synced with.
     @ObservationIgnored private var wantsSyncing: Bool
     @ObservationIgnored private var retry: Task<Void, Never>?
+    /// Whether iCloud has said the account changed and no check has had an
+    /// answer since. A store already syncing goes on meanwhile, since the news
+    /// comes without any change of user too and reopening costs a mirror held
+    /// and let go, but it keeps asking until it is told: left at one failed
+    /// check, the old library could go on mirroring under the new account.
+    @ObservationIgnored private var accountCheckOwed = false
+    @ObservationIgnored private var isReadingLegacyZone = false
+    /// When the old zone was last asked — see ``legacyZonePatience``.
+    @ObservationIgnored private var legacyZoneAsked: Date?
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
 
     /// Which iCloud user this device's library syncs with (the container's
@@ -190,6 +200,20 @@ final class LibraryDatabase {
     /// Where this device last read the old sync's zone up to — see
     /// ``LegacyCloudZone``. Cleared with the account, since it belongs to one.
     private static let legacyTokenKey = "iCloudLegacyZoneToken"
+    /// How long a return to the app leaves the old zone unasked: a device still
+    /// on an old build is heard from without a restart, and every return is
+    /// not a request.
+    nonisolated static let legacyZonePatience: TimeInterval = 15 * 60
+
+    nonisolated static func legacyZoneIsDue(asked: Date?, at now: Date) -> Bool {
+        asked.map { now.timeIntervalSince($0) >= legacyZonePatience } ?? true
+    }
+
+    /// Whether a check that could not tell is asked again: where syncing waits
+    /// on it, and where iCloud said the account changed (``accountCheckOwed``).
+    nonisolated static func asksAboutAccountAgain(isSyncing: Bool, owed: Bool) -> Bool {
+        !isSyncing || owed
+    }
     /// ``lastFetched``, per device. Cleared with the account, since it says
     /// when this device last heard from that account's iCloud.
     private static let lastFetchedKey = "iCloudLastFetched"
@@ -256,10 +280,17 @@ final class LibraryDatabase {
     }
 
     /// Asks again whether syncing can start, where the switch is on and the
-    /// last check could not tell — offline, say. Run on coming back to the app.
+    /// last check could not tell — offline, say. Syncing already, asks what is
+    /// still owed: whether the account changed, and what a device still on an
+    /// old build has written. Run on coming back to the app.
     func resumeSyncing() {
-        guard wantsSyncing, !isSyncing, syncStatus != .notConfigured else { return }
-        checkAccount()
+        guard wantsSyncing, syncStatus != .notConfigured else { return }
+        guard isSyncing else {
+            checkAccount()
+            return
+        }
+        if accountCheckOwed { checkAccount() }
+        if Self.legacyZoneIsDue(asked: legacyZoneAsked, at: .now) { readLegacyZone() }
     }
 
     /// Opens the store with CloudKit, now that the account is the one the
@@ -291,7 +322,11 @@ final class LibraryDatabase {
     /// Merges in what the sync before SwiftData left in iCloud, or what a
     /// device still on it has written there since — see ``LegacyCloudZone``.
     private func readLegacyZone() {
+        guard !isReadingLegacyZone else { return }
+        isReadingLegacyZone = true
+        legacyZoneAsked = .now
         Task {
+            defer { isReadingLegacyZone = false }
             let defaults = UserDefaults.standard
             let token = defaults.data(forKey: Self.legacyTokenKey).flatMap {
                 try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
@@ -309,8 +344,10 @@ final class LibraryDatabase {
                         onRemoteChanges?()
                     }
                 }
-                let saved = try NSKeyedArchiver.archivedData(withRootObject: next, requiringSecureCoding: true)
-                defaults.set(saved, forKey: Self.legacyTokenKey)
+                if let next {
+                    let saved = try NSKeyedArchiver.archivedData(withRootObject: next, requiringSecureCoding: true)
+                    defaults.set(saved, forKey: Self.legacyTokenKey)
+                }
             } catch {
                 Self.log.error("The old iCloud zone could not be read: \(error.localizedDescription, privacy: .public)")
             }
@@ -483,12 +520,17 @@ final class LibraryDatabase {
                 }
                 guard wantsSyncing else { return }
                 if let syncedWith, syncedWith != user {
+                    accountCheckOwed = false
                     stopSyncing(.accountChanged)
                 } else {
                     if syncedWith == nil { UserDefaults.standard.set(user, forKey: Self.accountKey) }
+                    // What the check that could not tell said no longer stands.
+                    if accountCheckOwed, isSyncing { syncStatus = nil }
+                    accountCheckOwed = false
                     startSyncing()
                 }
             case .noAccount:
+                accountCheckOwed = false
                 if syncedWith != nil { stopSyncing(.accountChanged) } else { syncStatus = .signedOut }
             case .temporarilyUnavailable, .couldNotDetermine:
                 // Asked again, as a check that could not get through is:
@@ -503,9 +545,11 @@ final class LibraryDatabase {
         }
     }
 
-    /// The account could not be checked. A store already syncing goes on; one
-    /// waiting to start stays unsynced — nothing is sent to a user nobody has
-    /// named — and asks again in a minute, and on coming back to the app.
+    /// The account could not be checked. A store already syncing goes on, and
+    /// asks again only where iCloud said the account changed
+    /// (``accountCheckOwed``); one waiting to start stays unsynced — nothing is
+    /// sent to a user nobody has named. Each asks again in a minute, and on
+    /// coming back to the app.
     private func couldNotCheck(_ error: any Error) {
         guard wantsSyncing else { return }
         syncStatus = Self.status(for: error)
@@ -513,9 +557,9 @@ final class LibraryDatabase {
     }
 
     /// Asks about the account again in a minute, unless the store is already
-    /// syncing.
+    /// syncing with nothing owed (``asksAboutAccountAgain(isSyncing:owed:)``).
     private func retryInAMinute() {
-        guard !isSyncing else { return }
+        guard Self.asksAboutAccountAgain(isSyncing: isSyncing, owed: accountCheckOwed) else { return }
         retry?.cancel()
         retry = Task { [weak self] in
             try? await Task.sleep(for: .seconds(60))
@@ -557,6 +601,7 @@ final class LibraryDatabase {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.wantsSyncing else { return }
+                self.accountCheckOwed = true
                 self.checkAccount()
             }
         })
@@ -646,6 +691,8 @@ final class LibraryDatabase {
                               preferring: LibraryEvent.isPreferred, in: context) || changed
         changed = try keepOne(of: LibraryLottery.self, by: LotteryKey.init,
                               preferring: LibraryLottery.isPreferred, in: context) || changed
+        changed = try keepOne(of: LibraryPlanItem.self, by: PlanKey.init,
+                              preferring: LibraryPlanItem.isPreferred, in: context) || changed
         changed = try keepOne(of: FollowingReadMark.self, by: \.eventID,
                               preferring: FollowingReadMark.isPreferred, in: context) || changed
         changed = try keepOne(of: FollowedPerformer.self, by: \.actorID,
@@ -722,11 +769,14 @@ final class LibraryDatabase {
 
     /// What the reader wrote on an event: its entry's answers, with the
     /// rounds its rows hold — or, where it has none yet, the list the entry
-    /// kept before rows.
-    static func tracking(of entry: LibraryEntry?, rows: [String: LibraryLottery]?) -> Tracking {
+    /// kept before rows — and the plan its own rows hold.
+    static func tracking(of entry: LibraryEntry?, rows: [String: LibraryLottery]?,
+                         plan: [String: LibraryPlanItem]? = nil) -> Tracking {
         let lotteries = lotteries(in: rows)
-        guard let entry else { return Tracking(lotteries: lotteries ?? []) }
-        return entry.tracking(lotteries: lotteries)
+        var record = entry?.tracking(lotteries: lotteries) ?? Tracking(lotteries: lotteries ?? [])
+        record.reminders = EventReminder.inOrder(planItems(EventReminder.self, in: plan))
+        record.queueTickets = QueueTicket.inOrder(planItems(QueueTicket.self, in: plan))
+        return record
     }
 
     /// When the newest of an event's lottery rows was written, if it has any.
@@ -812,6 +862,96 @@ final class LibraryDatabase {
             }
         }
         rows[eventID] = held
+        return changed
+    }
+
+    // MARK: - The plan
+
+    /// What two rows for one item share: the event and the item.
+    struct PlanKey: Hashable {
+        let eventID: String
+        let itemID: String
+
+        init(_ row: LibraryPlanItem) {
+            eventID = row.eventID
+            itemID = row.itemID
+        }
+    }
+
+    /// Every event's plan rows, by event and then by item — the row
+    /// ``deduplicate(in:)`` will keep for each.
+    static func planIndex(_ rows: [LibraryPlanItem]) -> [String: [String: LibraryPlanItem]] {
+        Dictionary(grouping: rows, by: \.eventID).mapValues { rows in
+            index(rows, by: \.itemID, preferring: LibraryPlanItem.isPreferred)
+        }
+    }
+
+    /// The items of one kind an event's rows hold, in no order.
+    static func planItems<Item: PlanItem>(_ type: Item.Type, in rows: [String: LibraryPlanItem]?) -> [Item] {
+        rows?.values.compactMap { $0.item(as: type) } ?? []
+    }
+
+    /// When the newest row of one kind was written, if the event has any.
+    static func planChanged<Item: PlanItem>(_ type: Item.Type, in rows: [String: LibraryPlanItem]?) -> Date? {
+        rows?.values.filter { $0.kind == Item.rowKind }.map(\.modified).max()
+    }
+
+    /// Writes `items` as an event's rows of their kind, dated `when`, touching
+    /// only those that move — an item added is a row inserted, one changed the
+    /// row rewritten, and one taken out the row marked removed. Answers
+    /// whether anything moved.
+    ///
+    /// An item this build cannot read is missing from every list it is handed,
+    /// and is left as it is rather than taken out: written by a later build,
+    /// it is the reader's on every device that can read it. Only
+    /// ``clearPlan(for:rows:dated:)`` takes it out.
+    ///
+    /// `redating` dates again an item left as it was, where `when` is later
+    /// than its row says — what a restore asks (``apply(_:to:)``). Not saved;
+    /// the caller saves.
+    @discardableResult
+    static func writePlan<Item: PlanItem>(_ items: [Item], for eventID: String,
+                                          rows: inout [String: [String: LibraryPlanItem]],
+                                          dated when: Date, redating: Bool = false,
+                                          in context: ModelContext) -> Bool {
+        var held = rows[eventID] ?? [:]
+        var changed = false
+        for item in items {
+            let id = item.id.uuidString
+            let target: LibraryPlanItem
+            if let row = held[id] {
+                target = row
+            } else {
+                target = LibraryPlanItem(eventID: eventID, itemID: id, kind: Item.rowKind)
+                context.insert(target)
+                held[id] = target
+            }
+            if target.write(item, dated: when) {
+                changed = true
+            } else if redating, when.toTheMillisecond > target.modified.toTheMillisecond {
+                target.modified = when.toTheMillisecond
+                changed = true
+            }
+        }
+        let wanted = Set(items.map(\.id.uuidString))
+        for (id, target) in held where !wanted.contains(id) && target.item(as: Item.self) != nil {
+            changed = target.write(Item?.none, dated: when) || changed
+        }
+        rows[eventID] = held
+        return changed
+    }
+
+    /// Takes out every row of an event's plan, of whatever kind and whether
+    /// this build can read it or not — a removal of the event, or Delete All,
+    /// which empty the whole record. Not saved; the caller saves.
+    @discardableResult
+    static func clearPlan(for eventID: String, rows: [String: [String: LibraryPlanItem]],
+                          dated when: Date) -> Bool {
+        guard let held = rows[eventID] else { return false }
+        var changed = false
+        for target in held.values {
+            changed = target.write(EventReminder?.none, dated: when) || changed
+        }
         return changed
     }
 
@@ -909,10 +1049,11 @@ final class LibraryDatabase {
         let entries = index(try context.fetch(FetchDescriptor<LibraryEntry>()), by: \.eventID,
                             preferring: LibraryEntry.isPreferred)
         let lotteries = lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))
+        let plans = planIndex(try context.fetch(FetchDescriptor<LibraryPlanItem>()))
         for (id, entry) in entries {
             archive.membership[id] = Stamped(entry.inLibrary, at: entry.changed(.inLibrary))
             archive.favorites[id] = Stamped(entry.isFavorite, at: entry.changed(.favorite))
-            archive.tracking[id] = stampedTracking(of: entry, rows: lotteries[id])
+            archive.tracking[id] = stampedTracking(of: entry, rows: lotteries[id], plan: plans[id])
             if archive.events[id] == nil { archive.events[id] = entry.kept }
         }
         let marks = index(try context.fetch(FetchDescriptor<FollowingReadMark>()), by: \.eventID,
@@ -938,20 +1079,38 @@ final class LibraryDatabase {
     }
 
     /// An event's record as an archive carries it: dated as its entry dates
-    /// its tracking, the lotteries as their newest row — the record as new as
-    /// the newer of the two, the other answer dated older within it.
-    static func stampedTracking(of entry: LibraryEntry, rows: [String: LibraryLottery]?) -> Stamped<Tracking> {
-        var record = tracking(of: entry, rows: rows)
+    /// its tracking, each list kept in rows as its newest row — the record as
+    /// new as the newest of them, the other answers dated older within it. A
+    /// kind of the plan with no row says nothing (``Tracking/unsaid``): no
+    /// reminder here is not another device's reminder taken out, and a removal
+    /// is a row of its own.
+    static func stampedTracking(of entry: LibraryEntry, rows: [String: LibraryLottery]?,
+                                plan: [String: LibraryPlanItem]? = nil) -> Stamped<Tracking> {
+        var record = tracking(of: entry, rows: rows, plan: plan)
         let part = entry.changed(.tracking).toTheMillisecond
-        guard let listed = lotteriesChanged(in: rows)?.toTheMillisecond, listed != part else {
-            return Stamped(record, at: part)
+        var listed: [Tracking.Field: Date] = [:]
+        listed[.lotteries] = lotteriesChanged(in: rows)?.toTheMillisecond
+        listed[.reminders] = planChanged(EventReminder.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
+        listed[.queueTickets] = planChanged(QueueTicket.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
+        let newest = listed.values.reduce(part, max)
+        for field in Tracking.Field.allCases {
+            let written = listed[field] ?? part
+            if written != newest { record.edits[field] = written }
         }
-        if listed > part {
-            for field in Tracking.Field.allCases where field != .lotteries { record.edits[field] = part }
-            return Stamped(record, at: listed)
-        }
-        record.edits[.lotteries] = listed
-        return Stamped(record, at: part)
+        return Stamped(record, at: newest)
+    }
+
+    /// One kind of an event's plan as an archive gives it, over what its rows
+    /// hold: written where the list moved, and dated again where it raises an
+    /// unchanged list past what its rows say, as a restore does.
+    private static func applyPlan<Item: PlanItem & Hashable>(
+        _ list: [Item], heldAs held: [Item], dated when: Date, for id: String,
+        rows: inout [String: [String: LibraryPlanItem]], in context: ModelContext
+    ) -> Bool {
+        let newest = planChanged(Item.self, in: rows[id])?.toTheMillisecond
+        let raises = when.toTheMillisecond > (newest ?? .distantPast)
+        guard Set(list) != Set(held) || (raises && newest != nil) else { return false }
+        return writePlan(list, for: id, rows: &rows, dated: when, redating: raises, in: context)
     }
 
     /// Writes what `archive` holds into the rows, touching only those whose
@@ -975,6 +1134,7 @@ final class LibraryDatabase {
         let performers = index(try context.fetch(FetchDescriptor<FollowedPerformer>()), by: \.actorID,
                                preferring: FollowedPerformer.isPreferred)
         var lotteries = lotteryIndex(try context.fetch(FetchDescriptor<LibraryLottery>()))
+        var plans = planIndex(try context.fetch(FetchDescriptor<LibraryPlanItem>()))
         var changed = false
 
         for (id, event) in archive.events where rows[id]?.facts != event {
@@ -993,7 +1153,7 @@ final class LibraryDatabase {
             // Only what the archive holds is taken: an answer it has no record
             // of stays as this device has it.
             var heldAnswers = held?.answers ?? LibraryEntry.Answers()
-            heldAnswers.tracking = tracking(of: held, rows: lotteries[id])
+            heldAnswers.tracking = tracking(of: held, rows: lotteries[id], plan: plans[id])
             var answers = heldAnswers
             if let membership = archive.membership[id] { answers.inLibrary = membership.value }
             if let favorite = archive.favorites[id] { answers.isFavorite = favorite.value }
@@ -1014,16 +1174,36 @@ final class LibraryDatabase {
                     changed = writeLotteries(listed, for: id, rows: &lotteries, entry: held, dated: listedDate,
                                              redating: raises, in: context) || changed
                 }
+                // The plan the same way, each kind dated as the archive dates
+                // its list, and left as it stands where the archive says
+                // nothing of it: what an older build left is applied with no
+                // merge when the plan's rows land before the entry's.
+                if tracking.value.says(.reminders) {
+                    changed = applyPlan(answers.tracking.reminders, heldAs: heldAnswers.tracking.reminders,
+                                        dated: tracking.value.edits[.reminders] ?? tracking.modified,
+                                        for: id, rows: &plans, in: context) || changed
+                } else {
+                    answers.tracking.reminders = heldAnswers.tracking.reminders
+                }
+                if tracking.value.says(.queueTickets) {
+                    changed = applyPlan(answers.tracking.queueTickets, heldAs: heldAnswers.tracking.queueTickets,
+                                        dated: tracking.value.edits[.queueTickets] ?? tracking.modified,
+                                        for: id, rows: &plans, in: context) || changed
+                } else {
+                    answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
+                }
             }
             // Whether there is anything to say, the lotteries included; the
             // entry's own parts are settled with them set aside.
             let saysNothing = answers.isEmpty
             answers.tracking.lotteries = heldAnswers.tracking.lotteries
+            answers.tracking.reminders = heldAnswers.tracking.reminders
+            answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
             // The entry's tracking is dated by its own answers, not by the
             // list beside it: dated by a newer list, it would outrank another
             // device's newer note in the fold (``LibraryEntry/absorb(_:)``).
             let answered = archive.tracking[id].map { record in
-                Tracking.Field.allCases.filter { $0 != .lotteries && $0 != .ticket }
+                [Tracking.Field.seat, .seatClass, .cost, .note]
                     .map { record.value.edits[$0] ?? record.modified }.max() ?? record.modified
             }
             let records: [LibraryEntry.Part: Date?] = [.inLibrary: archive.membership[id]?.modified,

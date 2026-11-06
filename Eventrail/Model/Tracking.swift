@@ -194,8 +194,20 @@ nonisolated struct Tracking: Hashable, Codable {
     /// only an answer *older* than the record around it is written down and a
     /// record edited once carries nothing here at all.
     var edits: [Field: Date] = [:]
+    /// The times the reader wants to hear about ahead of the event, as the
+    /// promoter's notice prints them — see ``EventReminder``. Not on Ticket
+    /// Details: they are read from the event's own sheet, and say nothing
+    /// about whether the reader got in.
+    ///
+    /// In the store each is a row of its own (``LibraryPlanItem``), for the
+    /// reason each lottery round is, and listed by when. In an archive the
+    /// list is one answer, as ``lotteries`` is.
+    var reminders: [EventReminder] = []
+    /// The links to the queue tickets the reader took — see ``QueueTicket``.
+    /// Kept as ``reminders`` are.
+    var queueTickets: [QueueTicket] = []
 
-    /// The six answers a record holds, named so that a merge can take them
+    /// The answers a record holds, named so that a merge can take them
     /// one at a time.
     ///
     /// Named by their raw value in an archive's ``edits``, so a raw value
@@ -211,6 +223,19 @@ nonisolated struct Tracking: Hashable, Codable {
     nonisolated enum Field: String, CaseIterable, Codable, CodingKeyRepresentable, Hashable, Sendable {
         case ticket, seat, seatClass, cost, note
         case lotteries = "lotteryEntries"
+        case reminders, queueTickets
+    }
+
+    /// The date of a list a record says nothing about: written before the list
+    /// existed, or with no row of it to speak for. Older than anything written,
+    /// so it never outranks an answer, and an empty list under it is no answer.
+    /// Dated as the record instead, a device still on an older build would take
+    /// the reader's reminders out by editing a note.
+    static let unsaid = Date(timeIntervalSince1970: 0)
+
+    /// Whether this record has anything to say about `field`.
+    func says(_ field: Field) -> Bool {
+        (edits[field] ?? .distantFuture) > Self.unsaid
     }
 
     /// Whether the reader has written anything down here.
@@ -219,6 +244,12 @@ nonisolated struct Tracking: Hashable, Codable {
     /// a record whose every answer has since been cleared is empty however
     /// recently that happened.
     var isEmpty: Bool {
+        isTicketBlank && reminders.isEmpty && queueTickets.isEmpty
+    }
+
+    /// Whether Ticket Details holds nothing: a goods sale planned for is not
+    /// the reader saying how getting in went.
+    var isTicketBlank: Bool {
         ticket == .none && seat.isEmpty && seatClass.isEmpty && cost == nil
             && lotteries.isEmpty && note.isEmpty
     }
@@ -242,6 +273,8 @@ nonisolated extension Tracking {
         case .cost: cost == other.cost && currency == other.currency
         case .lotteries: lotteries == other.lotteries
         case .note: note == other.note
+        case .reminders: Set(reminders) == Set(other.reminders)
+        case .queueTickets: Set(queueTickets) == Set(other.queueTickets)
         }
     }
 
@@ -256,6 +289,8 @@ nonisolated extension Tracking {
             currency = other.currency
         case .lotteries: lotteries = other.lotteries
         case .note: note = other.note
+        case .reminders: reminders = other.reminders
+        case .queueTickets: queueTickets = other.queueTickets
         }
     }
 
@@ -265,15 +300,21 @@ nonisolated extension Tracking {
     /// device while the copy was open keeps what it arrived with, unless the
     /// reader changed that one too.
     ///
-    /// The lotteries round by round, as they are kept (``LibraryLottery``):
-    /// a round another device added while the sheet was open stays, rather
-    /// than going because the sheet's copy of the list never had it.
+    /// The lists item by item, as they are kept (``LibraryLottery``,
+    /// ``LibraryPlanItem``): a round another device added while the sheet was
+    /// open stays, rather than going because the sheet's copy of the list
+    /// never had it.
     func applying(changesFrom original: Tracking, to edited: Tracking) -> Tracking {
         var record = self
         for field in Field.allCases where !edited.sameAnswer(for: field, as: original) {
-            if field == .lotteries {
+            switch field {
+            case .lotteries:
                 record.lotteries = Self.lotteries(lotteries, changedFrom: original.lotteries, to: edited.lotteries)
-            } else {
+            case .reminders:
+                record.reminders = Self.list(reminders, changedFrom: original.reminders, to: edited.reminders)
+            case .queueTickets:
+                record.queueTickets = Self.list(queueTickets, changedFrom: original.queueTickets, to: edited.queueTickets)
+            default:
                 record.take(field, from: edited)
             }
         }
@@ -285,6 +326,12 @@ nonisolated extension Tracking {
     /// taken as changed — and every other round as it now stands.
     static func lotteries(_ current: [LotteryEntry], changedFrom original: [LotteryEntry],
                           to edited: [LotteryEntry]) -> [LotteryEntry] {
+        list(current, changedFrom: original, to: edited)
+    }
+
+    private static func list<Item: Identifiable & Equatable>(
+        _ current: [Item], changedFrom original: [Item], to edited: [Item]
+    ) -> [Item] {
         let before = Dictionary(original.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let after = Set(edited.map(\.id))
         var list = current.filter { before[$0.id] == nil || after.contains($0.id) }
@@ -397,8 +444,13 @@ nonisolated extension Tracking {
                     .decodeIfPresent(Int.self, forKey: .lotteryEntries)),
             note: try record.decodeIfPresent(String.self, forKey: .note) ?? "",
             currency: try record.decodeIfPresent(String.self, forKey: .currency) ?? "",
-            edits: try record.decodeIfPresent([Field: Date].self, forKey: .edits) ?? [:])
+            edits: try record.decodeIfPresent([Field: Date].self, forKey: .edits) ?? [:],
+            reminders: try record.decodeIfPresent([EventReminder].self, forKey: .reminders) ?? [],
+            queueTickets: try record.decodeIfPresent([QueueTicket].self, forKey: .queueTickets) ?? [])
         foldLegacyTicket()
+        // A key that isn't there is not an empty list: see ``unsaid``.
+        if !record.contains(.reminders) { edits[.reminders] = Self.unsaid }
+        if !record.contains(.queueTickets) { edits[.queueTickets] = Self.unsaid }
     }
 
     /// Keys a record no longer writes, read so that what they held is not lost.

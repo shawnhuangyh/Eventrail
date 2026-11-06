@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		000000000000000150000001 /* EventrailWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000000320 /* EventrailWidgets.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		000000000000000170000001 /* EventrailWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000000520 /* EventrailWatch.app */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000150000001 /* EventrailWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000000320 /* EventrailWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000170000001 /* EventrailWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000000520 /* EventrailWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -247,7 +247,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2630;
-				LastUpgradeCheck = 2700;
+				LastUpgradeCheck = 2720;
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
@@ -338,17 +338,13 @@
 /* Begin PBXTargetDependency section */
 		000000000000000160000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilters = (
-				ios,
-			);
+			platformFilter = ios;
 			target = 000000000000000300000000 /* EventrailWidgets */;
 			targetProxy = 000000000000000160000001 /* PBXContainerItemProxy */;
 		};
 		000000000000000180000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			platformFilters = (
-				ios,
-			);
+			platformFilter = ios;
 			target = 000000000000000500000000 /* EventrailWatch */;
 			targetProxy = 000000000000000180000001 /* PBXContainerItemProxy */;
 		};
@@ -365,6 +361,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -396,6 +393,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -435,6 +433,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -466,6 +465,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -501,8 +501,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				"ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*]" = YES;
 				ENABLE_PREVIEWS = YES;
@@ -516,15 +516,15 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Eventrail keeps a calendar of its own for the events in your library. It reads back only that calendar, to correct and remove its own entries.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Eventrail uses the camera when you scan a paper ticket, to fill in its seat and price. The picture is read on your device and isn't kept.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Eventrail uses the camera when you scan a paper ticket, to fill in its seat and price, or a queue ticket's QR code, to link to its queue. What it sees is read on your device and isn't kept.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Eventrail adds an event's flyer, a ticket stub you make or a Passport card you share to your photos when you ask it to save one. It never reads your photos.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=macosx*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
@@ -563,8 +563,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				"ENABLE_OUTGOING_NETWORK_CONNECTIONS[sdk=macosx*]" = YES;
 				ENABLE_PREVIEWS = YES;
@@ -578,15 +578,15 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Eventrail keeps a calendar of its own for the events in your library. It reads back only that calendar, to correct and remove its own entries.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Eventrail uses the camera when you scan a paper ticket, to fill in its seat and price. The picture is read on your device and isn't kept.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Eventrail uses the camera when you scan a paper ticket, to fill in its seat and price, or a queue ticket's QR code, to link to its queue. What it sees is read on your device and isn't kept.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Eventrail adds an event's flyer, a ticket stub you make or a Passport card you share to your photos when you ask it to save one. It never reads your photos.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=macosx*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
@@ -622,7 +622,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
@@ -648,7 +647,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
@@ -675,7 +673,6 @@
 				CODE_SIGN_ENTITLEMENTS = EventrailWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "EventrailWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;
@@ -710,7 +707,6 @@
 				CODE_SIGN_ENTITLEMENTS = EventrailWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "EventrailWidgets-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;
@@ -744,7 +740,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;
@@ -778,7 +773,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JE9SRTHZY7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Eventrail;

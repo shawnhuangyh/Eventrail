@@ -50,6 +50,15 @@ struct LibraryDatabaseTests {
                                                  ],
                                                  note: "front row"), at: earlier)
         archive.favorites["2"] = Stamped(true, at: earlier)
+        archive.tracking["2"] = Stamped(Tracking(
+            // By when, as an event's rows hand them over.
+            reminders: [EventReminder(id: id(8), title: "ブシロードカード優先",
+                                      day: CalendarDay(year: 2027, month: 5, day: 9), minute: 690),
+                        EventReminder(id: id(7), title: "物販開始",
+                                      day: CalendarDay(year: 2027, month: 5, day: 9), minute: 720, lead: 30)],
+            queueTickets: [QueueTicket(id: id(9), link: URL(string: "https://example.com/queue/1")!, added: earlier,
+                                       number: "A-123")]),
+                                        at: earlier)
         let listed = Fixtures.event(id: "3", date: ahead)
         archive.followingReads = ["3": Stamped(FollowingRead(fingerprint: listed.listingFingerprint, day: listed.date), at: earlier)]
         archive.follows = ["10": Stamped(true, at: earlier), "11": Stamped(false, at: later)]
@@ -850,6 +859,25 @@ struct LibraryDatabaseTests {
 
         // And the next import finds nothing more to do.
         #expect(try LibraryDatabase.adoptLegacyRecords(in: context) == false)
+        withExtendedLifetime(database) {}
+    }
+
+    /// A plan's rows can land before its entry. What an older build left knows
+    /// nothing of a plan, and is applied with no merge to settle it.
+    @Test func takingInAnOlderRecordLeavesAPlanThatLandedFirst() throws {
+        let (database, context) = try database()
+        _ = legacyRow("1", in: context)
+        let time = EventReminder(title: "物販開始", day: CalendarDay(year: 2027, month: 5, day: 9),
+                                 minute: 12 * 60, lead: 30)
+        var plan: [String: [String: LibraryPlanItem]] = [:]
+        LibraryDatabase.writePlan([time], for: "1", rows: &plan, dated: earlier, in: context)
+        try context.save()
+
+        #expect(try LibraryDatabase.adoptLegacyRecords(in: context))
+        let held = LibraryDatabase.planIndex(try context.fetch(FetchDescriptor<LibraryPlanItem>()))["1"]
+        #expect(LibraryDatabase.planItems(EventReminder.self, in: held) == [time])
+        #expect(held?[time.id.uuidString]?.isRemoved == false)
+        #expect(try entries("1", in: context).first?.tracking.note == "front row")
         withExtendedLifetime(database) {}
     }
 

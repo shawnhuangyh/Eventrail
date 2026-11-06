@@ -132,12 +132,18 @@ final class EventStore {
     /// The lottery rounds the reader entered, by event id and then by round,
     /// kept the same way — see ``LibraryLottery``.
     private var lotteryRows: [Event.ID: [String: LibraryLottery]] = [:]
+    /// The reminders and queue tickets, by event id and then by item, kept the
+    /// same way — see ``LibraryPlanItem``.
+    private var planRows: [Event.ID: [String: LibraryPlanItem]] = [:]
     /// Every Following date's read, by event id, kept the same way.
     private var readMarks: [Event.ID: FollowingReadMark] = [:]
     /// The library by day, as ``upcoming(onDayOf:)`` last made it.
     @ObservationIgnored private var libraryByDay: (revision: Int, days: [Date: [Event]])?
     /// What ``unread(_:)`` last answered for each event — see there.
     @ObservationIgnored private var unreadAnswers: [Event.ID: (event: Event, read: FollowingRead?, answer: FollowingUnread?)] = [:]
+    /// The copy each Updated date had been read as, for the dates the reader
+    /// has read again since launch — see ``changesRead(in:)``.
+    private var readBefore: [Event.ID: ListingCopy] = [:]
     private var performerRows: [Int: FollowedPerformer] = [:]
     private var settingsRow: LibrarySettings?
 
@@ -289,6 +295,9 @@ final class EventStore {
     /// What the linked account listed at its last whole read — see
     /// ``AccountEvents``.
     private let accountEvents: AccountEvents?
+    /// The copy of each date the reader read, so an Updated one can say what
+    /// changed — see ``ReadCopies``.
+    private let readCopies: ReadCopies?
     private let client: EventernoteClient
     private var pendingSave: Task<Void, Never>?
     private var venuePlacings: Task<Void, Never>?
@@ -325,6 +334,7 @@ final class EventStore {
         venues: VenuePlaces? = .shared,
         pageReads: PageReads? = .shared,
         accountEvents: AccountEvents? = .shared,
+        readCopies: ReadCopies? = .shared,
         client: EventernoteClient = .shared,
         library: [Event] = [],
         tracking: [Event.ID: Tracking] = [:],
@@ -339,6 +349,7 @@ final class EventStore {
         self.venues = venues
         self.pageReads = pageReads
         self.accountEvents = accountEvents
+        self.readCopies = readCopies
         self.client = client
 
         iCloudSyncEnabled = syncing
@@ -409,6 +420,7 @@ final class EventStore {
         entries = LibraryDatabase.index((try? context.fetch(FetchDescriptor<LibraryEntry>())) ?? [],
                                         by: \.eventID, preferring: LibraryEntry.isPreferred)
         lotteryRows = LibraryDatabase.lotteryIndex((try? context.fetch(FetchDescriptor<LibraryLottery>())) ?? [])
+        planRows = LibraryDatabase.planIndex((try? context.fetch(FetchDescriptor<LibraryPlanItem>())) ?? [])
         readMarks = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowingReadMark>())) ?? [],
                                           by: \.eventID, preferring: FollowingReadMark.isPreferred)
         performerRows = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? [],
@@ -523,16 +535,31 @@ final class EventStore {
         let listed = answers.tracking.lotteries
         let listMoved = listed != heldAnswers.tracking.lotteries
             || (clearing && lotteryRows[event.id]?.values.contains(where: \.holdsUnreadableRound) == true)
-        // The entry's own parts, its lotteries set aside.
+        // The plan is its own rows, written the same way.
+        let reminders = answers.tracking.reminders
+        let queueTickets = answers.tracking.queueTickets
+        let planCleared = clearing && planRows[event.id]?.values.contains { !$0.isRemoved } == true
+        let planMoved = planCleared
+            || Set(reminders) != Set(heldAnswers.tracking.reminders)
+            || Set(queueTickets) != Set(heldAnswers.tracking.queueTickets)
+        // The entry's own parts, its lists set aside.
         answers.tracking.lotteries = heldAnswers.tracking.lotteries
+        answers.tracking.reminders = heldAnswers.tracking.reminders
+        answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
         var given = answers.parts(differingFrom: heldAnswers)
         // An event first written down by a lottery still gets an entry.
-        if held == nil, listMoved, !given.contains(.tracking) { given.append(.tracking) }
-        guard !given.isEmpty || listMoved else { return }
+        if held == nil, listMoved || planMoved, !given.contains(.tracking) { given.append(.tracking) }
+        guard !given.isEmpty || listMoved || planMoved else { return }
         let now = Date.now
         if listMoved {
             LibraryDatabase.writeLotteries(listed, for: event.id, rows: &lotteryRows, entry: held,
                                            dated: now, clearing: clearing, in: database.context)
+        }
+        if planCleared {
+            LibraryDatabase.clearPlan(for: event.id, rows: planRows, dated: now)
+        } else if planMoved {
+            LibraryDatabase.writePlan(reminders, for: event.id, rows: &planRows, dated: now, in: database.context)
+            LibraryDatabase.writePlan(queueTickets, for: event.id, rows: &planRows, dated: now, in: database.context)
         }
         records[event.id] = nil
         converted[event.id] = nil
@@ -605,10 +632,15 @@ final class EventStore {
         events(of: entries.values, where: \.inLibrary)
     }
 
-    /// The library's events still to come, soonest first — what the watch is
-    /// sent (``WatchLink``).
+    /// The library's events still to come, soonest first.
     var upcoming: [Event] {
         library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+    }
+
+    /// What the watch is sent (``WatchLink``): those still to come, and a show
+    /// still running past the end of its day.
+    var onTheWatch: [Event] {
+        library.filter { $0.isOnTheWatch() }.sorted { $0.sortDate < $1.sortDate }
     }
 
     /// The library's events on the day `event`'s hall prints it on
@@ -653,8 +685,8 @@ final class EventStore {
 
     private func tracking(of id: Event.ID) -> Tracking {
         if let record = records[id] { return record }
-        guard entries[id] != nil || lotteryRows[id] != nil else { return Tracking() }
-        let record = LibraryDatabase.tracking(of: entries[id], rows: lotteryRows[id])
+        guard entries[id] != nil || lotteryRows[id] != nil || planRows[id] != nil else { return Tracking() }
+        let record = LibraryDatabase.tracking(of: entries[id], rows: lotteryRows[id], plan: planRows[id])
         records[id] = record
         return record
     }
@@ -706,9 +738,10 @@ final class EventStore {
     /// Not merely no ticket. A lottery written down, lost included, is the
     /// reader having already said how the event went for them, and asking
     /// them to pick it again as one they went to is asking twice — so is a
-    /// seat, a cost or a note.
+    /// seat, a cost or a note. A reminder is not: planning for the goods sale
+    /// says nothing about whether the reader got in.
     func awaitsTicket(_ event: Event) -> Bool {
-        !event.isUpcoming && tracking(for: event).isEmpty
+        !event.isUpcoming && tracking(for: event).isTicketBlank
     }
 
     /// The past events here with nothing written down (``awaitsTicket(_:)``)
@@ -759,6 +792,54 @@ final class EventStore {
 
     func setTracking(_ tracking: Tracking, for event: Event) {
         edit(event) { $0.tracking = tracking }
+        save()
+    }
+
+    /// Writes `reminder` onto `event`: in its place where it is there already,
+    /// and as a new one where it is not.
+    func setReminder(_ reminder: EventReminder, for event: Event) {
+        edit(event) { answers in
+            if let index = answers.tracking.reminders.firstIndex(where: { $0.id == reminder.id }) {
+                answers.tracking.reminders[index] = reminder
+            } else {
+                answers.tracking.reminders.append(reminder)
+            }
+        }
+        save()
+    }
+
+    func removeReminder(_ id: EventReminder.ID, from event: Event) {
+        edit(event) { $0.tracking.reminders.removeAll { $0.id == id } }
+        save()
+    }
+
+    /// Adds a queue ticket for `link` to `event`, where it has none for it, and
+    /// answers the ticket added.
+    @discardableResult
+    func addQueueTicket(_ link: URL, to event: Event) -> QueueTicket? {
+        var added: QueueTicket?
+        edit(event) { answers in
+            guard !answers.tracking.queueTickets.contains(where: { $0.link == link }) else { return }
+            let ticket = QueueTicket(link: link, added: .now)
+            answers.tracking.queueTickets.append(ticket)
+            added = ticket
+        }
+        save()
+        return added
+    }
+
+    /// Writes what the reader typed as the number on one of `event`'s queue
+    /// tickets; nothing typed takes the number off.
+    func setQueueTicketNumber(_ typed: String, of id: QueueTicket.ID, on event: Event) {
+        edit(event) { answers in
+            guard let index = answers.tracking.queueTickets.firstIndex(where: { $0.id == id }) else { return }
+            answers.tracking.queueTickets[index].number = QueueTicket.typedNumber(typed)
+        }
+        save()
+    }
+
+    func removeQueueTicket(_ id: QueueTicket.ID, from event: Event) {
+        edit(event) { $0.tracking.queueTickets.removeAll { $0.id == id } }
         save()
     }
 
@@ -857,6 +938,10 @@ final class EventStore {
             LibraryDatabase.writeLotteries([], for: id, rows: &lotteryRows, entry: entries[id],
                                            dated: now, clearing: true, in: database.context)
         }
+        // And the plan.
+        for id in planRows.keys {
+            LibraryDatabase.clearPlan(for: id, rows: planRows, dated: now)
+        }
         records.removeAll(keepingCapacity: true)
         // Every Following date back to unread, on every device: written as a
         // record with no fingerprint rather than dropped, or the other
@@ -866,6 +951,9 @@ final class EventStore {
                 mark.read = Stamped(FollowingRead(fingerprint: nil, day: read.value.day), at: now)
             }
         }
+        // And what was read, which no mark speaks for now.
+        readCopies?.clear()
+        readBefore = [:]
         // Everyone followed goes too, as tombstones so the other device's
         // follows do not come back, and with them who they were.
         for row in performerRows.values {
@@ -891,14 +979,38 @@ final class EventStore {
     /// and worked out again only where either has moved: every row of
     /// Following and My Events, and the tab's badge over all of them, ask on
     /// every redraw, and each answer hashes the row.
+    ///
+    /// An Updated date says what changed where this device holds the copy
+    /// that was read (``ReadCopies``) — and a copy found to be the one read
+    /// is held here, so the day the listing changes there is something to
+    /// say it changed from.
     func unread(_ event: Event) -> FollowingUnread? {
         let read = readMarks[event.id]?.read?.value
         if let known = unreadAnswers[event.id], known.read == read, known.event == event {
             return known.answer
         }
-        let answer = FollowingRead.unread(event, read: read)
+        let fingerprint = read?.fingerprint
+        let answer = FollowingRead.unread(
+            event, read: read,
+            copy: fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) })
+        if answer == nil, let fingerprint { readCopies?.keep(event, markedAs: fingerprint) }
         unreadAnswers[event.id] = (event, read, answer)
         return answer
+    }
+
+
+    /// What has changed in `event` since the copy it had been read as before
+    /// the reader read it again — opened, swiped or marked in a batch — for
+    /// its sheet's What Changed card.
+    ///
+    /// Worked out against `event` as it stands, not kept as the row said it:
+    /// the sheet reads its page as it opens, another device's copy lands, a
+    /// hall is placed abroad and the event moves to its clock, and a card
+    /// kept whole went on saying 19:00 under a timeline already saying 20:00.
+    /// The copy is held until the app quits and written nowhere — the mark
+    /// read over it took its place.
+    func changesRead(in event: Event) -> ListingChanges? {
+        readBefore[event.id].flatMap { ListingChanges(from: $0, to: event) }
     }
 
     /// Marks these rows read as the listing prints them now, or unread again.
@@ -912,9 +1024,15 @@ final class EventStore {
         let now = Date.now
         var changed = false
         for event in events where isUnread(event) == read {
-            makeMark(for: event.id).read = Stamped(
-                FollowingRead(fingerprint: read ? event.listingFingerprint : nil, day: event.date),
-                at: now)
+            // Taken before the mark moves on from it: the copy an Updated date
+            // was read as (a New one has none).
+            let before = read
+                ? readMarks[event.id]?.read?.value.fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) }
+                : nil
+            if readBefore[event.id] != before { readBefore[event.id] = before }
+            let fingerprint = read ? event.listingFingerprint : nil
+            makeMark(for: event.id).read = Stamped(FollowingRead(fingerprint: fingerprint, day: event.date), at: now)
+            if let fingerprint { readCopies?.keep(event, markedAs: fingerprint) }
             changed = true
         }
         guard changed else { return }

@@ -698,8 +698,8 @@ struct FollowingFilter: Equatable {
 /// on it. Tapping the caption opens that performer; the circular control adds
 /// the event to the library, or takes it out again. The tag after the names says
 /// the reader has not looked at this copy of it yet — New, or Updated where the
-/// listing changed after they did. A tag rather than a dot, because the
-/// caption above already leads with one.
+/// listing changed after they did, with what changed under the date. A tag
+/// rather than a dot, because the caption above already leads with one.
 private struct FollowedDateRow: View {
     /// Which clock the day and times are printed on — see ``TimeDisplay``.
     @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
@@ -710,7 +710,8 @@ private struct FollowedDateRow: View {
     let open: () -> Void
 
     var body: some View {
-        EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail, opens: open) {
+        EventRowContent(event: event, detail: event.shown(on: timeDisplay).timeDetail,
+                        changes: unread?.changes, opens: open) {
             HStack(spacing: 6) {
                 if let first = billing.first {
                     // The whole caption leads to the first name on it. Two
