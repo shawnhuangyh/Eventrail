@@ -2396,6 +2396,29 @@
         }
       }
     },
+    "Add Number…" : {
+      "comment" : "A menu item on a queue ticket: write down the number printed on it, 整理番号.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理番号を追加…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加编号…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增編號…"
+          }
+        }
+      }
+    },
     "Add on Eventernote" : {
       "localizations" : {
         "ja" : {
@@ -4894,6 +4917,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編輯抽選紀錄"
+          }
+        }
+      }
+    },
+    "Edit Number…" : {
+      "comment" : "A menu item on a queue ticket: change the number written down for it, 整理番号.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理番号を編集…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑编号…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯編號…"
           }
         }
       }
@@ -9502,6 +9548,29 @@
         }
       }
     },
+    "No. %@" : {
+      "comment" : "A queue ticket's row, named by the number printed on it. The argument is as printed, such as A-123.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理番号 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编号 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編號 %@"
+          }
+        }
+      }
+    },
     "Nobody Followed" : {
       "localizations" : {
         "ja" : {
@@ -10163,6 +10232,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現為：%@"
+          }
+        }
+      }
+    },
+    "Number on Your Ticket" : {
+      "comment" : "The field asking for the number printed on a queue ticket, 整理番号.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理券の番号"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理券上的编号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理券上的編號"
           }
         }
       }
@@ -11517,6 +11609,29 @@
         }
       }
     },
+    "Queue Ticket Number" : {
+      "comment" : "The title of the box asking for the number printed on a queue ticket, 整理番号.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理番号"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理券编号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整理券編號"
+          }
+        }
+      }
+    },
     "Queue Tickets" : {
       "comment" : "The numbered tickets given out for the queue at a venue's goods sale, 整理券.",
       "localizations" : {
@@ -12732,6 +12847,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同一場館 · 間隔 %@"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "comment" : "A button saving what was typed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存"
           }
         }
       }

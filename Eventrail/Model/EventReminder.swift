@@ -204,6 +204,21 @@ nonisolated struct QueueTicket: PlanItem, Hashable, Sendable {
     /// When it was added — what tells two tickets at one host apart, and the
     /// order they are listed in.
     var added: Date
+    /// The number printed on it, as the reader wrote it down: what the queue's
+    /// page is checked against. Nil where none was. Each promoter prints its
+    /// own, so nothing here reads one off the ticket or the link.
+    var number: String?
+
+    /// As long as a number is kept: a row has room for one, and anything
+    /// longer is a note.
+    static let longestNumber = 20
+
+    /// A number as it is kept: width folded, since a ticket's １２３ is the
+    /// page's 123, and the ends trimmed. Nil where nothing is left.
+    static func typedNumber(_ text: String) -> String? {
+        let number = text.precomposedStringWithCompatibilityMapping.trimmingCharacters(in: .whitespacesAndNewlines)
+        return number.isEmpty ? nil : String(number.prefix(longestNumber))
+    }
 
     /// The web page a QR code's text points at, or nil where it points at
     /// anything else: a code is whatever was printed, and is opened on a tap.

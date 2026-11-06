@@ -36,6 +36,12 @@ struct EventPlanCard: View {
     /// What the camera read, until it has gone: asked about while it was still
     /// going, the dialog never came.
     @State private var scanned: URL?
+    /// The ticket whose number is being asked for, and what has been typed.
+    @State private var numbering: QueueTicket?
+    @State private var typedNumber = ""
+    /// Whether that ticket was only just added: the moment it is in hand, and
+    /// one that can be passed by.
+    @State private var isNumberingNew = false
 
     /// Where there is a camera that can read a code live. An iPad without one,
     /// the Simulator and a Mac read pictures alone.
@@ -64,7 +70,7 @@ struct EventPlanCard: View {
             if !tracking.queueTickets.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(tracking.queueTickets) { ticket in
-                        row(ticket, numbered: tracking.queueTickets.count > 1
+                        row(ticket, position: tracking.queueTickets.count > 1
                                 ? (tracking.queueTickets.firstIndex(of: ticket) ?? 0) + 1 : nil)
                     }
                 }
@@ -114,6 +120,17 @@ struct EventPlanCard: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Eventrail isn't allowed to use the camera. You can allow it in Settings.")
+        }
+        .alert("Queue Ticket Number",
+               isPresented: Binding { numbering != nil } set: { if !$0 { numbering = nil } },
+               presenting: numbering) { ticket in
+            TextField("Number on Your Ticket", text: $typedNumber)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+            Button("Save") { store.setQueueTicketNumber(typedNumber, of: ticket.id, on: event) }
+            Button(role: .cancel) {} label: {
+                isNumberingNew ? Text("Not Now") : Text("Cancel")
+            }
         }
     }
 
@@ -216,7 +233,7 @@ struct EventPlanCard: View {
                             titleVisibility: .visible) {
             ForEach(Array(zip(found, QueueTicket.labels(tellingApart: found))), id: \.0) { link, label in
                 Button {
-                    store.addQueueTicket(link, to: event)
+                    if let added = store.addQueueTicket(link, to: event) { askNumber(of: added, isNew: true) }
                 } label: {
                     if found.count > 1 {
                         Text(verbatim: label)
@@ -245,8 +262,9 @@ struct EventPlanCard: View {
     }
 
     /// The page the code points at, in the reader's browser, where the queue
-    /// stands. Beside it, the way to take the ticket out again.
-    private func row(_ ticket: QueueTicket, numbered number: Int?) -> some View {
+    /// stands, named by the number on the ticket where one is written down.
+    /// Beside it, the way to write one or take the ticket out again.
+    private func row(_ ticket: QueueTicket, position: Int?) -> some View {
         HStack(spacing: 10) {
             Link(destination: ticket.link) {
                 HStack(spacing: 10) {
@@ -256,13 +274,16 @@ struct EventPlanCard: View {
                         .frame(width: 20)
                     VStack(alignment: .leading, spacing: 2) {
                         Group {
-                            if let number {
-                                Text("Queue Ticket \(number)")
+                            if let number = ticket.number {
+                                Text("No. \(number)")
+                            } else if let position {
+                                Text("Queue Ticket \(position)")
                             } else {
                                 Text("Queue Ticket")
                             }
                         }
                         .scalingFont(size: 14.5, weight: .semibold)
+                        .monospacedDigit()
                         Text(verbatim: "\(ticket.link.host() ?? ticket.link.absoluteString) · \(ticket.added.formatted(date: .omitted, time: .shortened))")
                             .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
@@ -280,6 +301,15 @@ struct EventPlanCard: View {
             .accessibilityHint(Text("Opens the queue status in your browser"))
 
             Menu {
+                Button {
+                    askNumber(of: ticket, isNew: false)
+                } label: {
+                    Label {
+                        ticket.number == nil ? Text("Add Number…") : Text("Edit Number…")
+                    } icon: {
+                        Image(systemName: "number")
+                    }
+                }
                 Button("Copy Link", systemImage: "doc.on.doc") { UIPasteboard.general.url = ticket.link }
                 Button("Delete", systemImage: "trash", role: .destructive) {
                     store.removeQueueTicket(ticket.id, from: event)
@@ -296,6 +326,12 @@ struct EventPlanCard: View {
             .accessibilityLabel(Text("More"))
         }
         .padding(.vertical, 8)
+    }
+
+    private func askNumber(of ticket: QueueTicket, isNew: Bool) {
+        typedNumber = ticket.number ?? ""
+        isNumberingNew = isNew
+        numbering = ticket
     }
 
     /// The camera, once it is allowed: asked for the first time here, and

@@ -365,6 +365,49 @@ struct EventReminderTests {
         #expect(store.tracking(for: show).queueTickets.map(\.link.lastPathComponent) == ["b"])
     }
 
+    /// The ticket added is handed back to be numbered, and a link already held
+    /// adds nothing to number.
+    @Test func aNumberIsWrittenOnItsOwnTicket() throws {
+        let store = store()
+        let show = event()
+        store.toggleLibraryMembership(show)
+        let linkA = try #require(URL(string: "https://q.example.jp/a"))
+        let linkB = try #require(URL(string: "https://q.example.jp/b"))
+        let first = try #require(store.addQueueTicket(linkA, to: show))
+        let second = try #require(store.addQueueTicket(linkB, to: show))
+        #expect(store.addQueueTicket(first.link, to: show) == nil)
+
+        store.setQueueTicketNumber(" Ａ－１２３ ", of: second.id, on: show)
+        var tickets = store.tracking(for: show).queueTickets
+        #expect(tickets.map(\.id) == [first.id, second.id])
+        #expect(tickets.map(\.number) == [nil, "A-123"])
+
+        store.setQueueTicketNumber("", of: second.id, on: show)
+        tickets = store.tracking(for: show).queueTickets
+        #expect(tickets.allSatisfy { $0.number == nil })
+    }
+
+    /// As it is printed, less the width: a ticket's １２３ is the page's 123.
+    @Test func aNumberIsKeptAsPrinted() {
+        #expect(QueueTicket.typedNumber("  １２３\n") == "123")
+        #expect(QueueTicket.typedNumber("A-123") == "A-123")
+        #expect(QueueTicket.typedNumber("B列 45番") == "B列 45番")
+        #expect(QueueTicket.typedNumber("   ") == nil)
+        #expect(QueueTicket.typedNumber(String(repeating: "1", count: 100))?.count == QueueTicket.longestNumber)
+    }
+
+    /// A row written before there were numbers still reads, and one with none
+    /// is the same text it was, so it is not a change to send.
+    @Test func aTicketWithNoNumberReadsAndWritesAsBefore() throws {
+        let older = #"{"added":0,"id":"00000000-0000-0000-0000-000000000009","link":"https://q.example.jp/a"}"#
+        let ticket = try JSONDecoder().decode(QueueTicket.self, from: Data(older.utf8))
+        #expect(ticket.number == nil)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        #expect(String(decoding: try encoder.encode(ticket), as: UTF8.self) == older)
+    }
+
     /// Their own rows: a change to them leaves the entry as it was, so it can
     /// never carry an older note back over another device's.
     @Test func aReminderLeavesTheEntryAlone() throws {
@@ -496,6 +539,23 @@ struct LibraryPlanItemTests {
         try context.save()
         #expect(!LibraryDatabase.writePlan([first], for: "1", rows: &held, dated: later, in: context))
         #expect(!context.hasChanges)
+        withExtendedLifetime(database) {}
+    }
+
+    /// A number is a change to its own row alone.
+    @Test func aNumberRewritesOnlyItsTicket() throws {
+        let (database, context) = database()
+        var held: [String: [String: LibraryPlanItem]] = [:]
+        let first = ticket("a")
+        var second = ticket("b")
+        LibraryDatabase.writePlan([first, second], for: "1", rows: &held, dated: earlier, in: context)
+        try context.save()
+
+        second.number = "A-123"
+        #expect(LibraryDatabase.writePlan([first, second], for: "1", rows: &held, dated: later, in: context))
+        #expect(held["1"]?[first.id.uuidString]?.modified == earlier.toTheMillisecond)
+        #expect(held["1"]?[second.id.uuidString]?.modified == later.toTheMillisecond)
+        #expect(LibraryDatabase.planItems(QueueTicket.self, in: held["1"]).map(\.number) == [nil, "A-123"])
         withExtendedLifetime(database) {}
     }
 

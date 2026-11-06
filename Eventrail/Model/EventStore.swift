@@ -808,11 +808,27 @@ final class EventStore {
         save()
     }
 
-    /// Adds a queue ticket for `link` to `event`, where it has none for it.
-    func addQueueTicket(_ link: URL, to event: Event) {
+    /// Adds a queue ticket for `link` to `event`, where it has none for it, and
+    /// answers the ticket added.
+    @discardableResult
+    func addQueueTicket(_ link: URL, to event: Event) -> QueueTicket? {
+        var added: QueueTicket?
         edit(event) { answers in
             guard !answers.tracking.queueTickets.contains(where: { $0.link == link }) else { return }
-            answers.tracking.queueTickets.append(QueueTicket(link: link, added: .now))
+            let ticket = QueueTicket(link: link, added: .now)
+            answers.tracking.queueTickets.append(ticket)
+            added = ticket
+        }
+        save()
+        return added
+    }
+
+    /// Writes what the reader typed as the number on one of `event`'s queue
+    /// tickets; nothing typed takes the number off.
+    func setQueueTicketNumber(_ typed: String, of id: QueueTicket.ID, on event: Event) {
+        edit(event) { answers in
+            guard let index = answers.tracking.queueTickets.firstIndex(where: { $0.id == id }) else { return }
+            answers.tracking.queueTickets[index].number = QueueTicket.typedNumber(typed)
         }
         save()
     }
