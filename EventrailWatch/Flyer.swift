@@ -46,8 +46,15 @@ actor FlyerCache {
     private var memory: [WatchEvent.ID: (image: CGImage, address: URL, fetched: Date)] = [:]
     /// A fetch under way, which a second view asking for the same flyer — a
     /// card and the Countdown page appearing together — waits for rather
-    /// than fetching it again.
-    private var asking: [URL: Task<CGImage?, Never>] = [:]
+    /// than fetching it again. Kept per event as well as per address: each
+    /// event keeps its own copy, so two sharing a flyer each fetch it, or the
+    /// second has nothing to show offline after the next launch.
+    private var asking: [Asked: Task<CGImage?, Never>] = [:]
+
+    private struct Asked: Hashable {
+        let id: WatchEvent.ID
+        let address: URL
+    }
 
     private nonisolated static var folder: URL {
         URL.cachesDirectory.appending(path: "Flyers", directoryHint: .isDirectory)
@@ -69,11 +76,12 @@ actor FlyerCache {
         if let held = memory[id], held.address == url, -held.fetched.timeIntervalSinceNow < Self.window {
             return held.image
         }
-        if let asked = asking[url] { return await asked.value }
+        let key = Asked(id: id, address: url)
+        if let asked = asking[key] { return await asked.value }
         let asked = Task { await read(id, from: url) }
-        asking[url] = asked
+        asking[key] = asked
         let image = await asked.value
-        asking[url] = nil
+        asking[key] = nil
         return image
     }
 
