@@ -90,6 +90,10 @@ struct EventDetailView: View {
     /// The Live Activity bench is up — see ``LiveActivityTestView``.
     @State private var isTestingLiveActivity = false
     #endif
+    #if DEBUG
+    /// The notification bench is up — see ``NotificationTestView``.
+    @State private var isTestingNotifications = false
+    #endif
 
     /// The flyer as a file Quick Look and the share sheet can be handed —
     /// see ``ImageCache/file(for:named:checkedSince:)``. Nil until it is
@@ -369,6 +373,12 @@ struct EventDetailView: View {
         #if DEBUG && !targetEnvironment(macCatalyst)
         .sheet(isPresented: $isTestingLiveActivity) {
             LiveActivityTestView(event: event, seat: tracking.seat)
+        }
+        #endif
+        #if DEBUG
+        .sheet(isPresented: $isTestingNotifications) {
+            NotificationTestView(event: event, tracking: tracking)
+                .macSheetSize(.form)
         }
         #endif
         .task { await importPage() }
@@ -1448,12 +1458,19 @@ struct EventDetailView: View {
                 Task { await refreshPage() }
             }
 
-            #if DEBUG && !targetEnvironment(macCatalyst)
+            #if DEBUG
             Divider()
+            #if !targetEnvironment(macCatalyst)
             Button {
                 isTestingLiveActivity = true
             } label: {
                 Label { Text(verbatim: "Test Live Activity…") } icon: { Image(systemName: "hammer") }
+            }
+            #endif
+            Button {
+                isTestingNotifications = true
+            } label: {
+                Label { Text(verbatim: "Test Notifications…") } icon: { Image(systemName: "hammer") }
             }
             #endif
 

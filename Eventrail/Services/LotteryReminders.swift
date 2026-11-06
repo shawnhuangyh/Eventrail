@@ -217,7 +217,11 @@ extension LotteryReminders: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let request = response.notification.request
+        #if DEBUG
+        let identifier = TestNotification.routed(request.identifier)
+        #else
         let identifier = request.identifier
+        #endif
         let info = request.content.userInfo
         let take: @MainActor @Sendable () -> Void
         if identifier.hasPrefix(ActivityReminder.prefix) {
