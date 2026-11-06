@@ -312,7 +312,7 @@ An open event sheet is offered to the reader's other devices ([EventHandoff.swif
 - **The phone and the watch update apart**: `WatchLibrary` and `WatchEvent` decode key by key, dropping an unreadable event rather than the copy. **New fields use `decodeIfPresent`.**
 - **No store; only what the phone sends**: `WatchLink` sends the upcoming events and any show still running past its day, the line `EventMoment.isListed` draws (`EventStore.onTheWatch`; at most 60, with ticket, seat, class, cost, applications and `LotteryStanding` as text) as the application context **within `WatchLink.budget`** (60,000 bytes — past ~64 KB it is silently refused), on launch, revision and Time Zone changes (only where different), return and `sessionWatchStateDidChange`. **The watch never asks the phone for anything.**
 - Events are read by the Live Activity's rules (`EventActivityStage`). Countdowns are system timers; `StageSchedule` redraws the rest.
-- The watch fetches its own flyers (`FlyerCache`, 120 px); nothing else goes over the network.
+- The watch fetches its own flyers (`FlyerCache`, 120 px; an event given another address has another flyer, the address kept beside the picture); nothing else goes over the network.
 - **Simulator**: the paired iPhone 18 Pro and Series 12 42 mm. Install and launch the iPhone app *before* installing the watch app, or the phone thinks it isn't there; a context sent in the same second as an install can be lost, so relaunch the iPhone app. A `#if DEBUG` hook handing `WatchLibraryStore` `WatchLibrary.preview` shows the screens anywhere.
 
 ## The widgets

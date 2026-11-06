@@ -30,7 +30,9 @@ struct Flyer: View {
 ///
 /// Kept per event in Caches, and fetched again after a week: the host files a
 /// replaced flyer under the same address, and a watch has no business asking
-/// any more often than that. A copy the host fails to answer for stands.
+/// any more often than that. An event given another address has another flyer,
+/// asked for at once, so the address is kept beside the picture. A copy the
+/// host fails to answer for stands.
 actor FlyerCache {
     static let shared = FlyerCache()
 
@@ -41,11 +43,11 @@ actor FlyerCache {
 
     /// Each flyer drawn since launch, with when it was fetched — kept no
     /// longer than one on disk is.
-    private var memory: [WatchEvent.ID: (image: CGImage, fetched: Date)] = [:]
+    private var memory: [WatchEvent.ID: (image: CGImage, address: URL, fetched: Date)] = [:]
     /// A fetch under way, which a second view asking for the same flyer — a
     /// card and the Countdown page appearing together — waits for rather
     /// than fetching it again.
-    private var asking: [WatchEvent.ID: Task<CGImage?, Never>] = [:]
+    private var asking: [URL: Task<CGImage?, Never>] = [:]
 
     private nonisolated static var folder: URL {
         URL.cachesDirectory.appending(path: "Flyers", directoryHint: .isDirectory)
@@ -55,26 +57,37 @@ actor FlyerCache {
         folder.appending(path: "\(id).jpg", directoryHint: .notDirectory)
     }
 
+    /// Where the address `file(for:)` was fetched from is kept. Named for the
+    /// event as the picture is, so ``keep(only:)`` takes both.
+    private nonisolated static func addressFile(for id: WatchEvent.ID) -> URL {
+        folder.appending(path: "\(id).url", directoryHint: .notDirectory)
+    }
+
     func image(for event: WatchEvent) async -> CGImage? {
         guard let url = event.flyer else { return nil }
         let id = event.id
-        if let held = memory[id], -held.fetched.timeIntervalSinceNow < Self.window { return held.image }
-        if let asked = asking[id] { return await asked.value }
+        if let held = memory[id], held.address == url, -held.fetched.timeIntervalSinceNow < Self.window {
+            return held.image
+        }
+        if let asked = asking[url] { return await asked.value }
         let asked = Task { await read(id, from: url) }
-        asking[id] = asked
+        asking[url] = asked
         let image = await asked.value
-        asking[id] = nil
+        asking[url] = nil
         return image
     }
 
-    /// The copy on disk while it is younger than ``window``, and the host's
-    /// otherwise — or the copy on disk where the host does not answer.
+    /// The copy on disk while it is of this address and younger than
+    /// ``window``, and the host's otherwise — or the copy on disk where the host
+    /// does not answer. One from before the address was kept says nothing of
+    /// where it came from, so it is fetched again.
     private func read(_ id: WatchEvent.ID, from url: URL) async -> CGImage? {
         let file = Self.file(for: id)
         let kept = (try? Data(contentsOf: file)).flatMap(Self.decoded)
         let fetched = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-        if let kept, let fetched, -fetched.timeIntervalSinceNow < Self.window {
-            memory[id] = (kept, fetched)
+        let address = try? String(contentsOf: Self.addressFile(for: id), encoding: .utf8)
+        if let kept, let fetched, address == url.absoluteString, -fetched.timeIntervalSinceNow < Self.window {
+            memory[id] = (kept, url, fetched)
             return kept
         }
         guard let (data, response) = try? await URLSession.shared.data(from: url),
@@ -83,7 +96,8 @@ actor FlyerCache {
         else { return kept }
         try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
         try? small.write(to: file, options: .atomic)
-        memory[id] = (image, .now)
+        try? url.absoluteString.write(to: Self.addressFile(for: id), atomically: true, encoding: .utf8)
+        memory[id] = (image, url, .now)
         return image
     }
 
