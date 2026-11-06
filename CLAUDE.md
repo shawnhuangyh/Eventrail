@@ -348,6 +348,7 @@ An open event sheet is offered to the reader's other devices ([EventHandoff.swif
 - **Scheduled from the library as it stands** (launch, revisions, return), adding only what differs (`isScheduled(as:)`) — the 40 soonest (`limit`; iOS keeps 64, shared with the other reminders). Each device schedules its own.
 - **On by default** (`lotteryRemindersEnabled`): the system prompt is the consent, asked on the ticket sheet's checkmark for a new or moved results day (`askIfNeeded(for:)`).
 - The delegate is set as `MyApp` is made, or a tap that launches the app is lost. **It is the app's one delegate**: a Live Activity reminder's tap is handed on to `ActivityReminders`.
+- **`didReceive` takes its completion handler and calls it on the main thread; don't go back to the method's `async` form.** That form calls the handler wherever the task ended, UIKit asserts on it, and every tap that brought the app back from the background killed it. A unit test can't build a `UNNotificationResponse`: check with the bench (send, go to the Home Screen, tap the banner; then again with the app quit).
 
 ## The Live Activity reminder
 
