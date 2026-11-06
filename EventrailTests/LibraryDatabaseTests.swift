@@ -862,6 +862,25 @@ struct LibraryDatabaseTests {
         withExtendedLifetime(database) {}
     }
 
+    /// A plan's rows can land before its entry. What an older build left knows
+    /// nothing of a plan, and is applied with no merge to settle it.
+    @Test func takingInAnOlderRecordLeavesAPlanThatLandedFirst() throws {
+        let (database, context) = try database()
+        _ = legacyRow("1", in: context)
+        let time = EventReminder(title: "物販開始", day: CalendarDay(year: 2027, month: 5, day: 9),
+                                 minute: 12 * 60, lead: 30)
+        var plan: [String: [String: LibraryPlanItem]] = [:]
+        LibraryDatabase.writePlan([time], for: "1", rows: &plan, dated: earlier, in: context)
+        try context.save()
+
+        #expect(try LibraryDatabase.adoptLegacyRecords(in: context))
+        let held = LibraryDatabase.planIndex(try context.fetch(FetchDescriptor<LibraryPlanItem>()))["1"]
+        #expect(LibraryDatabase.planItems(EventReminder.self, in: held) == [time])
+        #expect(held?[time.id.uuidString]?.isRemoved == false)
+        #expect(try entries("1", in: context).first?.tracking.note == "front row")
+        withExtendedLifetime(database) {}
+    }
+
     /// An entry already there is the reader's answer, whatever an older build
     /// left beside it.
     @Test func anEntryAlreadyThereIsLeftAlone() throws {

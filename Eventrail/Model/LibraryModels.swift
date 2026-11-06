@@ -426,6 +426,9 @@ extension LibraryEvent {
             for (field, date) in trackingEdits {
                 if let field = Tracking.Field(rawValue: field) { edits[field] = date }
             }
+            // Those builds had no plan, so they say nothing of one.
+            edits[.reminders] = Tracking.unsaid
+            edits[.queueTickets] = Tracking.unsaid
             var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
                                   cost: cost.map { Decimal($0) },
                                   lotteries: LotteryEntry.carriedOver(count: lotteryEntries),

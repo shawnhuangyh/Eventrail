@@ -226,6 +226,18 @@ nonisolated struct Tracking: Hashable, Codable {
         case reminders, queueTickets
     }
 
+    /// The date of a list a record says nothing about: written before the list
+    /// existed, or with no row of it to speak for. Older than anything written,
+    /// so it never outranks an answer, and an empty list under it is no answer.
+    /// Dated as the record instead, a device still on an older build would take
+    /// the reader's reminders out by editing a note.
+    static let unsaid = Date(timeIntervalSince1970: 0)
+
+    /// Whether this record has anything to say about `field`.
+    func says(_ field: Field) -> Bool {
+        (edits[field] ?? .distantFuture) > Self.unsaid
+    }
+
     /// Whether the reader has written anything down here.
     ///
     /// Read off the answers alone: ``edits`` says when they were written, and
@@ -436,6 +448,9 @@ nonisolated extension Tracking {
             reminders: try record.decodeIfPresent([EventReminder].self, forKey: .reminders) ?? [],
             queueTickets: try record.decodeIfPresent([QueueTicket].self, forKey: .queueTickets) ?? [])
         foldLegacyTicket()
+        // A key that isn't there is not an empty list: see ``unsaid``.
+        if !record.contains(.reminders) { edits[.reminders] = Self.unsaid }
+        if !record.contains(.queueTickets) { edits[.queueTickets] = Self.unsaid }
     }
 
     /// Keys a record no longer writes, read so that what they held is not lost.

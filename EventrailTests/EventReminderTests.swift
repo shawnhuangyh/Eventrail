@@ -697,7 +697,97 @@ struct LibraryPlanItemTests {
         #expect(record.modified == later.toTheMillisecond)
         #expect(record.value.edits[.note] == earlier.toTheMillisecond)
         #expect(record.value.edits[.reminders] == nil)
-        #expect(record.value.edits[.queueTickets] == earlier.toTheMillisecond)
+        // No row of a kind says nothing of it, however new the record.
+        #expect(record.value.edits[.queueTickets] == Tracking.unsaid)
+        withExtendedLifetime(database) {}
+    }
+
+    /// What a device still on an older build sends after a note is edited
+    /// holds neither list. The reader only changed a note.
+    @Test func aRecordFromBeforeThePlanLeavesItAlone() throws {
+        let (database, context) = database()
+        let time = reminder(), link = ticket()
+        var archive = LibraryArchive()
+        archive.membership["1"] = Stamped(true, at: earlier)
+        archive.tracking["1"] = Stamped(Tracking(reminders: [time], queueTickets: [link]), at: earlier)
+        try LibraryDatabase.apply(archive, to: context)
+        try context.save()
+
+        let older = try JSONDecoder().decode(Tracking.self, from: Data(#"{"note":"front row"}"#.utf8))
+        var legacy = LibraryArchive()
+        legacy.tracking["1"] = Stamped(older, at: later)
+        let held = try LibraryDatabase.archive(in: context)
+        try LibraryDatabase.apply(held.merging(legacy), to: context)
+        try context.save()
+
+        let plan = try #require(try rows(in: context)["1"])
+        #expect(plan.values.allSatisfy { !$0.isRemoved })
+        #expect(LibraryDatabase.planItems(EventReminder.self, in: plan) == [time])
+        #expect(LibraryDatabase.planItems(QueueTicket.self, in: plan) == [link])
+        #expect(plan.values.allSatisfy { $0.modified == earlier.toTheMillisecond })
+        let entries = try context.fetch(FetchDescriptor<LibraryEntry>())
+        #expect(entries.map(\.tracking.note) == ["front row"])
+        withExtendedLifetime(database) {}
+    }
+
+    /// Written out and read back, it still says nothing.
+    @Test func whatARecordDoesNotSayStaysUnsaid() throws {
+        let older = try JSONDecoder().decode(Tracking.self, from: Data(#"{"seat":"A12"}"#.utf8))
+        #expect(!older.says(.reminders))
+        #expect(!older.says(.queueTickets))
+        let again = try JSONDecoder().decode(Tracking.self, from: JSONEncoder().encode(older))
+        #expect(!again.says(.reminders))
+        #expect(!again.says(.queueTickets))
+        #expect(again.says(.note))
+
+        // Settled against one that has, whichever is newer.
+        let time = reminder()
+        let merged = Stamped(older, at: later).merging(Stamped(Tracking(reminders: [time]), at: earlier))
+        #expect(merged.value.reminders == [time])
+        #expect(merged.value.seat == "A12")
+    }
+
+    /// A list emptied on this build is an answer, and still takes the rows out.
+    @Test func aListEmptiedIsStillAnAnswer() throws {
+        let (database, context) = database()
+        let time = reminder()
+        var archive = LibraryArchive()
+        archive.membership["1"] = Stamped(true, at: earlier)
+        archive.tracking["1"] = Stamped(Tracking(reminders: [time]), at: earlier)
+        try LibraryDatabase.apply(archive, to: context)
+        try context.save()
+
+        archive.tracking["1"] = Stamped(Tracking(), at: later)
+        try LibraryDatabase.apply(archive, to: context)
+        try context.save()
+        #expect(try rows(in: context)["1"]?[time.id.uuidString]?.isRemoved == true)
+        withExtendedLifetime(database) {}
+    }
+
+    /// A backup written before a reminder was added on another device says
+    /// nothing of it, however newly its note was typed.
+    @Test func aBackupWithNoRowOfAKindLeavesThatKindAlone() throws {
+        let (database, context) = database()
+        let time = reminder()
+        var archive = LibraryArchive()
+        archive.membership["1"] = Stamped(true, at: earlier)
+        archive.tracking["1"] = Stamped(Tracking(reminders: [time]), at: earlier)
+        try LibraryDatabase.apply(archive, to: context)
+        try context.save()
+
+        let entry = LibraryEntry(eventID: "1")
+        entry.give(LibraryEntry.Answers(inLibrary: true, tracking: Tracking(note: "front row")),
+                   dated: [.inLibrary: later, .tracking: later])
+        entry.modified = later
+        var backup = LibraryArchive()
+        backup.tracking["1"] = LibraryDatabase.stampedTracking(of: entry, rows: nil, plan: nil)
+
+        let held = try LibraryDatabase.archive(in: context)
+        for merged in [held.merging(backup), held.restoring(backup)] {
+            try LibraryDatabase.apply(merged, to: context)
+            try context.save()
+            #expect(try rows(in: context)["1"]?[time.id.uuidString]?.isRemoved == false)
+        }
         withExtendedLifetime(database) {}
     }
 

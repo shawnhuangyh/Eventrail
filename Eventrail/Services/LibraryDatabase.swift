@@ -1080,15 +1080,18 @@ final class LibraryDatabase {
 
     /// An event's record as an archive carries it: dated as its entry dates
     /// its tracking, each list kept in rows as its newest row — the record as
-    /// new as the newest of them, the other answers dated older within it.
+    /// new as the newest of them, the other answers dated older within it. A
+    /// kind of the plan with no row says nothing (``Tracking/unsaid``): no
+    /// reminder here is not another device's reminder taken out, and a removal
+    /// is a row of its own.
     static func stampedTracking(of entry: LibraryEntry, rows: [String: LibraryLottery]?,
                                 plan: [String: LibraryPlanItem]? = nil) -> Stamped<Tracking> {
         var record = tracking(of: entry, rows: rows, plan: plan)
         let part = entry.changed(.tracking).toTheMillisecond
         var listed: [Tracking.Field: Date] = [:]
         listed[.lotteries] = lotteriesChanged(in: rows)?.toTheMillisecond
-        listed[.reminders] = planChanged(EventReminder.self, in: plan)?.toTheMillisecond
-        listed[.queueTickets] = planChanged(QueueTicket.self, in: plan)?.toTheMillisecond
+        listed[.reminders] = planChanged(EventReminder.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
+        listed[.queueTickets] = planChanged(QueueTicket.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
         let newest = listed.values.reduce(part, max)
         for field in Tracking.Field.allCases {
             let written = listed[field] ?? part
@@ -1172,13 +1175,23 @@ final class LibraryDatabase {
                                              redating: raises, in: context) || changed
                 }
                 // The plan the same way, each kind dated as the archive dates
-                // its list.
-                changed = applyPlan(answers.tracking.reminders, heldAs: heldAnswers.tracking.reminders,
-                                    dated: tracking.value.edits[.reminders] ?? tracking.modified,
-                                    for: id, rows: &plans, in: context) || changed
-                changed = applyPlan(answers.tracking.queueTickets, heldAs: heldAnswers.tracking.queueTickets,
-                                    dated: tracking.value.edits[.queueTickets] ?? tracking.modified,
-                                    for: id, rows: &plans, in: context) || changed
+                // its list, and left as it stands where the archive says
+                // nothing of it: what an older build left is applied with no
+                // merge when the plan's rows land before the entry's.
+                if tracking.value.says(.reminders) {
+                    changed = applyPlan(answers.tracking.reminders, heldAs: heldAnswers.tracking.reminders,
+                                        dated: tracking.value.edits[.reminders] ?? tracking.modified,
+                                        for: id, rows: &plans, in: context) || changed
+                } else {
+                    answers.tracking.reminders = heldAnswers.tracking.reminders
+                }
+                if tracking.value.says(.queueTickets) {
+                    changed = applyPlan(answers.tracking.queueTickets, heldAs: heldAnswers.tracking.queueTickets,
+                                        dated: tracking.value.edits[.queueTickets] ?? tracking.modified,
+                                        for: id, rows: &plans, in: context) || changed
+                } else {
+                    answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
+                }
             }
             // Whether there is anything to say, the lotteries included; the
             // entry's own parts are settled with them set aside.
