@@ -104,6 +104,11 @@ struct EventDetailView: View {
     @State private var isMakingStub = false
     /// Another event of the same day, opened from the Same Day card.
     @State private var openedSameDay: Event?
+    /// The reminder up over this sheet, and what is reading a queue ticket —
+    /// see ``EventPlanCard``.
+    @State private var editingReminder: EventReminder?
+    @State private var isPickingQueueTicket = false
+    @State private var isScanningQueueTicket = false
 
     /// What ``flyerFile`` is written from: the flyer, the title it is named
     /// for, and the last refresh by hand it has to be as fresh as.
@@ -348,6 +353,11 @@ struct EventDetailView: View {
                 .macSheetSize(.form)
         }
         .eventSheet($openedSameDay, onDismiss: releaseHold)
+        .sheet(item: $editingReminder, onDismiss: releaseHold) { reminder in
+            EventReminderView(event: event, reminder: reminder,
+                              isNew: !tracking.reminders.contains { $0.id == reminder.id })
+                .macSheetSize(.form)
+        }
         .onChange(of: holdsSheet) { _, holds in
             if holds { sheetsHold?.set(holdID, holding: true) }
         }
@@ -436,7 +446,15 @@ struct EventDetailView: View {
         // date opened from Following or Search shows the facts
         // alone until it is added. A removal keeps whatever was
         // written, so re-adding brings the tiles back as they were.
-        if store.isInLibrary(event) { ticketTiles }
+        if store.isInLibrary(event) {
+            ticketTiles
+            // What to be there for and what is in hand: over once the event is.
+            if event.isUpcoming {
+                EventPlanCard(event: event, clock: clock, editing: $editingReminder,
+                              isPicking: $isPickingQueueTicket, isScanning: $isScanningQueueTicket,
+                              releaseHold: releaseHold)
+            }
+        }
         summaryCard
     }
 
@@ -619,7 +637,10 @@ struct EventDetailView: View {
     /// nothing until its checkmark, the ticket stub, and another event of the
     /// day opened from the Same Day card. Said to the screen
     /// (``EventSheetsHold``), which holds the page where it is meanwhile.
-    private var holdsSheet: Bool { isEditingTicket || isMakingStub || openedSameDay != nil }
+    private var holdsSheet: Bool {
+        isEditingTicket || isMakingStub || openedSameDay != nil
+            || editingReminder != nil || isPickingQueueTicket || isScanningQueueTicket
+    }
 
     /// Lets the screen move this page again, once the last of its sheets has
     /// gone — gone, not going: let go of as it began to go, the screen put

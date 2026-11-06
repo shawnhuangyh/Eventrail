@@ -25,6 +25,7 @@ Eventrail is in **beta testing** through TestFlight, for iPhone, iPad and Apple 
 - **🔍 Native browsing** — Search Eventernote's public events and performers, filtered by date and area and sorted either way, or start from the site's own Today and Just Added lists; every event, performer and hall has a page of its own
 - **🎫 Your own records** — Keep events in a library with every lottery round you entered, your seat, what it cost in any currency, and notes; the ticket is read from the round you won
 - **🎰 Lotteries** — Every round still waiting on a result in one list, by results day, with the result recorded from the list itself and a reminder at 8 PM on results day
+- **⏰ Reminders & queue tickets** — Write down when the goods sale starts, when the random queue tickets close or when a payment is due, and hear about it as far ahead as you like; scan a queue ticket's QR code to keep its queue status one tap away
 - **⭐ Favorites & following** — Favorite events and follow performers to see every upcoming date they are billed on, with new and changed dates marked until you have looked at them
 - **🗺️ Event Passport** — A map of the halls you have been to, with the numbers behind your events: time spent, ticket spending by seat class, and how your lotteries went
 - **🎟️ Ticket stub** — Turn a ticket into a keepsake image to save or share, with the seat masked if you like

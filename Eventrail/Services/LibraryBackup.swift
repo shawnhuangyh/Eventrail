@@ -74,7 +74,11 @@ nonisolated struct LibraryBackup: Sendable {
     /// 10: a tracking record's lottery count is a list of entries — each
     /// round, its results day, the seats asked for and how it went. A build
     /// that has never heard of them would read the list as no lottery at all.
-    static let currentFormat: UInt8 = 10
+    ///
+    /// 11: a tracking record carries the times to be reminded of and the
+    /// queue tickets' links. A build that has never heard of them would drop
+    /// them, and cannot read the date each list carries in ``Tracking/edits``.
+    static let currentFormat: UInt8 = 11
 
     var app: String
     var created: Date

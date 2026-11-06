@@ -421,7 +421,7 @@ nonisolated enum TicketScanner {
     }
 
     /// Which way up a photo was taken, as its file says.
-    private static func orientation(of imageData: Data) -> CGImagePropertyOrientation? {
+    static func orientation(of imageData: Data) -> CGImagePropertyOrientation? {
         guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let raw = properties[kCGImagePropertyOrientation] as? UInt32

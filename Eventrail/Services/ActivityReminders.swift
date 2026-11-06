@@ -21,7 +21,7 @@ import UserNotifications
 /// library as it stands, adding only what differs and taking back what no
 /// longer applies — an activity started from the sheet takes its reminder
 /// back. The soonest ``ActivityReminder/limit`` only: iOS keeps an app's 64
-/// soonest, and the results-day reminders take the rest.
+/// soonest, and the results-day reminders and an event's own take the rest.
 ///
 /// **Asked for at the moment it is wanted**, as the results-day reminder is:
 /// on the ticket sheet's checkmark, for an event ahead that now has a ticket
@@ -168,7 +168,7 @@ struct ActivityReminder: Hashable {
     let date: Date
 
     /// How many are scheduled at once, the soonest first: what iOS's 64
-    /// leaves beside ``LotteryReminder/limit``.
+    /// leaves beside ``LotteryReminder/limit`` and ``ReminderAlert/limit``.
     static let limit = 4
     /// The hour before which a reminder waits, on the reader's clock.
     static let morning = 8

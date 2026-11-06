@@ -132,6 +132,9 @@ final class EventStore {
     /// The lottery rounds the reader entered, by event id and then by round,
     /// kept the same way — see ``LibraryLottery``.
     private var lotteryRows: [Event.ID: [String: LibraryLottery]] = [:]
+    /// The reminders and queue tickets, by event id and then by item, kept the
+    /// same way — see ``LibraryPlanItem``.
+    private var planRows: [Event.ID: [String: LibraryPlanItem]] = [:]
     /// Every Following date's read, by event id, kept the same way.
     private var readMarks: [Event.ID: FollowingReadMark] = [:]
     /// The library by day, as ``upcoming(onDayOf:)`` last made it.
@@ -417,6 +420,7 @@ final class EventStore {
         entries = LibraryDatabase.index((try? context.fetch(FetchDescriptor<LibraryEntry>())) ?? [],
                                         by: \.eventID, preferring: LibraryEntry.isPreferred)
         lotteryRows = LibraryDatabase.lotteryIndex((try? context.fetch(FetchDescriptor<LibraryLottery>())) ?? [])
+        planRows = LibraryDatabase.planIndex((try? context.fetch(FetchDescriptor<LibraryPlanItem>())) ?? [])
         readMarks = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowingReadMark>())) ?? [],
                                           by: \.eventID, preferring: FollowingReadMark.isPreferred)
         performerRows = LibraryDatabase.index((try? context.fetch(FetchDescriptor<FollowedPerformer>())) ?? [],
@@ -531,16 +535,31 @@ final class EventStore {
         let listed = answers.tracking.lotteries
         let listMoved = listed != heldAnswers.tracking.lotteries
             || (clearing && lotteryRows[event.id]?.values.contains(where: \.holdsUnreadableRound) == true)
-        // The entry's own parts, its lotteries set aside.
+        // The plan is its own rows, written the same way.
+        let reminders = answers.tracking.reminders
+        let queueTickets = answers.tracking.queueTickets
+        let planCleared = clearing && planRows[event.id]?.values.contains { !$0.isRemoved } == true
+        let planMoved = planCleared
+            || Set(reminders) != Set(heldAnswers.tracking.reminders)
+            || Set(queueTickets) != Set(heldAnswers.tracking.queueTickets)
+        // The entry's own parts, its lists set aside.
         answers.tracking.lotteries = heldAnswers.tracking.lotteries
+        answers.tracking.reminders = heldAnswers.tracking.reminders
+        answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
         var given = answers.parts(differingFrom: heldAnswers)
         // An event first written down by a lottery still gets an entry.
-        if held == nil, listMoved, !given.contains(.tracking) { given.append(.tracking) }
-        guard !given.isEmpty || listMoved else { return }
+        if held == nil, listMoved || planMoved, !given.contains(.tracking) { given.append(.tracking) }
+        guard !given.isEmpty || listMoved || planMoved else { return }
         let now = Date.now
         if listMoved {
             LibraryDatabase.writeLotteries(listed, for: event.id, rows: &lotteryRows, entry: held,
                                            dated: now, clearing: clearing, in: database.context)
+        }
+        if planCleared {
+            LibraryDatabase.clearPlan(for: event.id, rows: planRows, dated: now)
+        } else if planMoved {
+            LibraryDatabase.writePlan(reminders, for: event.id, rows: &planRows, dated: now, in: database.context)
+            LibraryDatabase.writePlan(queueTickets, for: event.id, rows: &planRows, dated: now, in: database.context)
         }
         records[event.id] = nil
         converted[event.id] = nil
@@ -661,8 +680,8 @@ final class EventStore {
 
     private func tracking(of id: Event.ID) -> Tracking {
         if let record = records[id] { return record }
-        guard entries[id] != nil || lotteryRows[id] != nil else { return Tracking() }
-        let record = LibraryDatabase.tracking(of: entries[id], rows: lotteryRows[id])
+        guard entries[id] != nil || lotteryRows[id] != nil || planRows[id] != nil else { return Tracking() }
+        let record = LibraryDatabase.tracking(of: entries[id], rows: lotteryRows[id], plan: planRows[id])
         records[id] = record
         return record
     }
@@ -714,9 +733,10 @@ final class EventStore {
     /// Not merely no ticket. A lottery written down, lost included, is the
     /// reader having already said how the event went for them, and asking
     /// them to pick it again as one they went to is asking twice — so is a
-    /// seat, a cost or a note.
+    /// seat, a cost or a note. A reminder is not: planning for the goods sale
+    /// says nothing about whether the reader got in.
     func awaitsTicket(_ event: Event) -> Bool {
-        !event.isUpcoming && tracking(for: event).isEmpty
+        !event.isUpcoming && tracking(for: event).isTicketBlank
     }
 
     /// The past events here with nothing written down (``awaitsTicket(_:)``)
@@ -767,6 +787,38 @@ final class EventStore {
 
     func setTracking(_ tracking: Tracking, for event: Event) {
         edit(event) { $0.tracking = tracking }
+        save()
+    }
+
+    /// Writes `reminder` onto `event`: in its place where it is there already,
+    /// and as a new one where it is not.
+    func setReminder(_ reminder: EventReminder, for event: Event) {
+        edit(event) { answers in
+            if let index = answers.tracking.reminders.firstIndex(where: { $0.id == reminder.id }) {
+                answers.tracking.reminders[index] = reminder
+            } else {
+                answers.tracking.reminders.append(reminder)
+            }
+        }
+        save()
+    }
+
+    func removeReminder(_ id: EventReminder.ID, from event: Event) {
+        edit(event) { $0.tracking.reminders.removeAll { $0.id == id } }
+        save()
+    }
+
+    /// Adds a queue ticket for `link` to `event`, where it has none for it.
+    func addQueueTicket(_ link: URL, to event: Event) {
+        edit(event) { answers in
+            guard !answers.tracking.queueTickets.contains(where: { $0.link == link }) else { return }
+            answers.tracking.queueTickets.append(QueueTicket(link: link, added: .now))
+        }
+        save()
+    }
+
+    func removeQueueTicket(_ id: QueueTicket.ID, from event: Event) {
+        edit(event) { $0.tracking.queueTickets.removeAll { $0.id == id } }
         save()
     }
 
@@ -864,6 +916,10 @@ final class EventStore {
         for id in listed {
             LibraryDatabase.writeLotteries([], for: id, rows: &lotteryRows, entry: entries[id],
                                            dated: now, clearing: true, in: database.context)
+        }
+        // And the plan.
+        for id in planRows.keys {
+            LibraryDatabase.clearPlan(for: id, rows: planRows, dated: now)
         }
         records.removeAll(keepingCapacity: true)
         // Every Following date back to unread, on every device: written as a
