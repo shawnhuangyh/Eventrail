@@ -7,9 +7,10 @@ import VisionKit
 #endif
 
 /// What the reader has planned around a kept event, on its sheet: the times
-/// they want to hear about (``EventReminder``) and the queue tickets they took
-/// (``QueueTicket``). On an event gone by it stays, for what is written down
-/// afterwards, and nothing on it comes as a notification.
+/// they want to hear about (``EventReminder``), the queue tickets they took
+/// (``QueueTicket``) and, from the event's day, its set list (``SetList``). On
+/// an event gone by it stays, for what is written down afterwards, and nothing
+/// on it comes as a notification.
 ///
 /// The sheets it opens are held by ``EventDetailView`` through these bindings,
 /// since nothing may move the page while one is up (``EventSheetsHold``).
@@ -26,6 +27,39 @@ struct EventPlanCard: View {
     /// Lets the page move again, once the last of its sheets has gone.
     let releaseHold: () -> Void
 
+    /// What a QR code being read is for: each list asks from its own button,
+    /// and one camera and one picker serve them all.
+    private enum CodeList {
+        case queueTickets, setLists
+
+        var addLabel: LocalizedStringKey {
+            self == .queueTickets ? "Add Queue Ticket" : "Add Set List"
+        }
+
+        var addQuestion: LocalizedStringKey {
+            self == .queueTickets ? "Add this queue ticket?" : "Add this set list?"
+        }
+
+        var whichQuestion: LocalizedStringKey {
+            self == .queueTickets ? "Which code is your queue ticket?" : "Which code is the set list?"
+        }
+
+        var alreadyHeld: LocalizedStringKey {
+            self == .queueTickets ? "This queue ticket is already on this event." : "This set list is already on this event."
+        }
+
+        var nothingFound: LocalizedStringKey {
+            self == .queueTickets ? "Try again with a picture that shows the ticket's QR code clearly."
+                : "Try again with a picture that shows the set list's QR code clearly."
+        }
+
+        var cameraPrompt: LocalizedStringKey {
+            self == .queueTickets ? "Point the camera at the QR code on your queue ticket."
+                : "Point the camera at the set list's QR code."
+        }
+    }
+
+    @State private var codeList = CodeList.queueTickets
     @State private var picture: PhotosPickerItem?
     @State private var isReading = false
     /// The links a code held, until the reader has seen where they go.
@@ -55,6 +89,8 @@ struct EventPlanCard: View {
 
     var body: some View {
         let tracking = store.tracking(for: event)
+        // Read here so that the cover opens on the list that asked.
+        let cameraPrompt = codeList.cameraPrompt
         VStack(alignment: .leading, spacing: 12) {
             CardHeader(title: "Reminders") { addReminderMenu }
             if !tracking.reminders.isEmpty {
@@ -66,12 +102,27 @@ struct EventPlanCard: View {
                 }
             }
             Divider()
-            CardHeader(title: "Queue Tickets") { addTicketControl }
+            CardHeader(title: "Queue Tickets") { addCodeControl(for: .queueTickets) }
             if !tracking.queueTickets.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(tracking.queueTickets) { ticket in
                         row(ticket, position: tracking.queueTickets.count > 1
                                 ? (tracking.queueTickets.firstIndex(of: ticket) ?? 0) + 1 : nil)
+                    }
+                }
+            }
+            // A set list comes out as the show ends, which is before any end
+            // time printed can be trusted to have passed, so from the morning
+            // of the day. One already kept stands wherever the event has moved.
+            if !tracking.setLists.isEmpty || event.dayHasCome() {
+                Divider()
+                CardHeader(title: "Set List") { addCodeControl(for: .setLists) }
+                if !tracking.setLists.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(tracking.setLists) { setList in
+                            row(setList, position: tracking.setLists.count > 1
+                                    ? (tracking.setLists.firstIndex(of: setList) ?? 0) + 1 : nil)
+                        }
                     }
                 }
             }
@@ -99,7 +150,7 @@ struct EventPlanCard: View {
                 take([scanned])
             }
         } content: {
-            QueueTicketCamera { link in
+            QRCodeCamera(prompt: cameraPrompt) { link in
                 scanned = link
                 isScanning = false
             }
@@ -108,12 +159,12 @@ struct EventPlanCard: View {
         .alert("No Link Found", isPresented: $isFoundNothing) {
             Button("OK") {}
         } message: {
-            Text("Try again with a picture that shows the ticket's QR code clearly.")
+            Text(codeList.nothingFound)
         }
         .alert("Already Added", isPresented: $isAlreadyHeld) {
             Button("OK") {}
         } message: {
-            Text("This queue ticket is already on this event.")
+            Text(codeList.alreadyHeld)
         }
         .alert("Couldn't Open the Camera", isPresented: $isCameraRefused) {
             Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
@@ -208,37 +259,37 @@ struct EventPlanCard: View {
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: - Queue tickets
+    // MARK: - What a QR code holds
 
     /// Asked from the button, so the dialog points at what opened it.
-    private var addTicketControl: some View {
+    private func addCodeControl(for list: CodeList) -> some View {
         Group {
             if canScan {
                 Menu {
-                    Button("Scan QR Code", systemImage: "qrcode.viewfinder", action: openCamera)
-                    Button("Choose from Photos", systemImage: "photo.on.rectangle") { isPicking = true }
+                    Button("Scan QR Code", systemImage: "qrcode.viewfinder") { openCamera(for: list) }
+                    Button("Choose from Photos", systemImage: "photo.on.rectangle") { openPhotos(for: list) }
                 } label: {
-                    addTicketLabel
+                    addCodeLabel(for: list)
                 }
                 .menuOrder(.fixed)
             } else {
-                Button { isPicking = true } label: { addTicketLabel }
+                Button { openPhotos(for: list) } label: { addCodeLabel(for: list) }
             }
         }
         .buttonStyle(.plain)
         .disabled(isReading)
-        .accessibilityLabel(Text("Add Queue Ticket"))
-        .confirmationDialog(found.count > 1 ? Text("Which code is your queue ticket?") : Text("Add this queue ticket?"),
-                            isPresented: Binding { !found.isEmpty } set: { if !$0 { found = [] } },
+        .accessibilityLabel(Text(list.addLabel))
+        .confirmationDialog(found.count > 1 ? Text(list.whichQuestion) : Text(list.addQuestion),
+                            isPresented: Binding { codeList == list && !found.isEmpty } set: { if !$0 { found = [] } },
                             titleVisibility: .visible) {
-            ForEach(Array(zip(found, QueueTicket.labels(tellingApart: found))), id: \.0) { link, label in
+            ForEach(Array(zip(found, QRCodeLink.labels(tellingApart: found))), id: \.0) { link, label in
                 Button {
-                    if let added = store.addQueueTicket(link, to: event) { askNumber(of: added, isNew: true) }
+                    add(link, to: list)
                 } label: {
                     if found.count > 1 {
                         Text(verbatim: label)
                     } else {
-                        Text("Add Queue Ticket")
+                        Text(list.addLabel)
                     }
                 }
             }
@@ -251,8 +302,8 @@ struct EventPlanCard: View {
     }
 
     @ViewBuilder
-    private var addTicketLabel: some View {
-        if isReading {
+    private func addCodeLabel(for list: CodeList) -> some View {
+        if isReading && codeList == list {
             ProgressView()
                 .controlSize(.small)
                 .frame(width: 30, height: 30)
@@ -261,30 +312,24 @@ struct EventPlanCard: View {
         }
     }
 
-    /// The page the code points at, in the reader's browser, where the queue
-    /// stands, named by the number on the ticket where one is written down.
-    /// Beside it, the way to write one or take the ticket out again.
-    private func row(_ ticket: QueueTicket, position: Int?) -> some View {
+    /// A page kept from a QR code, in the reader's browser. Beside it, the way
+    /// to copy its link or take it out again, under anything else `actions` adds.
+    private func linkRow<Title: View, Actions: View>(
+        to link: URL, symbol: String, detail: String, hint: LocalizedStringKey, remove: @escaping () -> Void,
+        @ViewBuilder title: () -> Title, @ViewBuilder actions: () -> Actions = { EmptyView() }
+    ) -> some View {
         HStack(spacing: 10) {
-            Link(destination: ticket.link) {
+            Link(destination: link) {
                 HStack(spacing: 10) {
-                    Image(systemName: "qrcode")
+                    Image(systemName: symbol)
                         .scalingFont(size: 15, weight: .semibold)
                         .foregroundStyle(Color.brandTint)
                         .frame(width: 20)
                     VStack(alignment: .leading, spacing: 2) {
-                        Group {
-                            if let number = ticket.number {
-                                Text("No. \(number)")
-                            } else if let position {
-                                Text("Queue Ticket \(position)")
-                            } else {
-                                Text("Queue Ticket")
-                            }
-                        }
-                        .scalingFont(size: 14.5, weight: .semibold)
-                        .monospacedDigit()
-                        Text(verbatim: "\(ticket.link.host() ?? ticket.link.absoluteString) · \(ticket.added.formatted(date: .omitted, time: .shortened))")
+                        title()
+                            .scalingFont(size: 14.5, weight: .semibold)
+                            .monospacedDigit()
+                        Text(verbatim: detail)
                             .scalingFont(size: 12)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -298,22 +343,12 @@ struct EventPlanCard: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityHint(Text("Opens the queue status in your browser"))
+            .accessibilityHint(Text(hint))
 
             Menu {
-                Button {
-                    askNumber(of: ticket, isNew: false)
-                } label: {
-                    Label {
-                        ticket.number == nil ? Text("Add Number…") : Text("Edit Number…")
-                    } icon: {
-                        Image(systemName: "number")
-                    }
-                }
-                Button("Copy Link", systemImage: "doc.on.doc") { UIPasteboard.general.url = ticket.link }
-                Button("Delete", systemImage: "trash", role: .destructive) {
-                    store.removeQueueTicket(ticket.id, from: event)
-                }
+                actions()
+                Button("Copy Link", systemImage: "doc.on.doc") { UIPasteboard.general.url = link }
+                Button("Delete", systemImage: "trash", role: .destructive, action: remove)
             } label: {
                 Image(systemName: "ellipsis")
                     .scalingFont(size: 14, weight: .semibold)
@@ -328,15 +363,63 @@ struct EventPlanCard: View {
         .padding(.vertical, 8)
     }
 
+    /// The page the code points at, where the queue stands, named by the number
+    /// on the ticket where one is written down.
+    private func row(_ ticket: QueueTicket, position: Int?) -> some View {
+        linkRow(to: ticket.link, symbol: "qrcode",
+                detail: "\(ticket.link.host() ?? ticket.link.absoluteString) · \(ticket.added.formatted(date: .omitted, time: .shortened))",
+                hint: "Opens the queue status in your browser") {
+            store.removeQueueTicket(ticket.id, from: event)
+        } title: {
+            if let number = ticket.number {
+                Text("No. \(number)")
+            } else if let position {
+                Text("Queue Ticket \(position)")
+            } else {
+                Text("Queue Ticket")
+            }
+        } actions: {
+            Button {
+                askNumber(of: ticket, isNew: false)
+            } label: {
+                Label {
+                    ticket.number == nil ? Text("Add Number…") : Text("Edit Number…")
+                } icon: {
+                    Image(systemName: "number")
+                }
+            }
+        }
+    }
+
+    private func row(_ setList: SetList, position: Int?) -> some View {
+        linkRow(to: setList.link, symbol: "music.note.list",
+                detail: setList.link.host() ?? setList.link.absoluteString,
+                hint: "Opens the set list in your browser") {
+            store.removeSetList(setList.id, from: event)
+        } title: {
+            if let position {
+                Text("Set List \(position)")
+            } else {
+                Text("Set List")
+            }
+        }
+    }
+
     private func askNumber(of ticket: QueueTicket, isNew: Bool) {
         typedNumber = ticket.number ?? ""
         isNumberingNew = isNew
         numbering = ticket
     }
 
+    private func openPhotos(for list: CodeList) {
+        codeList = list
+        isPicking = true
+    }
+
     /// The camera, once it is allowed: asked for the first time here, and
     /// pointed at Settings where it was refused.
-    private func openCamera() {
+    private func openCamera(for list: CodeList) {
+        codeList = list
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             isScanning = true
@@ -355,7 +438,7 @@ struct EventPlanCard: View {
         Task {
             defer { isReading = false }
             let data = try? await picture.loadTransferable(type: Data.self)
-            let links = if let data { (try? await QueueTicketScanner.links(in: data)) ?? [] } else { [URL]() }
+            let links = if let data { (try? await QRCodeReader.links(in: data)) ?? [] } else { [URL]() }
             take(links)
         }
     }
@@ -366,22 +449,33 @@ struct EventPlanCard: View {
             isFoundNothing = true
             return
         }
-        let held = Set(store.tracking(for: event).queueTickets.map(\.link))
+        let tracking = store.tracking(for: event)
+        let held = Set(codeList == .queueTickets ? tracking.queueTickets.map(\.link) : tracking.setLists.map(\.link))
         let new = links.filter { !held.contains($0) }
         if new.isEmpty { isAlreadyHeld = true } else { found = new }
+    }
+
+    private func add(_ link: URL, to list: CodeList) {
+        switch list {
+        case .queueTickets:
+            if let added = store.addQueueTicket(link, to: event) { askNumber(of: added, isNew: true) }
+        case .setLists:
+            store.addSetList(link, to: event)
+        }
     }
 }
 
 #if !targetEnvironment(macCatalyst)
-/// The camera, reading QR codes as it looks: pointed at a queue ticket in a
-/// crowd, nothing has to be held still for a shutter, and a blurred frame only
-/// means the next one is read. The first code holding a web page is handed
-/// over; any other is passed by.
-private struct QueueTicketCamera: View {
+/// The camera, reading QR codes as it looks: pointed at a code in a crowd,
+/// nothing has to be held still for a shutter, and a blurred frame only means
+/// the next one is read. The first code holding a web page is handed over; any
+/// other is passed by.
+private struct QRCodeCamera: View {
     @Environment(\.dismiss) private var dismiss
     /// Moved once the cover has come up, which asks the scanner again: asked
     /// while it was still on its way, it may not start.
     @State private var isUp = false
+    let prompt: LocalizedStringKey
     let found: (URL) -> Void
 
     var body: some View {
@@ -396,7 +490,7 @@ private struct QueueTicketCamera: View {
                     .padding(16)
             }
             .overlay(alignment: .bottom) {
-                Text("Point the camera at the QR code on your queue ticket.")
+                Text(prompt)
                     .scalingFont(size: 14, weight: .medium)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
@@ -440,7 +534,7 @@ private struct QRCodeScanner: UIViewControllerRepresentable {
                          allItems: [RecognizedItem]) {
             guard !isDone else { return }
             for case .barcode(let code) in items {
-                guard let text = code.payloadStringValue, let link = QueueTicket.link(inCode: text) else { continue }
+                guard let text = code.payloadStringValue, let link = QRCodeLink.link(inCode: text) else { continue }
                 isDone = true
                 found(link)
                 return

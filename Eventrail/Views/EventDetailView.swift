@@ -108,11 +108,11 @@ struct EventDetailView: View {
     @State private var isMakingStub = false
     /// Another event of the same day, opened from the Same Day card.
     @State private var openedSameDay: Event?
-    /// The reminder up over this sheet, and what is reading a queue ticket —
-    /// see ``EventPlanCard``.
+    /// The reminder up over this sheet, and what is reading a QR code — see
+    /// ``EventPlanCard``.
     @State private var editingReminder: EventReminder?
-    @State private var isPickingQueueTicket = false
-    @State private var isScanningQueueTicket = false
+    @State private var isPickingCode = false
+    @State private var isScanningCode = false
 
     /// What ``flyerFile`` is written from: the flyer, the title it is named
     /// for, and the last refresh by hand it has to be as fresh as.
@@ -461,7 +461,7 @@ struct EventDetailView: View {
             // What to be there for and what is in hand, and on an event gone
             // by, what is written down afterwards.
             EventPlanCard(event: event, clock: clock, editing: $editingReminder,
-                          isPicking: $isPickingQueueTicket, isScanning: $isScanningQueueTicket,
+                          isPicking: $isPickingCode, isScanning: $isScanningCode,
                           releaseHold: releaseHold)
         }
         summaryCard
@@ -648,7 +648,7 @@ struct EventDetailView: View {
     /// (``EventSheetsHold``), which holds the page where it is meanwhile.
     private var holdsSheet: Bool {
         isEditingTicket || isMakingStub || openedSameDay != nil
-            || editingReminder != nil || isPickingQueueTicket || isScanningQueueTicket
+            || editingReminder != nil || isPickingCode || isScanningCode
     }
 
     /// Lets the screen move this page again, once the last of its sheets has

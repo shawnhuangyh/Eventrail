@@ -220,6 +220,37 @@ nonisolated struct QueueTicket: PlanItem, Hashable, Sendable {
         return number.isEmpty ? nil : String(number.prefix(longestNumber))
     }
 
+    /// As an event's rows hand them over: the first added first.
+    static func inOrder(_ tickets: [QueueTicket]) -> [QueueTicket] {
+        tickets.sorted { ($0.added, $0.id.uuidString) < ($1.added, $1.id.uuidString) }
+    }
+}
+
+/// A set list as the link in its QR code: what was played, as a promoter hands
+/// it out once the show is over, on a poster at the doors or on the hall's
+/// screen.
+///
+/// Kept as a ``QueueTicket`` is, and for the same reasons: only the link, never
+/// the picture, and the page opens in the reader's browser, never read by the
+/// app. Usually one to an event, though nothing insists: a run's poster can
+/// print one for each night, and a playlist can stand beside the page.
+nonisolated struct SetList: PlanItem, Hashable, Sendable {
+    static let rowKind = "setList"
+
+    var id = UUID()
+    var link: URL
+    /// When it was added, and the order they are listed in.
+    var added: Date
+
+    /// As an event's rows hand them over: the first added first.
+    static func inOrder(_ setLists: [SetList]) -> [SetList] {
+        setLists.sorted { ($0.added, $0.id.uuidString) < ($1.added, $1.id.uuidString) }
+    }
+}
+
+/// The web page a printed QR code holds, which is what a ``QueueTicket`` and a
+/// ``SetList`` are each kept as.
+nonisolated enum QRCodeLink {
     /// The web page a QR code's text points at, or nil where it points at
     /// anything else: a code is whatever was printed, and is opened on a tap.
     static func link(inCode text: String) -> URL? {
@@ -256,10 +287,5 @@ nonisolated struct QueueTicket: PlanItem, Hashable, Sendable {
         let dropped = shared.distance(from: shared.startIndex, to: separator) + 1
         let rests = bare.map { $0.dropFirst(dropped) }
         return rests.contains(where: \.isEmpty) ? bare : rests.map { "…\($0)" }
-    }
-
-    /// As an event's rows hand them over: the first added first.
-    static func inOrder(_ tickets: [QueueTicket]) -> [QueueTicket] {
-        tickets.sorted { ($0.added, $0.id.uuidString) < ($1.added, $1.id.uuidString) }
     }
 }

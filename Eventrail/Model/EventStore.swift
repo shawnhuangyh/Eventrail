@@ -538,14 +538,17 @@ final class EventStore {
         // The plan is its own rows, written the same way.
         let reminders = answers.tracking.reminders
         let queueTickets = answers.tracking.queueTickets
+        let setLists = answers.tracking.setLists
         let planCleared = clearing && planRows[event.id]?.values.contains { !$0.isRemoved } == true
         let planMoved = planCleared
             || Set(reminders) != Set(heldAnswers.tracking.reminders)
             || Set(queueTickets) != Set(heldAnswers.tracking.queueTickets)
+            || Set(setLists) != Set(heldAnswers.tracking.setLists)
         // The entry's own parts, its lists set aside.
         answers.tracking.lotteries = heldAnswers.tracking.lotteries
         answers.tracking.reminders = heldAnswers.tracking.reminders
         answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
+        answers.tracking.setLists = heldAnswers.tracking.setLists
         var given = answers.parts(differingFrom: heldAnswers)
         // An event first written down by a lottery still gets an entry.
         if held == nil, listMoved || planMoved, !given.contains(.tracking) { given.append(.tracking) }
@@ -560,6 +563,7 @@ final class EventStore {
         } else if planMoved {
             LibraryDatabase.writePlan(reminders, for: event.id, rows: &planRows, dated: now, in: database.context)
             LibraryDatabase.writePlan(queueTickets, for: event.id, rows: &planRows, dated: now, in: database.context)
+            LibraryDatabase.writePlan(setLists, for: event.id, rows: &planRows, dated: now, in: database.context)
         }
         records[event.id] = nil
         converted[event.id] = nil
@@ -840,6 +844,20 @@ final class EventStore {
 
     func removeQueueTicket(_ id: QueueTicket.ID, from event: Event) {
         edit(event) { $0.tracking.queueTickets.removeAll { $0.id == id } }
+        save()
+    }
+
+    /// Adds a set list for `link` to `event`, where it has none for it.
+    func addSetList(_ link: URL, to event: Event) {
+        edit(event) { answers in
+            guard !answers.tracking.setLists.contains(where: { $0.link == link }) else { return }
+            answers.tracking.setLists.append(SetList(link: link, added: .now))
+        }
+        save()
+    }
+
+    func removeSetList(_ id: SetList.ID, from event: Event) {
+        edit(event) { $0.tracking.setLists.removeAll { $0.id == id } }
         save()
     }
 

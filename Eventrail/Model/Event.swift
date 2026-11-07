@@ -182,6 +182,12 @@ nonisolated struct Event: Identifiable, Hashable, Codable, Sendable {
         calendar.date(byAdding: .day, value: 1, to: date) ?? date
     }
 
+    /// Whether its day has come at `now`, on its own clock: the other end of
+    /// the day ``dayEnds`` closes.
+    func dayHasCome(at now: Date = .now) -> Bool {
+        date <= now
+    }
+
     /// Whether the watch lists it at `now`: until its day is over, and for as
     /// long as the show runs past that. The line the watch draws on the copy it
     /// is sent (`EventMoment.isListed`), so a copy left out here would be gone

@@ -6,7 +6,7 @@ import UserNotifications
 
 /// The times a reader writes down for an event, the notifications they come
 /// with and the queue tickets beside them — see ``EventReminder``,
-/// ``EventReminders`` and ``QueueTicket``.
+/// ``EventReminders``, ``QueueTicket`` and ``SetList``.
 @MainActor
 struct EventReminderTests {
     /// The goods sale of a Bushiroad night, as its notice prints it:
@@ -259,18 +259,18 @@ struct EventReminderTests {
     // MARK: - The queue ticket's link
 
     @Test func onlyAWebPageIsALink() {
-        #expect(QueueTicket.link(inCode: "https://q.example.jp/t/abc?x=1")?.host() == "q.example.jp")
-        #expect(QueueTicket.link(inCode: "  http://q.example.jp/abc\n") != nil)
-        #expect(QueueTicket.link(inCode: "HTTPS://Q.EXAMPLE.JP/abc") != nil)
+        #expect(QRCodeLink.link(inCode: "https://q.example.jp/t/abc?x=1")?.host() == "q.example.jp")
+        #expect(QRCodeLink.link(inCode: "  http://q.example.jp/abc\n") != nil)
+        #expect(QRCodeLink.link(inCode: "HTTPS://Q.EXAMPLE.JP/abc") != nil)
 
         for code in ["", "整理券 123", "tel:0312345678", "javascript:alert(1)", "file:///etc/passwd",
                      "eventrail://event/1", "https://", "q.example.jp/abc", "see https://q.example.jp"] {
-            #expect(QueueTicket.link(inCode: code) == nil, "\(code)")
+            #expect(QRCodeLink.link(inCode: code) == nil, "\(code)")
         }
     }
 
     @Test func aPictureOfTwoOfOneCodeIsOneLink() {
-        let links = QueueTicket.links(inCodes: ["https://q.example.jp/a", "not a link", "https://q.example.jp/a",
+        let links = QRCodeLink.links(inCodes: ["https://q.example.jp/a", "not a link", "https://q.example.jp/a",
                                                 "https://q.example.jp/b"])
         #expect(links.map(\.lastPathComponent) == ["a", "b"])
     }
@@ -279,7 +279,7 @@ struct EventReminderTests {
     /// has to show that part or the reader cannot tell which they are picking.
     @Test func severalLinksAreToldApartOnTheirButtons() {
         func labels(_ links: String...) -> [String] {
-            QueueTicket.labels(tellingApart: links.map { URL(string: $0)! })
+            QRCodeLink.labels(tellingApart: links.map { URL(string: $0)! })
         }
         #expect(labels("https://q.example.jp/t/8f3a21?from=qr", "https://q.example.jp/t/77c0de?from=qr")
             == ["…8f3a21?from=qr", "…77c0de?from=qr"])
@@ -384,6 +384,62 @@ struct EventReminderTests {
         #expect(store.tracking(for: show).queueTickets.map(\.link.lastPathComponent) == ["b"])
     }
 
+    @Test func oneLinkIsOneSetList() throws {
+        let store = store()
+        let show = event(inDays: -3)
+        let link = try #require(URL(string: "https://example.jp/setlist/a"))
+        store.toggleLibraryMembership(show)
+        store.addSetList(link, to: show)
+        store.addSetList(link, to: show)
+        #expect(store.tracking(for: show).setLists.map(\.link) == [link])
+
+        store.addSetList(try #require(URL(string: "https://example.jp/setlist/b")), to: show)
+        #expect(store.tracking(for: show).setLists.count == 2)
+
+        store.removeSetList(store.tracking(for: show).setLists[0].id, from: show)
+        #expect(store.tracking(for: show).setLists.map(\.link.lastPathComponent) == ["b"])
+    }
+
+    /// The same link can be a queue ticket and a set list: each list is its
+    /// own, and neither answers for the other.
+    @Test func aSetListAndAQueueTicketKeepTheirOwnLists() throws {
+        let store = store()
+        let show = event(inDays: -3)
+        let link = try #require(URL(string: "https://example.jp/a"))
+        store.toggleLibraryMembership(show)
+        store.addQueueTicket(link, to: show)
+        store.addSetList(link, to: show)
+        #expect(store.tracking(for: show).queueTickets.map(\.link) == [link])
+        #expect(store.tracking(for: show).setLists.map(\.link) == [link])
+
+        store.removeQueueTicket(store.tracking(for: show).queueTickets[0].id, from: show)
+        #expect(store.tracking(for: show).queueTickets.isEmpty)
+        #expect(store.tracking(for: show).setLists.map(\.link) == [link])
+    }
+
+    /// A set list kept says nothing about a ticket: the event still asks.
+    @Test func aSetListLeavesTicketDetailsBlank() throws {
+        let store = store()
+        let show = event(inDays: -3)
+        store.toggleLibraryMembership(show)
+        store.addSetList(try #require(URL(string: "https://example.jp/setlist")), to: show)
+        #expect(store.tracking(for: show).isTicketBlank)
+        #expect(!store.tracking(for: show).isEmpty)
+        #expect(store.awaitsTicket(show))
+        #expect(!store.hasAttended(show))
+    }
+
+    /// Offered from the morning of the event's day at the hall: a set list
+    /// comes out as the show ends, which no printed end time can be trusted for.
+    @Test func theDayHasComeFromItsMorningAtTheHall() {
+        let show = event()
+        #expect(!show.dayHasCome(at: show.date.addingTimeInterval(-60)))
+        #expect(show.dayHasCome(at: show.date))
+        #expect(show.dayHasCome(at: show.dayEnds.addingTimeInterval(365 * 24 * 60 * 60)))
+        #expect(!event().dayHasCome())
+        #expect(event(inDays: -1).dayHasCome())
+    }
+
     /// The ticket added is handed back to be numbered, and a link already held
     /// adds nothing to number.
     @Test func aNumberIsWrittenOnItsOwnTicket() throws {
@@ -462,11 +518,12 @@ struct EventReminderTests {
         store.toggleLibraryMembership(show)
         store.setReminder(reminder(on: show), for: show)
         store.addQueueTicket(try #require(URL(string: "https://q.example.jp/a")), to: show)
+        store.addSetList(try #require(URL(string: "https://example.jp/setlist")), to: show)
 
         store.remove(CollectionOfOne(show))
         #expect(store.tracking(for: show).isEmpty)
         let rows = try store.database.context.fetch(FetchDescriptor<LibraryPlanItem>())
-        #expect(rows.count == 2)
+        #expect(rows.count == 3)
         let removed = rows.allSatisfy { $0.isRemoved && $0.text.isEmpty }
         #expect(removed)
     }
@@ -510,6 +567,10 @@ struct LibraryPlanItemTests {
 
     func ticket(_ path: String = "a") -> QueueTicket {
         QueueTicket(link: URL(string: "https://q.example.jp/\(path)")!, added: earlier)
+    }
+
+    func setList(_ path: String = "a") -> SetList {
+        SetList(link: URL(string: "https://example.jp/setlist/\(path)")!, added: earlier)
     }
 
     func rows(in context: ModelContext) throws -> [String: [String: LibraryPlanItem]] {
@@ -582,12 +643,18 @@ struct LibraryPlanItemTests {
     @Test func oneKindLeavesTheOtherAlone() throws {
         let (database, context) = database()
         var held: [String: [String: LibraryPlanItem]] = [:]
-        let time = reminder(), code = ticket()
+        let time = reminder(), code = ticket(), songs = setList()
         LibraryDatabase.writePlan([time], for: "1", rows: &held, dated: earlier, in: context)
         LibraryDatabase.writePlan([code], for: "1", rows: &held, dated: earlier, in: context)
+        LibraryDatabase.writePlan([songs], for: "1", rows: &held, dated: earlier, in: context)
         LibraryDatabase.writePlan([EventReminder](), for: "1", rows: &held, dated: later, in: context)
 
         #expect(LibraryDatabase.planItems(EventReminder.self, in: held["1"]).isEmpty)
+        #expect(LibraryDatabase.planItems(QueueTicket.self, in: held["1"]) == [code])
+        #expect(LibraryDatabase.planItems(SetList.self, in: held["1"]) == [songs])
+
+        LibraryDatabase.writePlan([SetList](), for: "1", rows: &held, dated: later, in: context)
+        #expect(LibraryDatabase.planItems(SetList.self, in: held["1"]).isEmpty)
         #expect(LibraryDatabase.planItems(QueueTicket.self, in: held["1"]) == [code])
         withExtendedLifetime(database) {}
     }
@@ -664,8 +731,9 @@ struct LibraryPlanItemTests {
         var archive = LibraryArchive()
         archive.events["1"] = Fixtures.event(id: "1")
         archive.membership["1"] = Stamped(true, at: earlier)
-        let time = reminder(), code = ticket()
-        archive.tracking["1"] = Stamped(Tracking(note: "front row", reminders: [time], queueTickets: [code]), at: later)
+        let time = reminder(), code = ticket(), songs = setList()
+        archive.tracking["1"] = Stamped(Tracking(note: "front row", reminders: [time], queueTickets: [code],
+                                                 setLists: [songs]), at: later)
         try LibraryDatabase.apply(archive, to: context)
         try context.save()
 
@@ -673,6 +741,7 @@ struct LibraryPlanItemTests {
         let record = try #require(read.tracking["1"])
         #expect(record.value.reminders == [time])
         #expect(record.value.queueTickets == [code])
+        #expect(record.value.setLists == [songs])
         #expect(record.value.note == "front row")
         #expect(record.modified == later.toTheMillisecond)
 
@@ -699,6 +768,7 @@ struct LibraryPlanItemTests {
         #expect(record.value.edits[.reminders] == nil)
         // No row of a kind says nothing of it, however new the record.
         #expect(record.value.edits[.queueTickets] == Tracking.unsaid)
+        #expect(record.value.edits[.setLists] == Tracking.unsaid)
         withExtendedLifetime(database) {}
     }
 
@@ -706,10 +776,10 @@ struct LibraryPlanItemTests {
     /// holds neither list. The reader only changed a note.
     @Test func aRecordFromBeforeThePlanLeavesItAlone() throws {
         let (database, context) = database()
-        let time = reminder(), link = ticket()
+        let time = reminder(), link = ticket(), songs = setList()
         var archive = LibraryArchive()
         archive.membership["1"] = Stamped(true, at: earlier)
-        archive.tracking["1"] = Stamped(Tracking(reminders: [time], queueTickets: [link]), at: earlier)
+        archive.tracking["1"] = Stamped(Tracking(reminders: [time], queueTickets: [link], setLists: [songs]), at: earlier)
         try LibraryDatabase.apply(archive, to: context)
         try context.save()
 
@@ -724,6 +794,7 @@ struct LibraryPlanItemTests {
         #expect(plan.values.allSatisfy { !$0.isRemoved })
         #expect(LibraryDatabase.planItems(EventReminder.self, in: plan) == [time])
         #expect(LibraryDatabase.planItems(QueueTicket.self, in: plan) == [link])
+        #expect(LibraryDatabase.planItems(SetList.self, in: plan) == [songs])
         #expect(plan.values.allSatisfy { $0.modified == earlier.toTheMillisecond })
         let entries = try context.fetch(FetchDescriptor<LibraryEntry>())
         #expect(entries.map(\.tracking.note) == ["front row"])
@@ -735,9 +806,11 @@ struct LibraryPlanItemTests {
         let older = try JSONDecoder().decode(Tracking.self, from: Data(#"{"seat":"A12"}"#.utf8))
         #expect(!older.says(.reminders))
         #expect(!older.says(.queueTickets))
+        #expect(!older.says(.setLists))
         let again = try JSONDecoder().decode(Tracking.self, from: JSONEncoder().encode(older))
         #expect(!again.says(.reminders))
         #expect(!again.says(.queueTickets))
+        #expect(!again.says(.setLists))
         #expect(again.says(.note))
 
         // Settled against one that has, whichever is newer.

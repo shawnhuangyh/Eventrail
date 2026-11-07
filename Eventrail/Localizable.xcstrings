@@ -2507,6 +2507,28 @@
         }
       }
     },
+    "Add Set List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリストを追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加歌单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增歌單"
+          }
+        }
+      }
+    },
     "Add this queue ticket?" : {
       "localizations" : {
         "ja" : {
@@ -2525,6 +2547,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要新增這張整理券嗎？"
+          }
+        }
+      }
+    },
+    "Add this set list?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このセットリストを追加しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要添加这份歌单吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要新增這份歌單嗎？"
           }
         }
       }
@@ -10835,6 +10879,28 @@
         }
       }
     },
+    "Opens the set list in your browser" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザでセットリストを開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在浏览器中打开歌单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在瀏覽器中開啟歌單"
+          }
+        }
+      }
+    },
     "Opens the ticket details" : {
       "localizations" : {
         "ja" : {
@@ -11449,6 +11515,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "將相機對準整理券上的 QR Code。"
+          }
+        }
+      }
+    },
+    "Point the camera at the set list's QR code." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリストのQRコードにカメラを向けてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把相机对准歌单的二维码。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將相機對準歌單的 QR Code。"
           }
         }
       }
@@ -13471,6 +13559,51 @@
         }
       }
     },
+    "Set List" : {
+      "comment" : "The songs played at an event, whose link a promoter hands out as a QR code, セットリスト.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌單"
+          }
+        }
+      }
+    },
+    "Set List %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリスト %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌单 %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌單 %lld"
+          }
+        }
+      }
+    },
     "Settings" : {
       "localizations" : {
         "ja" : {
@@ -14954,6 +15087,28 @@
         }
       }
     },
+    "This set list is already on this event." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このセットリストはすでに追加されています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这份歌单已经添加过了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這份歌單已經新增過了。"
+          }
+        }
+      }
+    },
     "This ticket is for another day" : {
       "localizations" : {
         "ja" : {
@@ -15417,6 +15572,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天"
+          }
+        }
+      }
+    },
+    "Try again with a picture that shows the set list's QR code clearly." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリストのQRコードがはっきり写った写真でもう一度お試しください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请用一张能清楚看到歌单二维码的照片再试一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請用一張能清楚看到歌單 QR Code 的照片再試一次。"
           }
         }
       }
@@ -16499,6 +16676,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中選的是哪個志願？"
+          }
+        }
+      }
+    },
+    "Which code is the set list?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どのコードがセットリストですか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "哪个二维码是歌单？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "哪個 QR Code 是歌單？"
           }
         }
       }

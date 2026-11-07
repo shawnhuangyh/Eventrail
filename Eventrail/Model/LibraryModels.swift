@@ -232,11 +232,12 @@ final class LibraryLottery {
 }
 
 /// One thing the reader added to an event's plan: a time to be reminded of
-/// (``EventReminder``) or a queue ticket's link (``QueueTicket``).
+/// (``EventReminder``), a queue ticket's link (``QueueTicket``) or a set list's
+/// (``SetList``).
 ///
 /// A row of its own for the reason a lottery round is (``LibraryLottery``):
 /// in one column, two devices adding one each between syncs kept only the
-/// last. One table for both, told apart by ``kind``, so what a later build
+/// last. One table for all of them, told apart by ``kind``, so what a later build
 /// adds to the plan needs no record type of its own — and is never taken for
 /// a removal here, since this build writes only the kinds it knows.
 ///
@@ -429,6 +430,7 @@ extension LibraryEvent {
             // Those builds had no plan, so they say nothing of one.
             edits[.reminders] = Tracking.unsaid
             edits[.queueTickets] = Tracking.unsaid
+            edits[.setLists] = Tracking.unsaid
             var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
                                   cost: cost.map { Decimal($0) },
                                   lotteries: LotteryEntry.carriedOver(count: lotteryEntries),

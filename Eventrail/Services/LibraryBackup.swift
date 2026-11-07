@@ -78,7 +78,10 @@ nonisolated struct LibraryBackup: Sendable {
     /// 11: a tracking record carries the times to be reminded of and the
     /// queue tickets' links. A build that has never heard of them would drop
     /// them, and cannot read the date each list carries in ``Tracking/edits``.
-    static let currentFormat: UInt8 = 11
+    ///
+    /// 12: a tracking record carries the links to the event's set lists. A
+    /// build that has never heard of them would drop them.
+    static let currentFormat: UInt8 = 12
 
     var app: String
     var created: Date
