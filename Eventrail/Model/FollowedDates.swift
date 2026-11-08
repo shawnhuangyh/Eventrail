@@ -184,6 +184,56 @@ final class FollowedDates {
         return await run(performers)
     }
 
+    /// Reads, from a background refresh, whichever followed performers are
+    /// stale — the one read longest ago first — for no longer than `budget`,
+    /// and returns once what it read is on disk.
+    ///
+    /// Not ``load(for:)``, whose read is a task of its own so that a screen
+    /// going away cannot cancel it. The system ends a background refresh by
+    /// cancelling it, and may suspend the app the moment it returns; so this
+    /// read stops at that, or at `budget`, keeping whatever landed before.
+    /// Whoever it did not reach is still stale, and read first next time.
+    ///
+    /// On disk before it returns: a read the system suspended before its
+    /// write would be found again by the next one, and announced twice
+    /// (``NewDateAlerts``).
+    func loadInBackground(for performers: [PerformerProfile], within budget: Duration) async {
+        dropFinished()
+        forget(everyoneBut: performers)
+        let stale = performers.filter { !isFresh($0.id) }
+            .sorted { (readAt[$0.id] ?? .distantPast) < (readAt[$1.id] ?? .distantPast) }
+        if !stale.isEmpty, running == nil {
+            let task = Task { await self.read(stale) }
+            running = task
+            let deadline = Task {
+                guard (try? await Task.sleep(for: budget)) != nil else { return }
+                task.cancel()
+            }
+            _ = await withTaskCancellationHandler {
+                await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            deadline.cancel()
+            if running == task { running = nil }
+        }
+        await settled()
+    }
+
+    /// When the first of `performers`' listings goes stale — long ago, for
+    /// one never read — or nil where there is nobody to read.
+    func staleAt(for performers: [PerformerProfile]) -> Date? {
+        performers.map { readAt[$0.id].map { $0.addingTimeInterval(Self.freshness) } ?? .distantPast }.min()
+    }
+
+    /// Waits until what is held is written down.
+    func settled() async {
+        while let saving = pendingSave {
+            await saving.value
+            if pendingSave == saving { return }
+        }
+    }
+
     /// Reads as a task of its own rather than as part of whichever screen
     /// asked, so a second caller can wait on it — and so leaving the tab
     /// halfway does not throw away a read the site has already been asked for.

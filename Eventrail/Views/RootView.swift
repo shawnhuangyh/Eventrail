@@ -48,6 +48,9 @@ struct RootView: View {
     private let activityReminders = ActivityReminders.shared
     /// The times the reader wrote down for an event — see ``EventReminders``.
     private let eventReminders = EventReminders.shared
+    /// The dates new on Following, said from a background read — see
+    /// ``NewDateAlerts``.
+    private let newDateAlerts = NewDateAlerts.shared
     /// What Siri, Shortcuts or a Spotlight result asked for through an
     /// intent — see ``IntentOpens``.
     private let intentOpens = IntentOpens.shared
@@ -90,12 +93,16 @@ struct RootView: View {
                 openReminder()
                 openActivityReminder()
                 openEventReminder()
+                openNewDates()
                 takeIntentOpen()
                 if wasInBackground || Self.owesCatchUp { catchUp() }
                 wasInBackground = false
             case .background:
                 wasInBackground = true
                 store.saveNow()
+                // From the listings as they stand now, which a read in the
+                // foreground may have made fresh.
+                newDateAlerts.scheduleRefresh()
             default:
                 store.saveNow()
             }
@@ -182,6 +189,8 @@ struct RootView: View {
             activityReminders.schedule(from: store)
             eventReminders.schedule(from: store)
             EventActivities.shared.refreshSoon(from: store)
+            // A date read takes its alert out of Notification Center.
+            newDateAlerts.tidy(from: store, followed: followed)
         }
         // An activity started from the sheet takes its reminder back, and
         // Live Activities turned off take them all.
@@ -202,6 +211,8 @@ struct RootView: View {
             reminders.schedule(from: store)
             activityReminders.schedule(from: store)
             eventReminders.schedule(from: store)
+            newDateAlerts.tidy(from: store, followed: followed)
+            newDateAlerts.scheduleRefresh()
         }
     }
 
@@ -277,6 +288,8 @@ struct RootView: View {
         .onChange(of: activityReminders.opened, initial: true) { openActivityReminder() }
         // The event, where its queue tickets are.
         .onChange(of: eventReminders.opened, initial: true) { openEventReminder() }
+        // The new date, or Following for several.
+        .onChange(of: newDateAlerts.opened, initial: true) { openNewDates() }
     }
 
     /// When the app last caught up on coming back (``catchUp()``) — once for
@@ -315,6 +328,8 @@ struct RootView: View {
         reminders.schedule(from: store)
         activityReminders.schedule(from: store)
         eventReminders.schedule(from: store)
+        // Dates read on another device meanwhile.
+        newDateAlerts.tidy(from: store, followed: followed)
     }
 
     /// Reads the linked account's lists again where they have gone stale —
@@ -379,6 +394,24 @@ struct RootView: View {
         guard scenePhase == .active, let id = eventReminders.opened else { return }
         eventReminders.opened = nil
         if let event = store.event(id: id) { opens.open(.event(event)) }
+    }
+
+    /// Opens what a new-date alert was tapped for: its one date — read, as a
+    /// row opened on Following is — or the Following tab, under any sheet,
+    /// for several or for a date gone since. In this window, only while it
+    /// is the one in front, for the reason a results-day reminder waits for
+    /// it (``openReminder()``).
+    private func openNewDates() {
+        guard scenePhase == .active, let ids = newDateAlerts.opened else { return }
+        newDateAlerts.opened = nil
+        if ids.count == 1, let date = followed.event(id: ids[0]) {
+            store.markRead([date], read: true)
+            opens.open(.event(date))
+        } else if ids.count == 1, let event = store.event(id: ids[0]) {
+            opens.open(.event(event))
+        } else {
+            selection = .following
+        }
     }
 
     /// Opens what an intent asked for, in this window — only while it is the

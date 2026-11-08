@@ -28,7 +28,7 @@ nonisolated enum TestNotification {
 }
 
 /// A bench for the app's notifications, in debug builds only, opened from the
-/// event sheet's menu as ``LiveActivityTestView`` is: sends one of the three
+/// event sheet's menu as ``LiveActivityTestView`` is: sends one of the four
 /// about the event in front of it within seconds, so the banner, the Lock
 /// Screen, a Focus and a tap can be looked at without waiting for somebody's
 /// goods sale. Beside that, what the app has scheduled and what the system
@@ -172,6 +172,9 @@ struct NotificationTestView: View {
             return LotteryReminder(testing: event, entry: entry).request
         case .liveActivity:
             return ActivityReminder(testing: event).request
+        case .newDate:
+            return NewDateAlert(dates: [event], names: { _ in event.performers.prefix(1).map(\.name) },
+                                clock: .stored)?.request
         }
     }
 
@@ -319,12 +322,13 @@ private extension NotificationTestView {
         case eventReminder = "Event Reminder"
         case resultsDay = "Results Day"
         case liveActivity = "Live Activity"
+        case newDate = "New Date"
 
         var id: String { rawValue }
 
         /// A Live Activity reminder is the iPhone's alone.
         static var offered: [Kind] {
-            UIDevice.current.userInterfaceIdiom == .phone ? allCases : [.eventReminder, .resultsDay]
+            UIDevice.current.userInterfaceIdiom == .phone ? allCases : [.eventReminder, .resultsDay, .newDate]
         }
     }
 

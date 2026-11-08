@@ -203,8 +203,8 @@ extension LotteryReminders: UNUserNotificationCenterDelegate {
     }
 
     /// The app's one delegate, so a Live Activity reminder tapped is handed
-    /// to ``ActivityReminders`` from here, and an event's own to
-    /// ``EventReminders``.
+    /// to ``ActivityReminders`` from here, an event's own to
+    /// ``EventReminders``, and a new date's to ``NewDateAlerts``.
     ///
     /// **The completion handler, called on the main thread, and not this
     /// method's `async` form**: where a tap brings the app back, the system's
@@ -230,6 +230,9 @@ extension LotteryReminders: UNUserNotificationCenterDelegate {
         } else if identifier.hasPrefix(ReminderAlert.prefix) {
             let event = info[ReminderAlert.eventKey] as? String
             take = { EventReminders.shared.opened = event }
+        } else if identifier.hasPrefix(NewDateAlert.prefix) {
+            let events = NewDateAlert.events(in: info)
+            take = { NewDateAlerts.shared.opened = events }
         } else if let event = info[LotteryReminder.eventKey] as? String,
                   let entry = (info[LotteryReminder.entryKey] as? String).flatMap(UUID.init(uuidString:)) {
             take = { self.opened = Opened(eventID: event, entryID: entry) }

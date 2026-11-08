@@ -936,6 +936,29 @@
         }
       }
     },
+    "%lld new dates" : {
+      "comment" : "A notification's title: how many dates were newly published for the people followed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着公演 %lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个新场次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個新場次"
+          }
+        }
+      }
+    },
     "%lld no result" : {
       "localizations" : {
         "ja" : {
@@ -1086,6 +1109,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中選其他票種 %lld 次"
+          }
+        }
+      }
+    },
+    "%lld others" : {
+      "comment" : "The end of a list of performers in a notification: how many it did not name.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld other"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld others"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほか%lld名"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另外 %lld 位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另外 %lld 位"
           }
         }
       }
@@ -2815,6 +2879,29 @@
         }
       }
     },
+    "and %lld more" : {
+      "comment" : "The last line of a new-dates notification: how many dates it did not list.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほか%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有 %lld 个"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還有 %lld 個"
+          }
+        }
+      }
+    },
     "Anywhere" : {
       "localizations" : {
         "ja" : {
@@ -3298,6 +3385,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "返回"
+          }
+        }
+      }
+    },
+    "Background App Refresh is off in Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「設定」でAppのバックグラウンド更新がオフになっています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在“设置”中关闭后台App刷新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在「設定」中關閉背景App重新整理"
           }
         }
       }
@@ -8878,6 +8987,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新"
+          }
+        }
+      }
+    },
+    "New date" : {
+      "comment" : "A notification's title: a date newly published for somebody followed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着公演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新场次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新場次"
+          }
+        }
+      }
+    },
+    "New Date Alerts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着公演の通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新场次提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新場次提醒"
+          }
+        }
+      }
+    },
+    "New date for %@" : {
+      "comment" : "A notification's title. The argument names who is billed among the people followed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の新着公演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@有新场次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@有新場次"
           }
         }
       }

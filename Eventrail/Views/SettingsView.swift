@@ -30,6 +30,7 @@ struct SettingsView: View {
     private let reminders = LotteryReminders.shared
     private let activityReminders = ActivityReminders.shared
     private let eventReminders = EventReminders.shared
+    private let newDateAlerts = NewDateAlerts.shared
 
     @State private var isConfirmingDeleteAll = false
     @State private var isConfirmingClearCache = false
@@ -93,6 +94,11 @@ struct SettingsView: View {
                         if ActivityReminders.isOffered {
                             SettingRowDivider()
                             activityRemindersRow
+                        }
+                        // Not a Mac's, which runs no background refresh.
+                        if NewDateAlerts.isOffered {
+                            SettingRowDivider()
+                            newDateAlertsRow
                         }
                     }
                     section("Backup") {
@@ -398,6 +404,40 @@ struct SettingsView: View {
     }
 
     private static let appSettings = URL(string: UIApplication.openSettingsURLString)!
+
+    /// Off until the reader turns it on — see ``NewDateAlerts``. Asks for
+    /// notifications as it is turned on, where nobody has answered yet.
+    private var newDateAlertsRow: some View {
+        @Bindable var newDateAlerts = newDateAlerts
+        let refusal = newDateAlertsRefusal
+        return Toggle(isOn: $newDateAlerts.isEnabled) {
+            SettingRowLabel("bell.badge", "New Date Alerts",
+                            status: refusal?.status, needsAttention: true) {
+                if let refusal {
+                    Link("Open Settings", destination: refusal.mend)
+                        .scalingFont(size: 12.5, weight: .semibold)
+                        .foregroundStyle(Color.brandTint)
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        .settingSwitch()
+        .settingRowPadding()
+    }
+
+    /// Only a refusal the reader can mend, and where: notifications off, on
+    /// the app's notification page, or Background App Refresh off, on the
+    /// app's own page, where its switch is.
+    private var newDateAlertsRefusal: (status: Text, mend: URL)? {
+        guard newDateAlerts.isEnabled else { return nil }
+        if reminders.authorization == .denied {
+            return (Text("Notifications are off in Settings"), Self.notificationSettings)
+        }
+        if newDateAlerts.backgroundRefresh != .available {
+            return (Text("Background App Refresh is off in Settings"), Self.appSettings)
+        }
+        return nil
+    }
 
     /// Only a refusal the reader can mend: the switch on and the system
     /// saying no.

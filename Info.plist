@@ -5,6 +5,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>moe.shawn.Eventrail.liveActivity</string>
+		<string>moe.shawn.Eventrail.followedDates</string>
 	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
