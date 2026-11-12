@@ -226,7 +226,7 @@ struct EventPlanCard: View {
         let isOver = reminder.date(in: event.timeZone) <= now
         // Dimmed against the times still to come; once the event is over there
         // are none, and the rows are a record to read.
-        let isDimmed = isEventAhead && isOver
+        let isDimmed = (isEventAhead && isOver) || reminder.done != nil
         return Button {
             editing = reminder
         } label: {
@@ -236,7 +236,17 @@ struct EventPlanCard: View {
                         .scalingFont(size: 14.5, weight: .semibold)
                         .foregroundStyle(isDimmed ? .secondary : .primary)
                         .multilineTextAlignment(.leading)
-                    if let lead = reminder.lead, event.holds(reminder), !isOver {
+                    if reminder.done != nil {
+                        // Dealt with from Ticket To-Dos: nothing more comes.
+                        Label {
+                            reminder.missed == true ? Text("Not Paid") : Text("Done")
+                        } icon: {
+                            Image(systemName: reminder.missed == true ? "xmark.circle.fill" : "checkmark.circle.fill")
+                        }
+                        .labelStyle(.titleAndIcon)
+                        .scalingFont(size: 12)
+                        .foregroundStyle(reminder.missed == true ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.trackAttended))
+                    } else if let lead = reminder.lead, event.holds(reminder), !isOver {
                         Label(ReminderLead.label(of: lead), systemImage: "bell.fill")
                             .labelStyle(.titleAndIcon)
                             .scalingFont(size: 12)

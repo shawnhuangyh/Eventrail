@@ -165,6 +165,8 @@ struct NotificationTestView: View {
             var reminder = tracking.reminders.first { $0.id == reminderID }
                 ?? EventReminder(kind: .goodsSale, for: event, at: event.date)
             reminder.lead = lead
+            // One dealt with owes nothing, and the bench shows what it said.
+            reminder.done = nil
             // From long ago, when its moment and the event's day are ahead.
             return ReminderAlert(reminder: reminder, event: event, clock: .stored, at: .distantPast)?.request
         case .resultsDay:

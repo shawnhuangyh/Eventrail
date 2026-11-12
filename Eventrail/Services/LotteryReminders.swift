@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OSLog
+import UIKit
 import UserNotifications
 
 /// A notification at eight in the evening of the day a lottery's results come
@@ -87,6 +88,9 @@ final class LotteryReminders: NSObject {
         isEnabled = UserDefaults.standard.object(forKey: Self.storageKey) as? Bool ?? true
         super.init()
         center.delegate = self
+        // The buttons under a ticket to-do's notification, which the system
+        // has to know of before one of them is pressed.
+        center.setNotificationCategories(ReminderAlert.categories)
     }
 
     /// Whether the system lets a reminder be shown at all.
@@ -229,7 +233,18 @@ extension LotteryReminders: UNUserNotificationCenterDelegate {
             take = { ActivityReminders.shared.opened = event }
         } else if identifier.hasPrefix(ReminderAlert.prefix) {
             let event = info[ReminderAlert.eventKey] as? String
-            take = { EventReminders.shared.opened = event }
+            let reminder = (info[ReminderAlert.reminderKey] as? String).flatMap(UUID.init(uuidString:))
+            let link = (info[ReminderAlert.linkKey] as? String).flatMap(QRCodeLink.link(inCode:))
+            // One of the buttons under a ticket to-do's notification, or the
+            // notification itself.
+            switch response.actionIdentifier {
+            case ReminderAlert.doneAction:
+                take = { if let event, let reminder { EventReminders.shared.markDone(reminder, at: event) } }
+            case ReminderAlert.openAction:
+                take = { if let link { UIApplication.shared.open(link) } }
+            default:
+                take = { EventReminders.shared.opened = event }
+            }
         } else if identifier.hasPrefix(NewDateAlert.prefix) {
             let events = NewDateAlert.events(in: info)
             take = { NewDateAlerts.shared.opened = events }

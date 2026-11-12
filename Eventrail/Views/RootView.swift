@@ -233,6 +233,7 @@ struct RootView: View {
             Tab("Me", systemImage: "person.crop.circle", value: AppTab.me) {
                 MeView().refreshNotices()
             }
+            .badge(urgentTodos)
 
             Tab(value: AppTab.search, role: .search) {
                 SearchView(request: $searchRequest).refreshNotices()
@@ -353,6 +354,14 @@ struct RootView: View {
     /// it is seen from every tab. None leaves the item without a badge.
     private var unreadFollowing: Int {
         followed.events(for: store.followedProfiles).count(where: store.isUnread)
+    }
+
+    /// How many deadlines of the ticket sale — to apply, to pay — are close
+    /// (``TicketTodo/isUrgent(at:)``): the count the Me tab's Ticket To-Dos
+    /// card leads with in red, carried on the tab's item so it is seen from
+    /// every tab. None leaves the item without a badge.
+    private var urgentTodos: Int {
+        TicketTodoList(events: store.upcoming) { store.tracking(for: $0) }.urgent().count
     }
 
     /// Opens the round a results-day reminder was tapped for, in this window

@@ -38,6 +38,33 @@ nonisolated struct EventReminder: PlanItem, Hashable, Sendable {
     /// the time itself. Nil is a time written down to be read, with no
     /// notification at all.
     var lead: Int?
+    /// When the reader said this was dealt with — applied, paid, the ticket
+    /// issued (``TicketTodo``) — and nil while it is still to do. A reminder
+    /// dealt with owes no notification (``Tracking/owes(_:)``); taking the
+    /// date off again brings back one whose moment is still ahead.
+    ///
+    /// These seven ride in the row's JSON, as a queue ticket's number does,
+    /// so they need no column, and each is left out where it says nothing: a
+    /// reminder written before them reads back, and writes back, as it was.
+    var done: Date?
+    /// Whether ``done`` is the reader giving it up rather than doing it: a
+    /// payment not made in time. Nil where it is not.
+    var missed: Bool?
+    /// The round of the sale it is for, as ``LotteryEntry/round`` is kept, or
+    /// nil where none was named.
+    var round: String?
+    /// What is to be paid, as the reader typed it — digits with a point, as
+    /// ``LibraryEntry/price`` keeps a cost, since JSON's own numbers are
+    /// read back through a `Double` — in ``currency``. Read through ``owed``.
+    var amount: String?
+    /// ISO 4217, beside ``amount``.
+    var currency: String?
+    /// Where it is paid, or the ticket issued, as the reader wrote it:
+    /// セブン-イレブン, a card.
+    var payAt: String?
+    /// The page it is done on — a play guide's own page for the order — which
+    /// opens in the reader's browser, as every other link does.
+    var link: URL?
 
     /// The instant this falls on, on `zone`'s clock — the hall's.
     func date(in zone: TimeZone) -> Date {
@@ -49,6 +76,34 @@ nonisolated struct EventReminder: PlanItem, Hashable, Sendable {
     /// When the notification comes, where there is one.
     func alertDate(in zone: TimeZone) -> Date? {
         lead.map { date(in: zone).addingTimeInterval(-Double($0) * 60) }
+    }
+
+    /// What is to be paid and what in, or nil where no amount is written.
+    var owed: Money? {
+        get {
+            amount.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) }
+                .map { Money(amount: $0, currency: currency ?? Currencies.yen) }
+        }
+        set {
+            amount = newValue.map { "\($0.amount)" }
+            currency = newValue?.currency
+        }
+    }
+
+    /// Which of the ticket sale's three this is, or nil for a time at the
+    /// goods sale or one the reader named themselves.
+    var ticketKind: ReminderKind? {
+        ReminderKind(rawValue: title).flatMap { ReminderKind.tickets.contains($0) ? $0 : nil }
+    }
+
+    /// As long as a place to pay is kept: a row has room for a line.
+    static let longestPlace = 40
+
+    /// A place to pay as it is kept: the ends trimmed, and nil where nothing
+    /// is left.
+    static func typedPlace(_ text: String) -> String? {
+        let place = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return place.isEmpty ? nil : String(place.prefix(longestPlace))
     }
 
     /// Moves this to the day and minute `date` falls on, on `zone`'s clock.

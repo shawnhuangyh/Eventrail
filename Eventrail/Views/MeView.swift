@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Which of the Me tab's lists has been opened in full.
 enum MeList: Hashable {
-    case onThisDay, lotteries, favorites, following, notOnAccount
+    case onThisDay, todos, lotteries, favorites, following, notOnAccount
 }
 
 /// The reader's own library at a glance: what it holds, when it was last
@@ -26,6 +26,10 @@ struct MeView: View {
     @Query private var settingsRows: [LibrarySettings]
 
     @State private var openEvent: Event?
+    /// The to-do whose own sheet is open, from its row on the card.
+    @State private var openTodo: TicketTodoLink?
+    /// Which clock the card's deadlines are printed on — see ``TimeDisplay``.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
     @State private var isLinking = false
     @State private var isConfirmingUnlink = false
     @State private var isShowingSettings = false
@@ -76,6 +80,7 @@ struct MeView: View {
             .navigationDestination(for: MeList.self) { list in
                 switch list {
                 case .onThisDay: OnThisDayView()
+                case .todos: TicketTodosView()
                 case .lotteries: LotteriesView()
                 case .favorites: FavoriteEventsView()
                 case .following: FollowedPerformersView()
@@ -88,6 +93,10 @@ struct MeView: View {
                 }
             }
             .eventSheet($openEvent)
+            .sheet(item: $openTodo) { link in
+                TicketTodoSheet(todo: link.id)
+                    .macSheetSize(.form)
+            }
             .sheet(isPresented: $isLinking) {
                 EventernoteAccountSheet()
                     .macSheetSize(.form)
@@ -142,6 +151,7 @@ struct MeView: View {
             HStack(alignment: .top, spacing: -16) {
                 column {
                     accountCard
+                    todosCard
                     onThisDayCard(today)
                     passportCard
                     lotteriesCard
@@ -163,6 +173,7 @@ struct MeView: View {
         case let fold? where fold.axis == .vertical:
             FoldSplitLayout(fold: fold) {
                 column {
+                    todosCard
                     lotteriesCard
                     favoritesCard
                     followingCard
@@ -181,6 +192,7 @@ struct MeView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     accountCard
+                    todosCard
                     passportCard
                     // On a day with no memories the followed performers take
                     // a row of their own rather than leave a hole beside them.
@@ -205,6 +217,7 @@ struct MeView: View {
         case nil:
             column {
                 accountCard
+                todosCard
                 onThisDayCard(today)
                 passportCard
                 lotteriesCard
@@ -598,6 +611,78 @@ struct MeView: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Ticket to-dos
+
+    /// How many of the to-dos the card shows, as the design draws it: the
+    /// next to deal with, the rest a line under them.
+    private static let todoLimit = 3
+
+    /// What a ticket still asks of the reader — apply, pay, pick up — the
+    /// soonest first, each with the button that marks it done, and the way
+    /// into the whole list (``TicketTodosView``), which holds the done ones
+    /// and the way to add one.
+    ///
+    /// Always there, See All with it, even with nothing written yet: the
+    /// screen behind it is where a deadline is added, and left out until the
+    /// first one the card could not be found at all (Shawn looked for it).
+    private var todosCard: some View {
+        let list = TicketTodoList(events: library) { store.tracking(for: $0) }
+        let urgent = list.urgent().count
+        let shown = Array(list.open.prefix(isGrid ? 2 : Self.todoLimit))
+        return VStack(alignment: .leading, spacing: 0) {
+            CardHeader(title: "Ticket To-Dos", count: list.open.isEmpty ? nil : list.open.count,
+                       caption: urgent > 0
+                           ? Text("^[\(urgent) deadline](inflect: true) due soon")
+                               .fontWeight(.semibold).foregroundStyle(.red)
+                           : nil) {
+                seeAll(.todos)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, list.open.isEmpty ? 6 : 12)
+
+            if list.open.isEmpty {
+                Text(TicketTodoCardRow.emptyNote)
+                    .scalingFont(size: 12)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, todo in
+                        TicketTodoCardRow(todo: todo, clock: timeDisplay, showsDivider: index > 0) {
+                            openTodo = TicketTodoLink(id: todo.id)
+                        } mark: {
+                            withAnimation(.snappy) { _ = store.advance(todo) }
+                        }
+                    }
+                    // The ones the card has no room for, by the next of them.
+                    if list.open.count > shown.count, let next = list.open[shown.count].current {
+                        NavigationLink(value: MeList.todos) {
+                            Text("\(list.open.count - shown.count) more · \(TicketTodoText.when(of: next, at: list.open[shown.count].event, on: timeDisplay))")
+                                .scalingFont(size: 13, weight: .medium)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, 70)
+                                .padding(.trailing, 16)
+                                .padding(.vertical, 11)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .overlay(alignment: .top) { Divider().padding(.leading, 70) }
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+        }
+        .frame(maxHeight: cardHeight, alignment: .top)
+        .panel()
     }
 
     // MARK: - Lotteries

@@ -142,6 +142,7 @@ struct TicketDetailsView: View {
                 // applied for six times and lost is worth having written
                 // down — and a win here is what makes the ticket, fills in
                 // its class and brings the seat and cost below it.
+                progressRows
                 lotteryRows
                 if hasTicket {
                     seatSection
@@ -336,6 +337,25 @@ struct TicketDetailsView: View {
     private func delete(_ entry: LotteryEntry) {
         withAnimation(.snappy) {
             tracking.lotteries.wrappedValue.removeAll { $0.id == entry.id }
+        }
+    }
+
+    /// Where the ticket stands between being won and being in hand — Awaiting
+    /// Payment, Paid, Issued — for each payment or pickup deadline written
+    /// for it (``TicketTodo``), as `TodoTicket.dc.html` draws it. Picking a
+    /// step here is marking it in Ticket To-Dos, and stops the same
+    /// reminders; like everything else on this sheet it is the copy that
+    /// changes, written by the checkmark. Nothing where no such deadline is
+    /// written: the steps are the reminders', and there is nowhere else to
+    /// keep one.
+    @ViewBuilder
+    private var progressRows: some View {
+        let tickets = TicketTodoList.todos(for: event, tracking: draft).filter { $0.application == nil }
+        ForEach(tickets) { ticket in
+            TicketProgressSection(todo: ticket) { state in
+                withAnimation(.snappy) { draft = ticket.standing(at: state, in: draft) }
+            }
+            .formRow(top: 4, bottom: Self.sectionGap - Self.rowGap)
         }
     }
 
