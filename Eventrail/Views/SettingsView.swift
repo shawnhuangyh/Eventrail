@@ -31,6 +31,7 @@ struct SettingsView: View {
     private let activityReminders = ActivityReminders.shared
     private let eventReminders = EventReminders.shared
     private let newDateAlerts = NewDateAlerts.shared
+    private let changeAlerts = ChangeAlerts.shared
 
     @State private var isConfirmingDeleteAll = false
     @State private var isConfirmingClearCache = false
@@ -95,6 +96,8 @@ struct SettingsView: View {
                             SettingRowDivider()
                             activityRemindersRow
                         }
+                        SettingRowDivider()
+                        changeAlertsRow
                         // Not a Mac's, which runs no background refresh.
                         if NewDateAlerts.isOffered {
                             SettingRowDivider()
@@ -404,6 +407,27 @@ struct SettingsView: View {
     }
 
     private static let appSettings = URL(string: UIApplication.openSettingsURLString)!
+
+    /// On until the reader turns it off — see ``ChangeAlerts``. Asks, turned
+    /// back on with nothing asked yet, as the results-day switch does.
+    private var changeAlertsRow: some View {
+        @Bindable var changeAlerts = changeAlerts
+        let isRefused = changeAlerts.isEnabled && reminders.authorization == .denied
+        return Toggle(isOn: $changeAlerts.isEnabled) {
+            SettingRowLabel("calendar.badge.exclamationmark", "Change Alerts",
+                            status: isRefused ? Text("Notifications are off in Settings") : nil,
+                            needsAttention: true) {
+                if isRefused {
+                    Link("Open Settings", destination: Self.notificationSettings)
+                        .scalingFont(size: 12.5, weight: .semibold)
+                        .foregroundStyle(Color.brandTint)
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+        .settingSwitch()
+        .settingRowPadding()
+    }
 
     /// Off until the reader turns it on — see ``NewDateAlerts``. Asks for
     /// notifications as it is turned on, where nobody has answered yet.

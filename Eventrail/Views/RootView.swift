@@ -51,6 +51,8 @@ struct RootView: View {
     /// The dates new on Following, said from a background read — see
     /// ``NewDateAlerts``.
     private let newDateAlerts = NewDateAlerts.shared
+    /// A kept event a read found moved — see ``ChangeAlerts``.
+    private let changeAlerts = ChangeAlerts.shared
     /// What Siri, Shortcuts or a Spotlight result asked for through an
     /// intent — see ``IntentOpens``.
     private let intentOpens = IntentOpens.shared
@@ -191,6 +193,7 @@ struct RootView: View {
             EventActivities.shared.refreshSoon(from: store)
             // A date read takes its alert out of Notification Center.
             newDateAlerts.tidy(from: store, followed: followed)
+            changeAlerts.tidy(from: store)
         }
         // An activity started from the sheet takes its reminder back, and
         // Live Activities turned off take them all.
@@ -213,6 +216,7 @@ struct RootView: View {
             eventReminders.schedule(from: store)
             newDateAlerts.tidy(from: store, followed: followed)
             newDateAlerts.scheduleRefresh()
+            changeAlerts.tidy(from: store)
         }
     }
 
@@ -291,6 +295,8 @@ struct RootView: View {
         .onChange(of: eventReminders.opened, initial: true) { openEventReminder() }
         // The new date, or Following for several.
         .onChange(of: newDateAlerts.opened, initial: true) { openNewDates() }
+        // The event that moved, on what it was and what it is now.
+        .onChange(of: changeAlerts.opened, initial: true) { openChangeAlert() }
     }
 
     /// When the app last caught up on coming back (``catchUp()``) — once for
@@ -331,6 +337,7 @@ struct RootView: View {
         eventReminders.schedule(from: store)
         // Dates read on another device meanwhile.
         newDateAlerts.tidy(from: store, followed: followed)
+        changeAlerts.tidy(from: store)
     }
 
     /// Reads the linked account's lists again where they have gone stale —
@@ -421,6 +428,19 @@ struct RootView: View {
         } else {
             selection = .following
         }
+    }
+
+    /// Opens the event a change alert was tapped for, read, its sheet leading
+    /// with what moved — what it was and what it is now
+    /// (``EventStore/markRead(_:changedFrom:)``). In this window, only while
+    /// it is the one in front, for the reason a results-day reminder waits
+    /// for it (``openReminder()``).
+    private func openChangeAlert() {
+        guard scenePhase == .active, let opened = changeAlerts.opened else { return }
+        changeAlerts.opened = nil
+        guard let event = store.event(id: opened.eventID) else { return }
+        if event.isUpcoming { store.markRead(event, changedFrom: opened.before) }
+        opens.open(.event(event))
     }
 
     /// Opens what an intent asked for, in this window — only while it is the
@@ -526,6 +546,11 @@ final class Launch {
             }
             if let zone = venues.timeZone(of: event) { return zone }
             return VenuePlaces.shared.timeZone(ofHallNamed: event.venue)
+        }
+        // A kept event a read found moved is said — see ``ChangeAlerts``.
+        store.onMoved = { [weak store] move in
+            guard let store else { return }
+            ChangeAlerts.shared.noticed(move, in: store)
         }
         self.store = store
         self.followed = followed

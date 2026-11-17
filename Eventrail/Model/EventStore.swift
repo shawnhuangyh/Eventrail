@@ -323,6 +323,14 @@ final class EventStore {
     private var accountReadTried: Date?
     private var accountRead: Task<Void, Never>?
 
+    /// Told of each event the reader keeps, still to come, that a read found
+    /// on another day, at another start or in another hall — see
+    /// ``ChangeAlerts``. Only the reads nobody is looking at the event
+    /// through: the account's history, and the pages Refresh reads again;
+    /// not the event's own sheet, nor the first read of one just arrived.
+    /// Set by ``Launch``; nil in previews and tests that do not ask.
+    @ObservationIgnored var onMoved: ((EventMove) -> Void)?
+
     /// The default store opens the reader's own library, synced or not as
     /// they last said. Previews and tests hand in a database held in memory
     /// and leave the file, the calendar and the venues out, so nothing they
@@ -1044,9 +1052,7 @@ final class EventStore {
         for event in events where isUnread(event) == read {
             // Taken before the mark moves on from it: the copy an Updated date
             // was read as (a New one has none).
-            let before = read
-                ? readMarks[event.id]?.read?.value.fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) }
-                : nil
+            let before = read ? copyRead(of: event) : nil
             if readBefore[event.id] != before { readBefore[event.id] = before }
             let fingerprint = read ? event.listingFingerprint : nil
             makeMark(for: event.id).read = Stamped(FollowingRead(fingerprint: fingerprint, day: event.date), at: now)
@@ -1055,6 +1061,34 @@ final class EventStore {
         }
         guard changed else { return }
         save()
+    }
+
+    /// Marks `event` read as a change alert opens it (``ChangeAlerts``), its
+    /// sheet's What Changed card saying what moved: since the copy the reader
+    /// last read, where this device holds it, as a row opened does — else
+    /// since `before`, the copy the alert said it moved from, which a date
+    /// never read, or read on another device, has nothing else to go by.
+    func markRead(_ event: Event, changedFrom before: ListingCopy?) {
+        markRead([event], read: true)
+        if readBefore[event.id] == nil, let before, ListingChanges(from: before, to: event) != nil {
+            readBefore[event.id] = before
+        }
+    }
+
+    /// The copy of `event` the reader last read, where this device holds it
+    /// (``ReadCopies``) — nil for a date never read, or marked unread.
+    func copyRead(of event: Event) -> ListingCopy? {
+        readMarks[event.id]?.read?.value.fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) }
+    }
+
+    /// Hands ``onMoved`` an event the reader keeps, still to come, that a
+    /// read has put on another day, at another start or in another hall than
+    /// `held` — see ``EventMove/kinds(in:from:)`` for what counts.
+    private func noticeMove(from held: Event, to read: Event) {
+        guard let onMoved, read.isUpcoming, isInLibrary(read) else { return }
+        let found = ListingCopy(held)
+        guard !EventMove.kinds(from: found, to: read).isEmpty else { return }
+        onMoved(EventMove(eventID: read.id, found: found))
     }
 
     /// Holds on to what a search turned up, without adding any of it.
@@ -1129,13 +1163,18 @@ final class EventStore {
     /// Folded into the row as it stands, not the copy the read began from:
     /// a placing that put the hall on its own clock while the page was being
     /// read would otherwise be undone by it, the event back on Tokyo time.
-    private func apply(_ imported: Event, asked: Date) {
+    ///
+    /// `announcing` where nobody is looking at the event as it lands —
+    /// Refresh's pass over every page — so a kept event found moved is said
+    /// (``onMoved``). Not from its own sheet, which is showing it.
+    private func apply(_ imported: Event, asked: Date, announcing: Bool = false) {
         pageReads?.record(imported.id, asked: asked)
         if let row = rows[imported.id], let held = row.facts {
             let read = held.merging(imported)
             guard !read.isSameRead(as: held) else { return }
             row.write(read)
             converted[imported.id] = nil
+            if announcing { noticeMove(from: held, to: read) }
         } else {
             seen[imported.id] = imported
         }
@@ -1546,7 +1585,7 @@ final class EventStore {
             for await result in group {
                 read += 1
                 if let event = result.event {
-                    apply(event, asked: asked)
+                    apply(event, asked: asked, announcing: true)
                     landed += 1
                 }
                 if result.throttled { throttled = true }
@@ -1749,7 +1788,12 @@ final class EventStore {
         var added: [Event] = []
 
         for event in imported {
+            // Only an event kept before this read can have moved: one that
+            // arrives with it is no news. Read only where somebody listens,
+            // and only for what is still to come — a history is hundreds.
+            let held = onMoved != nil && event.isUpcoming && isInLibrary(event) ? rows[event.id]?.facts : nil
             keep(event, in: makeRow(for: event.id))
+            if let held, let read = rows[event.id]?.facts { noticeMove(from: held, to: read) }
             guard !isInLibrary(event), !departed.contains(event.id) else { continue }
             edit(event) { $0.inLibrary = true }
             added.append(event)

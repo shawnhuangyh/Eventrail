@@ -892,6 +892,29 @@
         }
       }
     },
+    "%@: %@ → %@" : {
+      "comment" : "A line of a notification that an event moved: what moved, what it was and what it is now.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@ → %3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@ → %3$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@ → %3$@"
+          }
+        }
+      }
+    },
     "%lld done · %@" : {
       "comment" : "The Ticket To-Dos screen's subtitle on Done. The second argument says how many reminders were stopped.",
       "localizations" : {
@@ -4153,6 +4176,28 @@
         }
       }
     },
+    "Change Alerts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更の通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "变更提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "變更提醒"
+          }
+        }
+      }
+    },
     "changes.venue" : {
       "comment" : "The hall an event is held at, on the card saying what changed. Not the Venue of the Venue / Local clock switch.",
       "localizations" : {
@@ -4861,6 +4906,98 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "日期"
+          }
+        }
+      }
+    },
+    "Date and start time changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day and time.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付と開演時間が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和开演时间已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和開演時間已變更"
+          }
+        }
+      }
+    },
+    "Date and venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day and hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付と会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和場館已變更"
+          }
+        }
+      }
+    },
+    "Date changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期已變更"
+          }
+        }
+      }
+    },
+    "Date, start time and venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day, time and hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付・開演時間・会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期、开演时间和场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期、開演時間和場館已變更"
           }
         }
       }
@@ -16231,6 +16368,52 @@
         }
       }
     },
+    "Start time and venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another time and hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間と会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开演时间和场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間和場館已變更"
+          }
+        }
+      }
+    },
+    "Start time changed" : {
+      "comment" : "A notification's title: an event the reader keeps starts at another time.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开演时间已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間已變更"
+          }
+        }
+      }
+    },
     "Start time not announced" : {
       "localizations" : {
         "ja" : {
@@ -18486,6 +18669,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現地"
+          }
+        }
+      }
+    },
+    "Venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場館已變更"
           }
         }
       }

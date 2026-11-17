@@ -28,7 +28,7 @@ nonisolated enum TestNotification {
 }
 
 /// A bench for the app's notifications, in debug builds only, opened from the
-/// event sheet's menu as ``LiveActivityTestView`` is: sends one of the four
+/// event sheet's menu as ``LiveActivityTestView`` is: sends one of the five
 /// about the event in front of it within seconds, so the banner, the Lock
 /// Screen, a Focus and a tap can be looked at without waiting for somebody's
 /// goods sale. Beside that, what the app has scheduled and what the system
@@ -177,6 +177,16 @@ struct NotificationTestView: View {
         case .newDate:
             return NewDateAlert(dates: [event], names: { _ in event.performers.prefix(1).map(\.name) },
                                 clock: .stored)?.request
+        case .change:
+            // Made up: the start an hour later than it was, or the day
+            // after it, where none is printed. A tap opens the sheet on it.
+            var was = event
+            if let start = event.startsAt {
+                was.startsAt = start.addingTimeInterval(-60 * 60)
+            } else {
+                was.date = event.date.addingTimeInterval(-24 * 60 * 60)
+            }
+            return ChangeAlert(from: ListingCopy(was), to: event, clock: .stored)?.request
         }
     }
 
@@ -325,12 +335,13 @@ private extension NotificationTestView {
         case resultsDay = "Results Day"
         case liveActivity = "Live Activity"
         case newDate = "New Date"
+        case change = "Change"
 
         var id: String { rawValue }
 
         /// A Live Activity reminder is the iPhone's alone.
         static var offered: [Kind] {
-            UIDevice.current.userInterfaceIdiom == .phone ? allCases : [.eventReminder, .resultsDay, .newDate]
+            UIDevice.current.userInterfaceIdiom == .phone ? allCases : [.eventReminder, .resultsDay, .newDate, .change]
         }
     }
 
