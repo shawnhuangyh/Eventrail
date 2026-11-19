@@ -181,6 +181,37 @@ struct TicketTodoTests {
             == [TicketStageAlert.identifier(of: .pickup, of: Self.wonRound.id, at: show.id)])
     }
 
+    /// Mark as Issued under a pickup's notification, the payment never
+    /// marked: a ticket issued was paid for, as Ticket Details' Issued has
+    /// it — so the payment's notification stops and a step back is to Paid.
+    @Test func issuingFromTheNotificationMarksThePaymentToo() throws {
+        var entry = Self.wonRound
+        entry.reach(.pickup, at: now)
+        #expect(entry.payment?.done == now)
+        #expect(entry.pickup?.done == now)
+        let record = Tracking(cost: 8800, lotteries: [entry])
+        let issued = try #require(todos(record).first)
+        #expect(issued.state == .issued)
+        #expect(TicketStageAlert.standing(in: [row(entry)]).isEmpty)
+        #expect(try #require(todos(issued.steppedBack(in: record)).first).state == .paid)
+    }
+
+    /// A button pressed late, on a ticket issued since: it stays issued, and
+    /// each step keeps the date it was reached.
+    @Test func aStepMarkedAgainTakesNothingBack() {
+        var entry = Self.wonRound
+        let paid = now.addingTimeInterval(-3600)
+        entry.payment?.done = paid
+        entry.pickup?.done = now
+        entry.reach(.payment, at: now.addingTimeInterval(60))
+        #expect(entry.payment?.done == paid)
+        #expect(entry.pickup?.done == now)
+        var waiting = Self.wonRound
+        waiting.reach(.payment, at: now)
+        #expect(waiting.payment?.done == now)
+        #expect(waiting.pickup?.done == nil)
+    }
+
     /// An event moved to an earlier day leaves a round's steps where they
     /// were written: one now past the event's day is owed nothing, since it
     /// would come after the event is over; one on the day itself still is.

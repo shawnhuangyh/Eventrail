@@ -206,17 +206,17 @@ final class LotteryReminders: NSObject {
     }
 
     /// Marks the step a notification was about as reached, from the button
-    /// under it (``TicketStageAlert/doneAction``) — as its to-do's own button
-    /// does, where it is the step that to-do is waiting on. Written at once:
-    /// the app may have been woken for this alone, and be put away again
-    /// before a save a moment later would run.
+    /// under it (``TicketStageAlert/doneAction``), with every step before it
+    /// (``LotteryEntry/reach(_:at:)``): Mark as Issued on a ticket whose
+    /// payment was never marked marks it paid too, as its to-do's own button
+    /// and Ticket Details would leave it. Written at once: the app may have
+    /// been woken for this alone, and be put away again before a save a
+    /// moment later would run.
     func markDone(_ stage: TicketStage, of entryID: LotteryEntry.ID, at eventID: Event.ID) {
         let store = store ?? Launch.shared.store
         guard let event = store.event(id: eventID) else { return }
         let record = store.tracking(for: event)
-        let todo = TicketTodoList.todos(for: event, tracking: record).first { $0.entry.id == entryID }
-        let marked = todo?.current == stage ? todo?.advanced(in: record) : nil
-        store.setTracking(marked ?? record.updatingLottery(entryID) { $0[stage]?.done = .now }, for: event)
+        store.setTracking(record.updatingLottery(entryID) { $0.reach(stage) }, for: event)
         store.saveNow()
         schedule(from: store)
     }

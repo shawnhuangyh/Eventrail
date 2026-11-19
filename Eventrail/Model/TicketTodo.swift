@@ -210,6 +210,22 @@ nonisolated extension TicketTodo {
     }
 }
 
+nonisolated extension LotteryEntry {
+    /// `stage` reached at `now`, and every step written before it: a ticket
+    /// issued was paid for, as Ticket Details' Issued has it
+    /// (``TicketTodo/standing(at:in:at:)``). What a notification's button
+    /// marks (``LotteryReminders/markDone(_:of:at:)``), which can be pressed
+    /// on any step, not only the one waited on. A step already reached keeps
+    /// its date, and nothing after `stage` is taken back: a button pressed
+    /// late, on a ticket since issued, leaves it issued.
+    mutating func reach(_ stage: TicketStage, at now: Date = .now) {
+        for step in TicketStage.allCases {
+            if self[step] != nil, self[step]?.done == nil { self[step]?.done = now }
+            if step == stage { break }
+        }
+    }
+}
+
 nonisolated extension Tracking {
     /// This, with the round `id` changed by `change` — and nothing, where no
     /// such round is here.
