@@ -181,6 +181,18 @@ struct TicketTodoTests {
             == [TicketStageAlert.identifier(of: .pickup, of: Self.wonRound.id, at: show.id)])
     }
 
+    /// An event moved to an earlier day leaves a round's steps where they
+    /// were written: one now past the event's day is owed nothing, since it
+    /// would come after the event is over; one on the day itself still is.
+    @Test func aStepPastTheEventsDayOwesNoNotification() {
+        let earlier = Fixtures.event(id: "liella", date: Fixtures.date(2026, 11, 15))
+        let past = TicketStageAlert.due(in: [row(Self.wonRound, for: earlier)], paymentLead: 24 * 60, at: now)
+        #expect(past.map(\.stage) == [.payment])
+        let onTheDay = Fixtures.event(id: "liella", date: Fixtures.date(2026, 11, 19))
+        let both = TicketStageAlert.due(in: [row(Self.wonRound, for: onTheDay)], paymentLead: 24 * 60, at: now)
+        #expect(both.map(\.stage) == [.payment, .pickup])
+    }
+
     /// A payment as long ahead as Settings says, or not at all; a pickup as
     /// it opens.
     @Test func aPaymentComesAsFarAheadAsSettingsSays() throws {

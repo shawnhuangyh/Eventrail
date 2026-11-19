@@ -515,10 +515,17 @@ nonisolated struct LotteryDeadlineAlert: Hashable {
 
     /// The alert owed for `row`'s round at `now`, `lead` minutes ahead of
     /// its deadline and printed on `clock`: nil where it has no deadline, is
-    /// no lottery waiting on a result, or its moment has been.
+    /// no lottery waiting on a result, falls past the event's day, or its
+    /// moment has been. Past the event's day only where the event moved to an
+    /// earlier one, leaving the deadline where it was written (the calendar
+    /// offers none later): scheduled, it would come after the event is over,
+    /// with no way for the app to take it back — as a goods sale's time
+    /// (``Event/holds(_:)``).
     init?(_ row: LotteryRow, lead: Int, clock: TimeDisplay = .venue, at now: Date = .now) {
         let entry = row.entry
-        guard entry.isLottery, entry.isPending, let deadline = entry.deadline else { return nil }
+        guard entry.isLottery, entry.isPending, let deadline = entry.deadline,
+              deadline.date(in: row.event.timeZone) < row.event.dayEnds
+        else { return nil }
         let date = deadline.alertDate(in: row.event.timeZone, lead: lead)
         guard date > now else { return nil }
         self.init(event: row.event, entry: entry, deadline: deadline, lead: lead, comingAt: date, clock: clock)
@@ -729,11 +736,14 @@ nonisolated struct TicketStageAlert: Hashable {
 
     /// The alert owed for `stage` of `row`'s round at `now`, `lead` minutes
     /// ahead and printed on `clock`: nil where the round is not won, the step
-    /// is not written or is reached, or its moment has been.
+    /// is not written or is reached, falls past the event's day, or its
+    /// moment has been. Past the event's day only where the event moved to an
+    /// earlier one, for the reason a deadline's alert isn't owed there
+    /// (``LotteryDeadlineAlert/init(_:lead:clock:at:)``).
     init?(_ row: LotteryRow, stage: TicketStage, lead: Int, clock: TimeDisplay = .venue, at now: Date = .now) {
         let entry = row.entry
         guard entry.isWon, let moment = entry[stage], moment.done == nil,
-              let due = entry.date(of: stage, in: row.event.timeZone)
+              let due = entry.date(of: stage, in: row.event.timeZone), due < row.event.dayEnds
         else { return nil }
         let date = due.addingTimeInterval(-Double(lead) * 60)
         guard date > now else { return nil }

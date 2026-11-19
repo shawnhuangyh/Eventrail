@@ -178,6 +178,17 @@ struct LotteryDeadlineTests {
         #expect(LotteryDeadlineAlert.due(in: list, lead: 60).count == 1)
     }
 
+    /// An event moved to an earlier day leaves its round's deadline where it
+    /// was written: past the event's day, nothing is scheduled to come after
+    /// the event is over. On the day itself it still comes.
+    @Test func aDeadlinePastTheEventsDayIsWarnedOfNothing() {
+        let moved = Fixtures.event(id: "live", title: "MyGO!!!!! 9th LIVE", date: Fixtures.day(fromToday: 5))
+        let past = LotteryEntry(round: "最速先行抽選", deadline: Self.deadline(inDays: 10))
+        let onTheDay = LotteryEntry(round: "プレイガイド先行", deadline: Self.deadline(inDays: 5))
+        #expect(LotteryDeadlineAlert(Self.row(past, for: moved), lead: Self.day) == nil)
+        #expect(LotteryDeadlineAlert(Self.row(onTheDay, for: moved), lead: Self.day) != nil)
+    }
+
     @Test func anAlertShownStandsUntilTheDeadlinePasses() {
         let open = LotteryEntry(round: "最速先行抽選", deadline: Self.deadline(inDays: 3))
         let closed = LotteryEntry(round: "プレイガイド先行", deadline: Self.deadline(inDays: -2))
