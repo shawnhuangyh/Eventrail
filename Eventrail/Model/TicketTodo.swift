@@ -224,6 +224,23 @@ nonisolated extension LotteryEntry {
             if step == stage { break }
         }
     }
+
+    /// The marks that took this round from `before` to `after` taken back:
+    /// a step's ``TicketMoment/done`` and ``TicketMoment/missed`` alone, each
+    /// only where the mark changed it and it still says what the mark wrote.
+    /// What Undo does (``EventStore/take(back:)``), over the round as it now
+    /// stands: a deadline, an amount or a page written meanwhile — here or
+    /// on another device — stays, and so does a mark written over since.
+    mutating func takeBack(marksFrom after: LotteryEntry, to before: LotteryEntry) {
+        for stage in TicketStage.allCases where self[stage] != nil {
+            if after[stage]?.done != before[stage]?.done, self[stage]?.done == after[stage]?.done {
+                self[stage]?.done = before[stage]?.done
+            }
+            if after[stage]?.missed != before[stage]?.missed, self[stage]?.missed == after[stage]?.missed {
+                self[stage]?.missed = before[stage]?.missed
+            }
+        }
+    }
 }
 
 nonisolated extension Tracking {

@@ -345,12 +345,66 @@ struct TicketTodoTests {
     // MARK: - Taking a mark back
 
     /// Laid over the record as it stands, so a note written meanwhile stays.
+    /// A store holding the show with `record`, and the to-do it reads.
+    func kept(_ record: Tracking) throws -> (EventStore, TicketTodo) {
+        let store = EventStore(database: LibraryDatabase(at: .memory, syncing: false), libraryFile: nil,
+                               calendar: nil, venues: nil, pageReads: nil, accountEvents: nil)
+        store.toggleLibraryMembership(show)
+        store.setTracking(record, for: show)
+        return (store, try #require(todos(store.tracking(for: show)).first))
+    }
+
+    @Test func undoingTakesTheMarkBack() throws {
+        let (store, todo) = try kept(won)
+        let undo = try #require(store.advance(todo))
+        #expect(store.tracking(for: show).lotteries[0].payment?.done != nil)
+        store.take(back: undo)
+        #expect(store.tracking(for: show).lotteries == won.lotteries)
+    }
+
+    /// Undo puts back the marks alone, over the round as it stands: what
+    /// was written on it meanwhile — on another device, say — stays.
     @Test func undoingLeavesWhatWasWrittenMeanwhile() throws {
-        let paid = try #require(todos(won).first).advanced(in: won, at: now)
-        var meanwhile = paid
+        let (store, todo) = try kept(won)
+        let undo = try #require(store.advance(todo))
+        var meanwhile = store.tracking(for: show)
         meanwhile.note = "row 12"
-        let undone = meanwhile.applying(changesFrom: paid, to: won)
+        meanwhile.lotteries[0].payment?.day = CalendarDay(year: 2026, month: 11, day: 14)
+        meanwhile.lotteries[0].payment?.payAt = "ローソン"
+        store.setTracking(meanwhile, for: show)
+        store.take(back: undo)
+        let undone = store.tracking(for: show)
         #expect(undone.note == "row 12")
-        #expect(undone.lotteries == won.lotteries)
+        #expect(undone.lotteries[0].payment?.done == nil)
+        #expect(undone.lotteries[0].payment?.day == CalendarDay(year: 2026, month: 11, day: 14))
+        #expect(undone.lotteries[0].payment?.payAt == "ローソン")
+    }
+
+    /// A round taken out meanwhile stays out, and a mark written over since
+    /// stands.
+    @Test func undoingPutsBackNothingChangedSince() throws {
+        let (store, todo) = try kept(won)
+        let undo = try #require(store.advance(todo))
+        var remarked = store.tracking(for: show)
+        let later = now.addingTimeInterval(3600)
+        remarked.lotteries[0].payment?.done = later
+        store.setTracking(remarked, for: show)
+        store.take(back: undo)
+        #expect(store.tracking(for: show).lotteries[0].payment?.done == later)
+
+        var removed = store.tracking(for: show)
+        removed.lotteries = []
+        store.setTracking(removed, for: show)
+        store.take(back: undo)
+        #expect(store.tracking(for: show).lotteries.isEmpty)
+    }
+
+    /// Giving a payment up marks both steps missed; Undo takes both back.
+    @Test func undoingAPaymentGivenUpPutsBothStepsBack() throws {
+        let (store, todo) = try kept(won)
+        let undo = try #require(store.giveUp(todo))
+        #expect(try #require(todos(store.tracking(for: show)).first).state == .notPaid)
+        store.take(back: undo)
+        #expect(store.tracking(for: show).lotteries == won.lotteries)
     }
 }

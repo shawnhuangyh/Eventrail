@@ -777,12 +777,13 @@ struct TicketProgressSection: View {
 struct TicketTodoUndo: Identifiable, Equatable {
     let id = UUID()
     let event: Event
-    /// The record before the mark and after it: taking it back lays the one
-    /// over the other on the record as it then stands
-    /// (``Tracking/applying(changesFrom:to:)``), so nothing written meanwhile
-    /// goes with it.
-    let before: Tracking
-    let after: Tracking
+    /// The round before the mark and after it: taking it back puts back only
+    /// the marks it changed, on the round as it then stands
+    /// (``LotteryEntry/takeBack(marksFrom:to:)``), so nothing written
+    /// meanwhile goes with it — not a deadline or an amount changed on
+    /// another device, nor the round taken out.
+    let before: LotteryEntry
+    let after: LotteryEntry
     /// Where the mark left the to-do.
     let state: TicketTodo.State
     /// How many reminders it stopped.
@@ -812,7 +813,10 @@ extension EventStore {
 
     /// Takes a mark back, over the record as it now stands.
     func take(back undo: TicketTodoUndo) {
-        setTracking(tracking(for: undo.event).applying(changesFrom: undo.after, to: undo.before), for: undo.event)
+        let record = tracking(for: undo.event)
+        let restored = record.updatingLottery(undo.before.id) { $0.takeBack(marksFrom: undo.after, to: undo.before) }
+        guard restored != record else { return }
+        setTracking(restored, for: undo.event)
     }
 
     /// Over the record as it stands, and the to-do as it stands in it: the
@@ -823,10 +827,12 @@ extension EventStore {
         guard let standing = TicketTodoList.todos(for: todo.event, tracking: before).first(where: { $0.id == todo.id })
         else { return nil }
         let after = change(standing, before)
-        guard after != before else { return nil }
+        guard after != before,
+              let markedRound = after.lotteries.first(where: { $0.id == standing.entry.id })
+        else { return nil }
         setTracking(after, for: todo.event)
         let moved = TicketTodoList.todos(for: todo.event, tracking: after).first { $0.id == todo.id }
-        return TicketTodoUndo(event: todo.event, before: before, after: after,
+        return TicketTodoUndo(event: todo.event, before: standing.entry, after: markedRound,
                               state: moved?.state ?? standing.state,
                               stopped: max(0, (moved?.stoppedReminders ?? 0) - standing.stoppedReminders))
     }
