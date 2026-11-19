@@ -114,12 +114,20 @@ struct TicketDetailsView: View {
     /// put away.
     private func write(_ record: Tracking) {
         store.setTracking(store.tracking(for: event).applying(changesFrom: original, to: record), for: event)
-        // A results day written down here is the moment to ask whether the
-        // reader wants to hear about it — see ``LotteryReminders``. On the
-        // checkmark rather than on an entry's own page, which a sheet put
-        // away with its X undoes: asked there, a day thrown away still asked.
-        let days = Dictionary(original.lotteries.map { ($0.id, $0.day) }) { first, _ in first }
-        LotteryReminders.shared.askIfNeeded(for: record.lotteries.filter { days[$0.id] != .some($0.day) })
+        // A results day or a deadline written down here is the moment to ask
+        // whether the reader wants to hear about it — see ``LotteryReminders``.
+        // On the checkmark rather than on an entry's own page, which a sheet
+        // put away with its X undoes: asked there, a day thrown away still
+        // asked.
+        let before = Dictionary(original.lotteries.map { ($0.id, $0) }) { first, _ in first }
+        LotteryReminders.shared.askIfNeeded(for: record.lotteries.filter { entry in
+            before[entry.id].map {
+                $0.day != entry.day || $0.minute != entry.minute || $0.deadline != entry.deadline
+                    || $0.payment?.day != entry.payment?.day || $0.payment?.minute != entry.payment?.minute
+                    || $0.pickup?.day != entry.pickup?.day || $0.pickup?.minute != entry.pickup?.minute
+                    || $0.isWon != entry.isWon
+            } ?? true
+        }, in: event.timeZone)
         // And a ticket now held for an event ahead, the moment to ask whether
         // the reader wants to hear when its Live Activity can start.
         if record.hasTicket, !original.hasTicket {
@@ -200,7 +208,7 @@ struct TicketDetailsView: View {
                 }
             }
             .navigationDestination(for: LotteryEntry.self) { entry in
-                LotteryEntryView(entry: entry, in: $draft)
+                LotteryEntryView(entry: entry, of: event, in: $draft)
             }
             // Photos' own picker, which runs outside the app: it asks for no
             // permission and hands over the one picture picked.
@@ -265,7 +273,7 @@ struct TicketDetailsView: View {
         .formRow(top: 4)
 
         ForEach(entries) { entry in
-            LotteryEntryCard(entry: entry, isEventAhead: event.isUpcoming) {
+            LotteryEntryCard(entry: entry, event: event) {
                 path.append(entry)
             }
             // Not asked about first, as no swipe to delete on iOS is.
@@ -341,16 +349,14 @@ struct TicketDetailsView: View {
     }
 
     /// Where the ticket stands between being won and being in hand — Awaiting
-    /// Payment, Paid, Issued — for each payment or pickup deadline written
-    /// for it (``TicketTodo``), as `TodoTicket.dc.html` draws it. Picking a
-    /// step here is marking it in Ticket To-Dos, and stops the same
-    /// reminders; like everything else on this sheet it is the copy that
-    /// changes, written by the checkmark. Nothing where no such deadline is
-    /// written: the steps are the reminders', and there is nowhere else to
-    /// keep one.
+    /// Payment, Paid, Issued — for each round won with a payment or a pickup
+    /// written on its page (``TicketTodo``), as `TodoTicket.dc.html` draws it.
+    /// Picking a step here is marking it in Ticket To-Dos, and stops the same
+    /// notifications; like everything else on this sheet it is the copy that
+    /// changes, written by the checkmark. Nothing where no round has either.
     @ViewBuilder
     private var progressRows: some View {
-        let tickets = TicketTodoList.todos(for: event, tracking: draft).filter { $0.application == nil }
+        let tickets = TicketTodoList.todos(for: event, tracking: draft)
         ForEach(tickets) { ticket in
             TicketProgressSection(todo: ticket) { state in
                 withAnimation(.snappy) { draft = ticket.standing(at: state, in: draft) }
@@ -693,8 +699,12 @@ private extension View {
 /// whole card opens the entry.
 private struct LotteryEntryCard: View {
     let entry: LotteryEntry
-    let isEventAhead: Bool
+    let event: Event
     let open: () -> Void
+    /// The clock a results time and a deadline are printed on.
+    @AppStorage(TimeDisplay.storageKey) private var timeDisplay = TimeDisplay.venue
+
+    private var isEventAhead: Bool { event.isUpcoming }
 
     var body: some View {
         Button(action: open) {
@@ -704,8 +714,14 @@ private struct LotteryEntryCard: View {
                         LotteryText.round(of: entry)
                             .scalingFont(size: 15.5, weight: .semibold)
                             .foregroundStyle(entry.round.isEmpty ? .secondary : .primary)
-                        if let when = LotteryText.when(entry, isEventAhead: isEventAhead) {
+                        if let when = LotteryText.when(entry, isEventAhead: isEventAhead, at: event, on: timeDisplay) {
                             when
+                                .scalingFont(size: 12.5)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        if isEventAhead, let closing = LotteryText.closing(of: entry, at: event, on: timeDisplay) {
+                            closing
                                 .scalingFont(size: 12.5)
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
@@ -844,20 +860,40 @@ enum LotteryText {
     /// then its day — "Results Oct 12", and how far off that is while the
     /// result is still to come. Nothing for a first-come round, which is
     /// neither applied for nor announced.
-    static func when(_ entry: LotteryEntry, isEventAhead: Bool) -> Text? {
+    static func when(_ entry: LotteryEntry, isEventAhead: Bool, at event: Event? = nil,
+                     on clock: TimeDisplay = .venue) -> Text? {
         guard !entry.isFirstCome else { return nil }
-        let line = day(of: entry, isEventAhead: isEventAhead)
+        let line = day(of: entry, isEventAhead: isEventAhead, at: event, on: clock)
         guard entry.applications > 1 else { return line }
         return Text("\(Text("^[\(entry.applications) entry](inflect: true)")) · \(line)")
     }
 
     /// The results day — "Results Oct 12", and how far off that is while
-    /// the result is still to come — or that none was written down.
-    static func day(of entry: LotteryEntry, isEventAhead: Bool) -> Text {
+    /// the result is still to come — or that none was written down. With a
+    /// time written beside the day and the event to read its hall's clock
+    /// from, the moment, printed on `clock`: "Results Oct 12, 18:00".
+    static func day(of entry: LotteryEntry, isEventAhead: Bool, at event: Event? = nil,
+                    on clock: TimeDisplay = .venue) -> Text {
         guard let day = entry.day else { return Text("No results day") }
-        let date = Text(verbatim: short(day))
+        let moment = event.flatMap { event in
+            entry.resultsDate(in: event.timeZone).map { event.printedMoment($0, on: clock) }
+        }
+        let date = Text(verbatim: moment ?? short(day))
         guard entry.isPending, isEventAhead else { return Text("Results \(date)") }
         return Text("Results \(date) · \(relative(day))")
+    }
+
+    /// When a lottery still waiting stops taking applications, while that is
+    /// still to come — "Closes Nov 20, 23:59", on `clock`, or "Closes Nov 20"
+    /// where no time was written, as the results day is printed — and nil
+    /// otherwise.
+    static func closing(of entry: LotteryEntry, at event: Event, on clock: TimeDisplay,
+                        asOf now: Date = .now) -> Text? {
+        guard entry.isLottery, entry.isPending, let deadline = entry.deadline else { return nil }
+        let date = deadline.date(in: event.timeZone)
+        guard date > now else { return nil }
+        let printed = deadline.minute == nil ? short(deadline.day) : event.printedMoment(date, on: clock)
+        return Text("Closes \(Text(verbatim: printed))")
     }
 
     /// "Oct 12", with the year only where it is not this one.

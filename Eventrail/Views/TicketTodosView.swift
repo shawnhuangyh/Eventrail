@@ -45,7 +45,9 @@ struct TicketTodosView: View {
     var body: some View {
         let library = library
         let list = TicketTodoList(events: library) { store.tracking(for: $0) }
+        // A step is written for a round won, on an event still ahead.
         let ahead = library.filter(\.isUpcoming).sorted { $0.sortDate < $1.sortDate }
+            .filter { !TicketDeadlineView.wins(in: store.tracking(for: $0)).isEmpty }
         List {
             // A section of its own with no gap after it, as the Lotteries
             // screen keeps its halves.
@@ -86,7 +88,6 @@ struct TicketTodosView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Deadline", systemImage: "plus") { isAdding = true }
-                    // A deadline is written on an event still ahead.
                     .disabled(ahead.isEmpty)
             }
         }
@@ -95,7 +96,7 @@ struct TicketTodosView: View {
                 .macSheetSize(.form)
         }
         .sheet(isPresented: $isAdding) {
-            TicketDeadlineView(events: ahead)
+            TicketDeadlineView(events: ahead) { store.tracking(for: $0) }
                 .macSheetSize(.form)
         }
     }
@@ -126,7 +127,7 @@ struct TicketTodosView: View {
             }
         }
         if !groups.isEmpty {
-            note("Deadlines come from the reminders on each event. Marking a step done stops its reminder — undo brings it back.")
+            note("Deadlines come from the rounds you won, on each event's Ticket Details. Marking a step done stops its notification — undo brings it back.")
         }
     }
 
@@ -246,14 +247,14 @@ struct TicketTodosView: View {
                 Text("Nothing to Do")
                     .scalingFont(size: 17, weight: .bold)
                 if kind == nil {
-                    Text("Add a deadline to apply, to pay or to pick up a ticket, and it waits here until you have done it.")
+                    Text("Add a deadline to pay for or pick up a ticket you won, and it waits here until you have done it.")
                 } else {
                     Text("Nothing of this kind is waiting.")
                 }
             } else {
                 Text("Nothing Done Yet")
                     .scalingFont(size: 17, weight: .bold)
-                Text("Steps you mark as applied, paid or issued gather here.")
+                Text("Steps you mark as paid or issued gather here.")
             }
         }
         .scalingFont(size: 13)
@@ -353,11 +354,11 @@ struct TicketTodoCard: View {
                 HStack(spacing: 6) {
                     Image(systemName: "clock")
                         .foregroundStyle(tint)
-                    TicketTodoText.when(of: current, at: todo.event, on: clock)
+                    TicketTodoText.when(current, of: todo, on: clock)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if let lead = current.lead {
+                    if let lead = TicketTodoText.lead(of: current) {
                         Image(systemName: "bell")
                         Text(verbatim: ReminderLead.label(of: lead))
                     } else {
@@ -438,9 +439,8 @@ struct TicketTodoStepper: View {
 
     var body: some View {
         let reached = steps.lastIndex { $0.status != .ahead } ?? 0
-        // An application is the app's blue all along; a ticket is green
-        // behind it, whatever it is waiting on.
-        let behind = steps.first?.name == .notApplied ? Color.brandTint : Color.trackAttended
+        // Green behind it, whatever it is waiting on.
+        let behind = Color.trackAttended
         HStack(alignment: .top, spacing: 0) {
             ForEach(steps) { step in
                 VStack(spacing: 6) {
@@ -508,11 +508,7 @@ struct TicketTodoDoneRow: View {
 
     var body: some View {
         let state = todo.state
-        let tint: Color = switch state {
-        case .notPaid: Color(.systemGray)
-        case .applied: .brandTint
-        default: .trackAttended
-        }
+        let tint: Color = state == .notPaid ? Color(.systemGray) : .trackAttended
         Button(action: open) {
             HStack(spacing: 12) {
                 Image(systemName: state == .notPaid ? "xmark" : "checkmark")
@@ -571,7 +567,7 @@ struct TicketTodoDoneRow: View {
 /// is left, and a round button that marks the step reached.
 struct TicketTodoCardRow: View {
     /// What stands where these rows would, when there are none.
-    static let emptyNote: LocalizedStringKey = "Deadlines to apply, pay or pick up a ticket wait here until you mark them done."
+    static let emptyNote: LocalizedStringKey = "Deadlines to pay for or pick up a ticket you won wait here until you mark them done."
 
     let todo: TicketTodo
     let clock: TimeDisplay
@@ -594,8 +590,14 @@ struct TicketTodoCardRow: View {
                         Text(todo.event.title)
                             .scalingFont(size: 14, weight: .semibold)
                             .lineLimit(1)
-                        if let current = todo.current {
-                            Text("\(TicketTodoText.due(of: todo)) · \(todo.event.printedClock(of: current, on: clock))")
+                        if let current = todo.current, let clockLine = TicketTodoText.time(current, of: todo, on: clock) {
+                            Text("\(TicketTodoText.due(of: todo)) · \(clockLine)")
+                                .scalingFont(size: 11.5, weight: .semibold)
+                                .monospacedDigit()
+                                .foregroundStyle(isUrgent ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                                .lineLimit(1)
+                        } else if todo.current != nil {
+                            TicketTodoText.due(of: todo)
                                 .scalingFont(size: 11.5, weight: .semibold)
                                 .monospacedDigit()
                                 .foregroundStyle(isUrgent ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
@@ -689,13 +691,13 @@ struct TicketProgressSection: View {
                     }
                 }
                 .padding(10)
-                ForEach(todo.reminders) { reminder in
-                    deadline(reminder)
+                ForEach(todo.stages, id: \.self) { stage in
+                    deadline(stage)
                         .overlay(alignment: .top) { Divider().padding(.leading, 15) }
                 }
             }
             .background(TicketForm.fieldFill, in: .rect(cornerRadius: 18, style: .continuous))
-            Text("Pick where the ticket stands. Each step you reach stops its reminder — the same as in Ticket To-Dos.")
+            Text("Pick where the ticket stands. Each step you reach stops its notification — the same as in Ticket To-Dos.")
                 .scalingFont(size: 12.5)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -730,23 +732,24 @@ struct TicketProgressSection: View {
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 
-    private func deadline(_ reminder: EventReminder) -> some View {
-        let isStopped = reminder.done != nil
+    private func deadline(_ stage: TicketStage) -> some View {
+        let isStopped = todo.entry[stage]?.done != nil
+        let lead = TicketTodoText.lead(of: stage)
         return HStack(spacing: 11) {
-            Image(systemName: isStopped || reminder.lead == nil ? "bell.slash" : "bell")
+            Image(systemName: isStopped || lead == nil ? "bell.slash" : "bell")
                 .scalingFont(size: 15)
                 .foregroundStyle(isStopped ? AnyShapeStyle(.tertiary)
-                                 : AnyShapeStyle(reminder.ticketKind == .paymentDeadline ? Color.trackTicket : Color.trackAttended))
+                                 : AnyShapeStyle(stage == .payment ? Color.trackTicket : Color.trackAttended))
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
-                TicketTodoText.when(of: reminder, at: todo.event, on: timeDisplay)
+                TicketTodoText.when(stage, of: todo, on: timeDisplay)
                     .scalingFont(size: 14.5)
                     .strikethrough(isStopped)
                     .foregroundStyle(isStopped ? .secondary : .primary)
                 Group {
                     if isStopped {
                         Text("Reminder stopped")
-                    } else if let lead = reminder.lead {
+                    } else if let lead {
                         Text(verbatim: ReminderLead.label(of: lead))
                     } else {
                         Text("No Alert")
@@ -757,7 +760,7 @@ struct TicketProgressSection: View {
             }
             .monospacedDigit()
             .frame(maxWidth: .infinity, alignment: .leading)
-            if reminder.ticketKind == .paymentDeadline, let total = todo.total {
+            if stage == .payment, let total = todo.total {
                 Text(verbatim: total.formatted)
                     .scalingFont(size: 14.5, weight: .semibold)
                     .monospacedDigit()
@@ -881,7 +884,6 @@ struct TicketTodoUndoPill: View {
 
     private var words: Text {
         let marked: Text = switch undo.state {
-        case .applied: Text("Marked as applied")
         case .paid: Text("Marked as paid")
         case .issued: Text("Marked as issued")
         case .notPaid: Text("Marked as not paid")
@@ -898,17 +900,15 @@ struct TicketTodoUndoPill: View {
 enum TicketTodoText {
     static func symbol(of kind: TicketTodo.Kind) -> String {
         switch kind {
-        case .apply: "doc.text"
         case .pay: "yensign"
         case .pickUp: "ticket"
         }
     }
 
-    /// Blue to apply, amber to pay, green to pick up: the colours the app
-    /// already gives interest, a ticket and having been.
+    /// Amber to pay, green to pick up: the colours the app already gives a
+    /// ticket and having been.
     static func tint(of kind: TicketTodo.Kind) -> Color {
         switch kind {
-        case .apply: .brandTint
         case .pay: .trackTicket
         case .pickUp: .trackAttended
         }
@@ -917,7 +917,6 @@ enum TicketTodoText {
     /// A chip's word: what there is to do.
     static func chip(_ kind: TicketTodo.Kind) -> LocalizedStringKey {
         switch kind {
-        case .apply: "Apply"
         case .pay: "Pay"
         case .pickUp: "Pick Up"
         }
@@ -926,7 +925,6 @@ enum TicketTodoText {
     /// A card's badge, and its sheet's title: what it is about.
     static func name(of kind: TicketTodo.Kind) -> LocalizedStringKey {
         switch kind {
-        case .apply: "Application"
         case .pay: "Payment"
         case .pickUp: "Ticket Pickup"
         }
@@ -934,8 +932,6 @@ enum TicketTodoText {
 
     static func name(of state: TicketTodo.State) -> Text {
         switch state {
-        case .notApplied: Text("Not Applied")
-        case .applied: Text("Applied")
         case .awaitingPayment: Text("Awaiting Payment")
         case .paid: Text("Paid")
         case .awaitingPickup: Text("Not Issued")
@@ -947,7 +943,6 @@ enum TicketTodoText {
     /// What its button does, or nil once there is nothing left to mark.
     static func action(of todo: TicketTodo) -> Text? {
         switch todo.state {
-        case .notApplied: Text("Mark as Applied")
         case .awaitingPayment: Text("Mark as Paid")
         case .paid where todo.pickup != nil: Text("Mark as Issued")
         case .awaitingPickup: Text("Mark as Issued")
@@ -955,17 +950,21 @@ enum TicketTodoText {
         }
     }
 
-    /// The Me card's line over the title: "Pay ¥17,600", "Apply · Earliest
-    /// Presale Lottery", "Pick Up · Paid".
+    /// How far ahead of `stage` its notification comes, as Settings says —
+    /// nil where none will (``TicketStageAlert/lead(of:paymentLead:)``).
+    @MainActor
+    static func lead(of stage: TicketStage) -> Int? {
+        let reminders = LotteryReminders.shared
+        guard reminders.isEnabled else { return nil }
+        return TicketStageAlert.lead(of: stage, paymentLead: reminders.deadlineLead)
+    }
+
+    /// The Me card's line over the title: "Pay ¥17,600", "Pick Up · Paid".
     static func headline(of todo: TicketTodo) -> Text {
         let word = Text(chip(todo.kind))
         switch todo.kind {
         case .pay:
             if let total = todo.total { return Text("\(word) \(total.formatted)") }
-        case .apply:
-            if let round = todo.application?.round, !round.isEmpty {
-                return Text("\(word) · \(LotteryRound.label(of: round))")
-            }
         case .pickUp:
             if todo.state == .paid { return Text("\(word) · \(name(of: .paid))") }
         }
@@ -976,32 +975,53 @@ enum TicketTodoText {
     /// costs — as much of that as is written.
     static func detail(of todo: TicketTodo) -> Text? {
         var parts: [Text] = []
-        if let round = todo.entry?.round ?? todo.reminders.compactMap(\.round).first, !round.isEmpty {
-            parts.append(Text(verbatim: LotteryRound.label(of: round)))
+        if !todo.entry.round.isEmpty {
+            parts.append(Text(verbatim: LotteryRound.label(of: todo.entry.round)))
         }
-        if let choice = todo.entry?.wonChoice { parts.append(LotteryText.won(choice)) }
+        if let choice = todo.entry.wonChoice { parts.append(LotteryText.won(choice)) }
         if let total = todo.total { parts.append(Text(verbatim: total.formatted)) }
         guard var line = parts.first else { return nil }
         for part in parts.dropFirst() { line = Text("\(line) · \(part)") }
         return line
     }
 
+    /// "Fri, Nov 13 · 23:59", or the day alone where no time was written,
+    /// on `clock`.
+    static func moment(_ stage: TicketStage, of todo: TicketTodo, on clock: TimeDisplay) -> String {
+        guard let date = todo.date(of: stage) else { return "" }
+        let event = todo.event
+        guard let shown = Self.time(stage, of: todo, on: clock) else {
+            // A day alone is the hall's day whatever the clock.
+            return date.formatted(.gregorian(in: event.timeZone).weekday(.abbreviated).month(.abbreviated).day())
+        }
+        let zone = clock == .local ? TimeZone.current : event.timeZone
+        return "\(date.formatted(.gregorian(in: zone).weekday(.abbreviated).month(.abbreviated).day())) · \(shown)"
+    }
+
+    /// The time `stage` falls at, on `clock` — nil where only its day was
+    /// written.
+    static func time(_ stage: TicketStage, of todo: TicketTodo, on clock: TimeDisplay) -> String? {
+        guard todo.entry[stage]?.minute != nil, let date = todo.date(of: stage) else { return nil }
+        var style = Date.FormatStyle(date: .omitted, time: .shortened)
+        style.timeZone = clock == .local ? TimeZone.current : todo.event.timeZone
+        return date.formatted(style)
+    }
+
     /// "Pay by Fri, Nov 13 · 23:59", on `clock`.
-    static func when(of reminder: EventReminder, at event: Event, on clock: TimeDisplay) -> Text {
-        let moment = "\(event.printedDay(of: reminder, on: clock)) · \(event.printedClock(of: reminder, on: clock))"
-        return switch reminder.ticketKind {
-        case .applicationDeadline: Text("Apply by \(moment)")
-        case .paymentDeadline: Text("Pay by \(moment)")
-        case .ticketPickup: Text("Pickup opens \(moment)")
-        default: Text(verbatim: moment)
+    static func when(_ stage: TicketStage, of todo: TicketTodo, on clock: TimeDisplay) -> Text {
+        let moment = Self.moment(stage, of: todo, on: clock)
+        return switch stage {
+        case .payment: Text("Pay by \(moment)")
+        case .pickup: Text("Pickup opens \(moment)")
         }
     }
 
     /// How far off the step waited on is, in whole days on the hall's
     /// calendar: "2 days left", "In 26 days", "Opens in 8 days".
     static func due(of todo: TicketTodo, at now: Date = .now) -> Text {
-        guard let current = todo.current, let due = todo.due else { return Text(verbatim: "") }
-        let days = current.day.daysAway(from: now, in: .gregorian(in: todo.event.timeZone))
+        guard let current = todo.current, let day = todo.entry[current]?.day, let due = todo.due
+        else { return Text(verbatim: "") }
+        let days = day.daysAway(from: now, in: .gregorian(in: todo.event.timeZone))
         if todo.kind == .pickUp {
             if due <= now { return Text("Open now") }
             return days <= 0 ? Text("Opens today") : Text("Opens in ^[\(days) day](inflect: true)")
@@ -1022,22 +1042,6 @@ enum TicketTodoText {
         formatter.allowedUnits = due.timeIntervalSince(now) < 24 * 3600 ? [.hour, .minute] : [.day, .hour]
         let span = formatter.string(from: now, to: due) ?? ""
         return todo.kind == .pickUp ? Text("Opens in \(span)") : Text("\(span) left")
-    }
-}
-
-extension Event {
-    /// The day `reminder` falls on, as it is printed on `clock`: "Fri, Nov 13".
-    func printedDay(of reminder: EventReminder, on clock: TimeDisplay) -> String {
-        let zone = clock == .local ? TimeZone.current : timeZone
-        return reminder.date(in: timeZone)
-            .formatted(.gregorian(in: zone).weekday(.abbreviated).month(.abbreviated).day())
-    }
-
-    /// The time `reminder` falls at, as it is printed on `clock`.
-    func printedClock(of reminder: EventReminder, on clock: TimeDisplay) -> String {
-        var style = Date.FormatStyle(date: .omitted, time: .shortened)
-        style.timeZone = clock == .local ? TimeZone.current : timeZone
-        return reminder.date(in: timeZone).formatted(style)
     }
 }
 

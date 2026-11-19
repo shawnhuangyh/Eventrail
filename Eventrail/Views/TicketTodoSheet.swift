@@ -4,12 +4,12 @@ import SwiftUI
 /// One to-do on a sheet of its own, as `TodoPay.dc.html` and
 /// `TodoPaid.dc.html` draw it: the event, how long is left, the way the ticket
 /// has come and has still to go, what is to be paid and where, and the
-/// reminders behind it — each with its switch, and stopped once its step is
-/// reached. The button at its foot marks the step waited on; a pill over it
-/// takes that back.
+/// notifications behind it — as long ahead as Settings says, and stopped once
+/// its step is reached. The button at its foot marks the step waited on; a
+/// pill over it takes that back.
 ///
 /// **Written as answered**, as every screen but Ticket Details is: there is no
-/// copy here to throw away. The deadline itself is changed on
+/// copy here to throw away. A step itself is changed on
 /// ``TicketDeadlineView``, which holds one.
 struct TicketTodoSheet: View {
     @Environment(EventStore.self) private var store
@@ -22,7 +22,7 @@ struct TicketTodoSheet: View {
 
     @State private var undo: TicketTodoUndo?
     @State private var openEvent: Event?
-    @State private var editing: EventReminder?
+    @State private var editing: TicketStage?
     @State private var isConfirmingGiveUp = false
 
     init(todo id: TicketTodo.ID) {
@@ -40,7 +40,8 @@ struct TicketTodoSheet: View {
                 if let todo {
                     page(todo)
                 } else {
-                    // Its reminders were taken off the event meanwhile.
+                    // Its steps were taken off the round meanwhile, or it
+                    // is no longer won.
                     ContentUnavailableView("No Longer a To-Do", systemImage: "checklist")
                 }
             }
@@ -62,9 +63,9 @@ struct TicketTodoSheet: View {
         .opensFromOutside()
         .refreshNoticesInSheet()
         .eventSheet($openEvent)
-        .sheet(item: $editing) { reminder in
-            if let event = todo?.event {
-                TicketDeadlineView(event: event, editing: reminder)
+        .sheet(item: $editing) { stage in
+            if let todo {
+                TicketDeadlineView(event: todo.event, entry: todo.entry, editing: stage)
                     .macSheetSize(.form)
             }
         }
@@ -86,8 +87,8 @@ struct TicketTodoSheet: View {
                 }
                 TicketForm.section("Reminders") {
                     VStack(spacing: 0) {
-                        ForEach(Array(todo.reminders.enumerated()), id: \.element.id) { index, reminder in
-                            reminderRow(reminder, of: todo)
+                        ForEach(Array(todo.stages.enumerated()), id: \.element) { index, stage in
+                            stageRow(stage, of: todo)
                                 .overlay(alignment: .top) {
                                     if index > 0 { Divider().padding(.leading, 15) }
                                 }
@@ -145,7 +146,7 @@ struct TicketTodoSheet: View {
         let isUrgent = todo.isUrgent(at: now)
         let tint: Color = switch state {
         case .notPaid: Color(.systemGray)
-        case .applied, .paid: .brandTint
+        case .paid: .brandTint
         case .issued: .trackAttended
         default: TicketTodoText.tint(of: todo.kind)
         }
@@ -185,10 +186,10 @@ struct TicketTodoSheet: View {
             if let current = todo.current {
                 Group {
                     if state == .paid {
-                        Text("Next: \(TicketTodoText.when(of: current, at: todo.event, on: timeDisplay))")
+                        Text("Next: \(TicketTodoText.when(current, of: todo, on: timeDisplay))")
                             .foregroundStyle(Color.trackAttended)
                     } else {
-                        TicketTodoText.when(of: current, at: todo.event, on: timeDisplay)
+                        TicketTodoText.when(current, of: todo, on: timeDisplay)
                     }
                 }
                 .scalingFont(size: 14, weight: .semibold)
@@ -214,25 +215,23 @@ struct TicketTodoSheet: View {
 
     // MARK: - The way it has come
 
-    /// Having applied and having won, where a round is written for it, then
-    /// the to-do's own steps: each with what is known of it.
+    /// Having applied and having won, then the to-do's own steps: each with
+    /// what is known of it.
     private func timeline(_ todo: TicketTodo) -> some View {
-        var rows: [TimelineRow] = []
-        if todo.application == nil, let entry = todo.entry {
-            rows.append(TimelineRow(id: "applied", name: Text("Applied"), detail: LotteryText.round(of: entry),
-                                    status: .done, isMissed: false))
-            if entry.isWon {
-                let won = entry.wonChoice.map(LotteryText.won)
-                let day = entry.day.map { Text("Results \(LotteryText.short($0))") }
-                let detail: Text? = switch (day, won) {
-                case let (day?, won?): Text("\(day) · \(won)")
-                case let (day?, nil): day
-                case let (nil, won?): won
-                default: nil
-                }
-                rows.append(TimelineRow(id: "won", name: Text("Won"), detail: detail, status: .done, isMissed: false))
-            }
+        let entry = todo.entry
+        var rows: [TimelineRow] = [
+            TimelineRow(id: "applied", name: Text("Applied"), detail: LotteryText.round(of: entry),
+                        status: .done, isMissed: false),
+        ]
+        let won = entry.wonChoice.map(LotteryText.won)
+        let day = entry.day.map { Text("Results \(LotteryText.short($0))") }
+        let wonDetail: Text? = switch (day, won) {
+        case let (day?, won?): Text("\(day) · \(won)")
+        case let (day?, nil): day
+        case let (nil, won?): won
+        default: nil
         }
+        rows.append(TimelineRow(id: "won", name: Text("Won"), detail: wonDetail, status: .done, isMissed: false))
         for step in todo.steps {
             rows.append(TimelineRow(id: "\(step.name)", name: TicketTodoText.name(of: step.name),
                                     detail: detail(of: step, in: todo), status: step.status,
@@ -309,20 +308,18 @@ struct TicketTodoSheet: View {
     /// When a step falls, or when it was reached.
     private func detail(of step: TicketTodo.Step, in todo: TicketTodo) -> Text? {
         let zone = timeDisplay == .local ? TimeZone.current : todo.event.timeZone
-        func reached(_ reminder: EventReminder?) -> Text? {
-            reminder?.done.map {
+        func reached(_ moment: TicketMoment?) -> Text? {
+            moment?.done.map {
                 Text(verbatim: $0.formatted(.gregorian(in: zone).month(.abbreviated).day().hour().minute()))
             }
         }
         switch step.name {
-        case .notApplied, .awaitingPayment, .awaitingPickup:
-            return step.reminder.map { TicketTodoText.when(of: $0, at: todo.event, on: timeDisplay) }
-        case .applied: return reached(todo.application)
+        case .awaitingPayment, .awaitingPickup:
+            return step.stage.map { TicketTodoText.when($0, of: todo, on: timeDisplay) }
         case .paid: return reached(todo.payment)
         case .notPaid: return reached(todo.payment ?? todo.pickup)
         case .issued:
-            return reached(todo.pickup)
-                ?? step.reminder.map { TicketTodoText.when(of: $0, at: todo.event, on: timeDisplay) }
+            return reached(todo.pickup) ?? step.stage.map { TicketTodoText.when($0, of: todo, on: timeDisplay) }
         }
     }
 
@@ -335,7 +332,7 @@ struct TicketTodoSheet: View {
                     Text("Amount")
                     Spacer(minLength: 8)
                     // The sum, then how it is made up where it was worked out.
-                    if todo.payment?.owed == nil, let cost = todo.cost, let quantity = todo.entry?.wonChoice?.quantity {
+                    if todo.payment?.owed == nil, let cost = todo.cost, let quantity = todo.entry.wonChoice?.quantity {
                         Text("\(Text(verbatim: total.formatted).fontWeight(.bold).foregroundStyle(.primary)) · \(cost.formatted) × \(quantity)")
                             .foregroundStyle(.secondary)
                     } else {
@@ -382,32 +379,29 @@ struct TicketTodoSheet: View {
             }
     }
 
-    // MARK: - Its reminders
+    // MARK: - Its notifications
 
-    /// One reminder: its name, when it falls and how far ahead it alerts,
-    /// and its switch — or, once its step is reached, that it was stopped.
+    /// One step: its name, when it falls and how far ahead its notification
+    /// comes, as Settings says — or, once it is reached, that it was stopped.
     /// The words open it to be changed.
-    private func reminderRow(_ reminder: EventReminder, of todo: TicketTodo) -> some View {
-        let isStopped = reminder.done != nil
-        let tint: Color = switch reminder.ticketKind {
-        case .applicationDeadline: .brandTint
-        case .paymentDeadline: .trackTicket
-        default: .trackAttended
-        }
-        let moment = "\(todo.event.printedDay(of: reminder, on: timeDisplay)) · \(todo.event.printedClock(of: reminder, on: timeDisplay))"
+    private func stageRow(_ stage: TicketStage, of todo: TicketTodo) -> some View {
+        let isStopped = todo.entry[stage]?.done != nil
+        let tint: Color = stage == .payment ? .trackTicket : .trackAttended
+        let lead = TicketTodoText.lead(of: stage)
+        let moment = TicketTodoText.moment(stage, of: todo, on: timeDisplay)
         return HStack(spacing: 11) {
             Button {
-                editing = reminder
+                editing = stage
             } label: {
                 HStack(spacing: 11) {
-                    Image(systemName: isStopped || reminder.lead == nil ? "bell.slash" : "bell")
+                    Image(systemName: isStopped || lead == nil ? "bell.slash" : "bell")
                         .scalingFont(size: 15)
                         .foregroundStyle(isStopped ? AnyShapeStyle(.tertiary) : AnyShapeStyle(tint))
                         .frame(width: 20)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: ReminderKind.label(of: reminder.title))
+                        TicketDeadlineView.title(of: stage)
                             .scalingFont(size: 14.5)
-                        Text(verbatim: reminder.lead.map { "\(moment) · \(ReminderLead.label(of: $0))" } ?? moment)
+                        Text(verbatim: lead.map { "\(moment) · \(ReminderLead.label(of: $0))" } ?? moment)
                             .scalingFont(size: 12)
                             .monospacedDigit()
                             .strikethrough(isStopped)
@@ -415,6 +409,9 @@ struct TicketTodoSheet: View {
                     }
                     .foregroundStyle(isStopped ? .secondary : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right")
+                        .scalingFont(size: 11, weight: .semibold)
+                        .foregroundStyle(.tertiary)
                 }
                 .contentShape(.rect)
             }
@@ -422,49 +419,31 @@ struct TicketTodoSheet: View {
             .accessibilityHint(Text("Edits this deadline"))
 
             if isStopped {
-                Text("Stopped · \(stoppedBy(reminder))")
+                Text("Stopped · \(stoppedBy(stage, of: todo))")
                     .font(.system(size: 11.5, weight: .bold))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 9)
                     .frame(height: 24)
                     .background(Color.primary.opacity(0.08), in: .capsule)
-            } else {
-                // On is an alert to come; off leaves the time written down.
-                Toggle("Alert", isOn: Binding {
-                    reminder.lead != nil
-                } set: { isOn in
-                    var changed = reminder
-                    changed.lead = isOn ? reminder.ticketKind?.defaultLead ?? 0 : nil
-                    store.setReminder(changed, for: todo.event)
-                    if isOn { EventReminders.shared.askIfNeeded(for: changed, at: todo.event) }
-                })
-                .settingSwitch()
-                .labelsHidden()
-                .accessibilityLabel(Text(verbatim: ReminderKind.label(of: reminder.title)))
             }
         }
         .padding(.horizontal, 15)
         .padding(.vertical, 12)
     }
 
-    /// What reached the step a stopped reminder stood for.
-    private func stoppedBy(_ reminder: EventReminder) -> Text {
-        if reminder.missed == true { return TicketTodoText.name(of: .notPaid) }
-        return switch reminder.ticketKind {
-        case .applicationDeadline: TicketTodoText.name(of: .applied)
-        case .paymentDeadline: TicketTodoText.name(of: .paid)
-        default: TicketTodoText.name(of: .issued)
-        }
+    /// What reached the step a stopped notification stood for.
+    private func stoppedBy(_ stage: TicketStage, of todo: TicketTodo) -> Text {
+        if todo.entry[stage]?.missed == true { return TicketTodoText.name(of: .notPaid) }
+        return TicketTodoText.name(of: stage == .payment ? .paid : .issued)
     }
 
     private func footnote(_ todo: TicketTodo) -> Text {
         switch todo.state {
-        case .notApplied: Text("Marking it applied stops this reminder, and writes the round under Lotteries to wait for its results.")
         case .awaitingPayment where todo.pickup != nil:
             Text("Marking it paid stops the Payment Deadline reminder. Ticket Pickup keeps its alert until the ticket is issued.")
         case .awaitingPayment: Text("Marking it paid stops the Payment Deadline reminder.")
         case .paid, .awaitingPickup: Text("Marking it issued stops the Ticket Pickup reminder too.")
-        case .applied, .issued, .notPaid: Text("Nothing more will be said about this. Back to To Do brings back a reminder whose time is still ahead.")
+        case .issued, .notPaid: Text("Nothing more will be said about this. Back to To Do brings back a reminder whose time is still ahead.")
         }
     }
 
@@ -546,11 +525,11 @@ struct TicketTodoSheet: View {
 
     private func menu(_ todo: TicketTodo) -> some View {
         Menu {
-            if let current = todo.current ?? todo.reminders.last {
-                Button("Edit Deadline", systemImage: "square.and.pencil") { editing = current }
+            if let stage = todo.current ?? todo.stages.last {
+                Button("Edit Deadline", systemImage: "square.and.pencil") { editing = stage }
             }
             Button("Open Event", systemImage: "calendar") { openEvent = todo.event }
-            if todo.reminders.contains(where: { $0.done != nil }), !todo.isDone {
+            if todo.stages.contains(where: { todo.entry[$0]?.done != nil }), !todo.isDone {
                 Button("Undo Last Step", systemImage: "arrow.uturn.backward") {
                     withAnimation(.snappy) {
                         undo = nil

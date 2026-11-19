@@ -28,7 +28,7 @@ nonisolated enum TestNotification {
 }
 
 /// A bench for the app's notifications, in debug builds only, opened from the
-/// event sheet's menu as ``LiveActivityTestView`` is: sends one of the five
+/// event sheet's menu as ``LiveActivityTestView`` is: sends one of the seven
 /// about the event in front of it within seconds, so the banner, the Lock
 /// Screen, a Focus and a tap can be looked at without waiting for somebody's
 /// goods sale. Beside that, what the app has scheduled and what the system
@@ -43,9 +43,8 @@ struct NotificationTestView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var kind = Kind.eventReminder
-    /// Which of the event's reminders to send; nil is a sample.
+    /// Which of the event's goods times to send; nil is a sample.
     @State private var reminderID: EventReminder.ID?
-    @State private var lead: Int
     @State private var delay = 10
     @State private var permission = Permission()
     @State private var scheduled: [Scheduled] = []
@@ -57,8 +56,7 @@ struct NotificationTestView: View {
     init(event: Event, tracking: Tracking) {
         self.event = event
         self.tracking = tracking
-        _reminderID = State(initialValue: tracking.reminders.first?.id)
-        _lead = State(initialValue: tracking.reminders.first?.lead ?? 60)
+        _reminderID = State(initialValue: ReminderKind.goods.compactMap(tracking.goodsReminder).first?.id)
     }
 
     var body: some View {
@@ -111,17 +109,12 @@ struct NotificationTestView: View {
             }
             if kind == .eventReminder {
                 Picker(selection: $reminderID) {
-                    Text(verbatim: "Sample: \(ReminderKind.goodsSale.label)").tag(EventReminder.ID?.none)
-                    ForEach(tracking.reminders) { reminder in
+                    Text(verbatim: "Sample: \(ReminderKind.queueTime.label)").tag(EventReminder.ID?.none)
+                    ForEach(ReminderKind.goods.compactMap(tracking.goodsReminder)) { reminder in
                         Text(verbatim: ReminderKind.label(of: reminder.title)).tag(EventReminder.ID?.some(reminder.id))
                     }
                 } label: {
                     Text(verbatim: "Reminder")
-                }
-                Picker(selection: $lead) {
-                    ForEach(ReminderLead.choices, id: \.self) { Text(verbatim: ReminderLead.label(of: $0)).tag($0) }
-                } label: {
-                    Text(verbatim: "Alert")
                 }
             }
             Picker(selection: $delay) {
@@ -151,7 +144,7 @@ struct NotificationTestView: View {
         } header: {
             Text(verbatim: "It Will Say")
         } footer: {
-            if kind == .resultsDay, tracking.lotteries.isEmpty {
+            if kind == .resultsDay || kind == .lotteryDeadline || kind == .ticketStep, tracking.lotteries.isEmpty {
                 Text(verbatim: "This event has no rounds, so a tap opens its sheet rather than Ticket Details on a round.")
             }
         }
@@ -162,16 +155,43 @@ struct NotificationTestView: View {
     private var real: UNNotificationRequest? {
         switch kind {
         case .eventReminder:
-            var reminder = tracking.reminders.first { $0.id == reminderID }
-                ?? EventReminder(kind: .goodsSale, for: event, at: event.date)
-            reminder.lead = lead
-            // One dealt with owes nothing, and the bench shows what it said.
-            reminder.done = nil
-            // From long ago, when its moment and the event's day are ahead.
-            return ReminderAlert(reminder: reminder, event: event, clock: .stored, at: .distantPast)?.request
+            let reminder = tracking.reminders.first { $0.id == reminderID } ?? EventReminder(kind: .queueTime, for: event)
+            // Ahead by what Settings says — an hour where it says none, since
+            // the bench sends one anyway — and from long ago, when its moment
+            // and the event's day are ahead.
+            let lead = EventReminders.shared.goodsLead ?? EventReminders.defaultGoodsLead
+            return ReminderAlert(reminder: reminder, event: event, lead: lead, clock: .stored, at: .distantPast)?.request
         case .resultsDay:
             let entry = tracking.lotteries.first(where: \.isPending) ?? tracking.lotteries.first
             return LotteryReminder(testing: event, entry: entry).request
+        case .lotteryDeadline:
+            // The round's own deadline where one is written, else tonight's
+            // 23:59, ahead by what Settings says — a day where it says none,
+            // since the bench sends one anyway.
+            let entry = tracking.lotteries.first { $0.deadline != nil }
+                ?? tracking.lotteries.first(where: \.isPending)
+                ?? LotteryEntry(round: LotteryRound.earliest.rawValue)
+            let deadline = entry.deadline ?? LotteryDeadline(day: CalendarDay(.now, in: .gregorian(in: event.timeZone)),
+                                                             minute: LotteryDeadline.closingMinute)
+            let lead = LotteryReminders.shared.deadlineLead ?? LotteryReminders.defaultDeadlineLead
+            return LotteryDeadlineAlert(event: event, entry: entry, deadline: deadline, lead: lead, comingAt: .now,
+                                        clock: .stored).request
+        case .ticketStep:
+            // A won round's payment where one is written, else a sample due
+            // tonight, ahead by what Settings says — a day where it says none.
+            var entry = tracking.lotteries.first { $0.isWon && $0.payment != nil }
+                ?? tracking.lotteries.first(where: \.isWon)
+                ?? LotteryEntry(round: LotteryRound.earliest.rawValue, result: .won(nil))
+            if entry.payment == nil {
+                var payment = TicketMoment(day: CalendarDay(.now, in: .gregorian(in: event.timeZone)),
+                                           minute: TicketStage.payment.dayAloneMinute)
+                payment.owed = Money(amount: 17_600, currency: Currencies.yen)
+                payment.payAt = "セブン-イレブン"
+                entry.payment = payment
+            }
+            let lead = LotteryReminders.shared.deadlineLead ?? LotteryReminders.defaultDeadlineLead
+            return TicketStageAlert(event: event, entry: entry, stage: .payment, lead: lead, comingAt: .now,
+                                    clock: .stored).request
         case .liveActivity:
             return ActivityReminder(testing: event).request
         case .newDate:
@@ -240,8 +260,8 @@ struct NotificationTestView: View {
             } else {
                 ForEach(forEvent, content: row)
             }
-            line("Results Day", "\(count(LotteryReminder.prefix)) of \(LotteryReminder.limit)")
-            line("Event Reminders", "\(count(ReminderAlert.prefix)) of \(ReminderAlert.limit)")
+            line("Lotteries", "\(count(LotteryReminder.prefix) + count(LotteryDeadlineAlert.prefix) + count(TicketStageAlert.prefix)) of \(LotteryReminder.limit)")
+            line("Goods Sale", "\(count(ReminderAlert.prefix)) of \(ReminderAlert.limit)")
             line("Live Activity", "\(count(ActivityReminder.prefix)) of \(ActivityReminder.limit)")
             line("All Pending", "\(scheduled.count) of 64")
         } header: {
@@ -333,6 +353,8 @@ private extension NotificationTestView {
     enum Kind: String, CaseIterable, Identifiable {
         case eventReminder = "Event Reminder"
         case resultsDay = "Results Day"
+        case lotteryDeadline = "Lottery Deadline"
+        case ticketStep = "Payment Deadline"
         case liveActivity = "Live Activity"
         case newDate = "New Date"
         case change = "Change"
@@ -341,7 +363,7 @@ private extension NotificationTestView {
 
         /// A Live Activity reminder is the iPhone's alone.
         static var offered: [Kind] {
-            UIDevice.current.userInterfaceIdiom == .phone ? allCases : [.eventReminder, .resultsDay, .newDate, .change]
+            UIDevice.current.userInterfaceIdiom == .phone ? allCases : allCases.filter { $0 != .liveActivity }
         }
     }
 
@@ -399,6 +421,7 @@ extension LotteryReminder {
         eventTitle = event.title
         round = entry?.round ?? LotteryRound.earliest.rawValue
         day = CalendarDay(.now, in: .gregorian())
+        announced = nil
     }
 }
 

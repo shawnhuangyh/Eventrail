@@ -204,8 +204,9 @@ struct RootView: View {
             WidgetLink.shared.send(from: store)
             SpotlightIndex.shared.update(from: store, followed: followed)
             EventActivities.shared.refreshSoon(from: store)
-            // Its words print the time, on Settings' clock.
+            // Their words print the time, on Settings' clock.
             eventReminders.schedule(from: store)
+            reminders.schedule(from: store)
         }
         // Each results day still waiting is a reminder that evening, and the
         // ones answered on another device meanwhile are taken back — followed

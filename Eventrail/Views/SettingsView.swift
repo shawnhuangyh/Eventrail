@@ -89,7 +89,11 @@ struct SettingsView: View {
                         SettingRowDivider()
                         remindersRow
                         SettingRowDivider()
+                        deadlineAlertRow
+                        SettingRowDivider()
                         eventRemindersRow
+                        SettingRowDivider()
+                        goodsAlertRow
                         // An iPhone's alone: an iPad and a Mac show no Live
                         // Activities to be reminded of.
                         if ActivityReminders.isOffered {
@@ -351,13 +355,49 @@ struct SettingsView: View {
 
     private static let notificationSettings = URL(string: UIApplication.openNotificationSettingsURLString)!
 
-    /// On until the reader turns it off — see ``EventReminders``. Asks,
-    /// turned back on with nothing asked yet, as the results-day switch does.
+    /// How long before a lottery round's application deadline, or a won
+    /// round's payment deadline, its notification comes — one answer for
+    /// every round, rather than one asked on each
+    /// (``LotteryReminders/deadlineLead``). Chosen from a menu
+    /// on the value, as Translate Into is, for the same reason; dimmed while
+    /// the switch above it, which governs it, is off.
+    private var deadlineAlertRow: some View {
+        @Bindable var reminders = reminders
+        return SettingRowLabel("hourglass", "Deadline Alert") {
+            Menu {
+                Picker("Deadline Alert", selection: $reminders.deadlineLead) {
+                    Text("No Alert").tag(Int?.none)
+                    Divider()
+                    ForEach(LotteryReminders.deadlineLeads, id: \.self) { lead in
+                        Text(verbatim: ReminderLead.label(of: lead)).tag(Int?.some(lead))
+                    }
+                }
+                // The choices in the menu itself, as Translate Into's are.
+                .pickerStyle(.inline)
+            } label: {
+                SettingRowValue(deadlineLeadName, accessory: "chevron.up.chevron.down")
+                    .fixedSize()
+            }
+            .buttonStyle(.plain)
+        }
+        .settingRowPadding()
+        .disabled(!reminders.isEnabled)
+        .opacity(reminders.isEnabled ? 1 : 0.4)
+        .sensoryFeedback(.selection, trigger: reminders.deadlineLead)
+    }
+
+    private var deadlineLeadName: Text {
+        reminders.deadlineLead.map { Text(verbatim: ReminderLead.label(of: $0)) } ?? Text("No Alert")
+    }
+
+    /// On until the reader turns it off — see ``EventReminders``: the times
+    /// of the goods sale at the hall. Asks, turned back on with nothing asked
+    /// yet, as the results-day switch does.
     private var eventRemindersRow: some View {
         @Bindable var eventReminders = eventReminders
         let isRefused = eventReminders.isEnabled && reminders.authorization == .denied
         return Toggle(isOn: $eventReminders.isEnabled) {
-            SettingRowLabel("alarm", "Event Reminders",
+            SettingRowLabel("bag", "Goods Sale Reminders",
                             status: isRefused ? Text("Notifications are off in Settings") : nil,
                             needsAttention: true) {
                 if isRefused {
@@ -370,6 +410,35 @@ struct SettingsView: View {
         }
         .settingSwitch()
         .settingRowPadding()
+    }
+
+    /// How long before a time of the goods sale its notification comes — one
+    /// answer for every time (``EventReminders/goodsLead``), as Deadline Alert
+    /// is for the rounds; dimmed while the switch above it is off.
+    private var goodsAlertRow: some View {
+        @Bindable var eventReminders = eventReminders
+        return SettingRowLabel("alarm", "Goods Sale Alert") {
+            Menu {
+                Picker("Goods Sale Alert", selection: $eventReminders.goodsLead) {
+                    Text("No Alert").tag(Int?.none)
+                    Divider()
+                    ForEach(EventReminders.goodsLeads, id: \.self) { lead in
+                        Text(verbatim: ReminderLead.label(of: lead)).tag(Int?.some(lead))
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                SettingRowValue(eventReminders.goodsLead.map { Text(verbatim: ReminderLead.label(of: $0)) }
+                                    ?? Text("No Alert"),
+                                accessory: "chevron.up.chevron.down")
+                    .fixedSize()
+            }
+            .buttonStyle(.plain)
+        }
+        .settingRowPadding()
+        .disabled(!eventReminders.isEnabled)
+        .opacity(eventReminders.isEnabled ? 1 : 0.4)
+        .sensoryFeedback(.selection, trigger: eventReminders.goodsLead)
     }
 
     /// On until the reader turns it off — see ``ActivityReminders``. Asks,

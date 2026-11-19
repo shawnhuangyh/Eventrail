@@ -83,10 +83,18 @@ nonisolated struct LibraryBackup: Sendable {
     /// build that has never heard of them would drop them.
     ///
     /// 13: a reminder carries whether it is dealt with, and what a payment
-    /// is of, where and on which page (``EventReminder/done``). A build that
-    /// has never heard of them would read a ticket paid for as still owed,
-    /// and remind the reader of it.
-    static let currentFormat: UInt8 = 13
+    /// is of, where and on which page. A build that has never heard of them
+    /// would read a ticket paid for as still owed, and remind the reader of
+    /// it. (Format 14 moved all of that onto the round won.)
+    ///
+    /// 14: a lottery round carries the time its results come out, when it
+    /// stops taking applications (``LotteryEntry/deadline``), and once won
+    /// when it is paid by and its ticket issued from, with what was said of
+    /// each (``LotteryEntry/payment``, ``LotteryEntry/pickup``); and a
+    /// tracking record carries the link to the goods sale's notice
+    /// (``GoodsNotice``). A build that has never heard of them would drop
+    /// them, and the notifications and Ticket To-Dos with them.
+    static let currentFormat: UInt8 = 14
 
     var app: String
     var created: Date

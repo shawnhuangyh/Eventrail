@@ -6,11 +6,13 @@ import Vision
 import VisionKit
 #endif
 
-/// What the reader has planned around a kept event, on its sheet: the times
-/// they want to hear about (``EventReminder``), the queue tickets they took
-/// (``QueueTicket``) and, from the event's day, its set list (``SetList``). On
-/// an event gone by it stays, for what is written down afterwards, and nothing
-/// on it comes as a notification.
+/// What the reader has planned around a kept event, on its sheet: the goods
+/// sale at the hall (会場物販) — where it is told of (``GoodsNotice``), when
+/// its queue tickets are handed out (``EventReminder``), and the queue tickets
+/// they took (``QueueTicket``), all under the one heading — and, from the
+/// event's day, its set list (``SetList``).
+/// On an event gone by it stays, for what is written down afterwards, and
+/// nothing on it comes as a notification.
 ///
 /// The sheets it opens are held by ``EventDetailView`` through these bindings,
 /// since nothing may move the page while one is up (``EventSheetsHold``).
@@ -76,6 +78,13 @@ struct EventPlanCard: View {
     /// Whether that ticket was only just added: the moment it is in hand, and
     /// one that can be passed by.
     @State private var isNumberingNew = false
+    /// Whether the goods sale's notice is being written, and what has been
+    /// typed or pasted.
+    @State private var isWritingNotice = false
+    @State private var typedLink = ""
+    /// Whether what was typed was not a link, which is said before the field
+    /// comes back holding it.
+    @State private var isNotALink = false
 
     /// Where there is a camera that can read a code live. An iPad without one,
     /// the Simulator and a Mac read pictures alone.
@@ -92,31 +101,31 @@ struct EventPlanCard: View {
         // Read here so that the cover opens on the list that asked.
         let cameraPrompt = codeList.cameraPrompt
         VStack(alignment: .leading, spacing: 12) {
-            CardHeader(title: "Reminders") { addReminderMenu }
-            if !tracking.reminders.isEmpty {
+            CardHeader(title: "Goods Sale")
+            VStack(spacing: 0) {
+                noticeRow(tracking.goodsNotice)
                 // A time gone by dims without anyone touching the sheet.
                 TimelineView(.everyMinute) { context in
                     VStack(spacing: 0) {
-                        ForEach(tracking.reminders) { row($0, at: context.date) }
+                        ForEach(ReminderKind.goods) { kind in
+                            row(kind, written: tracking.goodsReminder(kind), at: context.date)
+                        }
                     }
                 }
-            }
-            Divider()
-            CardHeader(title: "Queue Tickets") { addCodeControl(for: .queueTickets) }
-            if !tracking.queueTickets.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(tracking.queueTickets) { ticket in
-                        row(ticket, position: tracking.queueTickets.count > 1
-                                ? (tracking.queueTickets.firstIndex(of: ticket) ?? 0) + 1 : nil)
-                    }
+                ForEach(tracking.queueTickets) { ticket in
+                    row(ticket, position: tracking.queueTickets.count > 1
+                            ? (tracking.queueTickets.firstIndex(of: ticket) ?? 0) + 1 : nil)
                 }
+                addCodeControl(for: .queueTickets) { addTicketLabel }
             }
             // A set list comes out as the show ends, which is before any end
             // time printed can be trusted to have passed, so from the morning
             // of the day. One already kept stands wherever the event has moved.
             if !tracking.setLists.isEmpty || event.dayHasCome() {
                 Divider()
-                CardHeader(title: "Set List") { addCodeControl(for: .setLists) }
+                CardHeader(title: "Set List") {
+                    addCodeControl(for: .setLists) { addCodeLabel(for: .setLists) }
+                }
                 if !tracking.setLists.isEmpty {
                     VStack(spacing: 0) {
                         ForEach(tracking.setLists) { setList in
@@ -183,32 +192,26 @@ struct EventPlanCard: View {
                 isNumberingNew ? Text("Not Now") : Text("Cancel")
             }
         }
-    }
-
-    // MARK: - Reminders
-
-    private var addReminderMenu: some View {
-        Menu {
-            Section("Goods Sale") {
-                ForEach(ReminderKind.goods) { kind in
-                    Button(kind.label) { editing = EventReminder(kind: kind, for: event) }
-                }
-            }
-            Section("Ticket Sale") {
-                ForEach(ReminderKind.tickets) { kind in
-                    Button(kind.label) { editing = EventReminder(kind: kind, for: event) }
-                }
-            }
-            Section {
-                Button("Other…") { editing = EventReminder(kind: nil, for: event) }
-            }
-        } label: {
-            addLabel(symbol: "plus")
+        .alert("Sale Info", isPresented: $isWritingNotice) {
+            // An example rather than a name: "Link" is the account's word.
+            TextField("https://x.com/…" as String, text: $typedLink)
+                .keyboardType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Save", action: saveNotice)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Paste the link to the post announcing the goods sale.")
         }
-        .menuOrder(.fixed)
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("Add Reminder"))
+        .alert("Not a Link", isPresented: $isNotALink) {
+            Button("Try Again") { isWritingNotice = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Paste a web link, such as one copied from a post on X.")
+        }
     }
+
+    // MARK: - The goods sale's times
 
     private func addLabel(symbol: String) -> some View {
         Image(systemName: symbol)
@@ -219,45 +222,35 @@ struct EventPlanCard: View {
             .contentShape(.circle)
     }
 
-    /// The name and its alert, with the time at the trailing edge where a
-    /// column of them reads as the day's running order.
-    private func row(_ reminder: EventReminder, at now: Date) -> some View {
+    /// A time of the sale: its name, and the time at the trailing edge — or
+    /// Add Time where none is written. Either opens it on a sheet of its own.
+    private func row(_ kind: ReminderKind, written: EventReminder?, at now: Date) -> some View {
         let isEventAhead = event.dayEnds > now
-        let isOver = reminder.date(in: event.timeZone) <= now
-        // Dimmed against the times still to come; once the event is over there
+        // Dimmed against a time still to come; once the event is over there
         // are none, and the rows are a record to read.
-        let isDimmed = (isEventAhead && isOver) || reminder.done != nil
+        let isDimmed = written.map { isEventAhead && $0.date(in: event.timeZone) <= now } ?? false
         return Button {
-            editing = reminder
+            editing = written ?? EventReminder(kind: kind, for: event)
         } label: {
             HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: ReminderKind.label(of: reminder.title))
-                        .scalingFont(size: 14.5, weight: .semibold)
-                        .foregroundStyle(isDimmed ? .secondary : .primary)
-                        .multilineTextAlignment(.leading)
-                    if reminder.done != nil {
-                        // Dealt with from Ticket To-Dos: nothing more comes.
-                        Label {
-                            reminder.missed == true ? Text("Not Paid") : Text("Done")
-                        } icon: {
-                            Image(systemName: reminder.missed == true ? "xmark.circle.fill" : "checkmark.circle.fill")
-                        }
-                        .labelStyle(.titleAndIcon)
-                        .scalingFont(size: 12)
-                        .foregroundStyle(reminder.missed == true ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.trackAttended))
-                    } else if let lead = reminder.lead, event.holds(reminder), !isOver {
-                        Label(ReminderLead.label(of: lead), systemImage: "bell.fill")
-                            .labelStyle(.titleAndIcon)
-                            .scalingFont(size: 12)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Text(verbatim: event.printedTime(of: reminder, on: clock))
-                    .scalingFont(size: 15, weight: .bold)
-                    .monospacedDigit()
+                Image(systemName: "number")
+                    .scalingFont(size: 14, weight: .semibold)
+                    .foregroundStyle(written == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Color.brandTint))
+                    .frame(width: 20)
+                Text(verbatim: kind.label)
+                    .scalingFont(size: 14.5, weight: .semibold)
                     .foregroundStyle(isDimmed ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let written {
+                    Text(verbatim: event.printedTime(of: written, on: clock))
+                        .scalingFont(size: 15, weight: .bold)
+                        .monospacedDigit()
+                        .foregroundStyle(isDimmed ? .secondary : .primary)
+                } else {
+                    Text("Add Time")
+                        .scalingFont(size: 14.5, weight: .medium)
+                        .foregroundStyle(Color.brandTint)
+                }
                 Image(systemName: "chevron.right")
                     .scalingFont(size: 11, weight: .semibold)
                     .foregroundStyle(.tertiary)
@@ -269,21 +262,86 @@ struct EventPlanCard: View {
         .accessibilityElement(children: .combine)
     }
 
+    // MARK: - The goods sale's notice
+
+    /// Where the sale is told of: opened at a tap once written, Add Link
+    /// until it is.
+    @ViewBuilder
+    private func noticeRow(_ notice: GoodsNotice?) -> some View {
+        if let notice {
+            linkRow(to: notice.link, symbol: "megaphone", detail: Self.shown(notice.link),
+                    hint: "Opens the goods sale's notice") {
+                store.removeGoodsNotice(from: event)
+            } title: {
+                Text("Sale Info")
+            } actions: {
+                Button("Edit Link…", systemImage: "pencil") { writeNotice() }
+            }
+        } else {
+            Button(action: writeNotice) {
+                HStack(spacing: 10) {
+                    Image(systemName: "megaphone")
+                        .scalingFont(size: 14, weight: .semibold)
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 20)
+                    Text("Sale Info")
+                        .scalingFont(size: 14.5, weight: .semibold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Add Link")
+                        .scalingFont(size: 14.5, weight: .medium)
+                        .foregroundStyle(Color.brandTint)
+                    Image(systemName: "chevron.right")
+                        .scalingFont(size: 11, weight: .semibold)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 8)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// A link as its row prints it: no scheme, and nothing after the path —
+    /// a post's link copied from X carries who shared it there.
+    private static func shown(_ link: URL) -> String {
+        let host = link.host() ?? ""
+        let path = link.path()
+        return path == "/" || path.isEmpty ? host : host + path
+    }
+
+    private func writeNotice() {
+        typedLink = store.tracking(for: event).goodsNotice?.link.absoluteString ?? ""
+        isWritingNotice = true
+    }
+
+    /// What was typed, as the notice — nothing typed takes it off — or, where
+    /// it is not a link, said so with the field coming back as it was.
+    private func saveNotice() {
+        if typedLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if store.tracking(for: event).goodsNotice != nil { store.removeGoodsNotice(from: event) }
+        } else if let link = QRCodeLink.link(typed: typedLink) {
+            store.setGoodsNotice(link, for: event)
+        } else {
+            isNotALink = true
+        }
+    }
+
     // MARK: - What a QR code holds
 
     /// Asked from the button, so the dialog points at what opened it.
-    private func addCodeControl(for list: CodeList) -> some View {
+    private func addCodeControl<Label: View>(for list: CodeList, @ViewBuilder label: () -> Label) -> some View {
         Group {
             if canScan {
                 Menu {
                     Button("Scan QR Code", systemImage: "qrcode.viewfinder") { openCamera(for: list) }
                     Button("Choose from Photos", systemImage: "photo.on.rectangle") { openPhotos(for: list) }
                 } label: {
-                    addCodeLabel(for: list)
+                    label()
                 }
                 .menuOrder(.fixed)
             } else {
-                Button { openPhotos(for: list) } label: { addCodeLabel(for: list) }
+                Button { openPhotos(for: list) } label: { label() }
             }
         }
         .buttonStyle(.plain)
@@ -309,6 +367,29 @@ struct EventPlanCard: View {
             // and this is where the reader sees where it goes.
             Text(verbatim: found.map(\.absoluteString).joined(separator: "\n"))
         }
+    }
+
+    /// The last row under the goods sale, adding a queue ticket: a row's
+    /// width to hit, since nothing above it names the list.
+    private var addTicketLabel: some View {
+        HStack(spacing: 10) {
+            Group {
+                if isReading && codeList == .queueTickets {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "qrcode.viewfinder")
+                        .scalingFont(size: 14, weight: .semibold)
+                }
+            }
+            .frame(width: 20)
+            Text("Add Queue Ticket")
+                .scalingFont(size: 14.5, weight: .semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .foregroundStyle(Color.brandTint)
+        .padding(.vertical, 8)
+        .contentShape(.rect)
     }
 
     @ViewBuilder

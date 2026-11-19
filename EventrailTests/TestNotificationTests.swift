@@ -10,7 +10,8 @@ import UserNotifications
 struct TestNotificationTests {
     func real() throws -> UNNotificationRequest {
         let show = Fixtures.event(date: Fixtures.day(fromToday: 3))
-        return try #require(ReminderAlert(reminder: EventReminder(kind: .goodsSale, for: show), event: show)).request
+        return try #require(ReminderAlert(reminder: EventReminder(kind: .queueTime, for: show), event: show,
+                                          lead: 30)).request
     }
 
     @Test func itSaysWhatTheRealOneSays() throws {
@@ -30,13 +31,19 @@ struct TestNotificationTests {
     /// library does not call for, which a test would be.
     @Test func theAppsOwnSchedulingLeavesItAlone() throws {
         let show = Fixtures.event(date: Fixtures.day(fromToday: 3))
+        let entry = LotteryEntry(round: LotteryRound.earliest.rawValue)
+        let deadline = LotteryDeadline(day: CalendarDay(year: 2026, month: 11, day: 20))
         let reals = [try real(),
                      LotteryReminder(testing: show, entry: nil).request,
+                     LotteryDeadlineAlert(event: show, entry: entry, deadline: deadline, lead: 60,
+                                          comingAt: .now, clock: .venue).request,
+                     TicketStageAlert(event: show, entry: entry, stage: .payment, lead: 60,
+                                      comingAt: .now, clock: .venue).request,
                      ActivityReminder(testing: show).request]
         for real in reals {
             let test = TestNotification.request(standingInFor: real, in: 10).identifier
             #expect(!test.hasPrefix(ReminderAlert.prefix))
-            #expect(!test.hasPrefix(LotteryReminder.prefix))
+            #expect(!LotteryAlert.isOwn(test))
             #expect(!test.hasPrefix(ActivityReminder.prefix))
         }
     }
@@ -58,9 +65,9 @@ struct TestNotificationTests {
     /// The app itself owes nothing here, and the bench can still send it.
     @Test func anEventGoneByCanBeSentOne() {
         let over = Fixtures.event(date: Fixtures.day(fromToday: -3))
-        let reminder = EventReminder(kind: .goodsSale, for: over, at: over.date)
-        #expect(ReminderAlert(reminder: reminder, event: over) == nil)
-        #expect(ReminderAlert(reminder: reminder, event: over, at: .distantPast) != nil)
+        let reminder = EventReminder(kind: .queueTime, for: over)
+        #expect(ReminderAlert(reminder: reminder, event: over, lead: 30) == nil)
+        #expect(ReminderAlert(reminder: reminder, event: over, lead: 30, at: .distantPast) != nil)
     }
 
     @Test func aRoundIsNamedWhereThereIsOne() {

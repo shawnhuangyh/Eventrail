@@ -232,8 +232,8 @@ final class LibraryLottery {
 }
 
 /// One thing the reader added to an event's plan: a time to be reminded of
-/// (``EventReminder``), a queue ticket's link (``QueueTicket``) or a set list's
-/// (``SetList``).
+/// (``EventReminder``), a queue ticket's link (``QueueTicket``), a set list's
+/// (``SetList``) or the goods sale's notice (``GoodsNotice``).
 ///
 /// A row of its own for the reason a lottery round is (``LibraryLottery``):
 /// in one column, two devices adding one each between syncs kept only the
@@ -431,6 +431,7 @@ extension LibraryEvent {
             edits[.reminders] = Tracking.unsaid
             edits[.queueTickets] = Tracking.unsaid
             edits[.setLists] = Tracking.unsaid
+            edits[.goodsNotices] = Tracking.unsaid
             var record = Tracking(ticket: TicketStatus(rawValue: ticket) ?? .none, seat: seat,
                                   cost: cost.map { Decimal($0) },
                                   lotteries: LotteryEntry.carriedOver(count: lotteryEntries),

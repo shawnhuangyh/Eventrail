@@ -36,6 +36,22 @@ nonisolated struct LotteryEntry: Hashable, Identifiable, Sendable {
     /// first-come round asks for none and shows none, but keeps one written
     /// while it was a lottery, so moving it back gives it back.
     var day: CalendarDay?
+    /// The time on ``day`` the results come out, in minutes past midnight on
+    /// the hall's clock, as a play guide prints it (18:00頃) — nil where only
+    /// the day was written, and meaningless without one. Read through
+    /// ``resultsDate(in:)``.
+    var minute: Int?
+    /// When the round stops taking applications — for one more 申込券
+    /// before it closes. Nil where none was written. A first-come round
+    /// keeps one written while it was a lottery, as it keeps ``day``.
+    var deadline: LotteryDeadline?
+    /// For a round won, when it has to be paid for (入金締切), and from when
+    /// its ticket can be issued (発券開始) — the steps between a win and a
+    /// ticket in hand that Ticket To-Dos follows (``TicketTodo``). Asked on
+    /// the round's page once it is won; kept, as ``day`` is, should its
+    /// result change back.
+    var payment: TicketMoment?
+    var pickup: TicketMoment?
     /// What was applied for, the most wanted first.
     var choices: [LotteryChoice] = []
     /// How a lottery went, as the reader gave it. Read through ``outcome``,
@@ -83,12 +99,179 @@ nonisolated struct LotteryEntry: Hashable, Identifiable, Sendable {
     /// down, and counted as one it would put a win into every win rate.
     var isLottery: Bool { !isFirstCome && !(round.isEmpty && applications == 0) }
 
+    /// The moment the results come out, where a time is written beside the
+    /// day: on `zone`'s clock — the hall's.
+    func resultsDate(in zone: TimeZone) -> Date? {
+        guard let day, let minute else { return nil }
+        return day.date(at: minute, in: zone)
+    }
+
+    /// The last day its deadline can fall on: the day before the results
+    /// come out, since applications close before anything is drawn. Nil
+    /// with no results day.
+    var lastDeadlineDay: CalendarDay? { day?.adding(days: -1) }
+
+    /// The first day its results can come out on: the day after its
+    /// applications close. Nil with no deadline.
+    var firstResultsDay: CalendarDay? { deadline?.day.adding(days: 1) }
+
+    /// The payment or the pickup.
+    subscript(stage: TicketStage) -> TicketMoment? {
+        get {
+            switch stage {
+            case .payment: payment
+            case .pickup: pickup
+            }
+        }
+        set {
+            switch stage {
+            case .payment: payment = newValue
+            case .pickup: pickup = newValue
+            }
+        }
+    }
+
+    /// The moment `stage` falls on, on `zone`'s clock — the hall's.
+    func date(of stage: TicketStage, in zone: TimeZone) -> Date? {
+        self[stage].map { $0.day.date(at: $0.minute ?? stage.dayAloneMinute, in: zone) }
+    }
+
     /// Takes one choice out, and the result with it where the lottery was
     /// won with that choice: a win with nothing left to say what was won is
     /// a result nobody gave.
     mutating func removeChoice(_ id: LotteryChoice.ID) {
         choices.removeAll { $0.id == id }
         if result == .won(id) { result = .pending }
+    }
+}
+
+/// The last moment a lottery round takes an application (申込締切), as the
+/// play guide's notice prints it: a day, and a time where one is given — a
+/// wall clock at the hall, as every time written for an event is
+/// (``EventReminder``), asked as the results day and its time are.
+///
+/// How long before it a notification comes is one answer for every round, in
+/// Settings (``LotteryReminders/deadlineLead``), not the round's own
+/// (``LotteryDeadlineAlert``).
+///
+/// The round's own, kept on its entry: it says when more can still be put
+/// in. Nothing is marked done on it — the entry being written is the
+/// application — so it is in no to-do (``TicketTodo`` follows a win's
+/// payment and pickup).
+nonisolated struct LotteryDeadline: Hashable, Sendable {
+    /// The day on the hall's calendar.
+    var day: CalendarDay
+    /// Minutes past midnight on the hall's clock; nil where only the day was
+    /// written, which closes at ``closingMinute``.
+    var minute: Int?
+
+    /// 23:59, where nearly every notice closes: what a day alone is read as,
+    /// and what a time added to one opens on.
+    static let closingMinute = 23 * 60 + 59
+
+    /// The instant it falls on, on `zone`'s clock — the hall's.
+    func date(in zone: TimeZone) -> Date {
+        day.date(at: minute ?? Self.closingMinute, in: zone)
+    }
+
+    /// When a notification `lead` minutes ahead of it comes.
+    func alertDate(in zone: TimeZone, lead: Int) -> Date {
+        date(in: zone).addingTimeInterval(-Double(lead) * 60)
+    }
+}
+
+/// The two steps between a round won and its ticket in hand.
+nonisolated enum TicketStage: String, CaseIterable, Hashable, Identifiable, Sendable {
+    /// When it has to be paid for by (入金締切).
+    case payment
+    /// From when the ticket can be issued or picked up (発券開始).
+    case pickup
+
+    var id: Self { self }
+
+    /// What a day written alone is read as: a payment closes at 23:59, as a
+    /// deadline does; a pickup opens in the morning, when a play guide's
+    /// issuing usually does.
+    var dayAloneMinute: Int {
+        switch self {
+        case .payment: LotteryDeadline.closingMinute
+        case .pickup: 10 * 60
+        }
+    }
+}
+
+/// When a step of a won round falls, as the play guide prints it — a day,
+/// and a time where one is given, a wall clock at the hall — and what the
+/// reader has said of it: reached, or given up, and for a payment what is
+/// owed, where, and on which page (``TicketTodo``).
+///
+/// Nothing here is read or worked out: the reader copies it from the notice.
+nonisolated struct TicketMoment: Hashable, Sendable {
+    /// The day on the hall's calendar.
+    var day: CalendarDay
+    /// Minutes past midnight on the hall's clock; nil where only the day was
+    /// written (``TicketStage/dayAloneMinute``).
+    var minute: Int?
+    /// When the reader said this step was reached — paid, issued — and nil
+    /// while it is still to do. A step reached owes no notification.
+    var done: Date?
+    /// Whether ``done`` is the reader giving it up rather than doing it: a
+    /// payment not made in time. Nil where it is not.
+    var missed: Bool?
+    /// What is to be paid, as the reader typed it — digits with a point, as
+    /// ``LibraryEntry/price`` keeps a cost, since JSON's own numbers are read
+    /// back through a `Double` — in ``currency``. Read through ``owed``.
+    var amount: String?
+    /// ISO 4217, beside ``amount``.
+    var currency: String?
+    /// Where it is paid, or the ticket issued, as the reader wrote it:
+    /// セブン-イレブン, a card.
+    var payAt: String?
+    /// The page it is done on — a play guide's own page for the order — which
+    /// opens in the reader's browser, as every other link does.
+    var link: URL?
+
+    init(day: CalendarDay, minute: Int? = nil) {
+        self.day = day
+        self.minute = minute
+    }
+
+    /// What is to be paid and what in, or nil where no amount is written.
+    var owed: Money? {
+        get {
+            amount.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) }
+                .map { Money(amount: $0, currency: currency ?? Currencies.yen) }
+        }
+        set {
+            amount = newValue.map { "\($0.amount)" }
+            currency = newValue?.currency
+        }
+    }
+
+    /// As long as a place to pay is kept: a row has room for a line.
+    static let longestPlace = 40
+
+    /// A place to pay as it is kept: the ends trimmed, and nil where nothing
+    /// is left.
+    static func typedPlace(_ text: String) -> String? {
+        let place = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return place.isEmpty ? nil : String(place.prefix(longestPlace))
+    }
+}
+
+nonisolated extension CalendarDay {
+    /// The day `days` on from this one, back for a negative count.
+    func adding(days: Int) -> CalendarDay {
+        let calendar = Calendar.gregorian(in: .gmt)
+        return CalendarDay(calendar.date(byAdding: .day, value: days, to: date(in: calendar)) ?? date(in: calendar),
+                           in: calendar)
+    }
+
+    /// `minute` past midnight on this day, on `zone`'s clock.
+    func date(at minute: Int, in zone: TimeZone) -> Date {
+        Calendar.gregorian(in: zone).date(from: DateComponents(year: year, month: month, day: day,
+                                                               hour: minute / 60, minute: minute % 60))
+            ?? .distantPast
     }
 }
 
@@ -359,7 +542,7 @@ nonisolated extension Tracking {
 
 nonisolated extension LotteryEntry: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, round, applications, day, choices, result, wonChoice
+        case id, round, applications, day, minute, deadline, payment, pickup, choices, result, wonChoice
     }
 
     init(from decoder: any Decoder) throws {
@@ -369,6 +552,11 @@ nonisolated extension LotteryEntry: Codable {
         applications = min(max(try record.decodeIfPresent(Int.self, forKey: .applications) ?? 1, 0),
                            Self.mostApplications)
         day = try record.decodeIfPresent(CalendarDay.self, forKey: .day)
+        minute = try record.decodeIfPresent(Int.self, forKey: .minute).map { min(max($0, 0), 24 * 60 - 1) }
+        // A deadline this build cannot read is dropped rather than the round.
+        deadline = (try? record.decodeIfPresent(LotteryDeadline.self, forKey: .deadline)) ?? nil
+        payment = (try? record.decodeIfPresent(TicketMoment.self, forKey: .payment)) ?? nil
+        pickup = (try? record.decodeIfPresent(TicketMoment.self, forKey: .pickup)) ?? nil
         choices = try record.decodeIfPresent([LotteryChoice].self, forKey: .choices) ?? []
         // A result a later build names is read as still to come rather than
         // as a reason to drop the record.
@@ -385,6 +573,12 @@ nonisolated extension LotteryEntry: Codable {
         if !round.isEmpty { try record.encode(round, forKey: .round) }
         try record.encode(applications, forKey: .applications)
         try record.encodeIfPresent(day, forKey: .day)
+        // Left out where nothing is written, so a round from before them is
+        // the same text and not a change to send.
+        try record.encodeIfPresent(minute, forKey: .minute)
+        try record.encodeIfPresent(deadline, forKey: .deadline)
+        try record.encodeIfPresent(payment, forKey: .payment)
+        try record.encodeIfPresent(pickup, forKey: .pickup)
         if !choices.isEmpty { try record.encode(choices, forKey: .choices) }
         switch result {
         case .pending: try record.encode("pending", forKey: .result)
@@ -393,6 +587,54 @@ nonisolated extension LotteryEntry: Codable {
             try record.encodeIfPresent(choice, forKey: .wonChoice)
         case .lost: try record.encode("lost", forKey: .result)
         }
+    }
+}
+
+nonisolated extension LotteryDeadline: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case day, minute
+    }
+
+    init(from decoder: any Decoder) throws {
+        let record = try decoder.container(keyedBy: CodingKeys.self)
+        day = try record.decode(CalendarDay.self, forKey: .day)
+        minute = try record.decodeIfPresent(Int.self, forKey: .minute).map { min(max($0, 0), 24 * 60 - 1) }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var record = encoder.container(keyedBy: CodingKeys.self)
+        try record.encode(day, forKey: .day)
+        try record.encodeIfPresent(minute, forKey: .minute)
+    }
+}
+
+nonisolated extension TicketMoment: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case day, minute, done, missed, amount, currency, payAt, link
+    }
+
+    init(from decoder: any Decoder) throws {
+        let record = try decoder.container(keyedBy: CodingKeys.self)
+        day = try record.decode(CalendarDay.self, forKey: .day)
+        minute = try record.decodeIfPresent(Int.self, forKey: .minute).map { min(max($0, 0), 24 * 60 - 1) }
+        done = try? record.decodeIfPresent(Date.self, forKey: .done)
+        missed = try? record.decodeIfPresent(Bool.self, forKey: .missed)
+        amount = try? record.decodeIfPresent(String.self, forKey: .amount)
+        currency = try? record.decodeIfPresent(String.self, forKey: .currency)
+        payAt = try? record.decodeIfPresent(String.self, forKey: .payAt)
+        link = try? record.decodeIfPresent(URL.self, forKey: .link)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var record = encoder.container(keyedBy: CodingKeys.self)
+        try record.encode(day, forKey: .day)
+        try record.encodeIfPresent(minute, forKey: .minute)
+        try record.encodeIfPresent(done, forKey: .done)
+        try record.encodeIfPresent(missed, forKey: .missed)
+        try record.encodeIfPresent(amount, forKey: .amount)
+        try record.encodeIfPresent(currency, forKey: .currency)
+        try record.encodeIfPresent(payAt, forKey: .payAt)
+        try record.encodeIfPresent(link, forKey: .link)
     }
 }
 

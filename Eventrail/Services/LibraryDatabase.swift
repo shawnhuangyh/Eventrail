@@ -777,6 +777,7 @@ final class LibraryDatabase {
         record.reminders = EventReminder.inOrder(planItems(EventReminder.self, in: plan))
         record.queueTickets = QueueTicket.inOrder(planItems(QueueTicket.self, in: plan))
         record.setLists = SetList.inOrder(planItems(SetList.self, in: plan))
+        record.goodsNotices = GoodsNotice.inOrder(planItems(GoodsNotice.self, in: plan))
         return record
     }
 
@@ -1094,6 +1095,7 @@ final class LibraryDatabase {
         listed[.reminders] = planChanged(EventReminder.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
         listed[.queueTickets] = planChanged(QueueTicket.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
         listed[.setLists] = planChanged(SetList.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
+        listed[.goodsNotices] = planChanged(GoodsNotice.self, in: plan)?.toTheMillisecond ?? Tracking.unsaid
         let newest = listed.values.reduce(part, max)
         for field in Tracking.Field.allCases {
             let written = listed[field] ?? part
@@ -1201,6 +1203,13 @@ final class LibraryDatabase {
                 } else {
                     answers.tracking.setLists = heldAnswers.tracking.setLists
                 }
+                if tracking.value.says(.goodsNotices) {
+                    changed = applyPlan(answers.tracking.goodsNotices, heldAs: heldAnswers.tracking.goodsNotices,
+                                        dated: tracking.value.edits[.goodsNotices] ?? tracking.modified,
+                                        for: id, rows: &plans, in: context) || changed
+                } else {
+                    answers.tracking.goodsNotices = heldAnswers.tracking.goodsNotices
+                }
             }
             // Whether there is anything to say, the lotteries included; the
             // entry's own parts are settled with them set aside.
@@ -1209,6 +1218,7 @@ final class LibraryDatabase {
             answers.tracking.reminders = heldAnswers.tracking.reminders
             answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
             answers.tracking.setLists = heldAnswers.tracking.setLists
+            answers.tracking.goodsNotices = heldAnswers.tracking.goodsNotices
             // The entry's tracking is dated by its own answers, not by the
             // list beside it: dated by a newer list, it would outrank another
             // device's newer note in the fold (``LibraryEntry/absorb(_:)``).

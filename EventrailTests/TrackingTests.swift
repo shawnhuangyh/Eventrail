@@ -15,7 +15,8 @@ struct TrackingTests {
         #expect(tracking.cost == nil)
         #expect(tracking.currency == "")
         // No dates of its own but for what it says nothing about.
-        #expect(tracking.edits == [.reminders: Tracking.unsaid, .queueTickets: Tracking.unsaid, .setLists: Tracking.unsaid])
+        #expect(tracking.edits == [.reminders: Tracking.unsaid, .queueTickets: Tracking.unsaid, .setLists: Tracking.unsaid,
+                                   .goodsNotices: Tracking.unsaid])
     }
 
     // MARK: - A ticket marked bought before entries

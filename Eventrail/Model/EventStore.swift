@@ -547,16 +547,19 @@ final class EventStore {
         let reminders = answers.tracking.reminders
         let queueTickets = answers.tracking.queueTickets
         let setLists = answers.tracking.setLists
+        let goodsNotices = answers.tracking.goodsNotices
         let planCleared = clearing && planRows[event.id]?.values.contains { !$0.isRemoved } == true
         let planMoved = planCleared
             || Set(reminders) != Set(heldAnswers.tracking.reminders)
             || Set(queueTickets) != Set(heldAnswers.tracking.queueTickets)
             || Set(setLists) != Set(heldAnswers.tracking.setLists)
+            || Set(goodsNotices) != Set(heldAnswers.tracking.goodsNotices)
         // The entry's own parts, its lists set aside.
         answers.tracking.lotteries = heldAnswers.tracking.lotteries
         answers.tracking.reminders = heldAnswers.tracking.reminders
         answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
         answers.tracking.setLists = heldAnswers.tracking.setLists
+        answers.tracking.goodsNotices = heldAnswers.tracking.goodsNotices
         var given = answers.parts(differingFrom: heldAnswers)
         // An event first written down by a lottery still gets an entry.
         if held == nil, listMoved || planMoved, !given.contains(.tracking) { given.append(.tracking) }
@@ -572,6 +575,7 @@ final class EventStore {
             LibraryDatabase.writePlan(reminders, for: event.id, rows: &planRows, dated: now, in: database.context)
             LibraryDatabase.writePlan(queueTickets, for: event.id, rows: &planRows, dated: now, in: database.context)
             LibraryDatabase.writePlan(setLists, for: event.id, rows: &planRows, dated: now, in: database.context)
+            LibraryDatabase.writePlan(goodsNotices, for: event.id, rows: &planRows, dated: now, in: database.context)
         }
         records[event.id] = nil
         converted[event.id] = nil
@@ -807,21 +811,18 @@ final class EventStore {
         save()
     }
 
-    /// Writes `reminder` onto `event`: in its place where it is there already,
-    /// and as a new one where it is not.
-    func setReminder(_ reminder: EventReminder, for event: Event) {
-        edit(event) { answers in
-            if let index = answers.tracking.reminders.firstIndex(where: { $0.id == reminder.id }) {
-                answers.tracking.reminders[index] = reminder
-            } else {
-                answers.tracking.reminders.append(reminder)
-            }
-        }
+    /// Writes `reminder` onto `event` as the one time of its kind of the
+    /// goods sale: in its place where it is there already, as a new one where
+    /// it is not, and the others an older build wrote for that kind taken out
+    /// (``Tracking/settingGoodsReminder(_:)``).
+    func setGoodsReminder(_ reminder: EventReminder, for event: Event) {
+        edit(event) { $0.tracking = $0.tracking.settingGoodsReminder(reminder) }
         save()
     }
 
-    func removeReminder(_ id: EventReminder.ID, from event: Event) {
-        edit(event) { $0.tracking.reminders.removeAll { $0.id == id } }
+    /// Takes every time written for `kind` of the goods sale off `event`.
+    func removeGoodsReminder(_ kind: ReminderKind, from event: Event) {
+        edit(event) { $0.tracking = $0.tracking.removingGoodsReminder(kind) }
         save()
     }
 
@@ -866,6 +867,20 @@ final class EventStore {
 
     func removeSetList(_ id: SetList.ID, from event: Event) {
         edit(event) { $0.tracking.setLists.removeAll { $0.id == id } }
+        save()
+    }
+
+    /// Writes `link` as where `event`'s goods sale is told of, in the place
+    /// of the one before.
+    func setGoodsNotice(_ link: URL, for event: Event) {
+        edit(event) { $0.tracking = $0.tracking.settingGoodsNotice(link) }
+        save()
+    }
+
+    /// Takes the goods sale's notice off `event`, with any another device
+    /// wrote beside it.
+    func removeGoodsNotice(from event: Event) {
+        edit(event) { $0.tracking.goodsNotices = [] }
         save()
     }
 

@@ -663,7 +663,7 @@ struct MeView: View {
                     // The ones the card has no room for, by the next of them.
                     if list.open.count > shown.count, let next = list.open[shown.count].current {
                         NavigationLink(value: MeList.todos) {
-                            Text("\(list.open.count - shown.count) more · \(TicketTodoText.when(of: next, at: list.open[shown.count].event, on: timeDisplay))")
+                            Text("\(list.open.count - shown.count) more · \(TicketTodoText.when(next, of: list.open[shown.count], on: timeDisplay))")
                                 .scalingFont(size: 13, weight: .medium)
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)

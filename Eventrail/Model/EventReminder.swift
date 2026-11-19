@@ -8,9 +8,9 @@ nonisolated protocol PlanItem: Identifiable, Codable, Equatable where ID == UUID
     static var rowKind: String { get }
 }
 
-/// A time the reader wrote down for an event ahead, and how long before it
-/// they want to hear about it: when the goods sale starts, when the random
-/// queue tickets stop being handed out, when a payment is due.
+/// A time of the goods sale at the hall the reader wrote down for an event:
+/// when the queue tickets are handed out (``ReminderKind/goods``) — the
+/// 会場物販 card on the event's sheet.
 ///
 /// A promoter prints these on the event's page and nowhere a reader of
 /// Eventernote can see, and each promoter runs them differently, so nothing
@@ -22,49 +22,27 @@ nonisolated protocol PlanItem: Identifiable, Codable, Equatable where ID == UUID
 /// instant only through the hall's zone (``date(in:)``). A hall whose clock
 /// is settled later (``EventStore/retimeEvents()``) moves the instant and not
 /// what was written.
+///
+/// How long before it the notification comes is one answer in Settings for
+/// every time (``EventReminders/goodsLead``). A reminder written by an older
+/// build — a time of the ticket sale, which a won round now keeps
+/// (``LotteryEntry/payment``), the sale's opening (物販開始), or one the
+/// reader named — is kept as it was and neither shown nor notified.
 nonisolated struct EventReminder: PlanItem, Hashable, Sendable {
     static let rowKind = "reminder"
 
     var id = UUID()
-    /// One of ``ReminderKind`` as the promoter prints it, or what the reader
-    /// typed. Shown through ``ReminderKind/label(of:)``.
+    /// One of ``ReminderKind`` as the promoter prints it, or what an older
+    /// build let the reader type. Shown through ``ReminderKind/label(of:)``.
     var title: String
-    /// The day on the hall's calendar: usually the event's, and not for a
-    /// payment due a month ahead.
+    /// The day on the hall's calendar: usually the event's, and the day
+    /// before for a sale held the night before (前日物販).
     var day: CalendarDay
     /// Minutes past midnight on the hall's clock.
     var minute: Int
-    /// How many minutes before the time the notification comes, 0 being at
-    /// the time itself. Nil is a time written down to be read, with no
-    /// notification at all.
+    /// How many minutes before the time an older build's notification came.
+    /// Kept as it was written, and read by nothing: Settings says now.
     var lead: Int?
-    /// When the reader said this was dealt with — applied, paid, the ticket
-    /// issued (``TicketTodo``) — and nil while it is still to do. A reminder
-    /// dealt with owes no notification (``Tracking/owes(_:)``); taking the
-    /// date off again brings back one whose moment is still ahead.
-    ///
-    /// These seven ride in the row's JSON, as a queue ticket's number does,
-    /// so they need no column, and each is left out where it says nothing: a
-    /// reminder written before them reads back, and writes back, as it was.
-    var done: Date?
-    /// Whether ``done`` is the reader giving it up rather than doing it: a
-    /// payment not made in time. Nil where it is not.
-    var missed: Bool?
-    /// The round of the sale it is for, as ``LotteryEntry/round`` is kept, or
-    /// nil where none was named.
-    var round: String?
-    /// What is to be paid, as the reader typed it — digits with a point, as
-    /// ``LibraryEntry/price`` keeps a cost, since JSON's own numbers are
-    /// read back through a `Double` — in ``currency``. Read through ``owed``.
-    var amount: String?
-    /// ISO 4217, beside ``amount``.
-    var currency: String?
-    /// Where it is paid, or the ticket issued, as the reader wrote it:
-    /// セブン-イレブン, a card.
-    var payAt: String?
-    /// The page it is done on — a play guide's own page for the order — which
-    /// opens in the reader's browser, as every other link does.
-    var link: URL?
 
     /// The instant this falls on, on `zone`'s clock — the hall's.
     func date(in zone: TimeZone) -> Date {
@@ -73,38 +51,10 @@ nonisolated struct EventReminder: PlanItem, Hashable, Sendable {
             ?? .distantPast
     }
 
-    /// When the notification comes, where there is one.
-    func alertDate(in zone: TimeZone) -> Date? {
-        lead.map { date(in: zone).addingTimeInterval(-Double($0) * 60) }
-    }
-
-    /// What is to be paid and what in, or nil where no amount is written.
-    var owed: Money? {
-        get {
-            amount.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) }
-                .map { Money(amount: $0, currency: currency ?? Currencies.yen) }
-        }
-        set {
-            amount = newValue.map { "\($0.amount)" }
-            currency = newValue?.currency
-        }
-    }
-
-    /// Which of the ticket sale's three this is, or nil for a time at the
-    /// goods sale or one the reader named themselves.
-    var ticketKind: ReminderKind? {
-        ReminderKind(rawValue: title).flatMap { ReminderKind.tickets.contains($0) ? $0 : nil }
-    }
-
-    /// As long as a place to pay is kept: a row has room for a line.
-    static let longestPlace = 40
-
-    /// A place to pay as it is kept: the ends trimmed, and nil where nothing
-    /// is left.
-    static func typedPlace(_ text: String) -> String? {
-        let place = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return place.isEmpty ? nil : String(place.prefix(longestPlace))
-    }
+    /// Which of the goods sale's times this is — the three queue times an
+    /// older build named apart read as the one they are (``ReminderKind/goodsTime``)
+    /// — or nil for anything else.
+    var goodsKind: ReminderKind? { ReminderKind(rawValue: title)?.goodsTime }
 
     /// Moves this to the day and minute `date` falls on, on `zone`'s clock.
     mutating func move(to date: Date, in zone: TimeZone) {
@@ -124,102 +74,86 @@ nonisolated struct EventReminder: PlanItem, Hashable, Sendable {
 }
 
 nonisolated extension EventReminder {
-    /// A new reminder for `event`, for the reader to set the time of: noon on
-    /// the event's own day, or for what is done from home ahead of it, the end
-    /// of today. Once the event's day is over it is a record: on that day, with
-    /// no notification, since none would come.
-    init(kind: ReminderKind?, for event: Event, at now: Date = .now) {
-        let calendar = Calendar.gregorian(in: event.timeZone)
-        let isOver = event.dayEnds <= now
-        let isAhead = !isOver && (kind.map(ReminderKind.tickets.contains) ?? false)
-        self.init(title: kind?.rawValue ?? "",
-                  day: CalendarDay(isAhead ? now : event.date, in: calendar),
-                  minute: kind == .applicationDeadline || kind == .paymentDeadline ? 23 * 60 + 59 : 12 * 60,
-                  lead: isOver ? nil : kind?.defaultLead ?? 60)
+    /// A new time of `kind` for `event`, for the reader to set: on the event's
+    /// own day, at the hour the kind usually falls at.
+    init(kind: ReminderKind, for event: Event) {
+        self.init(title: kind.rawValue,
+                  day: CalendarDay(event.date, in: .gregorian(in: event.timeZone)),
+                  minute: kind.usualMinute)
     }
 }
 
-/// The times a promoter's notice usually prints, offered ready named — as
-/// ``LotteryRound`` offers a sale's rounds. Stored as printed and kept as
-/// text, so a name typed by hand or added by a later build reads back as
-/// itself.
-nonisolated enum ReminderKind: String, CaseIterable, Identifiable {
-    /// Where a card holder gathers for the numbers called first, such as
-    /// ブシロードカード会員様の優先案内.
-    case priorityCheckIn = "優先案内 集合"
-    /// The last moment to be given a number in the shuffle (ランダム整理券).
-    case randomTicketsClose = "ランダム整理券 締切"
-    /// From when late arrivals and second purchases are given the numbers
-    /// called last (最後尾整理券).
-    case lastTicketsOpen = "最後尾整理券 配布開始"
-    case goodsSale = "物販開始"
-    case applicationDeadline = "申込締切"
-    case paymentDeadline = "入金締切"
-    case ticketPickup = "発券開始"
+nonisolated extension Tracking {
+    /// The time written for `kind` of the goods sale: the earliest, where an
+    /// older build left several — its three queue times are the one time
+    /// they almost always were.
+    func goodsReminder(_ kind: ReminderKind) -> EventReminder? {
+        EventReminder.inOrder(reminders.filter { $0.goodsKind == kind }).first
+    }
 
-    static let goods: [ReminderKind] = [.priorityCheckIn, .randomTicketsClose, .lastTicketsOpen, .goodsSale]
-    static let tickets: [ReminderKind] = [.applicationDeadline, .paymentDeadline, .ticketPickup]
+    /// This, with `reminder` as the one time of its kind — in its place where
+    /// it is already here — and every other written for that kind taken out.
+    func settingGoodsReminder(_ reminder: EventReminder) -> Tracking {
+        var record = self
+        guard let kind = reminder.goodsKind else { return record }
+        var reminder = reminder
+        reminder.title = kind.rawValue
+        record.reminders.removeAll { $0.goodsKind == kind && $0.id != reminder.id }
+        if let index = record.reminders.firstIndex(where: { $0.id == reminder.id }) {
+            record.reminders[index] = reminder
+        } else {
+            record.reminders.append(reminder)
+        }
+        return record
+    }
+
+    /// This, with every time written for `kind` taken out.
+    func removingGoodsReminder(_ kind: ReminderKind) -> Tracking {
+        var record = self
+        record.reminders.removeAll { $0.goodsKind == kind }
+        return record
+    }
+}
+
+/// The times a promoter's notice prints for the goods sale, offered ready
+/// named — as ``LotteryRound`` offers a sale's rounds. Stored as printed and
+/// kept as text, so a name a later build adds reads back as itself.
+///
+/// One is asked: when the queue tickets are handed out. The sale's opening
+/// (物販開始) an older build offered is no longer one (Shawn); what else the
+/// notice says is read on the notice itself (``GoodsNotice``).
+nonisolated enum ReminderKind: String, CaseIterable, Identifiable {
+    /// When the queue tickets are handed out (整理券配布): the priority
+    /// queue's gathering, the random tickets' close and the last-in-line
+    /// tickets' opening, which a notice nearly always sets at one time.
+    case queueTime = "整理券配布"
+    /// What older builds wrote for the queue time, three ways: read as
+    /// ``queueTime`` (``goodsTime``).
+    case priorityCheckIn = "優先案内 集合"
+    case randomTicketsClose = "ランダム整理券 締切"
+    case lastTicketsOpen = "最後尾整理券 配布開始"
+
+    /// The times the 会場物販 card asks, in the order they fall.
+    static let goods: [ReminderKind] = [.queueTime]
 
     var id: String { rawValue }
 
+    /// The one of ``goods`` this is.
+    var goodsTime: ReminderKind { .queueTime }
+
     var label: String {
-        switch self {
-        case .priorityCheckIn:
-            String(localized: "Priority Check-In",
-                   comment: "A reminder's name: when holders of a promoter's card gather for the queue numbers called first, 優先案内 集合.")
-        case .randomTicketsClose:
-            String(localized: "Random Queue Tickets Close",
-                   comment: "A reminder's name: the last moment to be given a shuffled queue number for the goods sale, ランダム整理券 締切.")
-        case .lastTicketsOpen:
-            String(localized: "Last-in-Line Tickets Open",
-                   comment: "A reminder's name: from when queue numbers called last are given out at the goods sale, 最後尾整理券 配布開始.")
-        case .goodsSale:
-            String(localized: "Goods Sale Starts",
-                   comment: "A reminder's name: when the goods sale at the venue opens, 物販開始.")
-        case .applicationDeadline:
-            String(localized: "Application Deadline",
-                   comment: "A reminder's name: the last moment to apply for a ticket lottery, 申込締切.")
-        case .paymentDeadline:
-            String(localized: "Payment Deadline",
-                   comment: "A reminder's name: the last moment to pay for a ticket won, 入金締切.")
-        case .ticketPickup:
-            String(localized: "Ticket Pickup Opens",
-                   comment: "A reminder's name: from when a ticket can be issued or collected, 発券開始.")
-        }
+        String(localized: "Queue Tickets Out",
+               comment: "A time of the goods sale at the venue: when the queue tickets are handed out, 整理券配布.")
     }
 
-    /// How far ahead a new reminder of this kind comes: long enough to get
-    /// there for what closes, shorter for what only opens, and a day for
-    /// what is done from home.
-    var defaultLead: Int {
-        switch self {
-        case .priorityCheckIn, .randomTicketsClose: 60
-        case .goodsSale: 30
-        case .lastTicketsOpen: 15
-        case .applicationDeadline, .paymentDeadline: 24 * 60
-        case .ticketPickup: 0
-        }
-    }
+    /// Where a new time of this kind opens: mid-morning. The reader moves it
+    /// to what the notice says.
+    var usualMinute: Int { 10 * 60 }
 
     /// A reminder's name as the reader reads it: one of these in their
     /// language, and anything else as it was typed.
     static func label(of title: String) -> String {
         ReminderKind(rawValue: title)?.label ?? title
-    }
-
-    /// As long as a name is kept: a row has room for a line, and anything
-    /// longer is a note.
-    static let longestTyped = 40
-
-    /// A name as it is kept: the ends trimmed, and one of these, by either of
-    /// its names, as that one — so a name left as it was offered still reads
-    /// in another language on another device.
-    static func typed(_ text: String) -> String {
-        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let listed = allCases.first(where: { $0.rawValue == typed || $0.label == typed }) {
-            return listed.rawValue
-        }
-        return String(typed.prefix(longestTyped))
     }
 }
 
@@ -303,6 +237,46 @@ nonisolated struct SetList: PlanItem, Hashable, Sendable {
     }
 }
 
+/// Where the goods sale is told of — usually the promoter's post on X, which
+/// prints the line-up, the prices, the queue's rules and its times — as the
+/// link the reader pasted: the 会場物販 card's Sale Info.
+///
+/// Kept as a ``QueueTicket`` is, and for the same reasons: only the link, and
+/// the page opens in the reader's browser — or the app that takes its links,
+/// X's among them — never read by the app. **One to an event**
+/// (``Tracking/goodsNotice``): written again, it takes the place of the one
+/// before. A list in the record all the same, as every part of the plan is,
+/// so two devices writing one each between syncs keep both, and the later
+/// is shown.
+nonisolated struct GoodsNotice: PlanItem, Hashable, Sendable {
+    static let rowKind = "goodsNotice"
+
+    var id = UUID()
+    var link: URL
+    /// When it was written, which settles the one shown.
+    var added: Date
+
+    /// As an event's rows hand them over: the first added first.
+    static func inOrder(_ notices: [GoodsNotice]) -> [GoodsNotice] {
+        notices.sorted { ($0.added, $0.id.uuidString) < ($1.added, $1.id.uuidString) }
+    }
+}
+
+nonisolated extension Tracking {
+    /// The goods sale's notice: the one written last, where two devices
+    /// wrote one each.
+    var goodsNotice: GoodsNotice? { GoodsNotice.inOrder(goodsNotices).last }
+
+    /// This, with `link` as the goods sale's notice — in the place of the one
+    /// shown, where there is one, and every other taken out.
+    func settingGoodsNotice(_ link: URL, at now: Date = .now) -> Tracking {
+        var record = self
+        if let shown = goodsNotice, shown.link == link, goodsNotices.count == 1 { return record }
+        record.goodsNotices = [GoodsNotice(id: goodsNotice?.id ?? UUID(), link: link, added: now)]
+        return record
+    }
+}
+
 /// The web page a printed QR code holds, which is what a ``QueueTicket`` and a
 /// ``SetList`` are each kept as.
 nonisolated enum QRCodeLink {
@@ -315,6 +289,21 @@ nonisolated enum QRCodeLink {
               let host = url.host(), !host.isEmpty
         else { return nil }
         return url
+    }
+
+    /// The web page a link typed or pasted points at: as a code's, or with
+    /// `https://` put before it where it was left off (`x.com/…`). Nil where
+    /// it is not a web page — anything with a space in it, another scheme
+    /// (`mailto:`), or a host with no dot.
+    static func link(typed text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let link = link(inCode: trimmed) { return link }
+        let head = trimmed.prefix { $0 != "/" }
+        guard !trimmed.contains(where: \.isWhitespace), !head.contains(":"), !head.contains("@"),
+              let link = link(inCode: "https://" + trimmed),
+              let host = link.host(), host.contains("."), !host.hasPrefix("."), !host.hasSuffix(".")
+        else { return nil }
+        return link
     }
 
     /// Every web page `codes` point at, once each, as they were found.
