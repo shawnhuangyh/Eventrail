@@ -96,6 +96,7 @@ struct RootView: View {
                 openActivityReminder()
                 openEventReminder()
                 openNewDates()
+                openChangeAlert()
                 takeIntentOpen()
                 if wasInBackground || Self.owesCatchUp { catchUp() }
                 wasInBackground = false
