@@ -6,14 +6,14 @@ import UserNotifications
 
 /// The times a reader writes down for an event, the notifications they come
 /// with and the queue tickets beside them — see ``EventReminder``,
-/// ``EventReminders`` and ``QueueTicket``.
+/// ``EventReminders``, ``QueueTicket``, ``GoodsNotice`` and ``SetList``.
 @MainActor
 struct EventReminderTests {
     /// The goods sale of a Bushiroad night, as its notice prints it:
     /// ランダム整理券 until 11:30, 最後尾整理券 from 11:31, the sale from 12:00.
     let notice = CalendarDay(year: 2026, month: 11, day: 14)
 
-    func reminder(_ kind: ReminderKind = .goodsSale, on day: CalendarDay? = nil, at minute: Int = 12 * 60,
+    func reminder(_ kind: ReminderKind = .queueTime, on day: CalendarDay? = nil, at minute: Int = 12 * 60,
                   lead: Int? = 30) -> EventReminder {
         EventReminder(title: kind.rawValue, day: day ?? notice, minute: minute, lead: lead)
     }
@@ -25,7 +25,7 @@ struct EventReminderTests {
 
     /// A reminder on the event's own day.
     func reminder(on event: Event, at minute: Int = 12 * 60, lead: Int? = 30) -> EventReminder {
-        EventReminder(title: ReminderKind.goodsSale.rawValue,
+        EventReminder(title: ReminderKind.queueTime.rawValue,
                       day: CalendarDay(event.date, in: .gregorian(in: event.timeZone)), minute: minute, lead: lead)
     }
 
@@ -54,119 +54,134 @@ struct EventReminderTests {
         #expect(written.date(in: Fixtures.tokyo) == Fixtures.date(2026, 11, 15, 23, 30))
     }
 
-    @Test func aNewReminderOpensOnTheEventsDay() {
+    /// On the event's own day, in the morning, with no alert of its own:
+    /// Settings says.
+    @Test func aNewTimeOpensOnTheEventsDay() {
         let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
-        let now = Fixtures.date(2026, 9, 1, 10)
-        let sale = EventReminder(kind: .goodsSale, for: show, at: now)
-        #expect(sale.day == notice)
-        #expect(sale.minute == 12 * 60)
-        #expect(sale.lead == ReminderKind.goodsSale.defaultLead)
-        #expect(sale.title == "物販開始")
-
-        let typed = EventReminder(kind: nil, for: show, at: now)
-        #expect(typed.title.isEmpty)
-        #expect(typed.day == notice)
-    }
-
-    /// Written down afterwards: on the event's day, which is as late as the
-    /// sheet's picker goes, whatever the kind, and asking for no notification.
-    @Test func aReminderOnAnEventGoneByIsARecord() {
-        let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
-        let afterwards = Fixtures.date(2026, 12, 1, 10)
-        for kind in ReminderKind.allCases {
-            let written = EventReminder(kind: kind, for: show, at: afterwards)
-            #expect(written.day == notice)
-            #expect(written.lead == nil)
-        }
-        let typed = EventReminder(kind: nil, for: show, at: afterwards)
-        #expect(typed.day == notice)
-        #expect(typed.lead == nil)
-    }
-
-    /// The line every list draws: the event's day being over at the hall.
-    @Test func anEventIsARecordOnlyOnceItsDayIsOver() {
-        let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
-        let lastMoment = show.dayEnds.addingTimeInterval(-1)
-        #expect(EventReminder(kind: .goodsSale, for: show, at: lastMoment).lead == ReminderKind.goodsSale.defaultLead)
-        #expect(EventReminder(kind: .goodsSale, for: show, at: show.dayEnds).lead == nil)
-    }
-
-    /// What is done from home is not on the event's day.
-    @Test func aDeadlineOpensToday() {
-        let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
-        let now = Fixtures.date(2026, 9, 1, 10)
-        let payment = EventReminder(kind: .paymentDeadline, for: show, at: now)
-        #expect(payment.day == CalendarDay(year: 2026, month: 9, day: 1))
-        #expect(payment.minute == 23 * 60 + 59)
+        let queue = EventReminder(kind: .queueTime, for: show)
+        #expect(queue.day == notice)
+        #expect(queue.minute == 10 * 60)
+        #expect(queue.lead == nil)
+        #expect(queue.title == "整理券配布")
     }
 
     @Test func aListReadsByWhen() {
-        let sale = reminder(.goodsSale, at: 12 * 60)
+        let queue = reminder(at: 12 * 60)
         let close = reminder(.randomTicketsClose, at: 11 * 60 + 30)
-        let payment = reminder(.paymentDeadline, on: CalendarDay(year: 2026, month: 9, day: 1), at: 23 * 60)
-        #expect(EventReminder.inOrder([sale, close, payment]).map(\.id) == [payment.id, close.id, sale.id])
+        let dayBefore = reminder(on: CalendarDay(year: 2026, month: 11, day: 13), at: 15 * 60)
+        #expect(EventReminder.inOrder([queue, close, dayBefore]).map(\.id) == [dayBefore.id, close.id, queue.id])
     }
 
-    // MARK: - Names
+    // MARK: - The goods sale's time
 
-    /// Offered in the reader's language and kept as printed, so it reads in
-    /// another language on another device; anything else as typed.
-    @Test func aNameIsKeptAsPrintedOrAsTyped() {
-        for kind in ReminderKind.allCases {
-            #expect(ReminderKind.typed(kind.label) == kind.rawValue)
-            #expect(ReminderKind.typed(kind.rawValue) == kind.rawValue)
-            #expect(ReminderKind.label(of: kind.rawValue) == kind.label)
+    /// The sale's opening an older build wrote (物販開始) is no time the card
+    /// asks any more.
+    func saleOpening(at minute: Int = 12 * 60) -> EventReminder {
+        EventReminder(title: "物販開始", day: notice, minute: minute, lead: 30)
+    }
+
+    /// The three queue times an older build named apart are the one time a
+    /// notice nearly always sets them at.
+    @Test func theOlderQueueTimesAreOne() {
+        for kind in [ReminderKind.priorityCheckIn, .randomTicketsClose, .lastTicketsOpen, .queueTime] {
+            #expect(kind.goodsTime == .queueTime)
+            #expect(ReminderKind.label(of: kind.rawValue) == ReminderKind.queueTime.label)
         }
-        #expect(ReminderKind.typed("  ブシロードカード優先\n") == "ブシロードカード優先")
-        #expect(ReminderKind.label(of: "ブシロードカード優先") == "ブシロードカード優先")
-        #expect(ReminderKind.typed(String(repeating: "券", count: 100)).count == ReminderKind.longestTyped)
+        #expect(ReminderKind.goods == [.queueTime])
+        #expect(saleOpening().goodsKind == nil)
     }
 
-    @Test func everyKindIsOffered() {
-        #expect(Set(ReminderKind.goods + ReminderKind.tickets) == Set(ReminderKind.allCases))
+    /// Of several an older build wrote, the earliest; the sale's opening, a
+    /// time of the ticket sale, or one the reader named, is no time of the
+    /// goods sale at all.
+    @Test func theEarliestQueueTimeStands() {
+        let random = reminder(.randomTicketsClose, at: 11 * 60 + 30)
+        let last = reminder(.lastTicketsOpen, at: 11 * 60 + 31)
+        let priority = reminder(.priorityCheckIn, at: 10 * 60)
+        let sale = saleOpening()
+        let payment = EventReminder(title: "入金締切", day: notice, minute: 23 * 60 + 59, lead: 24 * 60)
+        let typed = EventReminder(title: "ブシロードカード優先", day: notice, minute: 9 * 60, lead: 30)
+        let record = Tracking(reminders: [random, last, priority, sale, payment, typed])
+        #expect(record.goodsReminder(.queueTime) == priority)
+        #expect(sale.goodsKind == nil)
+        #expect(payment.goodsKind == nil)
+        #expect(typed.goodsKind == nil)
+    }
+
+    /// Written, it is the one time of its kind, under the kind's own name;
+    /// taken out, every time of its kind goes, and nothing else.
+    @Test func aTimeWrittenFoldsTheOthersOfItsKind() {
+        let random = reminder(.randomTicketsClose, at: 11 * 60 + 30)
+        var priority = reminder(.priorityCheckIn, at: 10 * 60)
+        let sale = saleOpening()
+        let payment = EventReminder(title: "入金締切", day: notice, minute: 23 * 60 + 59, lead: 24 * 60)
+        let record = Tracking(reminders: [random, priority, sale, payment])
+
+        priority.minute = 10 * 60 + 30
+        let written = record.settingGoodsReminder(priority)
+        #expect(written.goodsReminder(.queueTime)?.id == priority.id)
+        #expect(written.goodsReminder(.queueTime)?.title == ReminderKind.queueTime.rawValue)
+        #expect(written.goodsReminder(.queueTime)?.minute == 10 * 60 + 30)
+        #expect(written.reminders.count == 3)
+        #expect(written.reminders.contains(sale) && written.reminders.contains(payment))
+
+        let taken = record.removingGoodsReminder(.queueTime)
+        #expect(taken.goodsReminder(.queueTime) == nil)
+        #expect(taken.reminders == [sale, payment])
     }
 
     // MARK: - Notifications
 
-    @Test func theAlertComesItsLeadAhead() {
-        let written = reminder(at: 11 * 60 + 30, lead: 60)
-        #expect(written.alertDate(in: Fixtures.tokyo) == Fixtures.date(2026, 11, 14, 10, 30))
-        #expect(reminder(lead: 0).alertDate(in: Fixtures.tokyo) == reminder().date(in: Fixtures.tokyo))
-        #expect(reminder(lead: nil).alertDate(in: Fixtures.tokyo) == nil)
+    @Test func theAlertComesTheLeadAhead() throws {
+        let show = event()
+        let written = reminder(on: show, at: 11 * 60 + 30)
+        let alert = try #require(ReminderAlert(reminder: written, event: show, lead: 60))
+        #expect(alert.date == written.date(in: show.timeZone).addingTimeInterval(-3600))
+        let atTheTime = try #require(ReminderAlert(reminder: written, event: show, lead: 0))
+        #expect(atTheTime.date == written.date(in: show.timeZone))
     }
 
-    @Test func nothingIsOwedForNoAlertOrAMomentGone() throws {
+    @Test func nothingIsOwedForAMomentGone() throws {
         let show = event()
         let written = reminder(on: show)
-        #expect(ReminderAlert(reminder: written, event: show) != nil)
-        #expect(ReminderAlert(reminder: reminder(on: show, lead: nil), event: show) == nil)
-
-        let alert = try #require(written.alertDate(in: show.timeZone))
-        #expect(ReminderAlert(reminder: written, event: show, at: alert.addingTimeInterval(-1)) != nil)
+        let alert = try #require(ReminderAlert(reminder: written, event: show, lead: 30)).date
+        #expect(ReminderAlert(reminder: written, event: show, lead: 30, at: alert.addingTimeInterval(-1)) != nil)
         // Its moment has gone though the time itself is still ahead.
-        #expect(ReminderAlert(reminder: written, event: show, at: alert.addingTimeInterval(1)) == nil)
+        #expect(ReminderAlert(reminder: written, event: show, lead: 30, at: alert.addingTimeInterval(1)) == nil)
+    }
+
+    /// What an older build wrote that is no time of the goods sale is kept,
+    /// and says nothing.
+    @Test func anOlderBuildsOtherTimesAreOwedNothing() {
+        let show = event()
+        let day = CalendarDay(show.date, in: .gregorian(in: show.timeZone))
+        let payment = EventReminder(title: "入金締切", day: day, minute: 12 * 60, lead: 30)
+        let typed = EventReminder(title: "ブシロードカード優先", day: day, minute: 12 * 60, lead: 30)
+        let opening = EventReminder(title: "物販開始", day: day, minute: 12 * 60, lead: 30)
+        #expect(ReminderAlert(reminder: payment, event: show, lead: 30) == nil)
+        #expect(ReminderAlert(reminder: typed, event: show, lead: 30) == nil)
+        #expect(ReminderAlert(reminder: opening, event: show, lead: 30) == nil)
+        #expect(ReminderAlert.due(in: [show], tracking: { _ in Tracking(reminders: [payment, typed, opening]) },
+                                  lead: 30).isEmpty)
     }
 
     /// Nothing comes for an event gone by, not even for a time still ahead on
     /// it, which is what an event moved to an earlier day leaves behind.
-    @Test func anEventGoneByIsOwedNothing() throws {
+    @Test func anEventGoneByIsOwedNothing() {
         let over = event(inDays: -2)
         let stillAhead = reminder(on: event(inDays: 3))
-        #expect(try #require(stillAhead.alertDate(in: over.timeZone)) > .now)
-
-        #expect(ReminderAlert(reminder: stillAhead, event: over) == nil)
-        #expect(ReminderAlert.due(in: [over], tracking: { _ in Tracking(reminders: [stillAhead]) }).isEmpty)
+        #expect(ReminderAlert(reminder: stillAhead, event: over, lead: 30) == nil)
+        #expect(ReminderAlert.due(in: [over], tracking: { _ in Tracking(reminders: [stillAhead]) }, lead: 30).isEmpty)
     }
 
     /// Scheduled, it would come after the event is over, whether or not the app
     /// is opened again to take it back.
-    @Test func aTimePastAnEventMovedEarlierIsOwedNothing() throws {
+    @Test func aTimePastAnEventMovedEarlierIsOwedNothing() {
         let moved = event(inDays: 1)
         let written = reminder(on: event(inDays: 8))
-        #expect(try #require(written.alertDate(in: moved.timeZone)) > .now)
         #expect(!moved.holds(written))
-        #expect(ReminderAlert(reminder: written, event: moved) == nil)
-        #expect(ReminderAlert.due(in: [moved], tracking: { _ in Tracking(reminders: [written]) }).isEmpty)
+        #expect(ReminderAlert(reminder: written, event: moved, lead: 30) == nil)
+        #expect(ReminderAlert.due(in: [moved], tracking: { _ in Tracking(reminders: [written]) }, lead: 30).isEmpty)
     }
 
     /// As late as the sheet writes one, and earlier days for what comes ahead.
@@ -179,7 +194,7 @@ struct EventReminderTests {
 
     @Test func theSoonestAreScheduled() {
         let events = (0..<(ReminderAlert.limit + 5)).map { event("\($0)", inDays: 30 - $0) }
-        let due = ReminderAlert.due(in: events, tracking: { Tracking(reminders: [reminder(on: $0)]) })
+        let due = ReminderAlert.due(in: events, tracking: { Tracking(reminders: [reminder(on: $0)]) }, lead: 30)
         #expect(due.count == ReminderAlert.limit)
         #expect(due.map(\.date) == due.map(\.date).sorted())
         #expect(due.first?.eventID == events.last?.id)
@@ -190,57 +205,67 @@ struct EventReminderTests {
         #expect(LotteryReminder.limit + ActivityReminder.limit + ReminderAlert.limit <= 64)
     }
 
-    @Test func oneEventsSeveralTimesAreSeveralNotifications() {
+    /// The queue once: the three queue times an older build wrote come as
+    /// the earliest of them, and the sale's opening it wrote not at all.
+    @Test func eachTimeOfTheSaleIsOneNotification() throws {
         let show = event()
-        let due = ReminderAlert.due(in: [show], tracking: { _ in
-            Tracking(reminders: [reminder(on: show, at: 11 * 60), reminder(on: show, at: 12 * 60)])
-        })
-        #expect(Set(due.map(\.identifier)).count == 2)
+        let day = CalendarDay(show.date, in: .gregorian(in: show.timeZone))
+        let priority = reminder(.priorityCheckIn, on: day, at: 10 * 60)
+        let random = reminder(.randomTicketsClose, on: day, at: 11 * 60 + 30)
+        var sale = saleOpening()
+        sale.day = day
+        let due = ReminderAlert.due(in: [show], tracking: { _ in Tracking(reminders: [random, sale, priority]) },
+                                    lead: 30)
+        #expect(due.map(\.reminderID) == [priority.id])
         #expect(due.allSatisfy { $0.identifier.hasPrefix(ReminderAlert.prefix) })
+        #expect(due.first?.title == ReminderKind.queueTime.label)
     }
 
     /// Its words say what, for which event, and when — on the hall's clock.
     @Test func theNotificationSaysWhatAndWhen() throws {
         let show = Fixtures.event(title: "9th LIVE", date: Fixtures.day(fromToday: 3))
-        let written = reminder(on: show, at: 11 * 60 + 30, lead: 60)
-        let alert = try #require(ReminderAlert(reminder: written, event: show))
+        let written = reminder(on: show, at: 11 * 60 + 30)
+        let alert = try #require(ReminderAlert(reminder: written, event: show, lead: 60))
         var style = Date.FormatStyle(date: .omitted, time: .shortened)
         style.timeZone = Fixtures.tokyo
         let time = written.date(in: Fixtures.tokyo).formatted(style)
 
-        #expect(alert.title == ReminderKind.goodsSale.label)
+        #expect(alert.title == ReminderKind.queueTime.label)
         #expect(alert.eventTitle == "9th LIVE")
         #expect(alert.body == "\(time) · \(ReminderLead.label(of: 60))")
-        #expect(try #require(ReminderAlert(reminder: reminder(on: show, lead: 0), event: show))
-            .body.contains("·") == false)
+        #expect(try #require(ReminderAlert(reminder: written, event: show, lead: 0)).body.contains("·") == false)
         #expect(alert.request.content.userInfo[ReminderAlert.eventKey] as? String == show.id)
+        #expect(alert.request.content.categoryIdentifier.isEmpty)
     }
 
     @Test func aDayOtherThanTheEventsIsPrintedWithIt() {
         let show = Fixtures.event(date: Fixtures.date(2026, 11, 14))
         let onTheDay = show.printedTime(of: reminder(at: 12 * 60), on: .venue)
-        let before = show.printedTime(of: reminder(on: CalendarDay(year: 2026, month: 9, day: 1), at: 12 * 60),
+        let before = show.printedTime(of: reminder(on: CalendarDay(year: 2026, month: 11, day: 13), at: 12 * 60),
                                       on: .venue)
         #expect(before != onTheDay)
         #expect(before.count > onTheDay.count)
     }
 
-    /// A scheduled copy is left alone; a moved time or changed words are not.
+    /// A scheduled copy is left alone; a moved time, another lead or changed
+    /// words are not.
     @Test func aScheduledCopyIsKnownByItsMomentAndWords() throws {
         let show = event()
-        let alert = try #require(ReminderAlert(reminder: reminder(on: show), event: show))
+        let alert = try #require(ReminderAlert(reminder: reminder(on: show), event: show, lead: 30))
         #expect(alert.isScheduled(as: alert.request))
         #expect(!alert.isScheduled(as: nil))
 
-        let moved = try #require(ReminderAlert(reminder: reminder(on: show, at: 13 * 60), event: show))
+        let moved = try #require(ReminderAlert(reminder: reminder(on: show, at: 13 * 60), event: show, lead: 30))
         #expect(!moved.isScheduled(as: alert.request))
+        let sooner = try #require(ReminderAlert(reminder: reminder(on: show), event: show, lead: 15))
+        #expect(!sooner.isScheduled(as: alert.request))
     }
 
     /// What is about to close comes through a Focus; what is a day off waits.
     @Test func onlyWhatCannotWaitIsTimeSensitive() throws {
         let show = event()
-        for lead in ReminderLead.choices {
-            let alert = try #require(ReminderAlert(reminder: reminder(on: show, lead: lead), event: show))
+        for lead in EventReminders.goodsLeads {
+            let alert = try #require(ReminderAlert(reminder: reminder(on: show), event: show, lead: lead))
             #expect(alert.request.content.interruptionLevel == (lead < ReminderAlert.calmLead ? .timeSensitive : .active),
                     "\(lead)")
         }
@@ -249,7 +274,7 @@ struct EventReminderTests {
     /// A copy scheduled before it was urgent is scheduled again.
     @Test func aCopyLessUrgentIsScheduledAgain() throws {
         let show = event()
-        let alert = try #require(ReminderAlert(reminder: reminder(on: show), event: show))
+        let alert = try #require(ReminderAlert(reminder: reminder(on: show), event: show, lead: 30))
         let older = try #require(alert.request.content.mutableCopy() as? UNMutableNotificationContent)
         older.interruptionLevel = .active
         #expect(!alert.isScheduled(as: UNNotificationRequest(identifier: alert.identifier, content: older,
@@ -259,18 +284,18 @@ struct EventReminderTests {
     // MARK: - The queue ticket's link
 
     @Test func onlyAWebPageIsALink() {
-        #expect(QueueTicket.link(inCode: "https://q.example.jp/t/abc?x=1")?.host() == "q.example.jp")
-        #expect(QueueTicket.link(inCode: "  http://q.example.jp/abc\n") != nil)
-        #expect(QueueTicket.link(inCode: "HTTPS://Q.EXAMPLE.JP/abc") != nil)
+        #expect(QRCodeLink.link(inCode: "https://q.example.jp/t/abc?x=1")?.host() == "q.example.jp")
+        #expect(QRCodeLink.link(inCode: "  http://q.example.jp/abc\n") != nil)
+        #expect(QRCodeLink.link(inCode: "HTTPS://Q.EXAMPLE.JP/abc") != nil)
 
         for code in ["", "整理券 123", "tel:0312345678", "javascript:alert(1)", "file:///etc/passwd",
                      "eventrail://event/1", "https://", "q.example.jp/abc", "see https://q.example.jp"] {
-            #expect(QueueTicket.link(inCode: code) == nil, "\(code)")
+            #expect(QRCodeLink.link(inCode: code) == nil, "\(code)")
         }
     }
 
     @Test func aPictureOfTwoOfOneCodeIsOneLink() {
-        let links = QueueTicket.links(inCodes: ["https://q.example.jp/a", "not a link", "https://q.example.jp/a",
+        let links = QRCodeLink.links(inCodes: ["https://q.example.jp/a", "not a link", "https://q.example.jp/a",
                                                 "https://q.example.jp/b"])
         #expect(links.map(\.lastPathComponent) == ["a", "b"])
     }
@@ -279,7 +304,7 @@ struct EventReminderTests {
     /// has to show that part or the reader cannot tell which they are picking.
     @Test func severalLinksAreToldApartOnTheirButtons() {
         func labels(_ links: String...) -> [String] {
-            QueueTicket.labels(tellingApart: links.map { URL(string: $0)! })
+            QRCodeLink.labels(tellingApart: links.map { URL(string: $0)! })
         }
         #expect(labels("https://q.example.jp/t/8f3a21?from=qr", "https://q.example.jp/t/77c0de?from=qr")
             == ["…8f3a21?from=qr", "…77c0de?from=qr"])
@@ -352,19 +377,19 @@ struct EventReminderTests {
 
     // MARK: - The store
 
-    @Test func aReminderIsWrittenInPlaceAndTakenOut() {
+    @Test func aTimeIsWrittenInPlaceAndTakenOut() {
         let store = store()
         let show = event()
         store.toggleLibraryMembership(show)
         var written = reminder(on: show)
-        store.setReminder(written, for: show)
+        store.setGoodsReminder(written, for: show)
         #expect(store.tracking(for: show).reminders == [written])
 
         written.minute = 13 * 60
-        store.setReminder(written, for: show)
+        store.setGoodsReminder(written, for: show)
         #expect(store.tracking(for: show).reminders == [written])
 
-        store.removeReminder(written.id, from: show)
+        store.removeGoodsReminder(.queueTime, from: show)
         #expect(store.tracking(for: show).reminders.isEmpty)
     }
 
@@ -382,6 +407,115 @@ struct EventReminderTests {
 
         store.removeQueueTicket(store.tracking(for: show).queueTickets[0].id, from: show)
         #expect(store.tracking(for: show).queueTickets.map(\.link.lastPathComponent) == ["b"])
+    }
+
+    @Test func oneLinkIsOneSetList() throws {
+        let store = store()
+        let show = event(inDays: -3)
+        let link = try #require(URL(string: "https://example.jp/setlist/a"))
+        store.toggleLibraryMembership(show)
+        store.addSetList(link, to: show)
+        store.addSetList(link, to: show)
+        #expect(store.tracking(for: show).setLists.map(\.link) == [link])
+
+        store.addSetList(try #require(URL(string: "https://example.jp/setlist/b")), to: show)
+        #expect(store.tracking(for: show).setLists.count == 2)
+
+        store.removeSetList(store.tracking(for: show).setLists[0].id, from: show)
+        #expect(store.tracking(for: show).setLists.map(\.link.lastPathComponent) == ["b"])
+    }
+
+    /// The same link can be a queue ticket and a set list: each list is its
+    /// own, and neither answers for the other.
+    @Test func aSetListAndAQueueTicketKeepTheirOwnLists() throws {
+        let store = store()
+        let show = event(inDays: -3)
+        let link = try #require(URL(string: "https://example.jp/a"))
+        store.toggleLibraryMembership(show)
+        store.addQueueTicket(link, to: show)
+        store.addSetList(link, to: show)
+        #expect(store.tracking(for: show).queueTickets.map(\.link) == [link])
+        #expect(store.tracking(for: show).setLists.map(\.link) == [link])
+
+        store.removeQueueTicket(store.tracking(for: show).queueTickets[0].id, from: show)
+        #expect(store.tracking(for: show).queueTickets.isEmpty)
+        #expect(store.tracking(for: show).setLists.map(\.link) == [link])
+    }
+
+    // MARK: - The goods sale's notice
+
+    /// As copied from a post, or with the scheme left off; anything else is
+    /// no link.
+    @Test func aLinkIsReadAsTypedOrPasted() throws {
+        let post = try #require(URL(string: "https://x.com/bang_dream_info/status/1"))
+        #expect(QRCodeLink.link(typed: " https://x.com/bang_dream_info/status/1\n") == post)
+        #expect(QRCodeLink.link(typed: "x.com/bang_dream_info/status/1") == post)
+        #expect(QRCodeLink.link(typed: "http://example.jp/goods")?.scheme == "http")
+        for text in ["", "物販情報", "see x.com", "localhost", "ftp://example.jp/a", "mailto:goods@example.jp", "x."] {
+            #expect(QRCodeLink.link(typed: text) == nil, "\(text)")
+        }
+    }
+
+    /// One to an event: written again it takes the place of the one before,
+    /// and of two that two devices wrote, the later is the one read.
+    @Test func oneNoticeStands() throws {
+        let first = try #require(URL(string: "https://x.com/a/status/1"))
+        let second = try #require(URL(string: "https://x.com/a/status/2"))
+        let written = Tracking().settingGoodsNotice(first, at: Fixtures.date(2026, 11, 1))
+        let notice = try #require(written.goodsNotice)
+        #expect(notice.link == first)
+        #expect(written.settingGoodsNotice(first, at: Fixtures.date(2026, 11, 2)) == written)
+
+        let rewritten = written.settingGoodsNotice(second, at: Fixtures.date(2026, 11, 2))
+        #expect(rewritten.goodsNotices.map(\.link) == [second])
+        #expect(rewritten.goodsNotice?.id == notice.id)
+
+        let other = GoodsNotice(link: second, added: Fixtures.date(2026, 11, 3))
+        let both = Tracking(goodsNotices: [other, notice])
+        #expect(both.goodsNotice == other)
+        #expect(both.settingGoodsNotice(second, at: Fixtures.date(2026, 11, 4)).goodsNotices.count == 1)
+    }
+
+    @Test func aNoticeIsWrittenAndTakenOut() throws {
+        let store = store()
+        let show = event()
+        store.toggleLibraryMembership(show)
+        let post = try #require(URL(string: "https://x.com/a/status/1"))
+        store.setGoodsNotice(post, for: show)
+        #expect(store.tracking(for: show).goodsNotice?.link == post)
+        // Not a ticket, so the event still asks about one once it is over.
+        #expect(store.tracking(for: show).isTicketBlank)
+        #expect(!store.tracking(for: show).isEmpty)
+
+        let page = try #require(URL(string: "https://example.jp/goods"))
+        store.setGoodsNotice(page, for: show)
+        #expect(store.tracking(for: show).goodsNotices.map(\.link) == [page])
+
+        store.removeGoodsNotice(from: show)
+        #expect(store.tracking(for: show).goodsNotices.isEmpty)
+    }
+
+    /// A set list kept says nothing about a ticket: the event still asks.
+    @Test func aSetListLeavesTicketDetailsBlank() throws {
+        let store = store()
+        let show = event(inDays: -3)
+        store.toggleLibraryMembership(show)
+        store.addSetList(try #require(URL(string: "https://example.jp/setlist")), to: show)
+        #expect(store.tracking(for: show).isTicketBlank)
+        #expect(!store.tracking(for: show).isEmpty)
+        #expect(store.awaitsTicket(show))
+        #expect(!store.hasAttended(show))
+    }
+
+    /// Offered from the morning of the event's day at the hall: a set list
+    /// comes out as the show ends, which no printed end time can be trusted for.
+    @Test func theDayHasComeFromItsMorningAtTheHall() {
+        let show = event()
+        #expect(!show.dayHasCome(at: show.date.addingTimeInterval(-60)))
+        #expect(show.dayHasCome(at: show.date))
+        #expect(show.dayHasCome(at: show.dayEnds.addingTimeInterval(365 * 24 * 60 * 60)))
+        #expect(!event().dayHasCome())
+        #expect(event(inDays: -1).dayHasCome())
     }
 
     /// The ticket added is handed back to be numbered, and a link already held
@@ -440,7 +574,7 @@ struct EventReminderTests {
         let entry = try #require(try store.database.context.fetch(FetchDescriptor<LibraryEntry>()).first)
         let written = entry.modified
 
-        store.setReminder(reminder(on: show), for: show)
+        store.setGoodsReminder(reminder(on: show), for: show)
         store.saveNow()
         #expect(entry.modified == written)
         #expect(store.tracking(for: show).note == "front row")
@@ -450,7 +584,7 @@ struct EventReminderTests {
     @Test func anEventFirstWrittenDownByAReminderGetsAnEntry() throws {
         let store = store()
         let show = event()
-        store.setReminder(reminder(on: show), for: show)
+        store.setGoodsReminder(reminder(on: show), for: show)
         store.saveNow()
         #expect(try store.database.context.fetch(FetchDescriptor<LibraryEntry>()).count == 1)
     }
@@ -460,13 +594,14 @@ struct EventReminderTests {
         let store = store()
         let show = event()
         store.toggleLibraryMembership(show)
-        store.setReminder(reminder(on: show), for: show)
+        store.setGoodsReminder(reminder(on: show), for: show)
         store.addQueueTicket(try #require(URL(string: "https://q.example.jp/a")), to: show)
+        store.addSetList(try #require(URL(string: "https://example.jp/setlist")), to: show)
 
         store.remove(CollectionOfOne(show))
         #expect(store.tracking(for: show).isEmpty)
         let rows = try store.database.context.fetch(FetchDescriptor<LibraryPlanItem>())
-        #expect(rows.count == 2)
+        #expect(rows.count == 3)
         let removed = rows.allSatisfy { $0.isRemoved && $0.text.isEmpty }
         #expect(removed)
     }
@@ -475,7 +610,7 @@ struct EventReminderTests {
         let store = store()
         let show = event()
         store.toggleLibraryMembership(show)
-        store.setReminder(reminder(on: show), for: show)
+        store.setGoodsReminder(reminder(on: show), for: show)
 
         store.removeAllEvents()
         #expect(store.tracking(for: show).isEmpty)
@@ -488,7 +623,7 @@ struct EventReminderTests {
         let store = store()
         let past = event(inDays: -3)
         store.toggleLibraryMembership(past)
-        store.setReminder(reminder(on: past), for: past)
+        store.setGoodsReminder(reminder(on: past), for: past)
         #expect(store.awaitsTicket(past))
     }
 }
@@ -510,6 +645,14 @@ struct LibraryPlanItemTests {
 
     func ticket(_ path: String = "a") -> QueueTicket {
         QueueTicket(link: URL(string: "https://q.example.jp/\(path)")!, added: earlier)
+    }
+
+    func setList(_ path: String = "a") -> SetList {
+        SetList(link: URL(string: "https://example.jp/setlist/\(path)")!, added: earlier)
+    }
+
+    func notice(_ path: String = "1") -> GoodsNotice {
+        GoodsNotice(link: URL(string: "https://x.com/a/status/\(path)")!, added: earlier)
     }
 
     func rows(in context: ModelContext) throws -> [String: [String: LibraryPlanItem]] {
@@ -582,13 +725,25 @@ struct LibraryPlanItemTests {
     @Test func oneKindLeavesTheOtherAlone() throws {
         let (database, context) = database()
         var held: [String: [String: LibraryPlanItem]] = [:]
-        let time = reminder(), code = ticket()
+        let time = reminder(), code = ticket(), songs = setList()
         LibraryDatabase.writePlan([time], for: "1", rows: &held, dated: earlier, in: context)
         LibraryDatabase.writePlan([code], for: "1", rows: &held, dated: earlier, in: context)
+        LibraryDatabase.writePlan([songs], for: "1", rows: &held, dated: earlier, in: context)
         LibraryDatabase.writePlan([EventReminder](), for: "1", rows: &held, dated: later, in: context)
 
         #expect(LibraryDatabase.planItems(EventReminder.self, in: held["1"]).isEmpty)
         #expect(LibraryDatabase.planItems(QueueTicket.self, in: held["1"]) == [code])
+        #expect(LibraryDatabase.planItems(SetList.self, in: held["1"]) == [songs])
+
+        LibraryDatabase.writePlan([SetList](), for: "1", rows: &held, dated: later, in: context)
+        #expect(LibraryDatabase.planItems(SetList.self, in: held["1"]).isEmpty)
+        #expect(LibraryDatabase.planItems(QueueTicket.self, in: held["1"]) == [code])
+
+        let post = notice()
+        LibraryDatabase.writePlan([post], for: "1", rows: &held, dated: later, in: context)
+        LibraryDatabase.writePlan([QueueTicket](), for: "1", rows: &held, dated: later, in: context)
+        #expect(LibraryDatabase.planItems(GoodsNotice.self, in: held["1"]) == [post])
+        #expect(LibraryDatabase.planItems(QueueTicket.self, in: held["1"]).isEmpty)
         withExtendedLifetime(database) {}
     }
 
@@ -664,8 +819,9 @@ struct LibraryPlanItemTests {
         var archive = LibraryArchive()
         archive.events["1"] = Fixtures.event(id: "1")
         archive.membership["1"] = Stamped(true, at: earlier)
-        let time = reminder(), code = ticket()
-        archive.tracking["1"] = Stamped(Tracking(note: "front row", reminders: [time], queueTickets: [code]), at: later)
+        let time = reminder(), code = ticket(), songs = setList(), post = notice()
+        archive.tracking["1"] = Stamped(Tracking(note: "front row", reminders: [time], queueTickets: [code],
+                                                 setLists: [songs], goodsNotices: [post]), at: later)
         try LibraryDatabase.apply(archive, to: context)
         try context.save()
 
@@ -673,6 +829,8 @@ struct LibraryPlanItemTests {
         let record = try #require(read.tracking["1"])
         #expect(record.value.reminders == [time])
         #expect(record.value.queueTickets == [code])
+        #expect(record.value.setLists == [songs])
+        #expect(record.value.goodsNotices == [post])
         #expect(record.value.note == "front row")
         #expect(record.modified == later.toTheMillisecond)
 
@@ -699,6 +857,8 @@ struct LibraryPlanItemTests {
         #expect(record.value.edits[.reminders] == nil)
         // No row of a kind says nothing of it, however new the record.
         #expect(record.value.edits[.queueTickets] == Tracking.unsaid)
+        #expect(record.value.edits[.setLists] == Tracking.unsaid)
+        #expect(record.value.edits[.goodsNotices] == Tracking.unsaid)
         withExtendedLifetime(database) {}
     }
 
@@ -706,10 +866,11 @@ struct LibraryPlanItemTests {
     /// holds neither list. The reader only changed a note.
     @Test func aRecordFromBeforeThePlanLeavesItAlone() throws {
         let (database, context) = database()
-        let time = reminder(), link = ticket()
+        let time = reminder(), link = ticket(), songs = setList(), post = notice()
         var archive = LibraryArchive()
         archive.membership["1"] = Stamped(true, at: earlier)
-        archive.tracking["1"] = Stamped(Tracking(reminders: [time], queueTickets: [link]), at: earlier)
+        archive.tracking["1"] = Stamped(Tracking(reminders: [time], queueTickets: [link], setLists: [songs],
+                                                 goodsNotices: [post]), at: earlier)
         try LibraryDatabase.apply(archive, to: context)
         try context.save()
 
@@ -724,6 +885,8 @@ struct LibraryPlanItemTests {
         #expect(plan.values.allSatisfy { !$0.isRemoved })
         #expect(LibraryDatabase.planItems(EventReminder.self, in: plan) == [time])
         #expect(LibraryDatabase.planItems(QueueTicket.self, in: plan) == [link])
+        #expect(LibraryDatabase.planItems(SetList.self, in: plan) == [songs])
+        #expect(LibraryDatabase.planItems(GoodsNotice.self, in: plan) == [post])
         #expect(plan.values.allSatisfy { $0.modified == earlier.toTheMillisecond })
         let entries = try context.fetch(FetchDescriptor<LibraryEntry>())
         #expect(entries.map(\.tracking.note) == ["front row"])
@@ -735,9 +898,13 @@ struct LibraryPlanItemTests {
         let older = try JSONDecoder().decode(Tracking.self, from: Data(#"{"seat":"A12"}"#.utf8))
         #expect(!older.says(.reminders))
         #expect(!older.says(.queueTickets))
+        #expect(!older.says(.setLists))
+        #expect(!older.says(.goodsNotices))
         let again = try JSONDecoder().decode(Tracking.self, from: JSONEncoder().encode(older))
         #expect(!again.says(.reminders))
         #expect(!again.says(.queueTickets))
+        #expect(!again.says(.setLists))
+        #expect(!again.says(.goodsNotices))
         #expect(again.says(.note))
 
         // Settled against one that has, whichever is newer.

@@ -4,6 +4,29 @@
     "%@" : {
       "shouldTranslate" : false
     },
+    "%@ left" : {
+      "comment" : "How long until a ticket deadline. The argument is a span such as 2 days, 6 hours.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还剩 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還剩 %@"
+          }
+        }
+      }
+    },
     "%@ · %@" : {
       "localizations" : {
         "ja" : {
@@ -869,6 +892,75 @@
         }
       }
     },
+    "%@: %@ → %@" : {
+      "comment" : "A line of a notification that an event moved: what moved, what it was and what it is now.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@ → %3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@ → %3$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@ → %3$@"
+          }
+        }
+      }
+    },
+    "%lld done · %@" : {
+      "comment" : "The Ticket To-Dos screen's subtitle on Done. The second argument says how many reminders were stopped.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了 %lld件 · %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成 %lld 项 · %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成 %lld 項 · %@"
+          }
+        }
+      }
+    },
+    "%lld due soon" : {
+      "comment" : "How many ticket deadlines fall within three days.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期限間近 %lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 项即将到期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項即將到期"
+          }
+        }
+      }
+    },
     "%lld events" : {
       "localizations" : {
         "ja" : {
@@ -932,6 +1024,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提前 %lld 分鐘"
+          }
+        }
+      }
+    },
+    "%lld more · %@" : {
+      "comment" : "Under the Ticket To-Dos card's rows: how many more there are, and the next of them, such as Apply by Mon, Dec 7 · 23:59.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほか%lld件 · %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另有 %lld 项 · %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另有 %lld 項 · %@"
+          }
+        }
+      }
+    },
+    "%lld new dates" : {
+      "comment" : "A notification's title: how many dates were newly published for the people followed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着公演 %lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个新场次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個新場次"
           }
         }
       }
@@ -1090,6 +1228,47 @@
         }
       }
     },
+    "%lld others" : {
+      "comment" : "The end of a list of performers in a notification: how many it did not name.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld other"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld others"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほか%lld名"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另外 %lld 位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另外 %lld 位"
+          }
+        }
+      }
+    },
     "%lld pending" : {
       "localizations" : {
         "ja" : {
@@ -1130,6 +1309,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 位藝人"
+          }
+        }
+      }
+    },
+    "%lld to do" : {
+      "comment" : "The Ticket To-Dos screen's subtitle: how many are still to do.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未完了 %lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 项待办"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項待辦"
           }
         }
       }
@@ -1218,6 +1420,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在此有 %lld 個日期"
+          }
+        }
+      }
+    },
+    "^[%lld day](inflect: true) left" : {
+      "comment" : "How many days until a ticket deadline.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り%lld日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还剩 %lld 天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還剩 %lld 天"
+          }
+        }
+      }
+    },
+    "^[%lld deadline](inflect: true) due soon" : {
+      "comment" : "Under the Ticket To-Dos card's title, in red.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期限間近の締切 %lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个截止时间即将到期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個截止時間即將到期"
           }
         }
       }
@@ -1504,6 +1752,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已選擇 %lld 位藝人"
+          }
+        }
+      }
+    },
+    "^[%lld reminder](inflect: true) stopped" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リマインダー %lld件を停止"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已停止 %lld 条提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已停止 %lld 則提醒"
           }
         }
       }
@@ -2308,6 +2578,28 @@
         }
       }
     },
+    "Add a deadline to pay for or pick up a ticket you won, and it waits here until you have done it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選したチケットの入金・発券の締切を追加すると、済ませるまでここに表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为中选的门票添加付款或取票的截止时间后，在完成之前会显示在这里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "為中選的門票新增付款或取票的截止時間後，在完成之前會顯示在這裡。"
+          }
+        }
+      }
+    },
     "Add another lottery entry?" : {
       "localizations" : {
         "ja" : {
@@ -2326,6 +2618,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "還要再新增一筆抽選嗎？"
+          }
+        }
+      }
+    },
+    "Add Deadline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "締切を追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加截止时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增截止時間"
           }
         }
       }
@@ -2370,6 +2684,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新增活動"
+          }
+        }
+      }
+    },
+    "Add Link" : {
+      "comment" : "A button on the Goods Sale card: adds the link to the post announcing the goods sale.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加链接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增連結"
           }
         }
       }
@@ -2463,28 +2800,6 @@
         }
       }
     },
-    "Add Reminder" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "リマインダーを追加"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加提醒"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新增提醒"
-          }
-        }
-      }
-    },
     "Add Seat" : {
       "localizations" : {
         "ja" : {
@@ -2507,6 +2822,28 @@
         }
       }
     },
+    "Add Set List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリストを追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加歌单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增歌單"
+          }
+        }
+      }
+    },
     "Add this queue ticket?" : {
       "localizations" : {
         "ja" : {
@@ -2525,6 +2862,51 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要新增這張整理券嗎？"
+          }
+        }
+      }
+    },
+    "Add this set list?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このセットリストを追加しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要添加这份歌单吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要新增這份歌單嗎？"
+          }
+        }
+      }
+    },
+    "Add Time" : {
+      "comment" : "A button on a lottery entry: adds the time of day its results come out.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時刻を追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增時間"
           }
         }
       }
@@ -2661,28 +3043,6 @@
         }
       }
     },
-    "Alert" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通知"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通知"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通知"
-          }
-        }
-      }
-    },
     "All" : {
       "localizations" : {
         "ja" : {
@@ -2767,6 +3127,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "始終保持最新"
+          }
+        }
+      }
+    },
+    "Amount" : {
+      "comment" : "What is to be paid for a ticket.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "金額"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "金额"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "金額"
+          }
+        }
+      }
+    },
+    "and %lld more" : {
+      "comment" : "The last line of a new-dates notification: how many dates it did not list.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほか%lld件"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有 %lld 个"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還有 %lld 個"
           }
         }
       }
@@ -2944,6 +3350,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "申請截止"
+          }
+        }
+      }
+    },
+    "Applied" : {
+      "comment" : "A ticket to-do's step: the reader has applied for the lottery.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "申込済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已申请"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已申請"
           }
         }
       }
@@ -3213,6 +3642,29 @@
         }
       }
     },
+    "Awaiting Payment" : {
+      "comment" : "A ticket to-do's step: the ticket was won and is not yet paid for.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金待ち"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待付款"
+          }
+        }
+      }
+    },
     "Awaiting · %lld" : {
       "comment" : "The Lotteries screen's first half, with how many rounds await a result.",
       "localizations" : {
@@ -3254,6 +3706,51 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "返回"
+          }
+        }
+      }
+    },
+    "Back to To Do" : {
+      "comment" : "Moves a done ticket to-do back one step.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未完了に戻す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移回待办"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移回待辦"
+          }
+        }
+      }
+    },
+    "Background App Refresh is off in Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「設定」でAppのバックグラウンド更新がオフになっています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在“设置”中关闭后台App刷新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在「設定」中關閉背景App重新整理"
           }
         }
       }
@@ -3589,6 +4086,28 @@
         }
       }
     },
+    "Change Alerts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更の通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "变更提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "變更提醒"
+          }
+        }
+      }
+    },
     "changes.venue" : {
       "comment" : "The hall an event is held at, on the card saying what changed. Not the Venue of the Venue / Local clock switch.",
       "localizations" : {
@@ -3879,6 +4398,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "關閉"
+          }
+        }
+      }
+    },
+    "Closes %@" : {
+      "comment" : "When a lottery round stops taking applications. The argument is a date, with a time where one was written, such as Nov 20, 23:59.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 締切"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 截止"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 截止"
           }
         }
       }
@@ -4301,6 +4843,98 @@
         }
       }
     },
+    "Date and start time changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day and time.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付と開演時間が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和开演时间已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和開演時間已變更"
+          }
+        }
+      }
+    },
+    "Date and venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day and hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付と会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期和場館已變更"
+          }
+        }
+      }
+    },
+    "Date changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期已變更"
+          }
+        }
+      }
+    },
+    "Date, start time and venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another day, time and hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付・開演時間・会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期、开演时间和场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期、開演時間和場館已變更"
+          }
+        }
+      }
+    },
     "Dates come from publicly accessible Eventernote pages. Following is kept in your own library — nothing is written back." : {
       "localizations" : {
         "ja" : {
@@ -4363,6 +4997,96 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "天"
+          }
+        }
+      }
+    },
+    "Deadline" : {
+      "comment" : "A section on the New Deadline sheet: which of the ticket sale's deadlines this is.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "締切"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止時間"
+          }
+        }
+      }
+    },
+    "Deadline Alert" : {
+      "comment" : "A Settings row: how long before a lottery round's application deadline its notification comes, for every round.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "申込締切の通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "申请截止提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "申請截止提醒"
+          }
+        }
+      }
+    },
+    "Deadlines come from the rounds you won, on each event's Ticket Details. Marking a step done stops its notification — undo brings it back." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "締切は各イベントのチケット詳細で当選した受付から表示されます。完了にするとその通知は止まり、取り消すと元に戻ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止时间来自各活动“门票详情”中中选的轮次。标记为完成后对应的通知会停止，撤销即可恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止時間來自各活動「門票詳情」中中選的輪次。標記為完成後對應的通知會停止，還原即可恢復。"
+          }
+        }
+      }
+    },
+    "Deadlines to pay for or pick up a ticket you won wait here until you mark them done." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当選したチケットの入金・発券の締切は、完了にするまでここに表示されます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中选门票的付款和取票截止时间在标记完成之前会显示在这里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中選門票的付款和取票截止時間在標記完成之前會顯示在這裡。"
           }
         }
       }
@@ -4456,6 +5180,28 @@
         }
       }
     },
+    "Delete Deadline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "締切を削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除截止时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除截止時間"
+          }
+        }
+      }
+    },
     "Delete every event?" : {
       "localizations" : {
         "ja" : {
@@ -4478,24 +5224,25 @@
         }
       }
     },
-    "Delete Reminder" : {
+    "Delete Time" : {
+      "comment" : "A button: takes a time of the goods sale off the event.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リマインダーを削除"
+            "value" : "時刻を削除"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除提醒"
+            "value" : "删除时间"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刪除提醒"
+            "value" : "刪除時間"
           }
         }
       }
@@ -4518,6 +5265,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消全選"
+          }
+        }
+      }
+    },
+    "Didn’t Pay in Time" : {
+      "comment" : "A button under an unpaid ticket: the payment deadline passed without paying.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期限内に入金しなかった"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未在期限内付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未在期限內付款"
           }
         }
       }
@@ -4588,6 +5358,28 @@
         }
       }
     },
+    "Discard Deadline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "締切を破棄"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放弃截止时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捨棄截止時間"
+          }
+        }
+      }
+    },
     "Discard Entry" : {
       "localizations" : {
         "ja" : {
@@ -4628,6 +5420,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "捨棄提醒"
+          }
+        }
+      }
+    },
+    "Discard this deadline?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この締切を破棄しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要放弃这个截止时间吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要捨棄這個截止時間嗎？"
           }
         }
       }
@@ -4831,6 +5645,52 @@
         }
       }
     },
+    "Due Soon" : {
+      "comment" : "A header on Ticket To-Dos over the deadlines within three days.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期限間近"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将到期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即將到期"
+          }
+        }
+      }
+    },
+    "Due today" : {
+      "comment" : "A ticket deadline that falls today.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日まで"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天截止"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天截止"
+          }
+        }
+      }
+    },
     "Each event lands on the right day at its venue, with an alert when the doors open." : {
       "localizations" : {
         "ja" : {
@@ -4898,6 +5758,28 @@
         }
       }
     },
+    "Edit Deadline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "締切を編集"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑截止时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯截止時間"
+          }
+        }
+      }
+    },
     "Edit Entry" : {
       "comment" : "A menu item on a lottery round: open the round's own page on the ticket sheet.",
       "localizations" : {
@@ -4917,6 +5799,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編輯抽選紀錄"
+          }
+        }
+      }
+    },
+    "Edit Link…" : {
+      "comment" : "A menu item on the goods sale's notice: changes its link.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを編集…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑链接…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯連結…"
           }
         }
       }
@@ -4962,6 +5867,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修改和取消會跟隨你的資料庫，已參加過的活動也會一併補上。"
+          }
+        }
+      }
+    },
+    "Edits this deadline" : {
+      "comment" : "An accessibility hint.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この締切を編集します"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑这个截止时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯這個截止時間"
           }
         }
       }
@@ -5252,6 +6180,28 @@
         }
       }
     },
+    "Event" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベント"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "活動"
+          }
+        }
+      }
+    },
     "Event data imported from the public Eventernote page." : {
       "localizations" : {
         "ja" : {
@@ -5337,50 +6287,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "活動護照"
-          }
-        }
-      }
-    },
-    "Event Reminders" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イベントの通知"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "活动提醒"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "活動提醒"
-          }
-        }
-      }
-    },
-    "Event Reminders are off in Settings." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "設定でイベントの通知がオフになっています。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "活动提醒已在设置中关闭。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "活動提醒已在設定中關閉。"
           }
         }
       }
@@ -6730,6 +7636,29 @@
         }
       }
     },
+    "For" : {
+      "comment" : "A field on the New Deadline sheet: which round of the ticket sale the deadline is for.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対象"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对应轮次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對應輪次"
+          }
+        }
+      }
+    },
     "From %@" : {
       "localizations" : {
         "ja" : {
@@ -6997,12 +7926,12 @@
       }
     },
     "Goods Sale" : {
-      "comment" : "The section of goods-sale times in the menu that adds a reminder.",
+      "comment" : "A card on an event's sheet: the goods sale at the venue, its times and queue tickets.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "物販"
+            "value" : "会場物販"
           }
         },
         "zh-Hans" : {
@@ -7019,25 +7948,48 @@
         }
       }
     },
-    "Goods Sale Starts" : {
-      "comment" : "A reminder's name: when the goods sale at the venue opens, 物販開始.",
+    "Goods Sale Alert" : {
+      "comment" : "A Settings row: how long before a time of the goods sale its notification comes, for every event.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "物販開始"
+            "value" : "物販の通知タイミング"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "场贩开始"
+            "value" : "场贩提醒时间"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "場販開始"
+            "value" : "場販提醒時間"
+          }
+        }
+      }
+    },
+    "Goods Sale Reminders" : {
+      "comment" : "A Settings switch: notifications for the goods sale's times at the venue.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "物販の通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场贩提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場販提醒"
           }
         }
       }
@@ -7417,6 +8369,29 @@
         }
       }
     },
+    "Issued" : {
+      "comment" : "A ticket to-do's step: the ticket has been issued or picked up.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已出票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已出票"
+          }
+        }
+      }
+    },
     "It is the name in your Eventernote profile's address, after /users/." : {
       "localizations" : {
         "ja" : {
@@ -7457,6 +8432,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它的抽選紀錄、門票詳情和備註也會從你的所有裝置中刪除。如果 Eventernote 帳號中仍列出此活動，它會在下次重新整理時恢復，但這些內容不會恢復。"
+          }
+        }
+      }
+    },
+    "Its reminders stop and it moves to Done. The lottery round stays as you recorded it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リマインダーは止まり、完了に移動します。抽選の結果は記録したままです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒会停止，并移到“完成”。抽选轮次保持你记录的结果。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒會停止，並移到「完成」。抽選輪次維持你記錄的結果。"
           }
         }
       }
@@ -7703,25 +8700,25 @@
         }
       }
     },
-    "Last-in-Line Tickets Open" : {
-      "comment" : "A reminder's name: from when queue numbers called last are given out at the goods sale, 最後尾整理券 配布開始.",
+    "Later" : {
+      "comment" : "A header on Ticket To-Dos over the deadlines more than a week off.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最後尾整理券 配布開始"
+            "value" : "それ以降"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "末尾整理券开始发放"
+            "value" : "之后"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "末尾整理券開始發放"
+            "value" : "之後"
           }
         }
       }
@@ -8168,6 +9165,29 @@
         }
       }
     },
+    "Lottery applications close soon" : {
+      "comment" : "A notification's title, ahead of the moment a lottery round stops taking applications.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選の申込締切が近づいています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽选即将截止申请"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽選即將截止申請"
+          }
+        }
+      }
+    },
     "Lottery Entries" : {
       "localizations" : {
         "ja" : {
@@ -8217,19 +9237,19 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽選結果の通知"
+            "value" : "抽選の通知"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽选结果提醒"
+            "value" : "抽选提醒"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽選結果提醒"
+            "value" : "抽選提醒"
           }
         }
       }
@@ -8374,6 +9394,74 @@
         }
       }
     },
+    "Mark as Issued" : {
+      "comment" : "A button: the reader has had the ticket issued or picked it up.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券済みにする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已出票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為已出票"
+          }
+        }
+      }
+    },
+    "Mark as Not Paid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未入金にする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为未付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為未付款"
+          }
+        }
+      }
+    },
+    "Mark as Paid" : {
+      "comment" : "A button: the reader has paid for the ticket.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金済みにする"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為已付款"
+          }
+        }
+      }
+    },
     "Mark as Read" : {
       "localizations" : {
         "ja" : {
@@ -8414,6 +9502,182 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "標示為未讀"
+          }
+        }
+      }
+    },
+    "Mark this ticket as not paid?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このチケットを未入金にしますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要将这张票标记为未付款吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要將這張票標記為未付款嗎？"
+          }
+        }
+      }
+    },
+    "Marked" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新しました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已标记"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已標記"
+          }
+        }
+      }
+    },
+    "Marked as issued" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券済みにしました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已标记为已出票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已標記為已出票"
+          }
+        }
+      }
+    },
+    "Marked as not paid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未入金にしました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已标记为未付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已標記為未付款"
+          }
+        }
+      }
+    },
+    "Marked as paid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金済みにしました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已标记为已付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已標記為已付款"
+          }
+        }
+      }
+    },
+    "Marking it issued stops the Ticket Pickup reminder too." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券済みにすると発券開始のリマインダーも止まります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已出票后，取票提醒也会停止。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為已出票後，取票提醒也會停止。"
+          }
+        }
+      }
+    },
+    "Marking it paid stops the Payment Deadline reminder." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金済みにすると入金締切のリマインダーは止まります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已付款后，付款截止提醒会停止。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為已付款後，付款截止提醒會停止。"
+          }
+        }
+      }
+    },
+    "Marking it paid stops the Payment Deadline reminder. Ticket Pickup keeps its alert until the ticket is issued." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金済みにすると入金締切のリマインダーは止まります。発券開始の通知は、発券済みにするまで残ります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已付款后，付款截止提醒会停止。取票提醒会保留到出票为止。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為已付款後，付款截止提醒會停止。取票提醒會保留到出票為止。"
           }
         }
       }
@@ -8728,28 +9992,6 @@
         }
       }
     },
-    "Name" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "名前"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "名称"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "名稱"
-          }
-        }
-      }
-    },
     "Name your Eventernote account to bring in the events you have already been to. Read only — no password, and nothing is written back." : {
       "localizations" : {
         "ja" : {
@@ -8838,24 +10080,92 @@
         }
       }
     },
-    "New Reminder" : {
+    "New date" : {
+      "comment" : "A notification's title: a date newly published for somebody followed.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新規リマインダー"
+            "value" : "新着公演"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新建提醒"
+            "value" : "新场次"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新增提醒"
+            "value" : "新場次"
+          }
+        }
+      }
+    },
+    "New Date Alerts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着公演の通知"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新场次提醒"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新場次提醒"
+          }
+        }
+      }
+    },
+    "New date for %@" : {
+      "comment" : "A notification's title. The argument names who is billed among the people followed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の新着公演"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@有新场次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@有新場次"
+          }
+        }
+      }
+    },
+    "New Deadline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新規締切"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建截止时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增截止時間"
           }
         }
       }
@@ -8989,6 +10299,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一場活動"
+          }
+        }
+      }
+    },
+    "Next: %@" : {
+      "comment" : "On a paid ticket: what comes next. The argument is such as Pickup opens Thu, Nov 19 · 12:00.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一步：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一步：%@"
           }
         }
       }
@@ -9233,6 +10566,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "找不到連結"
+          }
+        }
+      }
+    },
+    "No Longer a To-Do" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この項目はなくなりました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此待办已不存在"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此待辦已不存在"
           }
         }
       }
@@ -9637,6 +10992,29 @@
         }
       }
     },
+    "Not a Link" : {
+      "comment" : "An alert's title: what was typed as the goods sale's notice is not a web link.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクではありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不是链接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不是連結"
+          }
+        }
+      }
+    },
     "Not announced" : {
       "comment" : "In a lottery round's card, under Results: no results day was written down.",
       "localizations" : {
@@ -9704,6 +11082,29 @@
         }
       }
     },
+    "Not Issued" : {
+      "comment" : "A ticket to-do's step.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未発券"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未出票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未出票"
+          }
+        }
+      }
+    },
     "Not Now" : {
       "localizations" : {
         "ja" : {
@@ -9766,6 +11167,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "帳號未收錄"
+          }
+        }
+      }
+    },
+    "Not Paid" : {
+      "comment" : "How a ticket to-do ended: the payment was not made in time.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未入金"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未付款"
           }
         }
       }
@@ -9949,6 +11373,28 @@
         }
       }
     },
+    "Nothing Done Yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了した項目はありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无已完成项目"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚無已完成項目"
+          }
+        }
+      }
+    },
     "Nothing Eventernote found for this search falls within the filter. Widen it to see the rest." : {
       "localizations" : {
         "ja" : {
@@ -10011,6 +11457,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不會清除任何內容"
+          }
+        }
+      }
+    },
+    "Nothing more will be said about this. Back to To Do brings back a reminder whose time is still ahead." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これ以上の通知はありません。未完了に戻すと、まだ先のリマインダーが再び有効になります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此项不会再有提醒。移回待办后，尚未到时间的提醒会恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此項不會再有提醒。移回待辦後，尚未到時間的提醒會恢復。"
+          }
+        }
+      }
+    },
+    "Nothing of this kind is waiting." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この種類の項目はありません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有这类待办。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有這類待辦。"
           }
         }
       }
@@ -10099,6 +11589,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未舉行的活動均已收錄於 Eventernote。"
+          }
+        }
+      }
+    },
+    "Nothing to Do" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やることはありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有待办"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有待辦"
           }
         }
       }
@@ -10590,6 +12102,29 @@
         }
       }
     },
+    "Open %@" : {
+      "comment" : "A link to the web page kept for a ticket deadline. The argument is the site's host name.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開 %@"
+          }
+        }
+      }
+    },
     "Open Event" : {
       "comment" : "A button on the On This Day screen that opens an event's sheet.",
       "localizations" : {
@@ -10631,6 +12166,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Eventernote 中打開"
+          }
+        }
+      }
+    },
+    "Open now" : {
+      "comment" : "A ticket pickup that has opened.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券受付中"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现已可取票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現已可取票"
+          }
+        }
+      }
+    },
+    "Open Page" : {
+      "comment" : "A button under a notification: opens the web page the reader kept for paying or picking up a ticket.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ページを開く"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开页面"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開頁面"
           }
         }
       }
@@ -10725,6 +12306,75 @@
         }
       }
     },
+    "Opens in %@" : {
+      "comment" : "How long until ticket pickup opens. The argument is a span such as 8 days, 2 hours.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あと%@で開始"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@后开始"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@後開始"
+          }
+        }
+      }
+    },
+    "Opens in ^[%lld day](inflect: true)" : {
+      "comment" : "How many days until ticket pickup opens.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld日後に開始"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天后开始"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天後開始"
+          }
+        }
+      }
+    },
+    "Opens in your browser" : {
+      "comment" : "An accessibility hint.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザで開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在浏览器中打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在瀏覽器中打開"
+          }
+        }
+      }
+    },
     "Opens the event" : {
       "localizations" : {
         "ja" : {
@@ -10765,6 +12415,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打開海報"
+          }
+        }
+      }
+    },
+    "Opens the goods sale's notice" : {
+      "comment" : "VoiceOver hint on the goods sale's notice.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "物販の告知を開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开场贩公告"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟場販公告"
           }
         }
       }
@@ -10835,6 +12508,28 @@
         }
       }
     },
+    "Opens the set list in your browser" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザでセットリストを開きます"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在浏览器中打开歌单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在瀏覽器中開啟歌單"
+          }
+        }
+      }
+    },
     "Opens the ticket details" : {
       "localizations" : {
         "ja" : {
@@ -10875,6 +12570,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打開場館"
+          }
+        }
+      }
+    },
+    "Opens today" : {
+      "comment" : "A ticket pickup that opens today.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日から"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天开始"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天開始"
           }
         }
       }
@@ -11034,6 +12752,29 @@
         }
       }
     },
+    "Overdue" : {
+      "comment" : "A ticket deadline that has passed.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期限切れ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已过期"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已過期"
+          }
+        }
+      }
+    },
     "Overlaps another event that day" : {
       "localizations" : {
         "ja" : {
@@ -11118,6 +12859,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "概覽"
+          }
+        }
+      }
+    },
+    "Page" : {
+      "comment" : "A section on the New Deadline sheet: the web page for the order.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ページ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "頁面"
+          }
+        }
+      }
+    },
+    "Paid" : {
+      "comment" : "A ticket to-do's step.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金済み"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已付款"
           }
         }
       }
@@ -11210,8 +12997,146 @@
         }
       }
     },
+    "Paste a web link, such as one copied from a post on X." : {
+      "comment" : "The message of the alert saying what was typed is not a link.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X のポストからコピーしたリンクなど、Web のリンクをペーストしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请粘贴网页链接，例如从 X 帖子拷贝的链接。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請貼上網頁連結，例如從 X 貼文拷貝的連結。"
+          }
+        }
+      }
+    },
+    "Paste the link to the post announcing the goods sale." : {
+      "comment" : "The message of the alert asking for the goods sale's notice.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "物販を告知しているポストのリンクをペーストしてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴场贩公告帖子的链接。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼上場販公告貼文的連結。"
+          }
+        }
+      }
+    },
+    "Pay" : {
+      "comment" : "A filter chip on Ticket To-Dos: the deadlines to pay by.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款"
+          }
+        }
+      }
+    },
+    "Pay At" : {
+      "comment" : "Where or how a ticket is paid for: a convenience store, a card.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支払い方法"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款方式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款方式"
+          }
+        }
+      }
+    },
+    "Pay by %@" : {
+      "comment" : "A ticket deadline. The argument is a day and time.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金締切 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款截止 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款截止 %@"
+          }
+        }
+      }
+    },
+    "Payment" : {
+      "comment" : "A ticket to-do's kind, and the section that says what is to be paid.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款"
+          }
+        }
+      }
+    },
     "Payment Deadline" : {
-      "comment" : "A reminder's name: the last moment to pay for a ticket won, 入金締切.",
+      "comment" : "A notification's title, and a section of a won lottery round: the last moment to pay for the ticket, 入金締切.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11387,6 +13312,52 @@
         }
       }
     },
+    "Pick Up" : {
+      "comment" : "A filter chip on Ticket To-Dos: the tickets to pick up.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票"
+          }
+        }
+      }
+    },
+    "Pick Up At" : {
+      "comment" : "Where a ticket is issued: a convenience store.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券場所"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票地点"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票地點"
+          }
+        }
+      }
+    },
     "Pick up where you left off" : {
       "localizations" : {
         "ja" : {
@@ -11405,6 +13376,51 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "接着上次繼續"
+          }
+        }
+      }
+    },
+    "Pick where the ticket stands. Each step you reach stops its notification — the same as in Ticket To-Dos." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットの状況を選んでください。進めた段階の通知は、チケットToDoと同じように止まります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择这张票目前的进度。到达的每一步都会停止对应的通知，与“票务待办”相同。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇這張票目前的進度。到達的每一步都會停止對應的通知，與「票務待辦」相同。"
+          }
+        }
+      }
+    },
+    "Pickup opens %@" : {
+      "comment" : "From when a ticket can be picked up. The argument is a day and time.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券開始 %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票开始 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票開始 %@"
           }
         }
       }
@@ -11449,6 +13465,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "將相機對準整理券上的 QR Code。"
+          }
+        }
+      }
+    },
+    "Point the camera at the set list's QR code." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリストのQRコードにカメラを向けてください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把相机对准歌单的二维码。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將相機對準歌單的 QR Code。"
           }
         }
       }
@@ -11519,25 +13557,25 @@
         }
       }
     },
-    "Priority Check-In" : {
-      "comment" : "A reminder's name: when holders of a promoter's card gather for the queue numbers called first, 優先案内 集合.",
+    "Progress" : {
+      "comment" : "Where a ticket stands between being won and being in hand.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "優先案内 集合"
+            "value" : "進行状況"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "优先集合"
+            "value" : "进度"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "優先集合"
+            "value" : "進度"
           }
         }
       }
@@ -11632,25 +13670,25 @@
         }
       }
     },
-    "Queue Tickets" : {
-      "comment" : "The numbered tickets given out for the queue at a venue's goods sale, 整理券.",
+    "Queue Tickets Out" : {
+      "comment" : "A time of the goods sale at the venue: when the queue tickets are handed out, 整理券配布.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "整理券"
+            "value" : "整理券配布"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "整理券"
+            "value" : "整理券发放"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "整理券"
+            "value" : "整理券發放"
           }
         }
       }
@@ -11674,29 +13712,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時長 %@"
-          }
-        }
-      }
-    },
-    "Random Queue Tickets Close" : {
-      "comment" : "A reminder's name: the last moment to be given a shuffled queue number for the goods sale, ランダム整理券 締切.",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ランダム整理券 締切"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "随机整理券截止"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "隨機整理券截止"
           }
         }
       }
@@ -12009,24 +14024,24 @@
         }
       }
     },
-    "Reminder" : {
+    "Reminder stopped" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リマインダー"
+            "value" : "リマインダー停止済み"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提醒"
+            "value" : "提醒已停止"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提醒"
+            "value" : "提醒已停止"
           }
         }
       }
@@ -12269,6 +14284,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "從資料庫中移除此活動？"
+          }
+        }
+      }
+    },
+    "Remove Time" : {
+      "comment" : "A button on a lottery entry: takes the time of day its results come out off again.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時刻を削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除時間"
           }
         }
       }
@@ -12781,6 +14819,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "S席"
+          }
+        }
+      }
+    },
+    "Sale Info" : {
+      "comment" : "A row on an event's Goods Sale card: the link to the post or page announcing the goods sale, and the title of the alert that asks for it.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "物販情報"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场贩信息"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場販資訊"
           }
         }
       }
@@ -13471,6 +15532,51 @@
         }
       }
     },
+    "Set List" : {
+      "comment" : "The songs played at an event, whose link a promoter hands out as a QR code, セットリスト.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌單"
+          }
+        }
+      }
+    },
+    "Set List %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリスト %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌单 %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌單 %lld"
+          }
+        }
+      }
+    },
     "Settings" : {
       "localizations" : {
         "ja" : {
@@ -14157,6 +16263,52 @@
         }
       }
     },
+    "Start time and venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another time and hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間と会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开演时间和场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間和場館已變更"
+          }
+        }
+      }
+    },
+    "Start time changed" : {
+      "comment" : "A notification's title: an event the reader keeps starts at another time.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开演时间已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開演時間已變更"
+          }
+        }
+      }
+    },
     "Start time not announced" : {
       "localizations" : {
         "ja" : {
@@ -14267,6 +16419,28 @@
         }
       }
     },
+    "Steps you mark as paid or issued gather here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入金済み・発券済みにした項目がここに集まります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标记为已付款或已出票的项目会集中在这里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標記為已付款或已出票的項目會集中在這裡。"
+          }
+        }
+      }
+    },
     "Stop following" : {
       "localizations" : {
         "ja" : {
@@ -14333,6 +16507,29 @@
         }
       }
     },
+    "Stopped · %@" : {
+      "comment" : "On a reminder a ticket to-do stopped. The argument is the step that stopped it, such as Paid.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止 · %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已停止 · %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已停止 · %@"
+          }
+        }
+      }
+    },
     "Style" : {
       "comment" : "VoiceOver: the ticket stub's look, Light or Night.",
       "localizations" : {
@@ -14352,6 +16549,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "樣式"
+          }
+        }
+      }
+    },
+    "Suggestions" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "候補"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建议"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建議"
+          }
+        }
+      }
+    },
+    "Swipe a row to move it back to To Do — its reminders come back for any time still ahead." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行をスワイプすると未完了に戻せます。まだ先のリマインダーは再び有効になります。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻扫一行可将其移回待办，尚未到时间的提醒会恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滑動一列可將其移回待辦，尚未到時間的提醒會恢復。"
           }
         }
       }
@@ -14556,24 +16797,24 @@
         }
       }
     },
-    "That moment has passed, so no notification will come." : {
+    "That isn’t a web address." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "通知の時刻を過ぎているため、通知は届きません。"
+            "value" : "ウェブアドレスではありません。"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已过提醒时间，不会再收到通知。"
+            "value" : "这不是网址。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已過提醒時間，不會再收到通知。"
+            "value" : "這不是網址。"
           }
         }
       }
@@ -14596,29 +16837,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "演出已結束"
-          }
-        }
-      }
-    },
-    "That's after the event, so no notification will come." : {
-      "comment" : "Under a reminder's alert, where its time is past the event's day because the event has moved to an earlier one.",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "イベントより後の時刻のため、通知は届きません。"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "该时间晚于活动，不会收到通知。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "該時間晚於活動，不會收到通知。"
           }
         }
       }
@@ -14773,6 +16991,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "公開可存取的 Eventernote 頁面上最近加入的藝人。"
+          }
+        }
+      }
+    },
+    "The play guide’s page for this order, if you want it one tap away. It opens in your browser." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この申込のプレイガイドのページを入れておくと、ワンタップで開けます。ブラウザで開きます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可填入售票平台上这笔订单的页面，方便一键打开。会在浏览器中打开。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可填入售票平台上這筆訂單的頁面，方便一鍵打開。會在瀏覽器中打開。"
           }
         }
       }
@@ -14954,6 +17194,28 @@
         }
       }
     },
+    "This set list is already on this event." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このセットリストはすでに追加されています。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这份歌单已经添加过了。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這份歌單已經新增過了。"
+          }
+        }
+      }
+    },
     "This ticket is for another day" : {
       "localizations" : {
         "ja" : {
@@ -14972,6 +17234,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這是另一天的門票"
+          }
+        }
+      }
+    },
+    "This Week" : {
+      "comment" : "A header on Ticket To-Dos over the deadlines within seven days.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今週"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本周"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本週"
           }
         }
       }
@@ -15020,8 +17305,31 @@
         }
       }
     },
+    "Ticket Pickup" : {
+      "comment" : "A ticket to-do's kind: having the ticket issued.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発券"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取票"
+          }
+        }
+      }
+    },
     "Ticket Pickup Opens" : {
-      "comment" : "A reminder's name: from when a ticket can be issued or collected, 発券開始.",
+      "comment" : "A notification's title: from when a ticket won can be issued or collected, 発券開始.",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -15039,29 +17347,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開始取票"
-          }
-        }
-      }
-    },
-    "Ticket Sale" : {
-      "comment" : "The section of ticket deadlines in the menu that adds a reminder.",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "チケット販売"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "票务"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "票務"
           }
         }
       }
@@ -15129,6 +17414,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "票根"
+          }
+        }
+      }
+    },
+    "Ticket To-Dos" : {
+      "comment" : "The card on the Me tab and the screen behind it: deadlines to apply, pay and pick up tickets.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケットToDo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "票务待办"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "票務待辦"
           }
         }
       }
@@ -15399,6 +17707,29 @@
         }
       }
     },
+    "To Do" : {
+      "comment" : "The first half of the Ticket To-Dos screen.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未完了"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待办"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待辦"
+          }
+        }
+      }
+    },
     "Today" : {
       "localizations" : {
         "ja" : {
@@ -15417,6 +17748,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天"
+          }
+        }
+      }
+    },
+    "Try again with a picture that shows the set list's QR code clearly." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セットリストのQRコードがはっきり写った写真でもう一度お試しください。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请用一张能清楚看到歌单二维码的照片再试一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請用一張能清楚看到歌單 QR Code 的照片再試一次。"
           }
         }
       }
@@ -15725,6 +18078,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟 iCloud 同步後，你的活動、備註和跟蹤記錄會透過你自己的 iCloud 私密地同步過來。"
+          }
+        }
+      }
+    },
+    "Undo" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り消す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撤销"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還原"
+          }
+        }
+      }
+    },
+    "Undo Last Step" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直前の段階を取り消す"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撤销上一步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還原上一步"
           }
         }
       }
@@ -16099,6 +18496,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現地"
+          }
+        }
+      }
+    },
+    "Venue changed" : {
+      "comment" : "A notification's title: an event the reader keeps moved to another hall.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場が変更されました"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "场馆已变更"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場館已變更"
           }
         }
       }
@@ -16480,6 +18900,28 @@
         }
       }
     },
+    "Where" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場所"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地点"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地點"
+          }
+        }
+      }
+    },
     "Which choice did you win?" : {
       "comment" : "Asked after swiping Won on a lottery round that applied with several choices; each button is one choice.",
       "localizations" : {
@@ -16499,6 +18941,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "中選的是哪個志願？"
+          }
+        }
+      }
+    },
+    "Which code is the set list?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どのコードがセットリストですか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "哪个二维码是歌单？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "哪個 QR Code 是歌單？"
           }
         }
       }

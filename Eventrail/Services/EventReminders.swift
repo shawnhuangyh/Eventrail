@@ -3,9 +3,10 @@ import Observation
 import OSLog
 import UserNotifications
 
-/// A notification ahead of a time the reader wrote down for an event
-/// (``EventReminder``). Tapped, it opens the event's sheet, where the queue
-/// tickets are.
+/// A notification ahead of a time of the goods sale the reader wrote down for
+/// an event (``EventReminder``) — as long ahead as Settings says for every one
+/// (``goodsLead``). Tapped, it opens the event's sheet, where the queue tickets
+/// are.
 ///
 /// Scheduled as ``LotteryReminders`` schedules: from ``RootView``, from the
 /// library as it stands, adding only what differs and taking back what no
@@ -44,6 +45,28 @@ final class EventReminders {
         }
     }
 
+    /// How many minutes before a time of the goods sale its notification
+    /// comes — one answer for every time, an hour until the reader picks
+    /// another; nil for none. Per device, as the switch is
+    /// (``goodsLeadKey``), and governed by it.
+    var goodsLead: Int? {
+        didSet {
+            guard goodsLead != oldValue else { return }
+            UserDefaults.standard.set(goodsLead ?? Self.noLead, forKey: Self.goodsLeadKey)
+            rescheduleSoon()
+        }
+    }
+
+    static let goodsLeadKey = "goodsSaleLead"
+    /// An hour: long enough to get to the hall for the queue.
+    static let defaultGoodsLead = 60
+    /// What Settings offers: an event reminder's leads, At the Time
+    /// included, since the sale opening is worth hearing about as it opens.
+    static let goodsLeads = ReminderLead.choices
+    /// How "none" is written down, apart from nothing written yet, which is
+    /// the default.
+    private static let noLead = -1
+
     /// The event a tapped reminder named, until ``RootView`` opens it. Handed
     /// over by ``LotteryReminders``, the app's one notification delegate.
     var opened: Event.ID?
@@ -54,6 +77,8 @@ final class EventReminders {
 
     private init() {
         isEnabled = UserDefaults.standard.object(forKey: Self.storageKey) as? Bool ?? true
+        let lead = UserDefaults.standard.object(forKey: Self.goodsLeadKey) as? Int ?? Self.defaultGoodsLead
+        goodsLead = lead < 0 ? nil : lead
     }
 
     /// Brings what is scheduled into line with `store` a second from now —
@@ -78,7 +103,9 @@ final class EventReminders {
     /// Asks the system for the right to notify, where nobody has answered yet
     /// and `reminder` has a notification to come.
     func askIfNeeded(for reminder: EventReminder, at event: Event) {
-        guard isEnabled, ReminderAlert(reminder: reminder, event: event) != nil else { return }
+        guard isEnabled, let goodsLead,
+              ReminderAlert(reminder: reminder, event: event, lead: goodsLead) != nil
+        else { return }
         Task {
             guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
             await requestAuthorization()
@@ -105,7 +132,7 @@ final class EventReminders {
         let clock = TimeDisplay.stored
 
         let due = isEnabled && canNotify
-            ? ReminderAlert.due(in: events, tracking: store.tracking(for:), clock: clock)
+            ? goodsLead.map { ReminderAlert.due(in: events, tracking: store.tracking(for:), lead: $0, clock: clock) } ?? []
             : []
         let wanted = Dictionary(due.map { ($0.identifier, $0) }) { first, _ in first }
         let scheduled = await center.pendingNotificationRequests()
@@ -123,8 +150,12 @@ final class EventReminders {
             }
         }
 
+        // One whose time has been taken off, or folded into another, has
+        // nothing left to say.
         let standing = Set(events.flatMap { event in
-            store.tracking(for: event).reminders.map { ReminderAlert.identifier(of: $0.id, at: event.id) }
+            let record = store.tracking(for: event)
+            return ReminderKind.goods.compactMap(record.goodsReminder)
+                .map { ReminderAlert.identifier(of: $0.id, at: event.id) }
         })
         let spent = await center.deliveredNotifications()
             .map(\.request.identifier)
@@ -133,17 +164,18 @@ final class EventReminders {
     }
 }
 
-/// One notification for one reminder: what it is about, and when it comes.
+/// One notification for one time of the goods sale: what it is about, and
+/// when it comes.
 struct ReminderAlert: Hashable {
     let eventID: Event.ID
     let reminderID: EventReminder.ID
     let eventTitle: String
     let title: String
     let body: String
-    /// When it comes: the reminder's time, less its lead.
+    /// When it comes: the time, less the lead.
     let date: Date
-    /// Whether it comes through a Focus and stays up: a deadline an hour away
-    /// is missed for good if it waits for the Focus to end. One a day ahead
+    /// Whether it comes through a Focus and stays up: a queue an hour away is
+    /// missed for good if it waits for the Focus to end. One a day ahead
     /// (``calmLead``) can wait, and asking iOS to treat it as urgent is what
     /// leads iOS to suggest the reader turn the whole thing off.
     let isTimeSensitive: Bool
@@ -154,40 +186,47 @@ struct ReminderAlert: Hashable {
     /// and the app next opens.
     static let limit = 20
     /// From how many minutes ahead a notification is no longer urgent.
-    static let calmLead = 24 * 60
+    nonisolated static let calmLead = 24 * 60
 
     nonisolated static let prefix = "eventReminder."
     nonisolated static let eventKey = "event"
+    nonisolated static let reminderKey = "reminder"
 
-    /// The notification owed for `reminder` on `event` at `now`, printed on
-    /// `clock`: nil where it asks for none, its moment has been, or it falls
-    /// past the event's day (``Event/holds(_:)``). So nothing comes for an event
-    /// gone by, and nothing is left scheduled to come after an event moved to
-    /// an earlier day is over, with no way for the app to take it back.
-    init?(reminder: EventReminder, event: Event, clock: TimeDisplay = .venue, at now: Date = .now) {
-        guard event.holds(reminder), let date = reminder.alertDate(in: event.timeZone), date > now else { return nil }
+    /// The notification owed for `reminder` on `event` at `now`, `lead`
+    /// minutes ahead and printed on `clock`: nil where it is no time of the
+    /// goods sale, its moment has been, or it falls past the event's day
+    /// (``Event/holds(_:)``). So nothing comes for an event gone by, and
+    /// nothing is left scheduled to come after an event moved to an earlier
+    /// day is over, with no way for the app to take it back.
+    init?(reminder: EventReminder, event: Event, lead: Int, clock: TimeDisplay = .venue, at now: Date = .now) {
+        let date = reminder.date(in: event.timeZone).addingTimeInterval(-Double(lead) * 60)
+        guard let kind = reminder.goodsKind, event.holds(reminder), date > now else { return nil }
         eventID = event.id
         reminderID = reminder.id
         eventTitle = event.title
-        title = ReminderKind.label(of: reminder.title)
+        title = kind.label
         let time = event.printedTime(of: reminder, on: clock)
-        body = reminder.lead.flatMap { $0 > 0 ? ReminderLead.label(of: $0) : nil }
-            .map { "\(time) · \($0)" } ?? time
+        body = lead > 0 ? "\(time) · \(ReminderLead.label(of: lead))" : time
         self.date = date
-        isTimeSensitive = (reminder.lead ?? 0) < Self.calmLead
+        isTimeSensitive = lead < Self.calmLead
     }
 
-    /// The notifications owed: every reminder on `events` with one to come,
-    /// the soonest first, up to ``limit``.
-    static func due(in events: [Event], tracking: (Event) -> Tracking, clock: TimeDisplay = .venue,
+    /// The notifications owed: the times of the goods sale on each of
+    /// `events` with one to come, `lead` minutes ahead, the soonest first, up
+    /// to ``limit``.
+    static func due(in events: [Event], tracking: (Event) -> Tracking, lead: Int, clock: TimeDisplay = .venue,
                     at now: Date = .now) -> [ReminderAlert] {
-        events
-            .flatMap { event in
-                tracking(event).reminders.compactMap { ReminderAlert(reminder: $0, event: event, clock: clock, at: now) }
+        var owed: [ReminderAlert] = []
+        for event in events {
+            let record = tracking(event)
+            for reminder in ReminderKind.goods.compactMap(record.goodsReminder) {
+                if let alert = ReminderAlert(reminder: reminder, event: event, lead: lead, clock: clock, at: now) {
+                    owed.append(alert)
+                }
             }
-            .sorted { $0.date != $1.date ? $0.date < $1.date : $0.identifier < $1.identifier }
-            .prefix(limit)
-            .map { $0 }
+        }
+        owed.sort { $0.date != $1.date ? $0.date < $1.date : $0.identifier < $1.identifier }
+        return Array(owed.prefix(limit))
     }
 
     nonisolated static func identifier(of reminder: EventReminder.ID, at event: Event.ID) -> String {
@@ -211,7 +250,7 @@ struct ReminderAlert: Hashable {
         content.interruptionLevel = interruptionLevel
         // One event's stack together, however many times its day has.
         content.threadIdentifier = "event-reminders-\(eventID)"
-        content.userInfo = [Self.eventKey: eventID]
+        content.userInfo = [Self.eventKey: eventID, Self.reminderKey: reminderID.uuidString]
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, date.timeIntervalSinceNow),
                                                         repeats: false)
         return UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
@@ -228,6 +267,7 @@ struct ReminderAlert: Hashable {
             && request.content.subtitle == eventTitle
             && request.content.body == body
             && request.content.interruptionLevel == interruptionLevel
+            && request.content.categoryIdentifier.isEmpty
     }
 }
 

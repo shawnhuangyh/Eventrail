@@ -1,55 +1,43 @@
 import SwiftUI
 
-/// One time to be reminded of, on a sheet of its own over the event's: what it
-/// is, when, and how long before it to hear about it.
+/// One time of the goods sale, on a sheet of its own over the event's: the
+/// day and the time, nothing else. Which time it is was chosen on the card
+/// (``EventPlanCard``); how long before it to hear is Settings' to say for
+/// every one (``EventReminders/goodsLead``).
 ///
 /// Holds a copy, as Ticket Details does: the checkmark writes it, the X leaves
 /// the record as it was, asking first where that throws something away. The
 /// time is asked on the hall's clock whatever Settings prints on, since that is
 /// the clock the promoter's notice prints it on.
-///
-/// On an event gone by it asks only what it was and when: that is a record, and
-/// no notification will come, so none is offered. What an alert was set to
-/// before the event ended stays as it was.
 struct EventReminderView: View {
     @Environment(EventStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
     let event: Event
-    /// Whether the reminder is not on the event yet, which only the checkmark
+    /// Whether the time is not on the event yet, which only the checkmark
     /// puts it.
     private let isNew: Bool
     private let opened: EventReminder
 
     @State private var draft: EventReminder
-    /// The name as the field holds it: one of ``ReminderKind`` in the reader's
-    /// language, or what they typed. Kept through ``ReminderKind/typed(_:)``.
-    @State private var name: String
     @State private var isConfirmingDiscard = false
-    @FocusState private var isNaming: Bool
 
     init(event: Event, reminder: EventReminder, isNew: Bool) {
         self.event = event
         self.isNew = isNew
         opened = reminder
         _draft = State(initialValue: reminder)
-        _name = State(initialValue: ReminderKind.label(of: reminder.title))
     }
 
-    private var settled: EventReminder {
-        var reminder = draft
-        reminder.title = ReminderKind.typed(name)
-        return reminder
-    }
+    private var hasChanges: Bool { isNew || draft != opened }
 
-    private var hasChanges: Bool { settled != opened }
+    private var title: String { ReminderKind.label(of: draft.title) }
 
     private func save() {
-        let reminder = settled
-        store.setReminder(reminder, for: event)
+        store.setGoodsReminder(draft, for: event)
         // The moment to ask whether the reader wants to hear about it — on
         // the checkmark, since a sheet put away with its X undoes it.
-        EventReminders.shared.askIfNeeded(for: reminder, at: event)
+        EventReminders.shared.askIfNeeded(for: draft, at: event)
         dismiss()
     }
 
@@ -57,23 +45,20 @@ struct EventReminderView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    nameSection
                     timeSection
-                    if event.isUpcoming { alertSection }
                     if !isNew { deleteButton }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
                 .padding(.bottom, 40)
             }
-            .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(isNew ? Text("New Reminder") : Text("Reminder"))
+            .navigationTitle(Text(verbatim: title))
             .navigationBarTitleDisplayMode(.inline)
             .padNavigationBarOnMac()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", systemImage: "xmark") {
-                        if hasChanges { isConfirmingDiscard = true } else { dismiss() }
+                        if draft != opened { isConfirmingDiscard = true } else { dismiss() }
                     }
                     .tint(.primary)
                     .keyboardShortcut(.cancelAction)
@@ -89,25 +74,13 @@ struct EventReminderView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(role: .confirm, action: save)
-                        .disabled(settled.title.isEmpty)
+                        .disabled(!hasChanges)
                 }
             }
         }
         .presentationDetents([.medium, .large])
-        .interactiveDismissDisabled(hasChanges)
+        .interactiveDismissDisabled(draft != opened)
         .opensFromOutside()
-        .task { await LotteryReminders.shared.refreshAuthorization() }
-        .onAppear { if name.isEmpty { isNaming = true } }
-    }
-
-    private var nameSection: some View {
-        TicketForm.section("Name") {
-            TicketForm.field(symbol: "text.cursor") {
-                TextField("Name", text: $name, prompt: Text(verbatim: ReminderKind.goodsSale.label))
-                    .focused($isNaming)
-                    .submitLabel(.done)
-            }
-        }
     }
 
     /// The day and the time, both moving the one moment on the hall's clock.
@@ -141,63 +114,14 @@ struct EventReminderView: View {
         }
     }
 
-    private var alertSection: some View {
-        let choices = ReminderLead.choices + (draft.lead.map { ReminderLead.choices.contains($0) ? [] : [$0] } ?? [])
-        return TicketForm.section("Alert") {
-            VStack(alignment: .leading, spacing: 10) {
-                TicketForm.field(symbol: draft.lead == nil ? "bell.slash" : "bell") {
-                    Picker("Alert", selection: $draft.lead) {
-                        Text("No Alert").tag(Int?.none)
-                        Divider()
-                        ForEach(choices, id: \.self) { lead in
-                            Text(verbatim: ReminderLead.label(of: lead)).tag(Int?.some(lead))
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(.brandTint)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                alertStatus
-            }
-        }
-    }
-
-    /// Why no notification will come, where one was asked for and none will.
-    @ViewBuilder
-    private var alertStatus: some View {
-        if let date = draft.alertDate(in: event.timeZone) {
-            if !EventReminders.shared.isEnabled {
-                alertNote(Text("Event Reminders are off in Settings."))
-            } else if LotteryReminders.shared.authorization == .denied {
-                HStack(spacing: 8) {
-                    alertNote(Text("Notifications are off in Settings"))
-                    Link("Open Settings", destination: URL(string: UIApplication.openNotificationSettingsURLString)!)
-                        .scalingFont(size: 12.5, weight: .semibold)
-                        .foregroundStyle(Color.brandTint)
-                }
-            } else if date <= .now {
-                alertNote(Text("That moment has passed, so no notification will come."))
-            } else if !event.holds(draft) {
-                // Where the event has moved to an earlier day since.
-                alertNote(Text("That's after the event, so no notification will come."))
-            }
-        }
-    }
-
-    private func alertNote(_ text: Text) -> some View {
-        text
-            .scalingFont(size: 12.5, weight: .medium)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    /// Not asked about first, as a swipe to delete is not.
+    /// Not asked about first, as a swipe to delete is not. Takes the time off
+    /// the card, with any an older build wrote for the same kind.
     private var deleteButton: some View {
         Button(role: .destructive) {
-            store.removeReminder(opened.id, from: event)
+            if let kind = opened.goodsKind { store.removeGoodsReminder(kind, from: event) }
             dismiss()
         } label: {
-            Label("Delete Reminder", systemImage: "trash")
+            Label("Delete Time", systemImage: "trash")
                 .scalingFont(size: 15, weight: .semibold)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 34)

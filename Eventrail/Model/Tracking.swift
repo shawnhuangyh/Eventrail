@@ -194,10 +194,10 @@ nonisolated struct Tracking: Hashable, Codable {
     /// only an answer *older* than the record around it is written down and a
     /// record edited once carries nothing here at all.
     var edits: [Field: Date] = [:]
-    /// The times the reader wants to hear about ahead of the event, as the
-    /// promoter's notice prints them — see ``EventReminder``. Not on Ticket
-    /// Details: they are read from the event's own sheet, and say nothing
-    /// about whether the reader got in.
+    /// The times of the goods sale at the hall, as the promoter's notice
+    /// prints them — see ``EventReminder`` — with whatever older builds wrote
+    /// here, kept as it was. Not on Ticket Details: they are read from the
+    /// event's own sheet, and say nothing about whether the reader got in.
     ///
     /// In the store each is a row of its own (``LibraryPlanItem``), for the
     /// reason each lottery round is, and listed by when. In an archive the
@@ -206,6 +206,13 @@ nonisolated struct Tracking: Hashable, Codable {
     /// The links to the queue tickets the reader took — see ``QueueTicket``.
     /// Kept as ``reminders`` are.
     var queueTickets: [QueueTicket] = []
+    /// The links to the event's set lists — see ``SetList``. Kept as
+    /// ``reminders`` are.
+    var setLists: [SetList] = []
+    /// The link to where the goods sale is told of — see ``GoodsNotice``,
+    /// one to an event, read through ``goodsNotice``. Kept as ``reminders``
+    /// are.
+    var goodsNotices: [GoodsNotice] = []
 
     /// The answers a record holds, named so that a merge can take them
     /// one at a time.
@@ -223,7 +230,7 @@ nonisolated struct Tracking: Hashable, Codable {
     nonisolated enum Field: String, CaseIterable, Codable, CodingKeyRepresentable, Hashable, Sendable {
         case ticket, seat, seatClass, cost, note
         case lotteries = "lotteryEntries"
-        case reminders, queueTickets
+        case reminders, queueTickets, setLists, goodsNotices
     }
 
     /// The date of a list a record says nothing about: written before the list
@@ -244,11 +251,11 @@ nonisolated struct Tracking: Hashable, Codable {
     /// a record whose every answer has since been cleared is empty however
     /// recently that happened.
     var isEmpty: Bool {
-        isTicketBlank && reminders.isEmpty && queueTickets.isEmpty
+        isTicketBlank && reminders.isEmpty && queueTickets.isEmpty && setLists.isEmpty && goodsNotices.isEmpty
     }
 
-    /// Whether Ticket Details holds nothing: a goods sale planned for is not
-    /// the reader saying how getting in went.
+    /// Whether Ticket Details holds nothing: a goods sale planned for or a set
+    /// list kept is not the reader saying how getting in went.
     var isTicketBlank: Bool {
         ticket == .none && seat.isEmpty && seatClass.isEmpty && cost == nil
             && lotteries.isEmpty && note.isEmpty
@@ -275,6 +282,8 @@ nonisolated extension Tracking {
         case .note: note == other.note
         case .reminders: Set(reminders) == Set(other.reminders)
         case .queueTickets: Set(queueTickets) == Set(other.queueTickets)
+        case .setLists: Set(setLists) == Set(other.setLists)
+        case .goodsNotices: Set(goodsNotices) == Set(other.goodsNotices)
         }
     }
 
@@ -291,6 +300,8 @@ nonisolated extension Tracking {
         case .note: note = other.note
         case .reminders: reminders = other.reminders
         case .queueTickets: queueTickets = other.queueTickets
+        case .setLists: setLists = other.setLists
+        case .goodsNotices: goodsNotices = other.goodsNotices
         }
     }
 
@@ -314,6 +325,11 @@ nonisolated extension Tracking {
                 record.reminders = Self.list(reminders, changedFrom: original.reminders, to: edited.reminders)
             case .queueTickets:
                 record.queueTickets = Self.list(queueTickets, changedFrom: original.queueTickets, to: edited.queueTickets)
+            case .setLists:
+                record.setLists = Self.list(setLists, changedFrom: original.setLists, to: edited.setLists)
+            case .goodsNotices:
+                record.goodsNotices = Self.list(goodsNotices, changedFrom: original.goodsNotices,
+                                                to: edited.goodsNotices)
             default:
                 record.take(field, from: edited)
             }
@@ -446,11 +462,15 @@ nonisolated extension Tracking {
             currency: try record.decodeIfPresent(String.self, forKey: .currency) ?? "",
             edits: try record.decodeIfPresent([Field: Date].self, forKey: .edits) ?? [:],
             reminders: try record.decodeIfPresent([EventReminder].self, forKey: .reminders) ?? [],
-            queueTickets: try record.decodeIfPresent([QueueTicket].self, forKey: .queueTickets) ?? [])
+            queueTickets: try record.decodeIfPresent([QueueTicket].self, forKey: .queueTickets) ?? [],
+            setLists: try record.decodeIfPresent([SetList].self, forKey: .setLists) ?? [],
+            goodsNotices: try record.decodeIfPresent([GoodsNotice].self, forKey: .goodsNotices) ?? [])
         foldLegacyTicket()
         // A key that isn't there is not an empty list: see ``unsaid``.
         if !record.contains(.reminders) { edits[.reminders] = Self.unsaid }
         if !record.contains(.queueTickets) { edits[.queueTickets] = Self.unsaid }
+        if !record.contains(.setLists) { edits[.setLists] = Self.unsaid }
+        if !record.contains(.goodsNotices) { edits[.goodsNotices] = Self.unsaid }
     }
 
     /// Keys a record no longer writes, read so that what they held is not lost.

@@ -323,6 +323,14 @@ final class EventStore {
     private var accountReadTried: Date?
     private var accountRead: Task<Void, Never>?
 
+    /// Told of each event the reader keeps, still to come, that a read found
+    /// on another day, at another start or in another hall — see
+    /// ``ChangeAlerts``. Only the reads nobody is looking at the event
+    /// through: the account's history, and the pages Refresh reads again;
+    /// not the event's own sheet, nor the first read of one just arrived.
+    /// Set by ``Launch``; nil in previews and tests that do not ask.
+    @ObservationIgnored var onMoved: ((EventMove) -> Void)?
+
     /// The default store opens the reader's own library, synced or not as
     /// they last said. Previews and tests hand in a database held in memory
     /// and leave the file, the calendar and the venues out, so nothing they
@@ -538,14 +546,20 @@ final class EventStore {
         // The plan is its own rows, written the same way.
         let reminders = answers.tracking.reminders
         let queueTickets = answers.tracking.queueTickets
+        let setLists = answers.tracking.setLists
+        let goodsNotices = answers.tracking.goodsNotices
         let planCleared = clearing && planRows[event.id]?.values.contains { !$0.isRemoved } == true
         let planMoved = planCleared
             || Set(reminders) != Set(heldAnswers.tracking.reminders)
             || Set(queueTickets) != Set(heldAnswers.tracking.queueTickets)
+            || Set(setLists) != Set(heldAnswers.tracking.setLists)
+            || Set(goodsNotices) != Set(heldAnswers.tracking.goodsNotices)
         // The entry's own parts, its lists set aside.
         answers.tracking.lotteries = heldAnswers.tracking.lotteries
         answers.tracking.reminders = heldAnswers.tracking.reminders
         answers.tracking.queueTickets = heldAnswers.tracking.queueTickets
+        answers.tracking.setLists = heldAnswers.tracking.setLists
+        answers.tracking.goodsNotices = heldAnswers.tracking.goodsNotices
         var given = answers.parts(differingFrom: heldAnswers)
         // An event first written down by a lottery still gets an entry.
         if held == nil, listMoved || planMoved, !given.contains(.tracking) { given.append(.tracking) }
@@ -560,6 +574,8 @@ final class EventStore {
         } else if planMoved {
             LibraryDatabase.writePlan(reminders, for: event.id, rows: &planRows, dated: now, in: database.context)
             LibraryDatabase.writePlan(queueTickets, for: event.id, rows: &planRows, dated: now, in: database.context)
+            LibraryDatabase.writePlan(setLists, for: event.id, rows: &planRows, dated: now, in: database.context)
+            LibraryDatabase.writePlan(goodsNotices, for: event.id, rows: &planRows, dated: now, in: database.context)
         }
         records[event.id] = nil
         converted[event.id] = nil
@@ -795,21 +811,18 @@ final class EventStore {
         save()
     }
 
-    /// Writes `reminder` onto `event`: in its place where it is there already,
-    /// and as a new one where it is not.
-    func setReminder(_ reminder: EventReminder, for event: Event) {
-        edit(event) { answers in
-            if let index = answers.tracking.reminders.firstIndex(where: { $0.id == reminder.id }) {
-                answers.tracking.reminders[index] = reminder
-            } else {
-                answers.tracking.reminders.append(reminder)
-            }
-        }
+    /// Writes `reminder` onto `event` as the one time of its kind of the
+    /// goods sale: in its place where it is there already, as a new one where
+    /// it is not, and the others an older build wrote for that kind taken out
+    /// (``Tracking/settingGoodsReminder(_:)``).
+    func setGoodsReminder(_ reminder: EventReminder, for event: Event) {
+        edit(event) { $0.tracking = $0.tracking.settingGoodsReminder(reminder) }
         save()
     }
 
-    func removeReminder(_ id: EventReminder.ID, from event: Event) {
-        edit(event) { $0.tracking.reminders.removeAll { $0.id == id } }
+    /// Takes every time written for `kind` of the goods sale off `event`.
+    func removeGoodsReminder(_ kind: ReminderKind, from event: Event) {
+        edit(event) { $0.tracking = $0.tracking.removingGoodsReminder(kind) }
         save()
     }
 
@@ -840,6 +853,34 @@ final class EventStore {
 
     func removeQueueTicket(_ id: QueueTicket.ID, from event: Event) {
         edit(event) { $0.tracking.queueTickets.removeAll { $0.id == id } }
+        save()
+    }
+
+    /// Adds a set list for `link` to `event`, where it has none for it.
+    func addSetList(_ link: URL, to event: Event) {
+        edit(event) { answers in
+            guard !answers.tracking.setLists.contains(where: { $0.link == link }) else { return }
+            answers.tracking.setLists.append(SetList(link: link, added: .now))
+        }
+        save()
+    }
+
+    func removeSetList(_ id: SetList.ID, from event: Event) {
+        edit(event) { $0.tracking.setLists.removeAll { $0.id == id } }
+        save()
+    }
+
+    /// Writes `link` as where `event`'s goods sale is told of, in the place
+    /// of the one before.
+    func setGoodsNotice(_ link: URL, for event: Event) {
+        edit(event) { $0.tracking = $0.tracking.settingGoodsNotice(link) }
+        save()
+    }
+
+    /// Takes the goods sale's notice off `event`, with any another device
+    /// wrote beside it.
+    func removeGoodsNotice(from event: Event) {
+        edit(event) { $0.tracking.goodsNotices = [] }
         save()
     }
 
@@ -1026,9 +1067,7 @@ final class EventStore {
         for event in events where isUnread(event) == read {
             // Taken before the mark moves on from it: the copy an Updated date
             // was read as (a New one has none).
-            let before = read
-                ? readMarks[event.id]?.read?.value.fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) }
-                : nil
+            let before = read ? copyRead(of: event) : nil
             if readBefore[event.id] != before { readBefore[event.id] = before }
             let fingerprint = read ? event.listingFingerprint : nil
             makeMark(for: event.id).read = Stamped(FollowingRead(fingerprint: fingerprint, day: event.date), at: now)
@@ -1037,6 +1076,34 @@ final class EventStore {
         }
         guard changed else { return }
         save()
+    }
+
+    /// Marks `event` read as a change alert opens it (``ChangeAlerts``), its
+    /// sheet's What Changed card saying what moved: since the copy the reader
+    /// last read, where this device holds it, as a row opened does — else
+    /// since `before`, the copy the alert said it moved from, which a date
+    /// never read, or read on another device, has nothing else to go by.
+    func markRead(_ event: Event, changedFrom before: ListingCopy?) {
+        markRead([event], read: true)
+        if readBefore[event.id] == nil, let before, ListingChanges(from: before, to: event) != nil {
+            readBefore[event.id] = before
+        }
+    }
+
+    /// The copy of `event` the reader last read, where this device holds it
+    /// (``ReadCopies``) — nil for a date never read, or marked unread.
+    func copyRead(of event: Event) -> ListingCopy? {
+        readMarks[event.id]?.read?.value.fingerprint.flatMap { readCopies?.copy(of: event.id, markedAs: $0) }
+    }
+
+    /// Hands ``onMoved`` an event the reader keeps, still to come, that a
+    /// read has put on another day, at another start or in another hall than
+    /// `held` — see ``EventMove/kinds(in:from:)`` for what counts.
+    private func noticeMove(from held: Event, to read: Event) {
+        guard let onMoved, read.isUpcoming, isInLibrary(read) else { return }
+        let found = ListingCopy(held)
+        guard !EventMove.kinds(from: found, to: read).isEmpty else { return }
+        onMoved(EventMove(eventID: read.id, found: found))
     }
 
     /// Holds on to what a search turned up, without adding any of it.
@@ -1111,13 +1178,18 @@ final class EventStore {
     /// Folded into the row as it stands, not the copy the read began from:
     /// a placing that put the hall on its own clock while the page was being
     /// read would otherwise be undone by it, the event back on Tokyo time.
-    private func apply(_ imported: Event, asked: Date) {
+    ///
+    /// `announcing` where nobody is looking at the event as it lands —
+    /// Refresh's pass over every page — so a kept event found moved is said
+    /// (``onMoved``). Not from its own sheet, which is showing it.
+    private func apply(_ imported: Event, asked: Date, announcing: Bool = false) {
         pageReads?.record(imported.id, asked: asked)
         if let row = rows[imported.id], let held = row.facts {
             let read = held.merging(imported)
             guard !read.isSameRead(as: held) else { return }
             row.write(read)
             converted[imported.id] = nil
+            if announcing { noticeMove(from: held, to: read) }
         } else {
             seen[imported.id] = imported
         }
@@ -1528,7 +1600,7 @@ final class EventStore {
             for await result in group {
                 read += 1
                 if let event = result.event {
-                    apply(event, asked: asked)
+                    apply(event, asked: asked, announcing: true)
                     landed += 1
                 }
                 if result.throttled { throttled = true }
@@ -1731,7 +1803,12 @@ final class EventStore {
         var added: [Event] = []
 
         for event in imported {
+            // Only an event kept before this read can have moved: one that
+            // arrives with it is no news. Read only where somebody listens,
+            // and only for what is still to come — a history is hundreds.
+            let held = onMoved != nil && event.isUpcoming && isInLibrary(event) ? rows[event.id]?.facts : nil
             keep(event, in: makeRow(for: event.id))
+            if let held, let read = rows[event.id]?.facts { noticeMove(from: held, to: read) }
             guard !isInLibrary(event), !departed.contains(event.id) else { continue }
             edit(event) { $0.inLibrary = true }
             added.append(event)

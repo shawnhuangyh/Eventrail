@@ -2,8 +2,13 @@ import SwiftUI
 
 /// One round of a sale the reader tried for, on a page of its own pushed over
 /// the ticket sheet: which round it was, how many times they applied in it,
-/// the day its results come out, what they asked for in order of preference,
-/// and how it went.
+/// when it stops taking applications, the day — and time — its results come
+/// out, what they asked for in order of preference, and how it went — and
+/// once it is won, when it is paid by and its ticket issued from.
+///
+/// Those times are wall clocks at the hall, as the
+/// play guide prints them, asked on the hall's clock as every time written
+/// for an event is (``EventReminderView``).
 ///
 /// A first-come round (一般発売, 見切れ席) is asked less: nothing was applied
 /// for, nothing is announced, and nobody writes one down but for a seat they
@@ -20,7 +25,8 @@ import SwiftUI
 struct LotteryEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(EventStore.self) private var store
-    @State private var isPickingDay = false
+    /// Which day the calendar is open over, if either.
+    @State private var pickingDay: Moment?
     /// The day the picker shows, held while it is open — see ``dayPicker``.
     @State private var pickedDay = Date.now
     /// The entry as the page has it, every answer given here included.
@@ -46,15 +52,23 @@ struct LotteryEntryView: View {
     private static let offeredTypedClasses = 4
     /// The ticket sheet's copy of the record — see ``TicketDetailsView``.
     @Binding private var tracking: Tracking
+    /// The event the round is for, whose hall's clock the times are asked on.
+    private let event: Event
 
-    /// The page for `entry` — one already in `tracking`, or a new one, which
-    /// the checkmark adds to it.
-    init(entry: LotteryEntry, in tracking: Binding<Tracking>) {
+    /// The page for `entry` on `event` — one already in `tracking`, or a new
+    /// one, which the checkmark adds to it.
+    init(entry: LotteryEntry, of event: Event, in tracking: Binding<Tracking>) {
         _draft = State(initialValue: entry)
         _isResultGiven = State(initialValue: tracking.wrappedValue.lotteries.contains { $0.id == entry.id })
         opened = entry
+        self.event = event
         _tracking = tracking
     }
+
+    /// 18:00, the hour many notices give (18:00頃), as a time added to a
+    /// results day opens (Shawn): the reader moves it to what the notice
+    /// says.
+    private static let usualResultsMinute = 18 * 60
 
     /// Whether the entry is not in the sheet's copy yet.
     private var isNew: Bool {
@@ -98,12 +112,19 @@ struct LotteryEntryView: View {
                 roundSection(entry)
                 if !entry.isFirstCome {
                     applicationsSection(entry)
-                    daySection(entry)
+                    momentSection(.deadline, of: entry)
+                    momentSection(.results, of: entry)
                 }
                 choicesSection(entry)
                 // A first-come round is got by being written down, so it
                 // has no result to ask.
                 if !entry.isFirstCome { resultSection(entry) }
+                // What a win still asks before the ticket is in hand: a
+                // first-come round's seat is a win from the start.
+                if entry.isWon {
+                    momentSection(.payment, of: entry)
+                    momentSection(.pickup, of: entry)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 4)
@@ -209,70 +230,262 @@ struct LotteryEntryView: View {
         }
     }
 
-    // MARK: - Day
+    // MARK: - Days and times
 
-    /// The day the results are out, written out in full with how far off it
-    /// is beside it. The calendar opens over the field.
-    private func daySection(_ entry: LotteryEntry) -> some View {
-        TicketForm.section("Results Announced") {
+    /// Which of the round's moments a field, or the calendar, is about.
+    private enum Moment {
+        /// When it stops taking applications (``LotteryEntry/deadline``).
+        case deadline
+        /// When its results come out (``LotteryEntry/day``,
+        /// ``LotteryEntry/minute``).
+        case results
+        /// For a round won, when it has to be paid by
+        /// (``LotteryEntry/payment``), and from when its ticket can be
+        /// issued (``LotteryEntry/pickup``).
+        case payment, pickup
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .deadline: "Application Deadline"
+            case .results: "Results Announced"
+            case .payment: "Payment Deadline"
+            case .pickup: "Ticket Pickup"
+            }
+        }
+
+        /// What a time added to the day opens on: 23:59 for a deadline or a
+        /// payment, where nearly every notice closes; 18:00 for results; the
+        /// morning for a pickup. The reader moves it to what the notice says.
+        var openingMinute: Int {
+            switch self {
+            case .deadline: LotteryDeadline.closingMinute
+            case .results: LotteryEntryView.usualResultsMinute
+            case .payment: TicketStage.payment.dayAloneMinute
+            case .pickup: TicketStage.pickup.dayAloneMinute
+            }
+        }
+
+        /// The step of a won round this is, where it is one.
+        var stage: TicketStage? {
+            switch self {
+            case .payment: .payment
+            case .pickup: .pickup
+            case .deadline, .results: nil
+            }
+        }
+    }
+
+    /// When the round stops taking applications (申込締切), when its results
+    /// come out, and for a round won when it is paid by (入金締切) and its
+    /// ticket issued from (発券開始), asked alike: a day, and beside it a time
+    /// where the notice gives one, with how far off the day is set on the
+    /// title.
+    ///
+    /// The deadline is for one more 申込券 before it closes
+    /// (``LotteryDeadlineAlert``); the payment and the pickup are what Ticket
+    /// To-Dos follows (``TicketTodo``), where what is owed and where is
+    /// written. How long before a deadline or a payment the notification
+    /// comes is one answer in Settings for every round
+    /// (``LotteryReminders/deadlineLead``), not asked here. The deadline falls
+    /// on an earlier day than the results — see ``selectableDays(_:of:)``.
+    private func momentSection(_ moment: Moment, of entry: LotteryEntry) -> some View {
+        TicketForm.section(moment.title) {
+            if let day = writtenDay(moment, in: entry) {
+                Text(verbatim: LotteryText.relative(day))
+                    .scalingFont(size: 13, weight: .medium)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        } content: {
+            momentField(moment, of: entry)
+            if writtenMinute(moment, in: entry) != nil { venueTimeNote }
+        }
+    }
+
+    /// One row: the day written out in full, the calendar opening over it,
+    /// and once there is a day, its time beside it — on the hall's clock —
+    /// or a button to add one. For the results, the time is what the
+    /// notification comes at, where it would otherwise come at eight in the
+    /// evening (``LotteryReminder``); for the deadline, when it closes, where
+    /// a day alone closes at 23:59. Taken off again with the ✕ beside it,
+    /// since many notices print a day alone.
+    private func momentField(_ moment: Moment, of entry: LotteryEntry) -> some View {
+        let day = writtenDay(moment, in: entry)
+        let minute = writtenMinute(moment, in: entry)
+        return TicketForm.field(symbol: "calendar", trailingInset: day != nil && minute != nil ? 6 : 14) {
             Button {
-                pickedDay = entry.day?.date() ?? Calendar.current.startOfDay(for: .now)
-                isPickingDay = true
+                let range = selectableDays(moment, of: entry)
+                let shown = day?.date() ?? Calendar.current.startOfDay(for: .now)
+                // Within what the calendar offers, so its checkmark gives a
+                // day that keeps the deadline before the results.
+                pickedDay = min(max(shown, range.lowerBound), range.upperBound)
+                pickingDay = moment
             } label: {
-                TicketForm.field(symbol: "calendar") {
-                    if let day = entry.day {
+                Group {
+                    if let day {
                         Text(verbatim: LotteryText.long(day))
                             .monospacedDigit()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(verbatim: LotteryText.relative(day))
-                            .scalingFont(size: 13, weight: .medium)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
                     } else {
                         Text("Not Set")
                             .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .contentShape(TicketForm.fieldShape)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
+                .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .popover(isPresented: $isPickingDay) { dayPicker(entry) }
-            .accessibilityValue(entry.day.map { Text(verbatim: LotteryText.long($0)) } ?? Text("Not Set"))
+            .popover(isPresented: Binding(get: { pickingDay == moment },
+                                          set: { if !$0 { pickingDay = nil } })) {
+                dayPicker(moment, of: entry)
+            }
+            .accessibilityLabel(Text(moment.title))
+            .accessibilityValue(day.map { Text(verbatim: LotteryText.long($0)) } ?? Text("Not Set"))
+
+            // A time means nothing without its day.
+            if let day {
+                timeControl(moment, on: day, at: minute)
+            }
         }
+    }
+
+    /// The time beside a day, and the ✕ that takes it off — or Add Time.
+    @ViewBuilder
+    private func timeControl(_ moment: Moment, on day: CalendarDay, at minute: Int?) -> some View {
+        let zone = event.timeZone
+        if let minute {
+            DatePicker("Time", selection: Binding<Date> {
+                day.date(at: minute, in: zone)
+            } set: { date in
+                let parts = Calendar.gregorian(in: zone).dateComponents([.hour, .minute], from: date)
+                setMinute((parts.hour ?? 0) * 60 + (parts.minute ?? 0), of: moment)
+            }, displayedComponents: .hourAndMinute)
+            .environment(\.timeZone, zone)
+            .tint(.brandTint)
+            .fixedSize()
+            removeButton(Text("Remove Time")) { setMinute(nil, of: moment) }
+        } else {
+            Button {
+                setMinute(moment.openingMinute, of: moment)
+            } label: {
+                Text("Add Time")
+                    .foregroundStyle(Color.brandTint)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(minHeight: 46)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func writtenDay(_ moment: Moment, in entry: LotteryEntry) -> CalendarDay? {
+        switch moment {
+        case .deadline: entry.deadline?.day
+        case .results: entry.day
+        case .payment, .pickup: moment.stage.flatMap { entry[$0]?.day }
+        }
+    }
+
+    private func writtenMinute(_ moment: Moment, in entry: LotteryEntry) -> Int? {
+        switch moment {
+        case .deadline: entry.deadline?.minute
+        case .results: entry.minute
+        case .payment, .pickup: moment.stage.flatMap { entry[$0]?.minute }
+        }
+    }
+
+    /// Moves `moment` to `day`, keeping its time — or, given nil, takes it
+    /// out, its time with it. A payment or a pickup moved keeps what else
+    /// was said of it: reached, what is owed, where.
+    private func setDay(_ day: CalendarDay?, of moment: Moment) {
+        change { entry in
+            switch moment {
+            case .deadline:
+                entry.deadline = day.map { LotteryDeadline(day: $0, minute: entry.deadline?.minute) }
+            case .results:
+                entry.day = day
+                if day == nil { entry.minute = nil }
+            case .payment, .pickup:
+                guard let stage = moment.stage else { return }
+                guard let day else {
+                    entry[stage] = nil
+                    return
+                }
+                var written = entry[stage] ?? TicketMoment(day: day)
+                written.day = day
+                entry[stage] = written
+            }
+        }
+    }
+
+    private func setMinute(_ minute: Int?, of moment: Moment) {
+        change { entry in
+            switch moment {
+            case .deadline: entry.deadline?.minute = minute
+            case .results: entry.minute = minute
+            case .payment, .pickup: if let stage = moment.stage { entry[stage]?.minute = minute }
+            }
+        }
+    }
+
+    /// Which clock a time is asked on, said only where it could be taken for
+    /// the reader's own.
+    @ViewBuilder
+    private var venueTimeNote: some View {
+        let zone = event.timeZone
+        if zone.identifier != TimeZone.current.identifier {
+            Text("Venue Time · \(event.offsetLine(in: zone))")
+                .scalingFont(size: 12.5, weight: .medium)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    /// A small round ✕ inside a field, taking out what the field holds.
+    private func removeButton(_ label: Text, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 17))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.secondary)
+                .frame(width: 34, height: 34)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     /// A calendar, with Clear and a checkmark under it. A day tapped is taken
     /// at once; the checkmark takes the one shown, so a day already selected
     /// — today, on an entry with none yet — can be given too, which a tap on
     /// it would not.
-    ///
-    /// A lottery already won or lost was drawn by today, so its calendar ends
-    /// there — the other half of a day ahead leaving only Pending to pick.
-    private func dayPicker(_ entry: LotteryEntry) -> some View {
+    private func dayPicker(_ moment: Moment, of entry: LotteryEntry) -> some View {
         VStack(spacing: 0) {
-            DatePicker("Results Announced", selection: Binding(
+            DatePicker(moment.title, selection: Binding(
                 get: { pickedDay },
                 set: { date in
                     pickedDay = date
-                    change { $0.day = CalendarDay(date) }
+                    setDay(CalendarDay(date), of: moment)
                 }
-            ), in: selectableDays(entry), displayedComponents: .date)
+            ), in: selectableDays(moment, of: entry), displayedComponents: .date)
             .datePickerStyle(.graphical)
             .labelsHidden()
             .tint(.brandTint)
 
             HStack {
-                if entry.day != nil {
+                if writtenDay(moment, in: entry) != nil {
                     Button("Clear", role: .destructive) {
-                        change { $0.day = nil }
-                        isPickingDay = false
+                        setDay(nil, of: moment)
+                        pickingDay = nil
                     }
                 }
                 Spacer()
                 Button("Done", systemImage: "checkmark") {
-                    change { $0.day = CalendarDay(pickedDay) }
-                    isPickingDay = false
+                    setDay(CalendarDay(pickedDay), of: moment)
+                    pickingDay = nil
                 }
                 .labelStyle(.iconOnly)
                 .fontWeight(.semibold)
@@ -285,13 +498,35 @@ struct LotteryEntryView: View {
         .presentationCompactAdaptation(.popover)
     }
 
-    /// Every day, or none after today for a lottery already drawn.
-    private func selectableDays(_ entry: LotteryEntry) -> ClosedRange<Date> {
-        guard entry.outcome != .pending,
-              let tomorrow = Calendar.current.date(byAdding: .day, value: 1,
-                                                   to: Calendar.current.startOfDay(for: .now))
-        else { return Date.distantPast...Date.distantFuture }
-        return Date.distantPast...tomorrow.addingTimeInterval(-1)
+    /// The days the calendar offers. A deadline falls before the results
+    /// day — applications close before anything is drawn — and no later than
+    /// the event's own day, since nothing is scheduled past it, and nor does a
+    /// payment or a pickup; the results
+    /// fall after the deadline's day (``LotteryEntry/lastDeadlineDay``,
+    /// ``LotteryEntry/firstResultsDay``). A lottery already won or lost was
+    /// drawn by today, so its results day falls no later than that — the
+    /// other half of a day ahead leaving only Pending to pick.
+    private func selectableDays(_ moment: Moment, of entry: LotteryEntry) -> ClosedRange<Date> {
+        let calendar = Calendar.gregorian()
+        /// The last moment of `day`, on this device's clock, as the
+        /// calendar counts it.
+        func end(of day: Date) -> Date {
+            calendar.date(byAdding: .day, value: 1, to: day)?.addingTimeInterval(-1) ?? .distantFuture
+        }
+        switch moment {
+        case .deadline:
+            var last = event.localDay
+            if let beforeResults = entry.lastDeadlineDay?.date(in: calendar) { last = min(last, beforeResults) }
+            return Date.distantPast...end(of: last)
+        case .payment, .pickup:
+            return Date.distantPast...end(of: event.localDay)
+        case .results:
+            let first = entry.firstResultsDay?.date(in: calendar) ?? .distantPast
+            let last = entry.outcome == .pending ? Date.distantFuture : end(of: calendar.startOfDay(for: .now))
+            // A round written as drawn with its deadline still to come has
+            // no day that keeps both; the calendar still opens, on today.
+            return min(first, last)...last
+        }
     }
 
     // MARK: - Choices
@@ -563,6 +798,7 @@ private struct BadgeLabelStyle: LabelStyle {
     NavigationStack {
         LotteryEntryView(entry: PreviewData.tracking[PreviewData.events[0].id]?.lotteries.first
                              ?? LotteryEntry(choices: [LotteryChoice()]),
+                         of: PreviewData.events[0],
                          in: .constant(PreviewData.tracking[PreviewData.events[0].id] ?? Tracking()))
     }
 }

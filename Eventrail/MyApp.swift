@@ -25,5 +25,10 @@ import SwiftUI
         .backgroundTask(.appRefresh(EventActivities.refreshTask)) {
             await EventActivities.shared.refresh()
         }
+        // Asked for once the first followed listing goes stale, where the
+        // reader turned New Date Alerts on — see ``NewDateAlerts``.
+        .backgroundTask(.appRefresh(NewDateAlerts.refreshTask)) {
+            await NewDateAlerts.shared.refreshInBackground()
+        }
     }
 }
